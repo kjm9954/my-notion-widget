@@ -32,10 +32,11 @@
     body {
       margin:0;
       min-height:100vh;
-      display:grid;
-      place-items:center;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
       color:var(--text);
-      background:var(--page);
+      background:transparent;
       font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -43,7 +44,7 @@
     button { color:inherit; }
 
     .card {
-      width:min(720px, 100vw);
+      width:940px;
       height:268px;
       display:flex;
       flex-direction:column;
@@ -52,7 +53,7 @@
       overflow:hidden;
       background:var(--surface);
       border-radius:18px;
-      box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
     .card.expanded {
       height:auto;
@@ -105,6 +106,9 @@
       flex-direction:column;
       overflow-x:hidden;
       overflow-y:auto;
+      background:#FAFCFD;
+      border:1px solid #F1F5F7;
+      border-radius:12px;
       scrollbar-width:thin;
       scrollbar-color:var(--border) transparent;
     }
@@ -325,7 +329,7 @@
       cursor:pointer;
     }
 
-    @media (max-width:639px) {
+    @media (max-width:0px) {
       .card { width:100vw; padding:18px 14px; }
       .segment, .add-trigger, .edit-action, .small-button, .confirm-button { min-height:40px; }
       .check-button { width:40px; height:40px; }
@@ -345,13 +349,18 @@
       .confirm-actions { width:100%; flex-wrap:wrap; }
     }
   </style>
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body>
-  <main class="card" id="card" aria-label="목표 계층 위젯">
+<body class="widget-page">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-goals.html" data-widget-width="940" data-widget-height="268" style="--widget-base-width:940px;--widget-base-height:268px;--widget-visual-height:268px">
+  <main class="card" id="card" data-widget-card aria-label="목표 계층 위젯">
     <header class="header" id="header"></header>
     <section class="goal-list" id="goalList" aria-live="polite"></section>
     <section class="footer-area" id="footerArea"></section>
+    <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+    <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
   </main>
+  </div>
 
   <script>
     (() => {
@@ -650,5 +659,6 @@
       render();
     })();
   </script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>

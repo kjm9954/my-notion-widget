@@ -30,11 +30,12 @@
     body {
       margin:0;
       min-height:100vh;
-      display:grid;
-      place-items:center;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
       overflow:hidden;
       color:var(--text);
-      background:var(--page);
+      background:transparent;
       font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -51,7 +52,7 @@
       overflow:hidden;
       background:var(--surface);
       border-radius:18px;
-      box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08);
+      box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06);
     }
     .card.cats-open { height:174px; }
     .card.detail-open { height:226px; }
@@ -184,7 +185,7 @@
       line-height:1.55;
     }
 
-    @media (max-width:399px) {
+    @media (max-width:0px) {
       .card { width:320px; }
       .chip, .detail-toggle { min-height:40px; padding-top:6px; padding-bottom:6px; }
       .card.cats-open { height:130px; }
@@ -193,9 +194,11 @@
       .card.cats-open .chip.more { position:sticky; }
     }
   </style>
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body>
-  <main class="card" id="card" aria-label="생각 적기 위젯">
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-add.html" data-widget-width="380" data-widget-height="130" style="--widget-base-width:380px;--widget-base-height:130px;--widget-visual-height:130px">
+  <main class="card" id="card" data-widget-card aria-label="생각 적기 위젯">
     <form class="entry-row" id="entryForm" autocomplete="off">
       <input class="one-input" id="oneInput" maxlength="240" placeholder="떠오른 생각을 한 줄로" aria-label="한 줄 내용">
       <button class="add-button" type="submit">추가</button>
@@ -209,7 +212,10 @@
     <div class="detail-wrap" id="detailWrap" hidden>
       <textarea class="detail-input" id="detailInput" maxlength="4000" placeholder="상세 내용 (선택)" aria-label="상세 내용"></textarea>
     </div>
+    <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+    <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
   </main>
+  </div>
 
   <script>
     (() => {
@@ -399,5 +405,6 @@
       renderCats();
     })();
   </script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>

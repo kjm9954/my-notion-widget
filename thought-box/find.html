@@ -32,11 +32,12 @@
     html, body { width:100%; min-height:100%; }
     body {
       margin:0;
-      display:grid;
-      place-items:start center;
-      overflow:auto;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      overflow:hidden;
       color:var(--text);
-      background:var(--page);
+      background:transparent;
       font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -46,7 +47,7 @@
     .card {
       position:relative;
       width:380px;
-      height:var(--widget-height, 920px);
+      height:920px;
       min-height:560px;
       display:flex;
       flex-direction:column;
@@ -55,40 +56,8 @@
       overflow:hidden;
       background:var(--surface);
       border-radius:18px;
-      box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08);
+      box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06);
     }
-
-    .resize-y {
-      position:absolute;
-      z-index:20;
-      left:50%;
-      bottom:2px;
-      width:58px;
-      height:14px;
-      display:grid;
-      place-items:center;
-      padding:0;
-      opacity:0;
-      color:var(--quiet);
-      background:transparent;
-      border:0;
-      border-radius:9px;
-      outline:none;
-      cursor:ns-resize;
-      touch-action:none;
-      transition:opacity .12s,color .12s;
-    }
-    .resize-y::before {
-      width:28px;
-      height:4px;
-      content:"";
-      border-top:1px solid currentColor;
-      border-bottom:1px solid currentColor;
-      border-radius:999px;
-    }
-    .card:hover .resize-y, .resize-y:focus-visible, body.is-widget-resizing .resize-y { opacity:1; }
-    .resize-y:focus-visible { color:var(--action); }
-    body.is-widget-resizing { cursor:ns-resize; user-select:none; }
 
     .fixed {
       height:148px;
@@ -341,6 +310,9 @@
       flex-direction:column;
       gap:7px;
       overflow-y:auto;
+      background:#FAFCFD;
+      border:1px solid #F1F5F7;
+      border-radius:12px;
       overscroll-behavior:contain;
       scrollbar-color:var(--dashed) transparent;
     }
@@ -562,7 +534,7 @@
     }
     .open-detail:focus { border-color:var(--action); }
 
-    @media (max-width:399px) {
+    @media (max-width:0px) {
       .card { width:320px; height:920px; }
       .chip, .manage-button, .banner-refresh { min-height:40px; padding-top:6px; padding-bottom:6px; }
       .filter-row { height:40px; }
@@ -573,13 +545,14 @@
       .manage-delete, .done-button, .text-button, .danger-button, .confirm-delete, .cancel-delete { min-height:40px; }
       .item { min-height:40px; }
       .overlay { left:12px; right:12px; }
-      .resize-y { opacity:.55; }
     }
   </style>
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body>
-  <main class="card" id="card" aria-label="생각 찾기 위젯">
-    <section class="fixed" id="fixedArea" aria-label="검색과 필터">
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-find.html" data-widget-width="380" data-widget-height="920" style="--widget-base-width:380px;--widget-base-height:920px;--widget-visual-height:920px">
+  <main class="card" id="card" data-widget-card aria-label="생각 찾기 위젯">
+    <section class="fixed" id="fixedArea" data-widget-fixed aria-label="검색과 필터">
       <div class="banner" id="banner" role="button" tabindex="0"></div>
       <input class="search" id="searchInput" type="search" autocomplete="off" placeholder="한 줄 내용과 상세 내용에서 검색" aria-label="생각 검색">
       <div class="filter-block">
@@ -592,22 +565,23 @@
       <div class="manage-panel" id="managePanel" hidden></div>
     </section>
 
-    <section class="list" id="itemList" aria-label="생각 목록"></section>
+    <section class="list" id="itemList" data-widget-list aria-label="생각 목록"></section>
     <section class="overlay" id="overlay" aria-label="열린 생각" hidden></section>
-    <button class="resize-y" id="resizeHandle" type="button" aria-label="위젯 세로 크기 조절" aria-orientation="horizontal"></button>
+    <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+    <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="목록 세로 크기 조절" aria-valuemin="160"></button>
+    <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
   </main>
+  </div>
 
   <script>
     (() => {
       'use strict';
 
       const KEY = 'thought-box-v1';
-      const SIZE_KEY = 'thought-box-find-size-v1';
       const CHANNEL = 'thought-box';
       const DAY = 24 * 60 * 60 * 1000;
       const DEFAULT_CATS = ['아이디어', '방향성'];
       const card = document.getElementById('card');
-      const resizeHandle = document.getElementById('resizeHandle');
       const fixedArea = document.getElementById('fixedArea');
       const banner = document.getElementById('banner');
       const searchInput = document.getElementById('searchInput');
@@ -631,31 +605,8 @@
       let deleteConfirm = false;
       let savedListScroll = 0;
       let channel = null;
-      let resizeStart = null;
 
       try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
-
-      function clampWidgetHeight(value) {
-        return Math.max(560, Math.min(1400, Math.round(Number(value) || 920)));
-      }
-
-      function readWidgetHeight() {
-        try { return clampWidgetHeight(JSON.parse(localStorage.getItem(SIZE_KEY))?.height); }
-        catch (_) { return 920; }
-      }
-
-      function applyWidgetHeight(value) {
-        const height = clampWidgetHeight(value);
-        card.style.setProperty('--widget-height', `${height}px`);
-        resizeHandle.setAttribute('aria-valuemin', '560');
-        resizeHandle.setAttribute('aria-valuemax', '1400');
-        resizeHandle.setAttribute('aria-valuenow', String(height));
-        return height;
-      }
-
-      function saveWidgetHeight(value) {
-        try { localStorage.setItem(SIZE_KEY, JSON.stringify({ height: clampWidgetHeight(value) })); } catch (_) {}
-      }
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -1176,41 +1127,6 @@
         if (managing) renderManage();
       }
 
-      resizeHandle.addEventListener('pointerdown', (event) => {
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        event.preventDefault();
-        event.stopPropagation();
-        resizeStart = {
-          pointerId:event.pointerId,
-          y:event.clientY,
-          height:card.getBoundingClientRect().height
-        };
-        resizeHandle.setPointerCapture?.(event.pointerId);
-        document.body.classList.add('is-widget-resizing');
-      });
-      resizeHandle.addEventListener('pointermove', (event) => {
-        if (!resizeStart || event.pointerId !== resizeStart.pointerId) return;
-        event.preventDefault();
-        applyWidgetHeight(resizeStart.height + event.clientY - resizeStart.y);
-      });
-      function finishWidgetResize(event) {
-        if (!resizeStart || event.pointerId !== resizeStart.pointerId) return;
-        const height = applyWidgetHeight(card.getBoundingClientRect().height);
-        if (resizeHandle.hasPointerCapture?.(event.pointerId)) resizeHandle.releasePointerCapture(event.pointerId);
-        resizeStart = null;
-        document.body.classList.remove('is-widget-resizing');
-        saveWidgetHeight(height);
-      }
-      resizeHandle.addEventListener('pointerup', finishWidgetResize);
-      resizeHandle.addEventListener('pointercancel', finishWidgetResize);
-      resizeHandle.addEventListener('keydown', (event) => {
-        if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
-        event.preventDefault();
-        const direction = event.key === 'ArrowDown' ? 1 : -1;
-        const height = applyWidgetHeight(card.getBoundingClientRect().height + direction * 20);
-        saveWidgetHeight(height);
-      });
-
       banner.addEventListener('click', () => {
         if (bannerId) openItem(bannerId);
       });
@@ -1234,7 +1150,6 @@
       });
       window.addEventListener('storage', (event) => {
         if (event.key === KEY) sync();
-        if (event.key === SIZE_KEY) applyWidgetHeight(readWidgetHeight());
       });
       window.addEventListener('focus', sync);
       document.addEventListener('visibilitychange', () => {
@@ -1244,12 +1159,12 @@
         if (!event.data || event.data.type === 'changed') sync();
       });
 
-      applyWidgetHeight(readWidgetHeight());
       chooseBanner(false);
       renderBanner();
       renderFilters();
       renderList();
     })();
   </script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>
