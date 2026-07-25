@@ -29,12 +29,12 @@
     }
 
     * { box-sizing:border-box; }
-    html, body { width:100%; height:100%; }
+    html, body { width:100%; min-height:100%; }
     body {
       margin:0;
       display:grid;
       place-items:start center;
-      overflow:hidden;
+      overflow:auto;
       color:var(--text);
       background:var(--page);
       font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
@@ -46,7 +46,8 @@
     .card {
       position:relative;
       width:380px;
-      height:920px;
+      height:var(--widget-height, 920px);
+      min-height:560px;
       display:flex;
       flex-direction:column;
       gap:11px;
@@ -56,6 +57,38 @@
       border-radius:18px;
       box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08);
     }
+
+    .resize-y {
+      position:absolute;
+      z-index:20;
+      left:50%;
+      bottom:2px;
+      width:58px;
+      height:14px;
+      display:grid;
+      place-items:center;
+      padding:0;
+      opacity:0;
+      color:var(--quiet);
+      background:transparent;
+      border:0;
+      border-radius:9px;
+      outline:none;
+      cursor:ns-resize;
+      touch-action:none;
+      transition:opacity .12s,color .12s;
+    }
+    .resize-y::before {
+      width:28px;
+      height:4px;
+      content:"";
+      border-top:1px solid currentColor;
+      border-bottom:1px solid currentColor;
+      border-radius:999px;
+    }
+    .card:hover .resize-y, .resize-y:focus-visible, body.is-widget-resizing .resize-y { opacity:1; }
+    .resize-y:focus-visible { color:var(--action); }
+    body.is-widget-resizing { cursor:ns-resize; user-select:none; }
 
     .fixed {
       height:148px;
@@ -540,6 +573,7 @@
       .manage-delete, .done-button, .text-button, .danger-button, .confirm-delete, .cancel-delete { min-height:40px; }
       .item { min-height:40px; }
       .overlay { left:12px; right:12px; }
+      .resize-y { opacity:.55; }
     }
   </style>
 </head>
@@ -560,6 +594,7 @@
 
     <section class="list" id="itemList" aria-label="생각 목록"></section>
     <section class="overlay" id="overlay" aria-label="열린 생각" hidden></section>
+    <button class="resize-y" id="resizeHandle" type="button" aria-label="위젯 세로 크기 조절" aria-orientation="horizontal"></button>
   </main>
 
   <script>
@@ -567,9 +602,12 @@
       'use strict';
 
       const KEY = 'thought-box-v1';
+      const SIZE_KEY = 'thought-box-find-size-v1';
       const CHANNEL = 'thought-box';
       const DAY = 24 * 60 * 60 * 1000;
       const DEFAULT_CATS = ['아이디어', '방향성'];
+      const card = document.getElementById('card');
+      const resizeHandle = document.getElementById('resizeHandle');
       const fixedArea = document.getElementById('fixedArea');
       const banner = document.getElementById('banner');
       const searchInput = document.getElementById('searchInput');
@@ -593,8 +631,31 @@
       let deleteConfirm = false;
       let savedListScroll = 0;
       let channel = null;
+      let resizeStart = null;
 
       try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
+
+      function clampWidgetHeight(value) {
+        return Math.max(560, Math.min(1400, Math.round(Number(value) || 920)));
+      }
+
+      function readWidgetHeight() {
+        try { return clampWidgetHeight(JSON.parse(localStorage.getItem(SIZE_KEY))?.height); }
+        catch (_) { return 920; }
+      }
+
+      function applyWidgetHeight(value) {
+        const height = clampWidgetHeight(value);
+        card.style.setProperty('--widget-height', `${height}px`);
+        resizeHandle.setAttribute('aria-valuemin', '560');
+        resizeHandle.setAttribute('aria-valuemax', '1400');
+        resizeHandle.setAttribute('aria-valuenow', String(height));
+        return height;
+      }
+
+      function saveWidgetHeight(value) {
+        try { localStorage.setItem(SIZE_KEY, JSON.stringify({ height: clampWidgetHeight(value) })); } catch (_) {}
+      }
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -1115,6 +1176,41 @@
         if (managing) renderManage();
       }
 
+      resizeHandle.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        resizeStart = {
+          pointerId:event.pointerId,
+          y:event.clientY,
+          height:card.getBoundingClientRect().height
+        };
+        resizeHandle.setPointerCapture?.(event.pointerId);
+        document.body.classList.add('is-widget-resizing');
+      });
+      resizeHandle.addEventListener('pointermove', (event) => {
+        if (!resizeStart || event.pointerId !== resizeStart.pointerId) return;
+        event.preventDefault();
+        applyWidgetHeight(resizeStart.height + event.clientY - resizeStart.y);
+      });
+      function finishWidgetResize(event) {
+        if (!resizeStart || event.pointerId !== resizeStart.pointerId) return;
+        const height = applyWidgetHeight(card.getBoundingClientRect().height);
+        if (resizeHandle.hasPointerCapture?.(event.pointerId)) resizeHandle.releasePointerCapture(event.pointerId);
+        resizeStart = null;
+        document.body.classList.remove('is-widget-resizing');
+        saveWidgetHeight(height);
+      }
+      resizeHandle.addEventListener('pointerup', finishWidgetResize);
+      resizeHandle.addEventListener('pointercancel', finishWidgetResize);
+      resizeHandle.addEventListener('keydown', (event) => {
+        if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const height = applyWidgetHeight(card.getBoundingClientRect().height + direction * 20);
+        saveWidgetHeight(height);
+      });
+
       banner.addEventListener('click', () => {
         if (bannerId) openItem(bannerId);
       });
@@ -1138,6 +1234,7 @@
       });
       window.addEventListener('storage', (event) => {
         if (event.key === KEY) sync();
+        if (event.key === SIZE_KEY) applyWidgetHeight(readWidgetHeight());
       });
       window.addEventListener('focus', sync);
       document.addEventListener('visibilitychange', () => {
@@ -1147,6 +1244,7 @@
         if (!event.data || event.data.type === 'changed') sync();
       });
 
+      applyWidgetHeight(readWidgetHeight());
       chooseBanner(false);
       renderBanner();
       renderFilters();
