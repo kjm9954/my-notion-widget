@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>게임 로그 일기 · 오늘의 재료</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body { margin:0; color:#12303C; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
+    button { color:inherit; font:inherit; }
+    .shell { min-height:0; }
+    .widget { width:100%; min-height:96px; display:flex; align-items:center; gap:13px; padding:16px 18px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
+    .label-block { min-width:88px; display:flex; flex:0 0 auto; flex-direction:column; gap:4px; }
+    .title { color:#93A5AD; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .count { color:#A9BAC2; font-size:9px; font-weight:700; }
+    .divider { width:1px; height:26px; flex:0 0 auto; background:#EDF2F4; }
+    .chip-area { min-width:0; display:flex; flex:1; align-items:center; gap:5px; overflow:hidden; }
+    .chip-area.expanded { flex-wrap:wrap; align-content:center; overflow:hidden; }
+    .pill { min-width:0; display:inline-flex; flex:0 0 auto; align-items:center; gap:6px; padding:5px 8px; color:#6B8794; background:#F5F9FB; border-radius:999px; font-size:10px; font-weight:700; white-space:nowrap; }
+    .pill-text { max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+    .done-marker { width:8px; height:8px; flex:0 0 auto; background:#C6D6DD; border-radius:50%; }
+    .thought-marker { width:8px; height:8px; flex:0 0 auto; background:transparent; border:1.5px solid #C6D6DD; }
+    .q-marker { width:15px; height:15px; display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; color:#FFFFFF; border-radius:5px; font-size:8px; font-weight:800; line-height:1; }
+    .q-S { background:oklch(0.62 0.09 245); } .q-D { background:oklch(0.62 0.09 195); }
+    .q-M { background:oklch(0.62 0.09 168); } .q-O { background:oklch(0.62 0.09 215); }
+    .more { min-height:28px; flex:0 0 auto; padding:0 8px; color:#93A5AD; background:#FFFFFF; border:1px dashed #C6D6DD; border-radius:999px; font-size:10px; font-weight:700; cursor:pointer; }
+    .empty { min-height:46px; display:flex; min-width:0; flex:1; align-items:center; padding:0 12px; background:#FAFCFD; border:1px dashed #C6D6DD; border-radius:12px; }
+    .empty-title { color:#55707C; font-size:11px; font-weight:700; }
+    @media (max-width:639px) {
+      .widget { min-height:96px; padding:12px 14px; }
+      .label-block { min-width:72px; }
+      .empty { justify-content:center; }
+      .pill-text { max-width:100px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-material.html" data-widget-max-width="1020" data-widget-height="96" style="--widget-max-width:1020px;--widget-base-width:1020px;--widget-base-height:96px;--widget-visual-height:96px">
+    <section class="widget" data-widget-card aria-label="오늘의 재료 위젯">
+      <div class="label-block"><span class="title">오늘의 재료</span><span class="count" id="count">0개</span></div>
+      <span class="divider" aria-hidden="true"></span>
+      <div class="chip-area" id="content"></div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </section>
+  </main>
+  <script>
+    (()=>{
+      'use strict';
+      const DIARY_KEY='game-log-diary-4b-v2',THOUGHT_KEY='thought-box-v1',ENERGY_KEYS=['energy-compass-3a-v1','energy-compass-3a-v2'];
+      const content=document.getElementById('content'),count=document.getElementById('count');
+      let expanded=false;
+      function localKey(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`;}
+      function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
+      function read(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch(_){return null;}}
+      const TODAY=localKey(new Date());
+      function dateKey(value){if(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}/.test(value))return value.slice(0,10);const number=Number(value);if(Number.isFinite(number)&&number>0)return localKey(new Date(number));return'';}
+      function diaryMaterials(){const entry=read(DIARY_KEY)?.entries?.[TODAY];if(entry?.mode!=='quest')return[];const q=entry.quest||{};return [...(Array.isArray(q.main)?q.main:[]),...(Array.isArray(q.sub)?q.sub:[])].filter(item=>item?.done&&String(item.t??'').trim()).map(item=>({type:'done',text:String(item.t).trim()}));}
+      function energyMaterials(){let source=null;for(const key of ENERGY_KEYS){source=read(key);if(Array.isArray(source?.items))break;}return (Array.isArray(source?.items)?source.items:[]).filter(item=>['O','D','S','M'].includes(item?.q)&&dateKey(item.placedAt??item.updatedAt??item.createdAt??item.date)===TODAY&&String(item.t??'').trim()).map(item=>({type:'energy',q:item.q,text:String(item.t).trim()}));}
+      function thoughtMaterials(){const source=read(THOUGHT_KEY);return (Array.isArray(source?.items)?source.items:[]).filter(item=>dateKey(item?.created)===TODAY&&String(item.one??'').trim()).map(item=>({type:'thought',text:String(item.one).trim()}));}
+      function items(){return [...diaryMaterials(),...energyMaterials(),...thoughtMaterials()];}
+      function marker(item){if(item.type==='done')return'<span class="done-marker"></span>';if(item.type==='thought')return'<span class="thought-marker"></span>';return `<span class="q-marker q-${item.q}">${item.q}</span>`;}
+      function visibleLimit(){return Math.max(2,Math.floor((Math.min(window.innerWidth,1020)-160)/120));}
+      function render(){const all=items(),limit=visibleLimit(),capacity=expanded?limit*2:limit,shownCount=all.length>limit?Math.min(all.length,Math.max(1,capacity-1)):all.length,shown=all.slice(0,shownCount),remaining=all.length-shown.length;count.textContent=`${all.length}개`;content.classList.toggle('expanded',expanded);content.closest('.widget').style.minHeight=expanded&&all.length>limit?'128px':'96px';if(!all.length){content.innerHTML='<div class="empty"><span class="empty-title">오늘은 아직 재료가 없어요</span></div>';return;}content.innerHTML=`${shown.map(item=>`<span class="pill">${marker(item)}<span class="pill-text">${escapeHtml(item.text)}</span></span>`).join('')}${all.length>limit?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
+      content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
+      window.addEventListener('storage',event=>{if([DIARY_KEY,THOUGHT_KEY,...ENERGY_KEYS].includes(event.key))render();});
+      window.addEventListener('focus',render);window.addEventListener('resize',render);render();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
