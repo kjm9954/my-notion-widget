@@ -66,6 +66,18 @@ body.widget-page.widget-page-centered {
   transition: opacity .12s ease, border-color .12s ease;
 }
 
+.widget-size-handle-top-left {
+  top: 6px;
+  right: auto;
+  bottom: auto;
+  left: 6px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top: 2px solid #C6D6DD;
+  border-left: 2px solid #C6D6DD;
+  border-radius: 3px 0 0 0;
+}
+
 [data-widget-card]:hover .widget-size-handle,
 .widget-size-handle:focus-visible,
 body.is-widget-scaling .widget-size-handle {
