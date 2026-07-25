@@ -34,11 +34,35 @@
 
   const leftWidthHandle = viewportWidthHandle('left', '왼쪽에서 가로 크기 비율 고정 조절');
   const rightWidthHandle = viewportWidthHandle('right', '오른쪽에서 가로 크기 비율 고정 조절');
-  const scaleHandles = [scaleHandle, topLeftHandle, leftWidthHandle, rightWidthHandle];
+
+  function viewportHeightHandle(position, label) {
+    let handle = document.querySelector(`[data-widget-scale-position="${position}"]`);
+    if (!handle) {
+      handle = scaleHandle.cloneNode(false);
+      handle.className = `widget-height-handle widget-height-handle-${position}`;
+      handle.dataset.widgetScalePosition = position;
+      handle.dataset.widgetScaleAxis = 'vertical';
+      handle.setAttribute('aria-label', label);
+    }
+    document.body.appendChild(handle);
+    return handle;
+  }
+
+  const topHeightHandle = viewportHeightHandle('top', '위쪽에서 세로 크기 비율 고정 조절');
+  const bottomHeightHandle = viewportHeightHandle('bottom', '아래쪽에서 세로 크기 비율 고정 조절');
+  const scaleHandles = [
+    scaleHandle,
+    topLeftHandle,
+    leftWidthHandle,
+    rightWidthHandle,
+    topHeightHandle,
+    bottomHeightHandle
+  ];
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
   const maximumWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
   const defaultHeight = Number(host.dataset.widgetHeight) || card.offsetHeight;
+  const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
@@ -76,6 +100,9 @@
   function maximumScale() {
     const widthLimit = window.innerWidth / Math.max(1, baseWidth);
     const heightLimit = window.innerHeight / Math.max(1, baseHeight);
+    if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) {
+      return Math.max(minimumScale, configuredMaximumScale);
+    }
     return Math.max(.02, Math.min(widthLimit, heightLimit));
   }
 
@@ -123,10 +150,20 @@
         ? (visibleTop + visibleBottom) / 2
         : window.innerHeight / 2;
       const widthHandleTop = Math.max(6, Math.min(window.innerHeight - 52, visibleMiddle - 23));
+      const visibleLeft = Math.max(6, rect.left);
+      const visibleRight = Math.min(window.innerWidth - 6, rect.right);
+      const visibleHorizontalMiddle = visibleRight > visibleLeft
+        ? (visibleLeft + visibleRight) / 2
+        : window.innerWidth / 2;
+      const heightHandleLeft = Math.max(6, Math.min(window.innerWidth - 52, visibleHorizontalMiddle - 23));
       leftWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.left + 6))}px`;
       rightWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.right - 10))}px`;
       leftWidthHandle.style.top = `${widthHandleTop}px`;
       rightWidthHandle.style.top = `${widthHandleTop}px`;
+      topHeightHandle.style.left = `${heightHandleLeft}px`;
+      bottomHeightHandle.style.left = `${heightHandleLeft}px`;
+      topHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.top + 6))}px`;
+      bottomHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.bottom - 10))}px`;
     });
   }
 
@@ -176,7 +213,7 @@
         pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
-        direction: ['top-left', 'left'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
+        direction: ['top-left', 'left', 'top'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
         axis: handle.dataset.widgetScaleAxis || 'both',
         scale: renderedScale,
         width: baseWidth,
@@ -194,6 +231,8 @@
       const verticalDelta = (event.clientY - scaleDrag.y) * scaleDrag.direction / Math.max(1, scaleDrag.height);
       const scaleDelta = scaleDrag.axis === 'horizontal'
         ? horizontalDelta
+        : scaleDrag.axis === 'vertical'
+          ? verticalDelta
         : Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
           ? horizontalDelta
           : verticalDelta;
@@ -217,7 +256,13 @@
     });
 
     handle.addEventListener('keydown', event => {
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      const axis = handle.dataset.widgetScaleAxis || 'both';
+      const allowedKeys = axis === 'horizontal'
+        ? ['ArrowLeft', 'ArrowRight']
+        : axis === 'vertical'
+          ? ['ArrowUp', 'ArrowDown']
+          : ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (!allowedKeys.includes(event.key)) return;
       event.preventDefault();
       const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
       applyScale(requestedScale + direction * .05, true);
