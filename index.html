@@ -48,8 +48,8 @@
 
     .widget {
       position: relative;
-      width: 940px;
-      height: 620px;
+      width: 100%;
+      min-height: clamp(620px, 58.57vw, 820px);
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -147,22 +147,36 @@
 
     .matrix-stage {
       min-width: 0;
+      height: 100%;
       display: grid;
       grid-template-columns: 16px minmax(0, 1fr);
-      grid-template-rows: 372px auto;
+      grid-template-rows: minmax(0, 1fr) auto;
       gap: 6px 8px;
     }
 
+    #mainContent { min-height: 0; flex: 1 1 auto; }
+
     .axis-y {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 3px;
       color: #B3C3CA;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: .1em;
       line-height: 1;
       white-space: nowrap;
+    }
+
+    .axis-arrow {
+      display: block;
+      writing-mode: horizontal-tb;
+      letter-spacing: 0;
+    }
+
+    .axis-label {
       writing-mode: vertical-rl;
     }
 
@@ -897,7 +911,7 @@
   <link rel="stylesheet" href="widget-frame.css">
 </head>
 <body class="widget-page">
-  <main class="app-shell widget-host" data-widget-host data-widget-key="widget-size-index.html" data-widget-width="940" data-widget-height="620" style="--widget-base-width:940px;--widget-base-height:620px;--widget-visual-height:620px">
+  <main class="app-shell widget-host" data-widget-host data-widget-key="widget-size-index.html" data-widget-max-width="1400" data-widget-height="820" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:820px;--widget-visual-height:820px">
     <section class="widget" id="widget" data-widget-card aria-label="에너지 나침반 우선순위 위젯">
       <header class="header" id="header"></header>
       <section id="mainContent"></section>
@@ -1067,7 +1081,7 @@
 
         mainContent.innerHTML = `
           <div class="matrix-stage">
-            <div class="axis-y">↑ 지속가능성</div>
+            <div class="axis-y"><span class="axis-arrow">↑</span><span class="axis-label">지속가능성</span></div>
             <div class="matrix-grid">${cells}</div>
             <div class="axis-x">확장성 →</div>
           </div>
