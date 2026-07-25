@@ -8,6 +8,7 @@
   if (!host || !card || !scaleHandle || !sizeLabel) return;
 
   scaleHandle.dataset.widgetScalePosition ||= 'bottom-right';
+  scaleHandle.dataset.widgetScaleAxis = 'both';
   let topLeftHandle = document.querySelector('[data-widget-scale-position="top-left"]');
   if (!topLeftHandle) {
     topLeftHandle = scaleHandle.cloneNode(false);
@@ -15,8 +16,25 @@
     topLeftHandle.dataset.widgetScalePosition = 'top-left';
     topLeftHandle.setAttribute('aria-label', '왼쪽 위에서 위젯 비율 고정 크기 조절');
   }
+  topLeftHandle.dataset.widgetScaleAxis = 'both';
   document.body.appendChild(topLeftHandle);
-  const scaleHandles = [scaleHandle, topLeftHandle];
+
+  function viewportWidthHandle(position, label) {
+    let handle = document.querySelector(`[data-widget-scale-position="${position}"]`);
+    if (!handle) {
+      handle = scaleHandle.cloneNode(false);
+      handle.className = `widget-width-handle widget-width-handle-${position}`;
+      handle.dataset.widgetScalePosition = position;
+      handle.dataset.widgetScaleAxis = 'horizontal';
+      handle.setAttribute('aria-label', label);
+    }
+    document.body.appendChild(handle);
+    return handle;
+  }
+
+  const leftWidthHandle = viewportWidthHandle('left', '왼쪽에서 가로 크기 비율 고정 조절');
+  const rightWidthHandle = viewportWidthHandle('right', '오른쪽에서 가로 크기 비율 고정 조절');
+  const scaleHandles = [scaleHandle, topLeftHandle, leftWidthHandle, rightWidthHandle];
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
   const maximumWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
@@ -99,11 +117,21 @@
       const rect = card.getBoundingClientRect();
       topLeftHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.left + 6))}px`;
       topLeftHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.top + 6))}px`;
+      const visibleTop = Math.max(6, rect.top);
+      const visibleBottom = Math.min(window.innerHeight - 6, rect.bottom);
+      const visibleMiddle = visibleBottom > visibleTop
+        ? (visibleTop + visibleBottom) / 2
+        : window.innerHeight / 2;
+      const widthHandleTop = Math.max(6, Math.min(window.innerHeight - 52, visibleMiddle - 23));
+      leftWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.left + 6))}px`;
+      rightWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.right - 10))}px`;
+      leftWidthHandle.style.top = `${widthHandleTop}px`;
+      rightWidthHandle.style.top = `${widthHandleTop}px`;
     });
   }
 
   function applyScale(value, fromUser = false) {
-    requestedScale = fromUser ? userScale(value) : Math.max(.1, number(value, 1));
+    requestedScale = fromUser ? userScale(value) : Math.max(minimumScale, number(value, 1));
     updateFrame();
   }
 
@@ -148,7 +176,8 @@
         pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
-        direction: handle.dataset.widgetScalePosition === 'top-left' ? -1 : 1,
+        direction: ['top-left', 'left'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
+        axis: handle.dataset.widgetScaleAxis || 'both',
         scale: renderedScale,
         width: baseWidth,
         height: baseHeight
@@ -163,9 +192,11 @@
       event.preventDefault();
       const horizontalDelta = (event.clientX - scaleDrag.x) * 2 * scaleDrag.direction / Math.max(1, scaleDrag.width);
       const verticalDelta = (event.clientY - scaleDrag.y) * scaleDrag.direction / Math.max(1, scaleDrag.height);
-      const scaleDelta = Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+      const scaleDelta = scaleDrag.axis === 'horizontal'
         ? horizontalDelta
-        : verticalDelta;
+        : Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+          ? horizontalDelta
+          : verticalDelta;
       applyScale(scaleDrag.scale + scaleDelta, true);
     });
 
@@ -229,7 +260,7 @@
   }
 
   const saved = readSize();
-  requestedScale = Math.max(.1, number(saved.scale, 1));
+  requestedScale = Math.max(minimumScale, number(saved.scale, 1));
   if (list) applyListHeight(number(saved.listH, list.offsetHeight));
   applyScale(requestedScale);
 
@@ -246,7 +277,7 @@
   window.addEventListener('storage', event => {
     if (event.key !== key) return;
     const next = readSize();
-    requestedScale = Math.max(.1, number(next.scale, 1));
+    requestedScale = Math.max(minimumScale, number(next.scale, 1));
     if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
     applyScale(requestedScale);
   });
