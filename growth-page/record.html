@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>성장 기록</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --action-soft:#E2F0F6;
+      --text:#12303C;
+      --secondary:#6B8794;
+      --secondary-deep:#55707C;
+      --recorded:#3E5A66;
+      --muted:#93A5AD;
+      --faint:#A2B4BC;
+      --done:#A9BAC2;
+      --border:#DCE7ED;
+      --border-soft:#E1EAEE;
+      --border-day:#E6EDF0;
+      --border-empty:#F1F5F7;
+      --track:#EDF2F4;
+      --surface:#FFFFFF;
+      --surface-soft:#FAFCFD;
+      --page:#F7F7F5;
+      --disabled:#C6D6DD;
+    }
+
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0;
+      display:grid;
+      place-items:start center;
+      color:var(--text);
+      background:var(--page);
+      font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button { font:inherit; color:inherit; }
+
+    .card {
+      width:min(404px, 100vw);
+      height:480px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding:18px;
+      overflow:hidden;
+      background:var(--surface);
+      border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+    }
+    .header {
+      min-height:30px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex:0 0 auto;
+    }
+    .month-button {
+      width:30px;
+      height:30px;
+      display:grid;
+      flex:0 0 30px;
+      place-items:center;
+      padding:0;
+      border:1px solid var(--border);
+      border-radius:9px;
+      background:var(--surface);
+      color:var(--secondary);
+      font-size:16px;
+      font-weight:700;
+      line-height:1;
+      cursor:pointer;
+      transition:color .12s, border-color .12s;
+    }
+    .month-button:hover, .month-button:focus-visible { color:var(--text); border-color:var(--secondary); }
+    .month-title {
+      color:var(--text);
+      font-size:13px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .month-summary {
+      margin-left:auto;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    .calendar-shell {
+      width:min(340px, 100%);
+      display:flex;
+      flex:0 0 auto;
+      align-self:center;
+      flex-direction:column;
+      gap:5px;
+    }
+    .calendar-shell.six-weeks { width:min(310px, 100%); }
+    .weekdays, .days {
+      display:grid;
+      grid-template-columns:repeat(7, minmax(0, 1fr));
+      gap:5px;
+    }
+    .weekday {
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+      line-height:1;
+      text-align:left;
+    }
+    .day {
+      min-width:0;
+      aspect-ratio:1 / 1;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      padding:6px;
+      border:1px solid var(--border-empty);
+      border-radius:10px;
+      outline:1.5px solid transparent;
+      outline-offset:-1.5px;
+      background:var(--surface);
+      cursor:pointer;
+      transition:outline-color .12s, color .12s;
+    }
+    .day.has-record { border-color:var(--border-day); }
+    .day.other-month { opacity:.3; }
+    .day.future { opacity:.35; }
+    .day.selected { outline-color:#CFE2EA; }
+    .day.today {
+      outline:2px solid var(--action);
+      outline-offset:-2px;
+    }
+    .day-number {
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+      line-height:1;
+      text-align:left;
+    }
+    .day.has-record .day-number { color:var(--recorded); }
+    .day.today .day-number { color:var(--action); font-weight:800; }
+    .marks {
+      min-height:6px;
+      display:flex;
+      align-items:center;
+      gap:4px;
+    }
+    .dot {
+      width:6px;
+      height:6px;
+      display:block;
+      flex:0 0 6px;
+      border-radius:999px;
+    }
+    .diary-dot { background:var(--action); }
+    .reading-dot { background:var(--surface); border:1.5px solid var(--action); }
+
+    .legend {
+      min-height:24px;
+      display:flex;
+      align-items:flex-end;
+      gap:12px;
+      padding-top:8px;
+      border-top:1px solid var(--track);
+      color:var(--muted);
+      font-size:9px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .legend-item { display:inline-flex; align-items:center; gap:5px; }
+    .legend-dot {
+      width:6px;
+      height:6px;
+      display:inline-block;
+      border-radius:999px;
+    }
+    .legend-diary { background:var(--action); }
+    .legend-reading { background:var(--surface); border:1.5px solid var(--action); }
+    .legend-today {
+      width:9px;
+      height:9px;
+      display:inline-block;
+      border:1.5px solid var(--action);
+      border-radius:2px;
+    }
+
+    .detail-row {
+      height:40px;
+      min-height:40px;
+      display:flex;
+      flex:0 0 40px;
+      align-items:center;
+      gap:10px;
+      margin-top:auto;
+      padding:0 10px;
+      border:1px dashed var(--disabled);
+      border-radius:10px;
+      background:var(--surface-soft);
+    }
+    .detail-copy {
+      min-width:0;
+      flex:1 1 auto;
+      overflow:hidden;
+      color:var(--secondary-deep);
+      font-size:11px;
+      font-weight:700;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .detail-actions {
+      display:flex;
+      flex:0 0 auto;
+      align-items:center;
+      gap:9px;
+    }
+    .detail-link, .detail-close {
+      padding:0;
+      border:0;
+      background:transparent;
+      color:var(--action);
+      font-size:10px;
+      font-weight:800;
+      text-decoration:none;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+
+    @media (max-width:639px) {
+      .card { width:100vw; padding:18px 14px; }
+      .month-button { width:44px; height:44px; flex-basis:44px; }
+      .header { min-height:44px; }
+      .day { padding:5px; }
+      .day-number { font-size:8px; }
+      .dot, .legend-dot { width:5px; height:5px; flex-basis:5px; }
+      .detail-link, .detail-close { min-height:40px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="card" aria-label="성장 기록 위젯">
+    <header class="header" id="header"></header>
+    <section class="calendar-shell" id="calendarShell" aria-label="월간 기록 캘린더">
+      <div class="weekdays" aria-hidden="true">
+        <span class="weekday">월</span><span class="weekday">화</span><span class="weekday">수</span><span class="weekday">목</span><span class="weekday">금</span><span class="weekday">토</span><span class="weekday">일</span>
+      </div>
+      <div class="days" id="days"></div>
+    </section>
+    <div class="legend" aria-label="범례">
+      <span class="legend-item"><span class="legend-dot legend-diary"></span>일기</span>
+      <span class="legend-item"><span class="legend-dot legend-reading"></span>독서 노트</span>
+      <span class="legend-item"><span class="legend-today"></span>오늘</span>
+    </div>
+    <section class="detail-row" id="detailRow" aria-live="polite"></section>
+  </main>
+
+  <script>
+    (() => {
+      const SETTINGS_KEY = 'growth-stats-v1';
+      const DIARY_KEY = 'game-log-diary-4b-v2';
+      const READING_KEY = 'reading-notes-v1';
+      const header = document.getElementById('header');
+      const calendarShell = document.getElementById('calendarShell');
+      const daysElement = document.getElementById('days');
+      const detailRow = document.getElementById('detailRow');
+      const today = localDay();
+      const todayKey = localKey(today);
+      let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      let selectedKey = null;
+      let settings = readSettings();
+      let activity = readActivity();
+
+      function pad(value) { return String(value).padStart(2, '0'); }
+      function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
+      function localKey(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
+      function keyDaysAgo(days) { const date = localDay(); date.setDate(date.getDate() - days); return localKey(date); }
+      function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+      function safeRead(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw === null ? { found: false, value: null } : { found: true, value: JSON.parse(raw) };
+        } catch (_) { return { found: false, value: null }; }
+      }
+      function readSettings() {
+        const source = safeRead(SETTINGS_KEY);
+        const urls = source.found && Array.isArray(source.value?.urls) ? source.value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
+        while (urls.length < 3) urls.push('');
+        return { urls };
+      }
+      function demoDiary() {
+        const entries = {};
+        [1, 2, 3, 5, 6, 9, 12, 14, 17, 21, 24].forEach(days => { entries[keyDaysAgo(days)] = { demo: true }; });
+        return entries;
+      }
+      function demoReading() {
+        const byDate = {};
+        [[2, 2], [4, 1], [9, 3], [15, 1], [23, 1]].forEach(([days, count]) => { byDate[keyDaysAgo(days)] = count; });
+        return byDate;
+      }
+      function readActivity() {
+        const diarySource = safeRead(DIARY_KEY);
+        const readingSource = safeRead(READING_KEY);
+        return {
+          diary: diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object' ? diarySource.value.entries : demoDiary(),
+          reading: readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object' ? readingSource.value.byDate : demoReading()
+        };
+      }
+      function countsFor(key) {
+        return {
+          diary: activity.diary[key] ? 1 : 0,
+          reading: Math.max(0, Number(activity.reading[key]) || 0)
+        };
+      }
+      function monthCounts(year, month) {
+        const prefix = `${year}-${pad(month + 1)}-`;
+        const diary = Object.keys(activity.diary).filter(key => key.startsWith(prefix) && activity.diary[key]).length;
+        const reading = Object.entries(activity.reading).filter(([key]) => key.startsWith(prefix)).reduce((sum, [, count]) => sum + Math.max(0, Number(count) || 0), 0);
+        return { diary, reading };
+      }
+      function href(index) { return settings.urls[index]?.trim() || '#'; }
+      function datedHref(index, key) {
+        const base = href(index);
+        if (base === '#') return '#';
+        const joiner = base.includes('?') ? '&' : '?';
+        return `${base}${joiner}date=${encodeURIComponent(key)}`;
+      }
+      function linkHtml(label, url) {
+        return `<a class="detail-link" href="${escapeAttr(url)}" target="_blank" rel="noopener" data-detail-link>${label}</a>`;
+      }
+
+      function renderHeader() {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const counts = monthCounts(year, month);
+        header.innerHTML = `
+          <button class="month-button" type="button" data-month-step="-1" aria-label="이전 달">‹</button>
+          <span class="month-title">${year}년 ${month + 1}월</span>
+          <button class="month-button" type="button" data-month-step="1" aria-label="다음 달">›</button>
+          <span class="month-summary">일기 ${counts.diary} · 독서 ${counts.reading}</span>
+        `;
+      }
+
+      function renderCalendar() {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const first = new Date(year, month, 1);
+        const mondayOffset = (first.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const totalCells = Math.ceil((mondayOffset + daysInMonth) / 7) * 7;
+        const start = new Date(year, month, 1 - mondayOffset);
+        calendarShell.classList.toggle('six-weeks', totalCells === 42);
+        const cells = [];
+        for (let index = 0; index < totalCells; index += 1) {
+          const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
+          const key = localKey(date);
+          const counts = countsFor(key);
+          const hasRecord = counts.diary > 0 || counts.reading > 0;
+          const otherMonth = date.getMonth() !== month;
+          const future = date > today;
+          const classes = ['day'];
+          if (hasRecord) classes.push('has-record');
+          if (otherMonth) classes.push('other-month');
+          if (future) classes.push('future');
+          if (selectedKey === key) classes.push('selected');
+          if (key === todayKey) classes.push('today');
+          cells.push(`
+            <button class="${classes.join(' ')}" type="button" data-date="${key}" aria-label="${date.getMonth() + 1}월 ${date.getDate()}일${hasRecord ? ' 기록 있음' : ''}">
+              <span class="day-number">${date.getDate()}</span>
+              <span class="marks">${counts.diary ? '<span class="dot diary-dot"></span>' : ''}${counts.reading ? '<span class="dot reading-dot"></span>' : ''}</span>
+            </button>
+          `);
+        }
+        daysElement.innerHTML = cells.join('');
+      }
+
+      function renderDetail() {
+        const key = selectedKey || todayKey;
+        const [year, month, day] = key.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        const counts = countsFor(key);
+        const hasRecord = counts.diary > 0 || counts.reading > 0;
+        const isToday = key === todayKey;
+        const isFuture = date > today;
+        let copy = '';
+        let actions = '';
+        if (isFuture) {
+          copy = `${month}월 ${day}일 · 아직 오지 않음`;
+          actions = '<button class="detail-close" type="button" data-close-detail>닫기</button>';
+        } else if (hasRecord) {
+          copy = `${isToday ? '오늘' : `${month}월 ${day}일`} · 일기 ${counts.diary} · 독서 ${counts.reading}`;
+          actions = linkHtml('열기', counts.diary ? datedHref(0, key) : datedHref(1, key));
+        } else if (isToday) {
+          copy = '오늘 아직 비어 있어요';
+          actions = `${linkHtml('일기 쓰기', datedHref(0, key))}${linkHtml('독서 노트', datedHref(1, key))}`;
+        } else {
+          copy = `${month}월 ${day}일 · 기록 없음`;
+          actions = linkHtml('그날로 쓰기', datedHref(0, key));
+        }
+        detailRow.innerHTML = `<div class="detail-copy">${copy}</div><div class="detail-actions">${actions}</div>`;
+      }
+
+      function render() {
+        renderHeader();
+        renderCalendar();
+        renderDetail();
+      }
+
+      document.getElementById('card').addEventListener('click', event => {
+        const monthStep = event.target.closest('[data-month-step]');
+        if (monthStep) {
+          viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + Number(monthStep.dataset.monthStep), 1);
+          selectedKey = null;
+          render();
+          return;
+        }
+        const dayButton = event.target.closest('[data-date]');
+        if (dayButton) {
+          selectedKey = selectedKey === dayButton.dataset.date ? null : dayButton.dataset.date;
+          renderCalendar();
+          renderDetail();
+          return;
+        }
+        if (event.target.closest('[data-close-detail]')) {
+          selectedKey = null;
+          renderCalendar();
+          renderDetail();
+          return;
+        }
+        const link = event.target.closest('[data-detail-link]');
+        if (link?.getAttribute('href') === '#') event.preventDefault();
+      });
+
+      window.addEventListener('storage', event => {
+        if (event.key === SETTINGS_KEY) settings = readSettings();
+        if (event.key === DIARY_KEY || event.key === READING_KEY) activity = readActivity();
+        if ([SETTINGS_KEY, DIARY_KEY, READING_KEY].includes(event.key)) render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

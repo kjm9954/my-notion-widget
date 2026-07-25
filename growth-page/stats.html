@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스탯</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --action-soft:#E2F0F6;
+      --text:#12303C;
+      --secondary:#6B8794;
+      --secondary-deep:#55707C;
+      --muted:#93A5AD;
+      --faint:#A2B4BC;
+      --done:#A9BAC2;
+      --border:#DCE7ED;
+      --border-soft:#E1EAEE;
+      --border-faint:#E6EDF0;
+      --track:#EDF2F4;
+      --surface:#FFFFFF;
+      --surface-soft:#FAFCFD;
+      --surface-edit:#F7FBFD;
+      --page:#F7F7F5;
+      --disabled:#C6D6DD;
+      --danger-border:#E4D5D5;
+      --danger:#A56B6B;
+    }
+
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0;
+      display:grid;
+      place-items:start center;
+      color:var(--text);
+      background:var(--page);
+      font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input { font:inherit; }
+    button { color:inherit; }
+
+    .card {
+      width:min(300px, 100vw);
+      height:300px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      padding:18px;
+      overflow:hidden;
+      background:var(--surface);
+      border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+    }
+
+    .status-row {
+      height:24px;
+      min-height:24px;
+      display:flex;
+      align-items:center;
+      gap:5px;
+    }
+    .status-items {
+      min-width:0;
+      display:flex;
+      flex:1 1 auto;
+      align-items:center;
+      gap:4px;
+      overflow:hidden;
+    }
+    .status-pill {
+      min-height:22px;
+      display:inline-flex;
+      align-items:center;
+      padding:0 7px;
+      border:1px solid var(--danger-border);
+      border-radius:999px;
+      background:var(--surface);
+      color:var(--danger);
+      font-size:10px;
+      font-weight:700;
+      line-height:1;
+      white-space:nowrap;
+    }
+    button.status-pill { cursor:pointer; }
+    .status-none {
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .settings-trigger {
+      min-height:24px;
+      flex:0 0 auto;
+      padding:0;
+      border:0;
+      background:transparent;
+      color:var(--disabled);
+      font-size:9px;
+      font-weight:700;
+      cursor:pointer;
+      transition:color .12s;
+    }
+    .settings-trigger:hover, .settings-trigger:focus-visible { color:var(--secondary); }
+
+    .level-line {
+      display:flex;
+      align-items:baseline;
+      gap:9px;
+    }
+    .level {
+      color:var(--text);
+      font-size:34px;
+      font-weight:800;
+      letter-spacing:-.02em;
+      line-height:1;
+    }
+    .tenure {
+      color:var(--done);
+      font-size:11px;
+      font-weight:700;
+    }
+
+    .meters {
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .meter {
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .meter-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .meter-label {
+      color:var(--muted);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.06em;
+    }
+    .meter-value {
+      color:var(--secondary);
+      font-size:11px;
+      font-weight:700;
+    }
+    .meter-track {
+      height:5px;
+      overflow:hidden;
+      background:var(--track);
+      border-radius:3px;
+    }
+    .meter-fill {
+      height:100%;
+      border-radius:3px;
+      transition:width .12s;
+    }
+    .hp-fill { background:var(--action); }
+    .mp-fill { background:var(--disabled); }
+
+    .shortcuts {
+      min-height:49px;
+      display:flex;
+      align-items:flex-end;
+      gap:7px;
+      margin-top:auto;
+      padding-top:14px;
+      border-top:1px solid var(--track);
+    }
+    .shortcut {
+      width:34px;
+      height:34px;
+      min-width:34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:0;
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:9px;
+      background:var(--surface);
+      color:var(--secondary);
+      text-decoration:none;
+      white-space:nowrap;
+      transition:width .12s, padding .12s, color .12s, border-color .12s;
+    }
+    .shortcut:hover, .shortcut:focus-visible {
+      width:auto;
+      padding:0 11px;
+      border-color:var(--action);
+      color:var(--action);
+    }
+    .shortcut-icon {
+      width:12px;
+      flex:0 0 12px;
+      font-size:12px;
+      font-weight:700;
+      line-height:1;
+      text-align:center;
+    }
+    .shortcut-label {
+      width:0;
+      overflow:hidden;
+      font-size:10px;
+      font-weight:700;
+      opacity:0;
+      transition:width .12s, opacity .12s;
+    }
+    .shortcut:hover .shortcut-label, .shortcut:focus-visible .shortcut-label {
+      width:auto;
+      opacity:1;
+    }
+
+    .settings-view {
+      display:flex;
+      flex:1 1 auto;
+      flex-direction:column;
+      gap:10px;
+    }
+    .settings-header {
+      min-height:26px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .settings-title {
+      color:var(--text);
+      font-size:13px;
+      font-weight:800;
+    }
+    .settings-done {
+      min-height:26px;
+      padding:0;
+      border:0;
+      background:transparent;
+      color:var(--secondary);
+      font-size:11px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .field-group {
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+    }
+    .field-label {
+      color:var(--muted);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.06em;
+    }
+    .date-input, .url-input {
+      min-width:0;
+      border:1px solid var(--border-soft);
+      border-radius:9px;
+      outline:0;
+      background:var(--surface);
+      color:var(--text);
+      font-size:11px;
+      font-weight:600;
+    }
+    .date-input { height:32px; padding:0 9px; }
+    .url-input { width:100%; height:30px; padding:0 9px; }
+    .date-input:focus, .url-input:focus { border-color:#CFE2EA; }
+    .url-input::placeholder { color:var(--done); }
+    .field-help {
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+      line-height:1.3;
+    }
+    .url-list {
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+    }
+    .url-row {
+      display:grid;
+      grid-template-columns:30px minmax(0, 1fr);
+      gap:7px;
+      align-items:center;
+    }
+    .url-icon {
+      width:30px;
+      height:30px;
+      display:grid;
+      place-items:center;
+      color:var(--secondary);
+      border:1px solid var(--border);
+      border-radius:9px;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    @media (max-width:639px) {
+      .card { width:100vw; }
+      .settings-trigger, .settings-done { min-height:40px; }
+      .shortcut { width:44px; height:44px; min-width:44px; }
+      .shortcuts { min-height:59px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="card" aria-label="스탯 위젯"></main>
+
+  <script>
+    (() => {
+      const SETTINGS_KEY = 'growth-stats-v1';
+      const DIARY_KEY = 'game-log-diary-4b-v2';
+      const READING_KEY = 'reading-notes-v1';
+      const card = document.getElementById('card');
+      const shortcutMeta = [
+        { glyph: '◲', label: '일기', placeholder: '일기 페이지 주소' },
+        { glyph: '▤', label: '독서 노트', placeholder: '독서 노트 페이지 주소' },
+        { glyph: '◇', label: '업무', placeholder: '업무 페이지 주소' }
+      ];
+      let memorySettings = { start: '2024-02-29', urls: ['', '', ''] };
+      let settings = readSettings();
+      let settingsOpen = false;
+      let statusExpanded = false;
+
+      function clone(value) { return JSON.parse(JSON.stringify(value)); }
+      function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+      function pad(value) { return String(value).padStart(2, '0'); }
+      function localKey(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
+      function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
+      function keyDaysAgo(days) { const date = localDay(); date.setDate(date.getDate() - days); return localKey(date); }
+      function parseKey(key) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+        if (!match) return null;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+      function dayDiff(from, to = localDay()) { return Math.floor((localDay(to) - localDay(from)) / 86400000); }
+      function normalizeSettings(value) {
+        const urls = Array.isArray(value?.urls) ? value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
+        while (urls.length < 3) urls.push('');
+        return {
+          start: /^\d{4}-\d{2}-\d{2}$/.test(value?.start || '') ? value.start : '2024-02-29',
+          urls
+        };
+      }
+      function readSettings() {
+        try {
+          const raw = localStorage.getItem(SETTINGS_KEY);
+          memorySettings = raw ? normalizeSettings(JSON.parse(raw)) : normalizeSettings(memorySettings);
+        } catch (_) {}
+        return clone(memorySettings);
+      }
+      function saveSettings() {
+        memorySettings = normalizeSettings(settings);
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(memorySettings)); } catch (_) {}
+      }
+      function safeRead(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw === null ? { found: false, value: null } : { found: true, value: JSON.parse(raw) };
+        } catch (_) { return { found: false, value: null }; }
+      }
+      function demoDiary() {
+        const entries = {};
+        [1, 2, 3, 5, 6, 9, 12, 14, 17, 21, 24].forEach(days => { entries[keyDaysAgo(days)] = { demo: true }; });
+        return entries;
+      }
+      function demoReading() {
+        const byDate = {};
+        [[2, 2], [4, 1], [9, 3], [15, 1], [23, 1]].forEach(([days, count]) => { byDate[keyDaysAgo(days)] = count; });
+        return byDate;
+      }
+      function readActivity() {
+        const diarySource = safeRead(DIARY_KEY);
+        const readingSource = safeRead(READING_KEY);
+        const diary = diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object'
+          ? diarySource.value.entries
+          : demoDiary();
+        const reading = readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object'
+          ? readingSource.value.byDate
+          : demoReading();
+        return { diary, reading };
+      }
+      function tenure() {
+        const start = parseKey(settings.start) || new Date(2024, 1, 29);
+        const days = Math.max(0, dayDiff(start));
+        return { days, level: Math.floor(days / 30) + 1 };
+      }
+      function recentPercent(keys) {
+        const recorded = new Set(keys);
+        let days = 0;
+        for (let offset = 0; offset < 14; offset += 1) if (recorded.has(keyDaysAgo(offset))) days += 1;
+        return Math.max(20, Math.round((days / 14) * 100));
+      }
+      function gapFromLast(keys) {
+        const today = localDay();
+        const dates = keys.map(parseKey).filter(date => date && date <= today);
+        if (!dates.length) return null;
+        const latest = new Date(Math.max(...dates.map(date => date.getTime())));
+        return dayDiff(latest, today);
+      }
+      function metrics() {
+        const activity = readActivity();
+        const diaryKeys = Object.keys(activity.diary).filter(key => Boolean(activity.diary[key]));
+        const readingKeys = Object.keys(activity.reading).filter(key => Number(activity.reading[key]) > 0);
+        const diaryGap = gapFromLast(diaryKeys);
+        const readingGap = gapFromLast(readingKeys);
+        const anomalies = [];
+        if (diaryGap !== null && diaryGap >= 5) anomalies.push(`일기 공백 ${diaryGap}일`);
+        if (readingGap !== null && readingGap >= 7) anomalies.push(`독서 공백 ${readingGap}일`);
+        return {
+          ...tenure(),
+          hp: recentPercent(diaryKeys),
+          mp: recentPercent(readingKeys),
+          anomalies
+        };
+      }
+      function safeHref(value) { return value.trim() || '#'; }
+
+      function renderStatus(anomalies) {
+        let content = '<span class="status-none">상태 이상 없음</span>';
+        if (anomalies.length) {
+          const visible = statusExpanded ? anomalies : anomalies.slice(0, 1);
+          content = visible.map(text => `<span class="status-pill">${text}</span>`).join('');
+          if (!statusExpanded && anomalies.length > 1) content += `<button class="status-pill" type="button" data-expand-status>+${anomalies.length - 1}</button>`;
+        }
+        return `
+          <div class="status-row">
+            <div class="status-items">${content}</div>
+            <button class="settings-trigger" type="button" data-open-settings>설정</button>
+          </div>
+        `;
+      }
+
+      function renderMain() {
+        const current = metrics();
+        card.innerHTML = `
+          ${renderStatus(current.anomalies)}
+          <div class="level-line"><span class="level">Lv.${current.level}</span><span class="tenure">D+${current.days}</span></div>
+          <div class="meters">
+            <div class="meter">
+              <div class="meter-head"><span class="meter-label">HP · 일기</span><span class="meter-value">${current.hp}</span></div>
+              <div class="meter-track"><div class="meter-fill hp-fill" style="width:${current.hp}%"></div></div>
+            </div>
+            <div class="meter">
+              <div class="meter-head"><span class="meter-label">MP · 독서 노트</span><span class="meter-value">${current.mp}</span></div>
+              <div class="meter-track"><div class="meter-fill mp-fill" style="width:${current.mp}%"></div></div>
+            </div>
+          </div>
+          <nav class="shortcuts" aria-label="바로가기">
+            ${shortcutMeta.map((item, index) => `
+              <a class="shortcut" href="${escapeAttr(safeHref(settings.urls[index]))}" target="_blank" rel="noopener" data-shortcut="${index}">
+                <span class="shortcut-icon">${item.glyph}</span><span class="shortcut-label">${item.label}</span>
+              </a>
+            `).join('')}
+          </nav>
+        `;
+      }
+
+      function renderSettings() {
+        const current = tenure();
+        card.innerHTML = `
+          <section class="settings-view">
+            <header class="settings-header"><span class="settings-title">설정</span><button class="settings-done" type="button" data-close-settings>완료</button></header>
+            <div class="field-group">
+              <label class="field-label" for="startDate">근속 시작일</label>
+              <input class="date-input" id="startDate" type="date" value="${escapeAttr(settings.start)}" data-start-date>
+              <div class="field-help" id="tenureHelp">근속 30일마다 Lv +1 · 현재 D+${current.days}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">바로가기 주소</div>
+              <div class="url-list">
+                ${shortcutMeta.map((item, index) => `
+                  <label class="url-row">
+                    <span class="url-icon">${item.glyph}</span>
+                    <input class="url-input" type="url" value="${escapeAttr(settings.urls[index])}" placeholder="${item.placeholder}" data-url-index="${index}">
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function render() { settingsOpen ? renderSettings() : renderMain(); }
+
+      card.addEventListener('click', event => {
+        if (event.target.closest('[data-open-settings]')) {
+          settingsOpen = true;
+          render();
+          return;
+        }
+        if (event.target.closest('[data-close-settings]')) {
+          settingsOpen = false;
+          statusExpanded = false;
+          render();
+          return;
+        }
+        if (event.target.closest('[data-expand-status]')) {
+          statusExpanded = true;
+          render();
+          return;
+        }
+        const shortcut = event.target.closest('[data-shortcut]');
+        if (shortcut?.getAttribute('href') === '#') event.preventDefault();
+      });
+
+      card.addEventListener('input', event => {
+        if (event.target.matches('[data-start-date]')) {
+          settings.start = event.target.value || '2024-02-29';
+          saveSettings();
+          document.getElementById('tenureHelp').textContent = `근속 30일마다 Lv +1 · 현재 D+${tenure().days}`;
+          return;
+        }
+        const urlInput = event.target.closest('[data-url-index]');
+        if (urlInput) {
+          settings.urls[Number(urlInput.dataset.urlIndex)] = urlInput.value;
+          saveSettings();
+        }
+      });
+
+      window.addEventListener('storage', event => {
+        if (event.key === SETTINGS_KEY) settings = readSettings();
+        if ([SETTINGS_KEY, DIARY_KEY, READING_KEY].includes(event.key) && !settingsOpen) renderMain();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
