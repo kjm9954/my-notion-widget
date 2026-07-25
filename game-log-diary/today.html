@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>게임 로그 일기 · 오늘</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --secondary:#6B8794;
+      --muted:#93A5AD; --faint:#A2B4BC; --done:#A9BAC2; --page:#F7F7F5;
+      --q:oklch(0.62 0.09 245); --q-tint:oklch(0.975 0.017 245);
+      --p:oklch(0.62 0.09 195); --p-tint:oklch(0.975 0.017 195);
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body { margin:0; background:#F7F7F5; color:#12303C; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
+    button, input, textarea { font:inherit; }
+    button { color:inherit; }
+    .shell { min-height:100vh; display:grid; place-items:center; padding:24px 16px; }
+    .widget { width:min(940px,calc(100vw - 32px)); min-height:620px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08); }
+    .header, .editor-head, .entry-head, .section-head, .stat-row, .button-row { display:flex; align-items:center; }
+    .header { min-height:34px; justify-content:space-between; gap:12px; }
+    .date-title { font-size:13px; font-weight:800; }
+    .empty-block { display:flex; flex-direction:column; align-items:center; gap:8px; padding:34px 16px; text-align:center; background:#FAFCFD; border:1px dashed #C6D6DD; border-radius:12px; }
+    .empty-title { color:#33505C; font-size:13px; font-weight:800; }
+    .empty-copy { color:#93A5AD; font-size:11px; font-weight:600; }
+    .empty-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:4px; }
+    .primary, .secondary-button, .destructive, .text-button { min-height:34px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; }
+    .primary { padding:0 14px; color:#FFFFFF; background:#0E5C7A; border:1px solid #0E5C7A; }
+    .secondary-button { padding:0 12px; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; }
+    .destructive { padding:0 11px; color:#A56B6B; background:#FFFFFF; border:1px solid #E4D5D5; }
+    .text-button { padding:0 6px; color:#93A5AD; background:transparent; border:0; }
+    .strip-block { display:flex; flex-direction:column; gap:8px; }
+    .section-title { color:#33505C; font-size:12px; font-weight:800; }
+    .recent-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+    .day-cell { position:relative; aspect-ratio:1/1; min-width:0; padding:6px; overflow:hidden; text-align:left; background:#FFFFFF; border:1px solid #F1F5F7; border-radius:10px; cursor:pointer; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .12s ease,background-color .12s ease; }
+    .day-cell.quest { background:var(--q-tint); border-color:transparent; }
+    .day-cell.photo { background-position:center; background-size:cover; border-color:transparent; }
+    .day-cell.today { outline-color:#0E5C7A; }
+    .day-number { display:inline-flex; align-items:center; min-height:18px; padding:2px 5px; color:#A9BAC2; border-radius:999px; font-size:9px; font-weight:800; line-height:1; }
+    .day-cell.photo .day-number { color:#12303C; background:rgba(255,255,255,.82); }
+    .day-cell.quest .day-number { color:#3E5A66; }
+    .mini-q { position:absolute; left:6px; bottom:6px; width:13px; height:13px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; background:var(--q); border-radius:5px; font-size:9px; font-weight:800; line-height:1; }
+    .stats { margin-top:auto; padding-top:12px; border-top:1px solid #EDF2F4; }
+    .stat-row { gap:16px; }
+    .gauge { min-width:0; display:grid; grid-template-columns:auto minmax(64px,120px) auto; align-items:center; gap:6px; }
+    .gauge-label { color:#93A5AD; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .gauge-track { height:5px; overflow:hidden; background:#EDF2F4; border-radius:3px; }
+    .gauge-fill { height:100%; background:#0E5C7A; border-radius:3px; }
+    .gauge-fill.mp { background:#C6D6DD; }
+    .gauge-value { color:#6B8794; font-size:11px; font-weight:700; white-space:nowrap; }
+    .streak { margin-left:auto; padding:5px 9px; color:#0E5C7A; background:#E2F0F6; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .entry-block { display:flex; flex-direction:column; gap:16px; padding:14px; border:1px solid #E6EDF0; border-radius:12px; }
+    .entry-head { min-width:0; gap:8px; }
+    .entry-date { min-width:0; overflow:hidden; color:#6B8794; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .entry-actions { display:flex; flex:0 0 auto; gap:6px; margin-left:auto; }
+    .mode-pill { display:inline-flex; flex:0 0 auto; align-items:center; gap:5px; padding:4px 8px 4px 5px; border-radius:999px; color:#33505C; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .mode-pill.q { background:var(--q-tint); }
+    .mode-pill.p { background:var(--p-tint); }
+    .mode-mark { width:15px; height:15px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; border-radius:5px; font-size:9px; font-weight:800; line-height:1; }
+    .q .mode-mark { background:var(--q); }
+    .p .mode-mark { background:var(--p); }
+    .entry-content, .quest-section { display:flex; flex-direction:column; gap:8px; }
+    .quest-section + .quest-section { padding-top:12px; border-top:1px solid #F1F5F7; }
+    .section-head { justify-content:space-between; gap:8px; }
+    .label { color:#6B8794; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .count { color:#93A5AD; font-size:10px; font-weight:800; }
+    .job { color:#12303C; font-size:12px; font-weight:700; }
+    .pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .pill { padding:4px 8px; color:#6B8794; background:#F5F9FB; border-radius:999px; font-size:10px; font-weight:700; }
+    .quest-list { display:flex; flex-direction:column; gap:4px; }
+    .quest-item { width:100%; min-height:36px; display:flex; align-items:center; gap:8px; padding:7px 9px; text-align:left; background:#FFFFFF; border:0; border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05); cursor:pointer; }
+    .quest-list.sub .quest-item { background:#FAFCFD; }
+    .state-dot { width:9px; height:9px; flex:0 0 auto; background:#FFFFFF; border:1.5px solid #C6D6DD; border-radius:50%; }
+    .quest-item.done .state-dot { background:#C6D6DD; }
+    .quest-item-text { min-width:0; color:#12303C; font-size:12px; font-weight:600; line-height:1.4; }
+    .quest-item.done .quest-item-text { color:#A9BAC2; text-decoration:line-through; }
+    .event-block { padding:2px 0 2px 10px; border-left:2px solid #CFE2EA; }
+    .body-text { margin:0; color:#12303C; font-size:12px; font-weight:600; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .choice { margin-top:6px; color:#0E5C7A; font-size:11px; font-weight:700; }
+    .photo-view { display:flex; flex-direction:column; gap:12px; }
+    .thumb-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+    .view-thumb { width:96px; height:96px; flex:0 0 auto; object-fit:cover; border:1px solid #E6EDF0; border-radius:9px; }
+    .editor { min-height:576px; display:flex; flex-direction:column; gap:16px; }
+    .editor-head { min-height:34px; gap:8px; }
+    .editor-date { font-size:13px; font-weight:800; }
+    .editor-head .text-button { margin-left:auto; }
+    .progress { display:flex; gap:4px; }
+    .progress-part { flex:1; height:4px; background:#EDF2F4; border-radius:2px; }
+    .progress-part.active { background:#0E5C7A; }
+    .question { display:flex; flex-direction:column; gap:4px; }
+    .question-title { font-size:15px; font-weight:800; }
+    .hint { color:#93A5AD; font-size:11px; font-weight:600; }
+    .step-body { display:flex; flex:1; flex-direction:column; gap:12px; }
+    .field, .textarea, .list-input { width:100%; color:#12303C; outline:none; border-radius:9px; font-size:12px; font-weight:600; }
+    .field, .textarea { padding:10px 11px; background:#FFFFFF; border:1px solid #E1EAEE; }
+    .textarea { min-height:112px; resize:vertical; line-height:1.6; }
+    .field:focus, .textarea:focus, .list-input:focus { border-color:#0E5C7A; }
+    .condition-list { display:flex; flex-wrap:wrap; gap:6px; }
+    .condition { min-height:32px; padding:0 10px; color:#6B8794; background:#FFFFFF; border:1px solid #E1EAEE; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; }
+    .condition.active { color:#0E5C7A; background:#E2F0F6; border-color:#0E5C7A; }
+    .draft-list { display:flex; flex-direction:column; gap:4px; }
+    .draft-item { min-height:38px; display:flex; align-items:center; gap:8px; padding:7px 9px; background:#FFFFFF; border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    .draft-title { min-width:0; flex:1; overflow-wrap:anywhere; font-size:12px; font-weight:600; }
+    .remove-item { width:30px; height:30px; flex:0 0 auto; padding:0; color:#93A5AD; background:transparent; border:0; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+    .list-input { padding:10px 11px; background:#FAFCFD; border:1px dashed #C6D6DD; }
+    .list-help { color:#A2B4BC; font-size:10px; font-weight:600; }
+    .button-row { gap:8px; margin-top:auto; }
+    .button-spacer { flex:1; }
+    .photo-label { color:#6B8794; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .photo-slots { display:flex; align-items:flex-start; gap:8px; overflow-x:auto; padding-bottom:2px; }
+    .photo-slot-wrap { display:flex; flex:0 0 auto; flex-direction:column; align-items:center; gap:4px; }
+    .photo-slot { position:relative; width:104px; height:104px; overflow:hidden; border:1px solid #E6EDF0; border-radius:9px; }
+    .photo-slot img { width:100%; height:100%; object-fit:cover; }
+    .remove-photo { position:absolute; top:5px; right:5px; width:22px; height:22px; display:flex; align-items:center; justify-content:center; padding:0; color:#FFFFFF; background:transparent; border:0; border-radius:999px; font-size:10px; font-weight:700; cursor:pointer; }
+    .remove-photo span { width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:rgba(18,48,60,.62); border-radius:999px; }
+    .photo-order { display:flex; align-items:center; gap:7px; color:#93A5AD; font-size:9px; font-weight:700; }
+    .order-button { width:26px; height:26px; padding:0; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; cursor:pointer; }
+    .add-photo { width:104px; height:104px; display:flex; flex:0 0 auto; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#6B8794; background:#FAFCFD; border:1px dashed #C6D6DD; border-radius:9px; font-size:10px; font-weight:700; cursor:pointer; }
+    .add-photo span:first-child { color:#93A5AD; font-size:18px; line-height:1; }
+    .add-photo input { position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; }
+    .photo-help { color:#A2B4BC; font-size:10px; font-weight:600; }
+    @media (min-width:640px) and (max-width:999px) { .widget { width:min(720px,calc(100vw - 32px)); } }
+    @media (max-width:639px) {
+      .shell { place-items:start center; padding:10px 8px; }
+      .widget { width:min(380px,calc(100vw - 16px)); min-height:620px; padding:22px; }
+      button, .day-cell, .add-photo { min-height:44px; }
+      .primary, .secondary-button, .destructive, .text-button { min-height:44px; }
+      .recent-grid { gap:4px; }
+      .day-cell { padding:4px; }
+      .mini-q { left:4px; bottom:4px; }
+      .stat-row { flex-wrap:wrap; gap:10px; }
+      .gauge { flex:1 1 120px; grid-template-columns:auto minmax(42px,1fr) auto; }
+      .streak { margin-left:0; }
+      .entry-head { flex-wrap:wrap; }
+      .entry-actions { width:100%; margin-left:0; }
+      .entry-actions button { flex:1; }
+      .quest-item { min-height:44px; }
+      .button-row { flex-wrap:wrap; }
+      .button-spacer { display:none; }
+      .button-row .primary, .button-row .secondary-button, .button-row .text-button { flex:1 1 auto; }
+      .condition, .remove-item, .order-button { min-height:44px; }
+      .remove-item, .order-button { width:44px; height:44px; }
+      .photo-slot, .add-photo { width:96px; height:96px; }
+      .remove-photo { width:44px; height:44px; top:0; right:0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell"><section class="widget" id="app" aria-label="게임 로그 일기 오늘 위젯"></section></main>
+  <script>
+    (() => {
+      'use strict';
+      const STORAGE_KEY = 'game-log-diary-v1';
+      const CHANNEL_NAME = 'game-log-diary';
+      const CONDITIONS = ['의욕 충만','피로 누적','집중력 저하','기분 좋음','불안','여유'];
+      const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+      const app = document.getElementById('app');
+
+      function localKey(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2,'0');
+        const d = String(date.getDate()).padStart(2,'0');
+        return `${y}-${m}-${d}`;
+      }
+      function fromKey(key) { const [y,m,d] = key.split('-').map(Number); return new Date(y,m-1,d,12); }
+      function addDays(date, amount) { const next = new Date(date); next.setDate(next.getDate()+amount); return next; }
+      function formatDate(key) { const d=fromKey(key); return `${d.getMonth()+1}월 ${d.getDate()}일 ${WEEKDAYS[d.getDay()]}`; }
+      function escapeHtml(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
+      function clone(value) { return JSON.parse(JSON.stringify(value)); }
+
+      const TODAY = localKey(new Date());
+      let memoryStore = { entries:{} };
+      function normalizeStore(value) { return value && typeof value === 'object' && value.entries && typeof value.entries === 'object' ? {entries:value.entries} : {entries:{}}; }
+      function readStore() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          memoryStore = raw ? normalizeStore(JSON.parse(raw)) : {entries:{}};
+        } catch (_) {}
+        return clone(memoryStore);
+      }
+      let store = readStore();
+      let channel = null;
+      try { if ('BroadcastChannel' in window) channel = new BroadcastChannel(CHANNEL_NAME); } catch (_) {}
+      function announceChange() { try { channel?.postMessage({type:'changed'}); } catch (_) {} }
+      function writeEntry(key, entry) {
+        const latest = readStore();
+        latest.entries[key] = clone(entry);
+        memoryStore = latest;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(latest)); } catch (_) {}
+        store = clone(latest);
+        announceChange();
+      }
+      function removeEntry(key) {
+        const latest = readStore();
+        delete latest.entries[key];
+        memoryStore = latest;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(latest)); } catch (_) {}
+        store = clone(latest);
+        announceChange();
+      }
+
+      const ui = { screen:'home', selectedDate:TODAY, questStep:1, questDraft:null, photoDraft:null, pending:{2:'',3:'',5:''} };
+      function emptyQuest() { return {job:'',conds:[],main:[],sub:[],event:{t:'',c:''},achieve:[],ending:''}; }
+      function isEditing() { return ui.screen === 'quest' || ui.screen === 'photo'; }
+      function syncFromStorage() { store = readStore(); if (!isEditing()) render(); }
+      window.addEventListener('storage', event => { if (event.key === STORAGE_KEY) syncFromStorage(); });
+      if (channel) channel.onmessage = event => { if (event.data?.type === 'changed') syncFromStorage(); };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncFromStorage(); });
+      window.addEventListener('focus', syncFromStorage);
+
+      function modePill(mode) {
+        const quest = mode === 'quest';
+        return `<span class="mode-pill ${quest?'q':'p'}"><span class="mode-mark">${quest?'Q':'P'}</span>${quest?'퀘스트':'일기'}</span>`;
+      }
+      function photoStyle(entry) { return entry?.mode === 'photo' && entry.photos?.[0] ? ` style="background-image:url('${escapeHtml(entry.photos[0])}')"` : ''; }
+      function recentKeys() { const today=fromKey(TODAY); return Array.from({length:7},(_,i)=>localKey(addDays(today,i-6))); }
+      function stats() {
+        const seven = recentKeys();
+        const hpCount = seven.filter(key => store.entries[key]).length;
+        let streak=0, cursor=fromKey(TODAY);
+        while (store.entries[localKey(cursor)]) { streak++; cursor=addDays(cursor,-1); }
+        return { hpCount, hpPct:(hpCount/7)*100, streak };
+      }
+      function renderStats() {
+        const s=stats();
+        return `<section class="stats"><div class="stat-row">
+          <div class="gauge"><span class="gauge-label">HP</span><span class="gauge-track"><span class="gauge-fill" style="width:${s.hpPct}%"></span></span><span class="gauge-value">${s.hpCount} / 7</span></div>
+          <span class="streak">연속 ${s.streak}일</span>
+        </div></section>`;
+      }
+      function renderRecent() {
+        return `<section class="strip-block"><div class="section-title">최근 7일</div><div class="recent-grid">${recentKeys().map(key=>{
+          const entry=store.entries[key]; const date=fromKey(key);
+          const classes=['day-cell',entry?.mode||'',key===TODAY?'today':''].filter(Boolean).join(' ');
+          return `<button class="${classes}" type="button" data-day="${key}"${photoStyle(entry)} aria-label="${formatDate(key)}${entry?' 기록':''}"><span class="day-number">${date.getDate()}</span>${entry?.mode==='quest'?'<span class="mini-q">Q</span>':''}</button>`;
+        }).join('')}</div></section>`;
+      }
+      function renderEmpty() {
+        return `<section class="empty-block"><div class="empty-title">오늘의 로그가 비어 있습니다</div><div class="empty-copy">한 섹션만 쓰고 저장해도 됩니다</div><div class="empty-actions"><button class="primary" type="button" data-start="quest">퀘스트로 쓰기</button><button class="secondary-button" type="button" data-start="photo">사진으로 쓰기</button></div></section>`;
+      }
+      function questItems(items,type,date,sub=false) {
+        if (!items?.length) return '';
+        return `<div class="quest-list${sub?' sub':''}">${items.map((item,index)=>`<button class="quest-item${item.done?' done':''}" type="button" data-toggle-task="${type}" data-index="${index}" data-date="${date}"><span class="state-dot"></span><span class="quest-item-text">${escapeHtml(item.t)}</span></button>`).join('')}</div>`;
+      }
+      function renderQuestEntry(entry,date) {
+        const q=entry.quest||emptyQuest(); const parts=[];
+        if (q.job?.trim() || q.conds?.length) parts.push(`<section class="quest-section"><div class="label">오늘의 상태</div>${q.job?.trim()?`<div class="job">${escapeHtml(q.job)}</div>`:''}${q.conds?.length?`<div class="pills">${q.conds.map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join('')}</div>`:''}</section>`);
+        if (q.main?.length) { const done=q.main.filter(x=>x.done).length; parts.push(`<section class="quest-section"><div class="section-head"><div class="label">오늘의 퀘스트</div><div class="count">${done} / ${q.main.length}</div></div>${questItems(q.main,'main',date)}</section>`); }
+        if (q.sub?.length) { const done=q.sub.filter(x=>x.done).length; parts.push(`<section class="quest-section"><div class="section-head"><div class="label">서브 퀘스트</div><div class="count">${done} / ${q.sub.length}</div></div>${questItems(q.sub,'sub',date,true)}</section>`); }
+        if (q.event?.t?.trim() || q.event?.c?.trim()) parts.push(`<section class="quest-section"><div class="label">발생한 이벤트</div><div class="event-block">${q.event.t?.trim()?`<p class="body-text">${escapeHtml(q.event.t)}</p>`:''}${q.event.c?.trim()?`<div class="choice">→ ${escapeHtml(q.event.c)}</div>`:''}</div></section>`);
+        if (q.achieve?.length) parts.push(`<section class="quest-section"><div class="label">오늘의 업적</div><div class="pills">${q.achieve.map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join('')}</div></section>`);
+        if (q.ending?.trim()) parts.push(`<section class="quest-section"><div class="label">하루 엔딩로그</div><p class="body-text">${escapeHtml(q.ending)}</p></section>`);
+        return parts.join('');
+      }
+      function renderEntry(entry,date) {
+        const photos=entry.mode==='photo'?(entry.photos||[]):[];
+        return `<section class="entry-block"><div class="entry-head">${modePill(entry.mode)}<span class="entry-date">${formatDate(date)}</span><div class="entry-actions"><button class="secondary-button" type="button" data-edit="${entry.mode}">수정</button><button class="destructive" type="button" data-delete-date="${date}">삭제</button></div></div><div class="entry-content">${entry.mode==='photo'?`<div class="photo-view">${photos.length?`<div class="thumb-row">${photos.map(src=>`<img class="view-thumb" src="${escapeHtml(src)}" alt="">`).join('')}</div>`:''}${entry.text?.trim()?`<p class="body-text">${escapeHtml(entry.text)}</p>`:''}</div>`:renderQuestEntry(entry,date)}</div></section>`;
+      }
+      function renderHome() {
+        const entry=store.entries[ui.selectedDate];
+        app.innerHTML=`<header class="header"><div class="date-title">${formatDate(ui.selectedDate)}</div></header>${entry?renderEntry(entry,ui.selectedDate):renderEmpty()}${renderRecent()}${renderStats()}`;
+      }
+
+      const STEPS=[
+        ['오늘의 상태는?','직업과 상태이상을 정해두면 하루 톤이 잡힙니다'],
+        ['오늘의 퀘스트는?','꼭 해야 했던 일들'],
+        ['서브 퀘스트가 있었나요?','곁다리로 처리한 일들'],
+        ['오늘 발생한 이벤트는?','돌발 상황과 그때 고른 선택지'],
+        ['오늘의 업적은?','잘한 일, 작아도 괜찮습니다'],
+        ['하루 엔딩로그','마무리 한두 줄']
+      ];
+      function renderDraftList(kind,items) {
+        return `<div class="draft-list">${items.map((item,index)=>`<div class="draft-item"><span class="state-dot"></span><span class="draft-title">${escapeHtml(typeof item==='string'?item:item.t)}</span><button class="remove-item" type="button" data-remove-list="${kind}" data-index="${index}">✕</button></div>`).join('')}</div><input class="list-input" data-list-input="${kind}" value="${escapeHtml(ui.pending[ui.questStep]||'')}" placeholder="항목을 입력하고 Enter"><div class="list-help">Enter로 추가 · 비워두고 넘어가도 됩니다</div>`;
+      }
+      function renderStepBody() {
+        const q=ui.questDraft, step=ui.questStep;
+        if(step===1) return `<input class="field" data-quest-field="job" value="${escapeHtml(q.job)}" placeholder="오늘의 직업"><div class="condition-list">${CONDITIONS.map(c=>`<button class="condition${q.conds.includes(c)?' active':''}" type="button" data-condition="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`;
+        if(step===2) return renderDraftList('main',q.main);
+        if(step===3) return renderDraftList('sub',q.sub);
+        if(step===4) return `<textarea class="textarea" data-event-field="t" placeholder="오늘 발생한 이벤트">${escapeHtml(q.event.t)}</textarea><input class="field" data-event-field="c" value="${escapeHtml(q.event.c)}" placeholder="그때 고른 선택지">`;
+        if(step===5) return renderDraftList('achieve',q.achieve);
+        return `<textarea class="textarea" data-quest-field="ending" placeholder="하루를 마무리하는 한두 줄">${escapeHtml(q.ending)}</textarea>`;
+      }
+      function renderQuestEditor() {
+        const [question,hint]=STEPS[ui.questStep-1];
+        app.innerHTML=`<section class="editor"><header class="editor-head"><span class="editor-date">${formatDate(ui.selectedDate)}</span>${modePill('quest')}<button class="text-button" type="button" data-cancel>취소</button></header><div class="progress">${Array.from({length:6},(_,i)=>`<span class="progress-part${i<ui.questStep?' active':''}"></span>`).join('')}</div><div class="question"><div class="question-title">${question}</div><div class="hint">${hint}</div></div><div class="step-body">${renderStepBody()}</div><div class="button-row"><button class="primary" type="button" data-next>${ui.questStep===6?'저장하고 끝내기':'다음'}</button><button class="text-button" type="button" data-skip>건너뛰기</button>${ui.questStep>1?'<button class="secondary-button" type="button" data-prev>이전</button>':''}<span class="button-spacer"></span><button class="secondary-button" type="button" data-save-quest>바로 저장</button></div></section>`;
+      }
+      function renderPhotoEditor() {
+        const draft=ui.photoDraft;
+        app.innerHTML=`<section class="editor"><header class="editor-head"><span class="editor-date">${formatDate(ui.selectedDate)}</span>${modePill('photo')}<button class="text-button" type="button" data-cancel>취소</button></header><div class="step-body"><div class="photo-label">사진 · ${draft.photos.length}장</div><div class="photo-slots">${draft.photos.map((src,index)=>`<div class="photo-slot-wrap"><div class="photo-slot"><img src="${escapeHtml(src)}" alt=""><button class="remove-photo" type="button" data-remove-photo="${index}"><span>✕</span></button></div><div class="photo-order"><button class="order-button" type="button" data-move-photo="${index}" data-dir="-1">‹</button><span>${index+1}</span><button class="order-button" type="button" data-move-photo="${index}" data-dir="1">›</button></div></div>`).join('')}<label class="add-photo"><span>＋</span><span>사진 추가</span><input type="file" accept="image/*" multiple data-photo-input></label></div><div class="photo-help">저장하면 캘린더에 바로 반영됩니다 · 긴 변 720px로 자동 축소</div><textarea class="textarea" data-photo-text placeholder="사진에 대해 짧게 적어보세요">${escapeHtml(draft.text)}</textarea></div><div class="button-row"><button class="primary" type="button" data-save-photo>저장</button><button class="secondary-button" type="button" data-switch-quest>퀘스트 모드로 바꾸기</button></div></section>`;
+      }
+      function render() { if(ui.screen==='quest') renderQuestEditor(); else if(ui.screen==='photo') renderPhotoEditor(); else renderHome(); }
+      function startQuest(edit=false) {
+        const existing=edit?store.entries[ui.selectedDate]:null;
+        ui.questDraft=existing?.mode==='quest'?clone(existing.quest):emptyQuest();
+        ui.pending={2:'',3:'',5:''}; ui.questStep=1; ui.screen='quest'; render();
+      }
+      function startPhoto(edit=false) {
+        const existing=edit?store.entries[ui.selectedDate]:null;
+        ui.photoDraft=existing?.mode==='photo'?{photos:[...(existing.photos||[])],text:existing.text||''}:{photos:[],text:''};
+        ui.screen='photo'; render();
+      }
+      function commitPending() {
+        const value=(ui.pending[ui.questStep]||'').trim(); if(!value) return;
+        if(ui.questStep===2) ui.questDraft.main.push({t:value,done:false});
+        if(ui.questStep===3) ui.questDraft.sub.push({t:value,done:false});
+        if(ui.questStep===5) ui.questDraft.achieve.push(value);
+        ui.pending[ui.questStep]='';
+      }
+      function saveQuest() { commitPending(); writeEntry(ui.selectedDate,{mode:'quest',quest:clone(ui.questDraft)}); ui.screen='home'; render(); }
+      function savePhoto() { writeEntry(ui.selectedDate,{mode:'photo',photos:[...ui.photoDraft.photos],text:ui.photoDraft.text}); ui.screen='home'; render(); }
+      function toggleTask(date,type,index) {
+        const latest=readStore(); const entry=latest.entries[date]; if(entry?.mode!=='quest'||!entry.quest[type]?.[index]) return;
+        entry.quest[type][index].done=!entry.quest[type][index].done; writeEntry(date,entry); render();
+      }
+      function resizePhoto(file) {
+        return new Promise(resolve=>{
+          try {
+            const reader=new FileReader();
+            reader.onerror=()=>resolve(null);
+            reader.onload=()=>{ const image=new Image(); image.onerror=()=>resolve(null); image.onload=()=>{ try { const scale=Math.min(1,720/Math.max(image.width,image.height)); const canvas=document.createElement('canvas'); canvas.width=Math.max(1,Math.round(image.width*scale)); canvas.height=Math.max(1,Math.round(image.height*scale)); const ctx=canvas.getContext('2d'); ctx.drawImage(image,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/jpeg',.8)); } catch(_){resolve(null);} }; image.src=reader.result; };
+            reader.readAsDataURL(file);
+          } catch(_){ resolve(null); }
+        });
+      }
+
+      app.addEventListener('click', event=>{
+        const target=event.target;
+        const start=target.closest('[data-start]'); if(start){ start.dataset.start==='quest'?startQuest():startPhoto(); return; }
+        const day=target.closest('[data-day]'); if(day){ ui.selectedDate=day.dataset.day; ui.screen='home'; render(); return; }
+        const edit=target.closest('[data-edit]'); if(edit){ edit.dataset.edit==='quest'?startQuest(true):startPhoto(true); return; }
+        const del=target.closest('[data-delete-date]'); if(del){ removeEntry(del.dataset.deleteDate); ui.screen='home'; render(); return; }
+        const toggle=target.closest('[data-toggle-task]'); if(toggle){ toggleTask(toggle.dataset.date,toggle.dataset.toggleTask,Number(toggle.dataset.index)); return; }
+        if(target.closest('[data-cancel]')){ ui.screen='home'; render(); return; }
+        const cond=target.closest('[data-condition]'); if(cond){ const value=cond.dataset.condition; const pos=ui.questDraft.conds.indexOf(value); pos>=0?ui.questDraft.conds.splice(pos,1):ui.questDraft.conds.push(value); renderQuestEditor(); return; }
+        const remove=target.closest('[data-remove-list]'); if(remove){ const list=ui.questDraft[remove.dataset.removeList]; list.splice(Number(remove.dataset.index),1); renderQuestEditor(); return; }
+        if(target.closest('[data-next]')){ commitPending(); if(ui.questStep===6) saveQuest(); else {ui.questStep++;renderQuestEditor();} return; }
+        if(target.closest('[data-skip]')){ ui.pending[ui.questStep]=''; if(ui.questStep===6) saveQuest(); else {ui.questStep++;renderQuestEditor();} return; }
+        if(target.closest('[data-prev]')){ commitPending(); ui.questStep=Math.max(1,ui.questStep-1); renderQuestEditor(); return; }
+        if(target.closest('[data-save-quest]')){ saveQuest(); return; }
+        const removePhoto=target.closest('[data-remove-photo]'); if(removePhoto){ ui.photoDraft.photos.splice(Number(removePhoto.dataset.removePhoto),1); renderPhotoEditor(); return; }
+        const move=target.closest('[data-move-photo]'); if(move){ const from=Number(move.dataset.movePhoto),to=from+Number(move.dataset.dir); if(to>=0&&to<ui.photoDraft.photos.length){ const [photo]=ui.photoDraft.photos.splice(from,1); ui.photoDraft.photos.splice(to,0,photo); renderPhotoEditor(); } return; }
+        if(target.closest('[data-save-photo]')){ savePhoto(); return; }
+        if(target.closest('[data-switch-quest]')){ startQuest(false); }
+      });
+      app.addEventListener('input', event=>{
+        const el=event.target;
+        if(el.matches('[data-quest-field]')) ui.questDraft[el.dataset.questField]=el.value;
+        if(el.matches('[data-event-field]')) ui.questDraft.event[el.dataset.eventField]=el.value;
+        if(el.matches('[data-list-input]')) ui.pending[ui.questStep]=el.value;
+        if(el.matches('[data-photo-text]')) ui.photoDraft.text=el.value;
+      });
+      app.addEventListener('keydown', event=>{
+        const input=event.target.closest('[data-list-input]'); if(!input||event.key!=='Enter') return;
+        event.preventDefault(); commitPending(); renderQuestEditor(); requestAnimationFrame(()=>app.querySelector('[data-list-input]')?.focus());
+      });
+      app.addEventListener('change', async event=>{
+        const input=event.target.closest('[data-photo-input]'); if(!input) return;
+        const files=[...input.files].filter(file=>file.type.startsWith('image/'));
+        const resized=await Promise.all(files.map(resizePhoto));
+        ui.photoDraft.photos.push(...resized.filter(Boolean));
+        renderPhotoEditor();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
