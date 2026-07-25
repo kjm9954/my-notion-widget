@@ -1,0 +1,1485 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>에너지 나침반</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action: #0E5C7A;
+      --action-soft: #E2F0F6;
+      --text: #12303C;
+      --text-secondary: #6B8794;
+      --text-muted: #93A5AD;
+      --text-faint: #A2B4BC;
+      --text-done: #A9BAC2;
+      --border: #DCE7ED;
+      --page: #F7F7F5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--page);
+      font-family: "Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+    }
+
+    .widget {
+      width: min(940px, calc(100vw - 32px));
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 22px 22px 18px;
+      overflow: hidden;
+      background: #FFFFFF;
+      border-radius: 18px;
+      box-shadow: 0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+    }
+
+    .header {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .scope-side,
+    .progress-side {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .scope-side {
+      gap: 12px;
+    }
+
+    .segments {
+      display: flex;
+      flex: 0 0 auto;
+      gap: 2px;
+      padding: 3px;
+      background: #F1F5F7;
+      border-radius: 9px;
+    }
+
+    .segment {
+      min-height: 26px;
+      padding: 4px 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #8AA0AA;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .segment.active {
+      color: #12303C;
+      background: #FFFFFF;
+      box-shadow: 0 1px 2px rgba(18,48,60,.10);
+    }
+
+    .period {
+      overflow: hidden;
+      color: #93A5AD;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .progress-side {
+      flex: 0 0 auto;
+      gap: 10px;
+    }
+
+    .progress-copy {
+      color: #6B8794;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .progress-track {
+      width: 86px;
+      height: 5px;
+      overflow: hidden;
+      background: #EDF2F4;
+      border-radius: 999px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #0E5C7A;
+      border-radius: inherit;
+      transition: width .12s ease;
+    }
+
+    .matrix-stage {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr);
+      grid-template-rows: 372px auto;
+      gap: 6px 8px;
+    }
+
+    .axis-y {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #B3C3CA;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      line-height: 1;
+      white-space: nowrap;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    .axis-x {
+      grid-column: 2;
+      color: #B3C3CA;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      line-height: 1;
+      text-align: right;
+    }
+
+    .matrix-grid {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .q-S {
+      --q-color: oklch(0.62 0.09 245);
+      --q-tint: oklch(0.975 0.017 245);
+    }
+
+    .q-D {
+      --q-color: oklch(0.62 0.09 195);
+      --q-tint: oklch(0.975 0.017 195);
+    }
+
+    .q-M {
+      --q-color: oklch(0.62 0.09 168);
+      --q-tint: oklch(0.975 0.017 168);
+    }
+
+    .q-O {
+      --q-color: oklch(0.62 0.09 215);
+      --q-tint: oklch(0.975 0.017 215);
+    }
+
+    .quadrant {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 12px 10px;
+      overflow: hidden;
+      background: var(--q-tint);
+      border-radius: 14px;
+      transition: outline-color .12s ease, background-color .12s ease;
+    }
+
+    .quadrant-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex: 0 0 auto;
+    }
+
+    .q-badge {
+      width: 17px;
+      height: 17px;
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      background: var(--q-color);
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .quadrant-name {
+      min-width: 0;
+      overflow: hidden;
+      color: #33505C;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .quadrant-count {
+      margin-left: auto;
+      color: #A2B4BC;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .quadrant-list {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #DCE7ED transparent;
+    }
+
+    .item-card {
+      min-width: 0;
+      display: flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      gap: 3px;
+      padding: 7px 9px;
+      background: #FFFFFF;
+      border-radius: 9px;
+      box-shadow: 0 1px 2px rgba(18,48,60,.05);
+      cursor: grab;
+      touch-action: none;
+      outline: 1.5px solid transparent;
+      outline-offset: -1.5px;
+      transition: outline-color .12s ease, opacity .12s ease;
+    }
+
+    .item-card.selected {
+      outline-color: #0E5C7A;
+    }
+
+    .item-card.dragging,
+    .tray-chip.dragging {
+      opacity: .45;
+    }
+
+    .parent-caption {
+      overflow: hidden;
+      color: #A2B4BC;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-body {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .state-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+    }
+
+    .state-todo {
+      background: #FFFFFF;
+      border: 1.5px solid #C6D6DD;
+    }
+
+    .state-doing {
+      background: #0E5C7A;
+      border: 1.5px solid #0E5C7A;
+    }
+
+    .state-done {
+      background: #C6D6DD;
+      border: 1.5px solid #C6D6DD;
+    }
+
+    .item-title {
+      min-width: 0;
+      overflow: hidden;
+      color: #12303C;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-card.done .item-title,
+    .mobile-item.done .item-title {
+      color: #A9BAC2;
+      text-decoration: line-through;
+    }
+
+    .child-count {
+      flex: 0 0 auto;
+      margin-left: auto;
+      padding: 2px 6px;
+      color: #0E5C7A;
+      background: #E2F0F6;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .drop-active {
+      outline: 2px solid #0E5C7A !important;
+      outline-offset: -2px !important;
+    }
+
+    .mobile-main {
+      display: none;
+    }
+
+    .bottom-bar {
+      min-width: 0;
+      position: relative;
+      transition: outline-color .12s ease, background-color .12s ease;
+    }
+
+    .drag-action-zones {
+      position: absolute;
+      z-index: 5;
+      inset: 0;
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      padding: 4px;
+      background: #FAFCFD;
+      border-radius: 12px;
+    }
+
+    body.is-dragging .drag-action-zones {
+      display: grid;
+    }
+
+    body.is-dragging .bottom-bar {
+      min-height: 56px;
+      cursor: default;
+    }
+
+    .drag-action-zone {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.2;
+      transition: outline-color .12s ease, background-color .12s ease;
+    }
+
+    .drag-tray-zone {
+      color: #55707C;
+      background: #FAFCFD;
+      border: 1px dashed #C6D6DD;
+    }
+
+    .drag-delete-zone {
+      color: #A56B6B;
+      background: #FFFFFF;
+      border: 1px solid #E4D5D5;
+    }
+
+    .drag-delete-zone.drop-active {
+      outline-color: #A56B6B !important;
+    }
+
+    .bottom-bar.collapsed {
+      padding: 11px 14px;
+      background: #FAFCFD;
+      border: 1px dashed #C6D6DD;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .collapsed-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .collapsed-copy {
+      color: #55707C;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .collapsed-hint {
+      color: #A2B4BC;
+      font-weight: 500;
+    }
+
+    .collapsed-plus {
+      color: #93A5AD;
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .bottom-bar.tray {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      padding: 11px 12px 10px;
+      background: #FAFCFD;
+      border: 1px solid #E1EAEE;
+      border-radius: 12px;
+    }
+
+    .tray-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .tray-title {
+      color: #33505C;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .text-button {
+      padding: 3px 4px;
+      border: 0;
+      background: transparent;
+      color: #93A5AD;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tray-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tray-chip {
+      max-width: 100%;
+      padding: 7px 11px;
+      overflow: hidden;
+      background: #FFFFFF;
+      border: 1px solid #E1EAEE;
+      border-radius: 9px;
+      color: #12303C;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: grab;
+      touch-action: none;
+      transition: opacity .12s ease;
+    }
+
+    .new-item-input,
+    .title-input {
+      width: 100%;
+      color: #12303C;
+      background: #FFFFFF;
+      border: 1px solid #E1EAEE;
+      border-radius: 9px;
+      outline: none;
+    }
+
+    .new-item-input {
+      padding: 9px 11px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .new-item-input::placeholder {
+      color: #A2B4BC;
+    }
+
+    .new-item-input:focus,
+    .title-input:focus {
+      border-color: #0E5C7A;
+    }
+
+    .tray-help {
+      color: #A2B4BC;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    .bottom-bar.edit {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 11px 12px;
+      background: #F7FBFD;
+      border: 1px solid #CFE2EA;
+      border-radius: 12px;
+    }
+
+    .edit-primary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-input {
+      min-width: 0;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .delete-button {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      color: #A56B6B;
+      background: #FFFFFF;
+      border: 1px solid #E4D5D5;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .edit-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-label {
+      margin-right: 1px;
+      color: #6B8794;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .q-choice {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      color: #7E96A1;
+      background: #FFFFFF;
+      border: 1px solid #E1EAEE;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .q-choice.active {
+      color: #FFFFFF;
+      background: var(--q-color);
+      border-color: var(--q-color);
+    }
+
+    .unclassify-button {
+      min-height: 30px;
+      padding: 0 9px;
+      color: #7E96A1;
+      background: #FFFFFF;
+      border: 1px dashed #C6D6DD;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .status-button {
+      min-height: 30px;
+      padding: 0 10px;
+      color: #6B8794;
+      background: #FFFFFF;
+      border: 1px solid #E1EAEE;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .status-button.active,
+    .descend-button {
+      color: #FFFFFF;
+      background: #0E5C7A;
+      border-color: #0E5C7A;
+    }
+
+    .descend-button {
+      min-height: 30px;
+      padding: 0 11px;
+      border: 1px solid #0E5C7A;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .parent-origin {
+      padding: 2px 0 2px 9px;
+      border-left: 2px solid #CFE2EA;
+      color: #6B8794;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    @media (min-width: 640px) and (max-width: 999px) {
+      .widget {
+        width: min(720px, calc(100vw - 32px));
+      }
+
+      .matrix-stage {
+        grid-template-rows: 300px auto;
+      }
+    }
+
+    @media (max-width: 639px) {
+      .app-shell {
+        place-items: start center;
+        padding: 10px 8px;
+      }
+
+      .widget {
+        width: min(380px, calc(100vw - 16px));
+        gap: 14px;
+        padding: 18px 14px 14px;
+        border-radius: 16px;
+      }
+
+      .header {
+        gap: 8px;
+      }
+
+      .scope-side {
+        gap: 8px;
+      }
+
+      .segment {
+        min-height: 44px;
+        padding-right: 8px;
+        padding-left: 8px;
+      }
+
+      .period {
+        max-width: 96px;
+      }
+
+      .progress-side {
+        gap: 7px;
+      }
+
+      .progress-track {
+        width: 60px;
+      }
+
+      .matrix-stage {
+        display: none;
+      }
+
+      .mobile-main {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .mobile-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .mobile-q-button {
+        min-width: 0;
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 10px;
+        background: var(--q-tint);
+        border: 0;
+        border-radius: 12px;
+        outline: 2px solid transparent;
+        outline-offset: -2px;
+        cursor: pointer;
+        transition: outline-color .12s ease, background-color .12s ease;
+      }
+
+      .mobile-q-button.selected {
+        outline-color: #0E5C7A;
+      }
+
+      .mobile-q-button .q-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 11px;
+      }
+
+      .mobile-q-name {
+        min-width: 0;
+        overflow: hidden;
+        color: #33505C;
+        font-size: 12px;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mobile-q-count {
+        flex: 0 0 auto;
+        margin-left: auto;
+        color: #A2B4BC;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .mobile-list-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .mobile-list-title {
+        color: #33505C;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.3;
+      }
+
+      .mobile-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .mobile-item {
+        min-width: 0;
+        min-height: 46px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        padding: 8px 11px;
+        background: #FFFFFF;
+        border: 1px solid #E6EDF0;
+        border-radius: 11px;
+        outline: 1.5px solid transparent;
+        outline-offset: -1.5px;
+        cursor: grab;
+        transition: outline-color .12s ease, opacity .12s ease;
+      }
+
+      .mobile-item.selected {
+        outline-color: #0E5C7A;
+      }
+
+      .mobile-item .item-title {
+        font-size: 13px;
+      }
+
+      .mobile-empty {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        color: #A2B4BC;
+        border: 1px dashed #C6D6DD;
+        border-radius: 11px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .bottom-bar.collapsed {
+        min-height: 44px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .tray-head,
+      .text-button,
+      .tray-chip,
+      .new-item-input,
+      .delete-button,
+      .title-input,
+      .unclassify-button,
+      .status-button,
+      .descend-button {
+        min-height: 44px;
+      }
+
+      .tray-chip {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .edit-primary {
+        align-items: stretch;
+      }
+
+      .q-choice {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+
+      .edit-controls {
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .control-group {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="widget" id="widget" aria-label="에너지 나침반 우선순위 위젯">
+      <header class="header" id="header"></header>
+      <section id="mainContent"></section>
+      <section class="bottom-bar collapsed" id="bottomBar" data-drop-tray="true"></section>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'energy-compass-3a-v2';
+      const ORDER = ['S', 'D', 'M', 'O'];
+      const QUADRANTS = {
+        O: { full: '기회를 찾는 업무', short: '기회' },
+        D: { full: '방향을 찾는 업무', short: '방향' },
+        S: { full: '체계를 찾는 업무', short: '체계' },
+        M: { full: '현재를 유지하는 업무', short: '유지' }
+      };
+      const PERIODS = {
+        week: '7월 20일 – 26일',
+        month: '2026년 7월'
+      };
+
+      const seedItems = [];
+
+      const cloneSeed = () => seedItems.map(item => ({ ...item }));
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.items)) return null;
+          const items = parsed.items
+            .filter(item => item && typeof item.id === 'string' && typeof item.t === 'string')
+            .map(item => ({
+              id: item.id,
+              scope: item.scope === 'month' ? 'month' : 'week',
+              q: ['O', 'D', 'S', 'M'].includes(item.q) ? item.q : null,
+              st: ['todo', 'doing', 'done'].includes(item.st) ? item.st : 'todo',
+              t: item.t,
+              p: typeof item.p === 'string' ? item.p : null
+            }));
+          return {
+            items,
+            scope: parsed.scope === 'month' ? 'month' : 'week'
+          };
+        } catch (_) {
+          return null;
+        }
+      }
+
+      const restored = loadState();
+      const state = restored || { items: cloneSeed(), scope: 'week' };
+      const ui = {
+        bottomState: 'collapsed',
+        selectedId: null,
+        mobileQ: 'S',
+        draggingId: null,
+        justDragged: false
+      };
+      let pointerDrag = null;
+
+      const widget = document.getElementById('widget');
+      const header = document.getElementById('header');
+      const mainContent = document.getElementById('mainContent');
+      const bottomBar = document.getElementById('bottomBar');
+
+      function save() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items, scope: state.scope }));
+        } catch (_) {
+          // 저장이 막혀도 현재 세션의 위젯은 계속 동작한다.
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function makeId() {
+        if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+          return globalThis.crypto.randomUUID();
+        }
+        return `item-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function currentItems() {
+        return state.items.filter(item => item.scope === state.scope);
+      }
+
+      function findItem(id) {
+        return state.items.find(item => item.id === id) || null;
+      }
+
+      function childCount(id) {
+        return state.items.filter(item => item.scope === 'week' && item.p === id).length;
+      }
+
+      function renderHeader() {
+        const items = currentItems();
+        const done = items.filter(item => item.st === 'done').length;
+        const ratio = items.length ? (done / items.length) * 100 : 0;
+        header.innerHTML = `
+          <div class="scope-side">
+            <div class="segments" aria-label="기간 선택">
+              <button class="segment ${state.scope === 'week' ? 'active' : ''}" type="button" data-scope="week">이번 주</button>
+              <button class="segment ${state.scope === 'month' ? 'active' : ''}" type="button" data-scope="month">이번 달</button>
+            </div>
+            <div class="period">${PERIODS[state.scope]}</div>
+          </div>
+          <div class="progress-side">
+            <span class="progress-copy">${done} / ${items.length} 완료</span>
+            <div class="progress-track" aria-hidden="true"><div class="progress-fill" style="width:${ratio}%"></div></div>
+          </div>
+        `;
+      }
+
+      function itemCardHtml(item, mobile = false) {
+        const parent = item.p ? findItem(item.p) : null;
+        const children = item.scope === 'month' ? childCount(item.id) : 0;
+        const selected = ui.selectedId === item.id ? ' selected' : '';
+        const done = item.st === 'done' ? ' done' : '';
+        const className = mobile ? 'mobile-item' : 'item-card';
+        return `
+          <div class="${className}${selected}${done}" draggable="true" data-drag-id="${escapeHtml(item.id)}" data-item-id="${escapeHtml(item.id)}" role="button" tabindex="0">
+            ${parent ? `<div class="parent-caption">↑ <span data-parent-title-id="${escapeHtml(parent.id)}">${escapeHtml(parent.t)}</span></div>` : ''}
+            <div class="item-body">
+              <span class="state-dot state-${item.st}" aria-hidden="true"></span>
+              <span class="item-title" data-title-id="${escapeHtml(item.id)}">${escapeHtml(item.t)}</span>
+              ${children ? `<span class="child-count">주간 ${children}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderMain() {
+        const items = currentItems();
+        const groups = Object.fromEntries(ORDER.map(q => [q, items.filter(item => item.q === q)]));
+        const cells = ORDER.map(q => `
+          <section class="quadrant q-${q}" data-drop-q="${q}">
+            <div class="quadrant-head">
+              <span class="q-badge">${q}</span>
+              <span class="quadrant-name">${QUADRANTS[q].full}</span>
+              <span class="quadrant-count">${groups[q].length}</span>
+            </div>
+            <div class="quadrant-list">${groups[q].map(item => itemCardHtml(item)).join('')}</div>
+          </section>
+        `).join('');
+
+        const selectedGroup = groups[ui.mobileQ];
+        const mobileSelectors = ORDER.map(q => `
+          <button class="mobile-q-button q-${q}${ui.mobileQ === q ? ' selected' : ''}" type="button" data-mobile-q="${q}" data-drop-q="${q}">
+            <span class="q-badge">${q}</span>
+            <span class="mobile-q-name">${QUADRANTS[q].short}</span>
+            <span class="mobile-q-count">${groups[q].length}개</span>
+          </button>
+        `).join('');
+
+        mainContent.innerHTML = `
+          <div class="matrix-stage">
+            <div class="axis-y">지속가능성 ↑</div>
+            <div class="matrix-grid">${cells}</div>
+            <div class="axis-x">확장성 →</div>
+          </div>
+          <div class="mobile-main">
+            <div class="mobile-selector">${mobileSelectors}</div>
+            <section class="mobile-list-panel">
+              <div class="mobile-list-title">${QUADRANTS[ui.mobileQ].full} · ${selectedGroup.length}</div>
+              <div class="mobile-list">
+                ${selectedGroup.length ? selectedGroup.map(item => itemCardHtml(item, true)).join('') : '<div class="mobile-empty">이 분면은 비어 있습니다</div>'}
+              </div>
+            </section>
+          </div>
+        `;
+      }
+
+      function renderBottom() {
+        const unclassified = currentItems().filter(item => item.q === null);
+        const selected = ui.selectedId ? findItem(ui.selectedId) : null;
+        const dragActions = `
+          <div class="drag-action-zones" aria-hidden="true">
+            <div class="drag-action-zone drag-tray-zone" data-drop-tray="true">미분류로</div>
+            <div class="drag-action-zone drag-delete-zone" data-drop-delete="true">삭제</div>
+          </div>
+        `;
+
+        if (ui.bottomState === 'edit' && (!selected || selected.scope !== state.scope)) {
+          ui.bottomState = 'collapsed';
+          ui.selectedId = null;
+        }
+
+        bottomBar.className = `bottom-bar ${ui.bottomState}`;
+        bottomBar.dataset.dropTray = 'true';
+
+        if (ui.bottomState === 'collapsed') {
+          bottomBar.innerHTML = `
+            <div class="collapsed-content">
+              <div class="collapsed-copy">미분류 ${unclassified.length} <span class="collapsed-hint">· 눌러서 펼치기</span></div>
+              <div class="collapsed-plus" aria-hidden="true">＋</div>
+            </div>
+            ${dragActions}
+          `;
+          return;
+        }
+
+        if (ui.bottomState === 'tray') {
+          const placeholder = state.scope === 'week' ? '이번 주에 하고 싶은 일…' : '이번 달에 하고 싶은 일…';
+          bottomBar.innerHTML = `
+            <div class="tray-head">
+              <div class="tray-title">미분류 ${unclassified.length}</div>
+              <button class="text-button" type="button" data-tray-close>접기</button>
+            </div>
+            <div class="tray-chips">
+              ${unclassified.map(item => `<button class="tray-chip" type="button" draggable="true" data-drag-id="${escapeHtml(item.id)}" data-item-id="${escapeHtml(item.id)}"><span data-title-id="${escapeHtml(item.id)}">${escapeHtml(item.t)}</span></button>`).join('')}
+            </div>
+            <input class="new-item-input" type="text" data-new-item placeholder="${placeholder}" aria-label="새 항목">
+            <div class="tray-help">항목을 분면으로 끌어놓거나, 눌러서 O·D·S·M 버튼으로 배치하세요.</div>
+            ${dragActions}
+          `;
+          return;
+        }
+
+        const parent = selected.p ? findItem(selected.p) : null;
+        const qButtons = ['O', 'D', 'S', 'M'].map(q => `
+          <button class="q-choice q-${q}${selected.q === q ? ' active' : ''}" type="button" data-q-choice="${q}">${q}</button>
+        `).join('');
+        const statuses = [
+          ['todo', '할 일'],
+          ['doing', '진행 중'],
+          ['done', '완료']
+        ].map(([value, label]) => `
+          <button class="status-button${selected.st === value ? ' active' : ''}" type="button" data-status-choice="${value}">${label}</button>
+        `).join('');
+
+        bottomBar.innerHTML = `
+          <div class="edit-primary">
+            <input class="title-input" type="text" value="${escapeHtml(selected.t)}" data-title-input="${escapeHtml(selected.id)}" aria-label="항목 제목">
+            <button class="delete-button" type="button" data-delete>삭제</button>
+            <button class="text-button" type="button" data-edit-close>닫기</button>
+          </div>
+          <div class="edit-controls">
+            <div class="control-group">
+              <span class="control-label">분면</span>
+              ${qButtons}
+              <button class="unclassify-button" type="button" data-unclassify>미분류로</button>
+            </div>
+            <div class="control-group">
+              <span class="control-label">상태</span>
+              ${statuses}
+            </div>
+            ${selected.scope === 'month' ? '<button class="descend-button" type="button" data-descend>↓ 이번 주로 내리기</button>' : ''}
+            ${parent ? `<div class="parent-origin">월간 · <span data-parent-title-id="${escapeHtml(parent.id)}">${escapeHtml(parent.t)}</span> 에서 내려옴</div>` : ''}
+          </div>
+          ${dragActions}
+        `;
+      }
+
+      function render() {
+        renderHeader();
+        renderMain();
+        renderBottom();
+      }
+
+      function selectItem(id) {
+        const item = findItem(id);
+        if (!item || item.scope !== state.scope) return;
+        ui.selectedId = id;
+        ui.bottomState = 'edit';
+        if (item.q) ui.mobileQ = item.q;
+        render();
+      }
+
+      function switchScope(scope) {
+        if (!['week', 'month'].includes(scope) || scope === state.scope) return;
+        state.scope = scope;
+        ui.selectedId = null;
+        ui.bottomState = 'collapsed';
+        save();
+        render();
+      }
+
+      function updateItem(mutator) {
+        const item = ui.selectedId ? findItem(ui.selectedId) : null;
+        if (!item) return;
+        mutator(item);
+        save();
+        render();
+      }
+
+      function deleteWithChildren(id) {
+        const toDelete = new Set([id]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          state.items.forEach(item => {
+            if (item.p && toDelete.has(item.p) && !toDelete.has(item.id)) {
+              toDelete.add(item.id);
+              expanded = true;
+            }
+          });
+        }
+        state.items = state.items.filter(item => !toDelete.has(item.id));
+        ui.selectedId = null;
+        ui.bottomState = 'collapsed';
+        save();
+        render();
+      }
+
+      function descendToWeek(item) {
+        const child = {
+          id: makeId(),
+          scope: 'week',
+          q: item.q,
+          st: 'todo',
+          t: item.t,
+          p: item.id
+        };
+        state.items.push(child);
+        state.scope = 'week';
+        ui.selectedId = child.id;
+        ui.bottomState = 'edit';
+        if (child.q) ui.mobileQ = child.q;
+        save();
+        render();
+      }
+
+      function setDropHighlight(target) {
+        document.querySelectorAll('.drop-active').forEach(node => {
+          if (node !== target) node.classList.remove('drop-active');
+        });
+        if (target) target.classList.add('drop-active');
+      }
+
+      function clearDragState() {
+        document.querySelectorAll('.drop-active').forEach(node => node.classList.remove('drop-active'));
+        document.querySelectorAll('.dragging').forEach(node => node.classList.remove('dragging'));
+        document.body.classList.remove('is-dragging');
+        ui.draggingId = null;
+      }
+
+      function getDropTargets(element) {
+        return {
+          deleteTarget: element ? element.closest('[data-drop-delete]') : null,
+          qTarget: element ? element.closest('[data-drop-q]') : null,
+          trayTarget: element ? element.closest('[data-drop-tray]') : null
+        };
+      }
+
+      function commitDrop(id, targets) {
+        const item = id ? findItem(id) : null;
+        if (!item || item.scope !== state.scope) return false;
+        if (!targets.deleteTarget && !targets.qTarget && !targets.trayTarget) return false;
+
+        if (targets.deleteTarget) {
+          deleteWithChildren(item.id);
+          return true;
+        }
+
+        item.q = targets.qTarget ? targets.qTarget.dataset.dropQ : null;
+        if (targets.qTarget) ui.mobileQ = targets.qTarget.dataset.dropQ;
+        save();
+        render();
+        return true;
+      }
+
+      function endPointerDrag(event, cancelled = false) {
+        if (!pointerDrag || event.pointerId !== pointerDrag.pointerId) return;
+        const drag = pointerDrag;
+        pointerDrag = null;
+
+        if (drag.source.hasPointerCapture?.(event.pointerId)) {
+          drag.source.releasePointerCapture(event.pointerId);
+        }
+
+        if (!drag.started) return;
+        event.preventDefault();
+        const targets = cancelled
+          ? getDropTargets(null)
+          : getDropTargets(document.elementFromPoint(event.clientX, event.clientY));
+        ui.justDragged = true;
+        clearDragState();
+        if (!cancelled) commitDrop(drag.id, targets);
+        setTimeout(() => { ui.justDragged = false; }, 80);
+      }
+
+      widget.addEventListener('click', event => {
+        const target = event.target;
+        const scopeButton = target.closest('[data-scope]');
+        if (scopeButton) {
+          switchScope(scopeButton.dataset.scope);
+          return;
+        }
+
+        const mobileQ = target.closest('[data-mobile-q]');
+        if (mobileQ) {
+          ui.mobileQ = mobileQ.dataset.mobileQ;
+          renderMain();
+          return;
+        }
+
+        if (target.closest('[data-tray-close]')) {
+          ui.bottomState = 'collapsed';
+          renderBottom();
+          return;
+        }
+
+        if (target.closest('[data-edit-close]')) {
+          ui.selectedId = null;
+          ui.bottomState = 'collapsed';
+          render();
+          return;
+        }
+
+        if (target.closest('[data-delete]')) {
+          if (ui.selectedId) deleteWithChildren(ui.selectedId);
+          return;
+        }
+
+        const qChoice = target.closest('[data-q-choice]');
+        if (qChoice) {
+          updateItem(item => { item.q = qChoice.dataset.qChoice; });
+          return;
+        }
+
+        if (target.closest('[data-unclassify]')) {
+          updateItem(item => { item.q = null; });
+          return;
+        }
+
+        const statusChoice = target.closest('[data-status-choice]');
+        if (statusChoice) {
+          updateItem(item => { item.st = statusChoice.dataset.statusChoice; });
+          return;
+        }
+
+        if (target.closest('[data-descend]')) {
+          const item = ui.selectedId ? findItem(ui.selectedId) : null;
+          if (item && item.scope === 'month') descendToWeek(item);
+          return;
+        }
+
+        const itemTarget = target.closest('[data-item-id]');
+        if (itemTarget) {
+          if (!ui.justDragged) selectItem(itemTarget.dataset.itemId);
+          return;
+        }
+
+        if (bottomBar.classList.contains('collapsed')) {
+          ui.bottomState = 'tray';
+          renderBottom();
+        }
+      });
+
+      widget.addEventListener('input', event => {
+        const input = event.target.closest('[data-title-input]');
+        if (!input) return;
+        const item = findItem(input.dataset.titleInput);
+        if (!item) return;
+        item.t = input.value;
+        save();
+        document.querySelectorAll(`[data-title-id="${CSS.escape(item.id)}"]`).forEach(node => {
+          node.textContent = item.t;
+        });
+        document.querySelectorAll(`[data-parent-title-id="${CSS.escape(item.id)}"]`).forEach(node => {
+          node.textContent = item.t;
+        });
+      });
+
+      widget.addEventListener('keydown', event => {
+        const newInput = event.target.closest('[data-new-item]');
+        if (newInput && event.key === 'Enter') {
+          event.preventDefault();
+          const title = newInput.value.trim();
+          if (!title) return;
+          state.items.push({
+            id: makeId(),
+            scope: state.scope,
+            q: null,
+            st: 'todo',
+            t: title,
+            p: null
+          });
+          save();
+          render();
+          requestAnimationFrame(() => document.querySelector('[data-new-item]')?.focus());
+          return;
+        }
+
+        const itemTarget = event.target.closest('[data-item-id]');
+        if (itemTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          selectItem(itemTarget.dataset.itemId);
+        }
+      });
+
+      widget.addEventListener('dragstart', event => {
+        const source = event.target.closest('[data-drag-id]');
+        if (!source) return;
+        if (pointerDrag?.started) {
+          event.preventDefault();
+          return;
+        }
+        ui.draggingId = source.dataset.dragId;
+        document.body.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', ui.draggingId);
+        requestAnimationFrame(() => source.classList.add('dragging'));
+      });
+
+      document.addEventListener('dragover', event => {
+        const { deleteTarget, qTarget, trayTarget } = getDropTargets(event.target);
+        const dropTarget = deleteTarget || qTarget || trayTarget;
+        if (!dropTarget || !ui.draggingId) {
+          setDropHighlight(null);
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDropHighlight(dropTarget);
+      });
+
+      document.addEventListener('drop', event => {
+        const targets = getDropTargets(event.target);
+        const { deleteTarget, qTarget, trayTarget } = targets;
+        if (!deleteTarget && !qTarget && !trayTarget) return;
+        event.preventDefault();
+        const id = event.dataTransfer.getData('text/plain') || ui.draggingId;
+        clearDragState();
+        commitDrop(id, targets);
+      });
+
+      document.addEventListener('dragend', () => {
+        ui.justDragged = true;
+        clearDragState();
+        setTimeout(() => { ui.justDragged = false; }, 80);
+      });
+
+      widget.addEventListener('pointerdown', event => {
+        const source = event.target.closest('[data-drag-id]');
+        if (!source || event.button !== 0) return;
+        pointerDrag = {
+          id: source.dataset.dragId,
+          source,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          started: false
+        };
+        source.setPointerCapture?.(event.pointerId);
+      });
+
+      widget.addEventListener('pointermove', event => {
+        if (!pointerDrag || event.pointerId !== pointerDrag.pointerId) return;
+        if (!pointerDrag.started) {
+          const distance = Math.hypot(event.clientX - pointerDrag.startX, event.clientY - pointerDrag.startY);
+          if (distance < 6) return;
+          pointerDrag.started = true;
+          ui.draggingId = pointerDrag.id;
+          document.body.classList.add('is-dragging');
+          pointerDrag.source.classList.add('dragging');
+        }
+        event.preventDefault();
+        const targets = getDropTargets(document.elementFromPoint(event.clientX, event.clientY));
+        setDropHighlight(targets.deleteTarget || targets.qTarget || targets.trayTarget);
+      });
+
+      widget.addEventListener('pointerup', event => endPointerDrag(event));
+      widget.addEventListener('pointercancel', event => endPointerDrag(event, true));
+
+      render();
+      if (!restored) save();
+    })();
+  </script>
+</body>
+</html>
