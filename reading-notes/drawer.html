@@ -23,19 +23,19 @@
     button, input, textarea { font:inherit; color:inherit; }
     button { cursor:pointer; }
     .card {
-      width:380px; height:990px; padding:16px; overflow:hidden; position:relative;
+      width:380px; height:470px; padding:16px; overflow:hidden; position:relative;
       display:flex; flex-direction:column; gap:10px; background:var(--surface); border-radius:18px;
       box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
     .fixed { flex:0 0 auto; display:flex; flex-direction:column; gap:10px; }
     .banner {
-      height:74px; padding:10px 12px; display:grid; grid-template-columns:1fr 28px; grid-template-rows:auto 1fr auto;
-      gap:5px 8px; background:var(--action-soft); border-radius:14px;
+      height:100px; min-height:100px; padding:10px 12px; display:grid; grid-template-columns:1fr 28px; grid-template-rows:auto auto auto;
+      align-content:center; gap:4px 8px; background:var(--action-soft); border-radius:14px;
     }
-    .banner-title { align-self:center; color:var(--action); font-size:11px; font-weight:800; }
+    .banner-title { align-self:center; color:var(--action); font-size:11px; font-weight:800; line-height:1.35; }
     .rotate { width:28px; height:24px; padding:0; border:0; background:transparent; color:var(--action); font-size:14px; font-weight:800; }
-    .banner-quote { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:800; }
-    .banner-meta { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--deep); font-size:9px; font-weight:700; }
+    .banner-quote { grid-column:1 / -1; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; font-size:12px; font-weight:800; line-height:1.4; }
+    .banner-meta { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--deep); font-size:9px; font-weight:700; line-height:1.4; }
     .banner.is-empty { display:flex; align-items:center; justify-content:center; text-align:center; color:var(--secondary); font-size:10px; font-weight:700; }
     .search { width:100%; height:32px; padding:0 11px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
     .search:focus, textarea:focus { border-color:var(--action); outline:2px solid var(--action-soft); }
@@ -93,7 +93,7 @@
     .hidden { display:none !important; }
     @media (max-width:340px) {
       .card { padding:11px; gap:9px; }
-      .banner { height:74px; }
+      .banner { height:100px; }
       .quote-list { padding-inline:6px; }
       .overlay { inset:5px; padding:11px; }
     }
@@ -101,7 +101,7 @@
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-drawer.html" data-widget-max-width="380" data-widget-height="990" data-widget-max-scale="4" style="--widget-max-width:380px;--widget-base-width:380px;--widget-base-height:990px;--widget-visual-height:990px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-drawer-v2.html" data-widget-max-width="380" data-widget-height="470" data-widget-max-scale="4" style="--widget-max-width:380px;--widget-base-width:380px;--widget-base-height:470px;--widget-visual-height:470px">
     <main class="card" data-widget-card aria-label="문장 서랍 위젯">
       <div class="fixed" data-widget-fixed>
         <section class="banner" id="waitingBanner"></section>
@@ -192,6 +192,7 @@
           return fieldMatch && textMatch;
         }).sort((a, b) => new Date(b.created) - new Date(a.created));
       }
+      function visibleQuotes() { return filteredQuotes().slice(0, 4); }
       function renderBanner() {
         const waiting = waitingQuotes();
         if (!waiting.length) { els.banner.className = 'banner is-empty'; els.banner.innerHTML = '지금은 사유 대기 중인 문장이 없어요'; return; }
@@ -217,7 +218,7 @@
         document.getElementById('moreFields')?.addEventListener('click', () => { fieldsExpanded = true; renderFilters(); });
       }
       function renderList() {
-        const list = filteredQuotes();
+        const list = visibleQuotes();
         if (!list.length) { els.list.innerHTML = `<div class="empty"><strong>찾는 문장이 없어요</strong><span>검색어나 분야를 바꿔보세요</span></div>`; return; }
         els.list.innerHTML = list.map(item => {
           const book = bookFor(item.bookId); const preview = stripMarkdown(item.thought) || item.note || '생각 한 줄 아직 없음';
@@ -229,7 +230,7 @@
       function renderDetail() {
         const item = quotes.find(quote => quote.id === activeId);
         if (!item) { closeDetail(); return; }
-        const book = bookFor(item.bookId); const list = filteredQuotes(); const index = list.findIndex(quote => quote.id === item.id);
+        const book = bookFor(item.bookId); const list = visibleQuotes(); const index = list.findIndex(quote => quote.id === item.id);
         els.overlay.classList.remove('hidden');
         els.overlay.innerHTML = `<div class="overlay-head"><button class="back" id="detailBack" type="button">← 목록</button><button class="delete" id="detailDelete" type="button">${deleteArmed ? '삭제할까요?' : '삭제'}</button></div><div class="detail-quote">${escapeHtml(item.text)}</div><div class="detail-meta"><span>${escapeHtml(book.title)}${item.page ? ` · ${escapeHtml(item.page)}p` : ''}</span><span class="field-pill">${escapeHtml(book.field || '미분류')}</span></div>${item.note ? `<div class="detail-note">${escapeHtml(item.note)}</div>` : ''}<label class="thought-label" for="thoughtInput"><span>생각 한 줄</span><span class="saved" id="savedLabel">저장됨</span></label><textarea class="thought" id="thoughtInput" placeholder="이 문장이 남긴 생각을 자유롭게 적어보세요">${escapeHtml(item.thought || '')}</textarea><div class="markdown">**굵게** 표시할 수 있어요</div><div class="pager"><button type="button" id="prevQuote" ${index <= 0 ? 'disabled' : ''}>← 이전</button><span>${Math.max(0, index) + 1} / ${list.length}</span><button type="button" id="nextQuote" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>`;
         document.getElementById('detailBack').addEventListener('click', closeDetail);
