@@ -7,102 +7,91 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <style>
     :root {
-      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --secondary:#6B8794;
-      --muted:#93A5AD; --faint:#A2B4BC; --done:#A9BAC2;
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --title:#33505C;
+      --secondary:#6B8794; --muted:#93A5AD; --faint:#A2B4BC; --done:#A9BAC2;
       --q:oklch(0.62 0.09 245); --q-tint:oklch(0.975 0.017 245);
       --p:oklch(0.62 0.09 195); --p-tint:oklch(0.975 0.017 195);
     }
     * { box-sizing:border-box; }
-    html, body { min-height:100%; }
-    body { margin:0; color:#12303C; background:transparent; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
-    button { font:inherit; color:inherit; }
+    html, body { min-height:100%; background:transparent; }
+    body { margin:0; color:var(--text); font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
+    button, a { color:inherit; font:inherit; }
     .shell { min-height:0; }
-    .widget { width:100%; min-height:700px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
-    .calendar-head, .month-controls, .detail-head, .mode-line, .section-head, .record-nav { display:flex; align-items:center; }
-    .calendar-head { min-height:34px; justify-content:space-between; gap:16px; }
-    .month-controls { gap:8px; }
-    .month-button { width:34px; height:34px; padding:0; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
-    .month-title { min-width:104px; text-align:center; font-size:13px; font-weight:800; }
-    .record-count { color:#6B8794; font-size:11px; font-weight:700; }
-    .calendar-wrap { display:flex; flex-direction:column; gap:8px; background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px; }
-    .weekday-grid, .calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
-    .weekday { padding:2px 6px; color:#A9BAC2; font-size:9px; font-weight:700; text-align:left; }
-    .calendar-cell { position:relative; min-width:0; aspect-ratio:1/1; padding:6px; overflow:hidden; text-align:left; background:transparent; border:1px solid transparent; border-radius:10px; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .12s ease,background-color .12s ease; }
+    .widget { width:100%; height:546px; display:flex; flex-direction:column; gap:10px; padding:18px; overflow:hidden; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
+    #app { min-height:0; display:flex; flex:1; flex-direction:column; gap:10px; }
+    .calendar-head, .month-controls, .detail-head, .mode-line, .detail-meta, .section-head, .record-nav { display:flex; align-items:center; }
+    .calendar-head { min-height:30px; justify-content:space-between; gap:12px; }
+    .month-controls { gap:7px; }
+    .month-button { width:30px; height:30px; padding:0; color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:24px; font-weight:600; line-height:1; cursor:pointer; }
+    .month-title { min-width:92px; text-align:center; font-size:12px; font-weight:800; }
+    .record-count, .detail-index { color:var(--muted); font-size:10px; font-weight:700; }
+    .calendar-wrap { width:100%; min-height:0; display:flex; flex:1; flex-direction:column; gap:5px; }
+    .weekday-grid, .calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; }
+    .calendar-grid { min-height:0; flex:1; }
+    .weekday { color:var(--done); font-size:9px; font-weight:700; text-align:center; }
+    .calendar-cell { position:relative; min-width:0; min-height:0; padding:5px; overflow:hidden; text-align:left; background:transparent; border:1px solid #F7F9FA; border-radius:9px; outline:2px solid transparent; outline-offset:-2px; }
     button.calendar-cell { cursor:pointer; }
+    .calendar-cell.quest { background:var(--q-tint); border-color:transparent; }
+    .calendar-cell.photo { background-position:center; background-size:cover; border-color:transparent; }
+    .calendar-cell.today { outline-color:var(--action); }
     .calendar-cell.outside { opacity:.3; }
     .calendar-cell.future { opacity:.35; }
-    .calendar-cell.today { background:#FFFFFF; outline-color:#0E5C7A; }
-    .calendar-cell.quest { background:#FFFFFF; border-color:#E6EDF0; }
-    .calendar-cell.photo { background-color:#FFFFFF; background-position:center; background-size:cover; border-color:#E6EDF0; }
-    .cell-number { display:inline-flex; min-height:18px; align-items:center; padding:2px 5px; color:#A9BAC2; border-radius:999px; font-size:9px; font-weight:800; line-height:1; }
-    .calendar-cell.quest .cell-number { color:#3E5A66; }
-    .calendar-cell.photo .cell-number { color:#12303C; background:rgba(255,255,255,.82); }
-    .cell-q { position:absolute; left:6px; bottom:6px; width:13px; height:13px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; background:var(--q); border-radius:5px; font-size:9px; font-weight:800; line-height:1; }
-    .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:auto; padding-top:12px; color:#93A5AD; border-top:1px solid #EDF2F4; font-size:10px; font-weight:700; }
-    .legend-item { display:flex; align-items:center; gap:6px; }
-    .legend-q { width:13px; height:13px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; background:var(--q); border-radius:5px; font-size:9px; font-weight:800; }
-    .legend-photo { width:16px; height:13px; background:var(--p-tint); border:1px solid #E6EDF0; border-radius:5px; }
-    .legend-today { width:16px; height:13px; border-radius:5px; outline:2px solid #0E5C7A; outline-offset:-2px; }
-    .detail { min-height:656px; display:flex; flex-direction:column; gap:16px; }
-    .detail-head { min-height:34px; justify-content:space-between; gap:12px; }
-    .back-button { min-height:34px; padding:0 6px; color:#6B8794; background:transparent; border:0; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; }
-    .detail-index { color:#93A5AD; font-size:11px; font-weight:700; }
-    .detail-grid { display:grid; grid-template-columns:minmax(0,320px) 1fr; gap:22px; flex:1; }
-    .detail-visual { width:100%; aspect-ratio:1/1; overflow:hidden; background-position:center; background-size:cover; border:1px solid #E6EDF0; border-radius:12px; }
-    .detail-visual.quest { background:var(--q-tint); border-color:transparent; }
-    .detail-visual.photo-empty { background:var(--p-tint); }
-    .detail-copy { min-width:0; display:flex; flex-direction:column; gap:16px; }
-    .mode-line { flex-wrap:wrap; gap:8px; }
-    .detail-date { color:#6B8794; font-size:11px; font-weight:700; }
-    .mode-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; color:#33505C; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .cell-number { display:inline-flex; min-height:16px; align-items:center; padding:2px 5px; color:var(--done); border-radius:999px; font-size:9px; font-weight:700; line-height:1; }
+    .calendar-cell.photo .cell-number { color:var(--text); background:rgba(255,255,255,.82); }
+    .cell-q { position:absolute; left:5px; bottom:5px; width:12px; height:12px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; background:var(--q); border-radius:5px; font-size:8px; font-weight:800; line-height:1; }
+
+    .detail { min-height:0; display:flex; flex:1; flex-direction:column; gap:10px; }
+    .detail-head { min-height:30px; justify-content:space-between; gap:10px; }
+    .back-button { min-height:30px; padding:0 4px; color:var(--secondary); background:transparent; border:0; font-size:11px; font-weight:700; cursor:pointer; }
+    .detail-grid { min-height:0; display:grid; flex:1; grid-template-columns:minmax(180px,34%) minmax(0,1fr); gap:14px; }
+    .detail-visual { min-height:0; overflow:hidden; background:var(--q-tint); border:1px solid #F1F5F7; border-radius:12px; }
+    .detail-visual.photo { background-color:var(--p-tint); background-position:center; background-size:cover; }
+    .detail-copy { min-width:0; min-height:0; display:flex; flex-direction:column; gap:9px; }
+    .detail-meta { flex-wrap:wrap; gap:6px; }
+    .detail-date { font-size:13px; font-weight:800; }
+    .mode-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; color:var(--title); border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.06em; }
     .mode-pill.q { background:var(--q-tint); }
     .mode-pill.p { background:var(--p-tint); }
     .mode-mark { width:15px; height:15px; display:inline-flex; align-items:center; justify-content:center; color:#FFFFFF; border-radius:5px; font-size:9px; font-weight:800; line-height:1; }
     .q .mode-mark { background:var(--q); }
     .p .mode-mark { background:var(--p); }
-    .detail-sections { display:flex; flex-direction:column; gap:12px; }
-    .detail-section { display:flex; flex-direction:column; gap:6px; }
-    .detail-section + .detail-section { padding-top:12px; border-top:1px solid #F1F5F7; }
-    .label { color:#6B8794; font-size:10px; font-weight:800; letter-spacing:.06em; }
-    .body-text { margin:0; color:#12303C; font-size:12px; font-weight:600; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .job { color:#12303C; font-size:12px; font-weight:700; }
-    .pills { display:flex; flex-wrap:wrap; gap:6px; }
-    .pill { padding:4px 8px; color:#6B8794; background:#F5F9FB; border-radius:999px; font-size:10px; font-weight:700; }
-    .plain-list { display:flex; flex-direction:column; gap:4px; }
-    .plain-item { color:#12303C; font-size:12px; font-weight:600; line-height:1.5; }
-    .plain-item.done { color:#A9BAC2; text-decoration:line-through; }
-    .event { padding:2px 0 2px 10px; border-left:2px solid #CFE2EA; }
-    .choice { margin-top:6px; color:#0E5C7A; font-size:11px; font-weight:700; }
-    .photo-thumbs { display:flex; flex-wrap:wrap; gap:6px; }
-    .photo-thumb { width:52px; height:52px; padding:0; overflow:hidden; background:#FFFFFF; border:1px solid #E6EDF0; border-radius:9px; outline:2px solid transparent; outline-offset:-2px; cursor:pointer; }
-    .photo-thumb.active { outline-color:#0E5C7A; }
+    .temperature-pill { display:inline-flex; padding:4px 8px; color:var(--action); background:var(--action-soft); border-radius:999px; font-size:10px; font-weight:700; }
+    .pills { display:flex; min-width:0; flex-wrap:nowrap; gap:5px; overflow:hidden; }
+    .pill { flex:0 0 auto; padding:4px 8px; color:var(--secondary); background:#F5F9FB; border-radius:999px; font-size:10px; font-weight:700; }
+    .detail-sections { min-height:0; display:flex; flex:1; flex-direction:column; gap:8px; overflow-y:auto; }
+    .detail-section { display:flex; flex-direction:column; gap:5px; }
+    .detail-section + .detail-section { padding-top:8px; border-top:1px solid #F1F5F7; }
+    .section-head { justify-content:space-between; gap:8px; }
+    .label { color:var(--secondary); font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .count { color:var(--muted); font-size:10px; font-weight:800; }
+    .job { font-size:12px; font-weight:700; }
+    .detail-item { min-height:30px; display:flex; align-items:center; gap:7px; padding:6px 8px; background:#FFFFFF; border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    .state-dot { width:9px; height:9px; flex:0 0 auto; background:#FFFFFF; border:1.5px solid #C6D6DD; border-radius:50%; }
+    .detail-item.done .state-dot { background:#C6D6DD; }
+    .item-text { font-size:11px; font-weight:600; line-height:1.4; }
+    .detail-item.done .item-text { color:var(--done); text-decoration:line-through; }
+    .quote { padding-left:9px; border-left:2px solid #CFE2EA; }
+    .body-text { margin:0; font-size:12px; font-weight:600; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .choice { margin-top:4px; color:var(--action); font-size:11px; font-weight:700; }
+    .achievement-pill { background:#FFFFFF; border:1px solid #E6EDF0; }
+    .photo-thumbs { display:flex; gap:6px; overflow-x:auto; }
+    .photo-thumb { width:54px; height:54px; flex:0 0 auto; padding:0; overflow:hidden; background:#FFFFFF; border:1px solid #E6EDF0; border-radius:9px; cursor:pointer; }
+    .photo-thumb.active { outline:2px solid var(--action); outline-offset:-2px; }
     .photo-thumb img { width:100%; height:100%; object-fit:cover; }
-    .record-nav { justify-content:flex-end; gap:6px; margin-top:auto; padding-top:12px; }
-    .record-button { width:34px; height:34px; padding:0; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
-    .record-button:disabled { color:#A9BAC2; background:#FAFCFD; cursor:default; }
-    @media (min-width:2px) and (max-width:1px) { .widget { width:min(720px,calc(100vw - 32px)); } }
-    @media (max-width:0px) {
-      .shell { place-items:start center; padding:10px 8px; }
-      .widget { width:min(380px,calc(100vw - 16px)); min-height:700px; padding:22px; }
-      .month-button, .record-button { width:44px; height:44px; }
-      .back-button, button.calendar-cell, .photo-thumb { min-height:44px; }
-      .calendar-head { min-height:44px; }
-      .weekday-grid, .calendar-grid { gap:4px; }
-      .weekday { padding:2px 3px; text-align:center; }
-      .calendar-cell { padding:4px; }
-      .cell-q { left:4px; bottom:4px; }
-      .detail { min-height:656px; }
-      .detail-head { min-height:44px; }
-      .detail-grid { grid-template-columns:1fr; gap:16px; }
-      .detail-visual { max-width:320px; justify-self:center; }
-      .record-nav { justify-content:center; }
-      .photo-thumb { width:52px; height:52px; }
+    .record-nav { justify-content:flex-end; gap:5px; margin-top:auto; }
+    .record-button { width:32px; height:32px; padding:0; color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; cursor:pointer; }
+    .record-button:disabled { color:var(--done); cursor:default; }
+    @media (max-width:639px) {
+      .widget { padding:14px; }
+      .detail-grid { display:flex; flex-direction:column; }
+      .detail-visual { min-height:120px; flex:0 0 120px; }
+      .month-button, .back-button, .record-button { min-height:40px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body class="widget-page">
-  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-calendar.html" data-widget-max-width="1200" data-widget-height="700" style="--widget-max-width:1200px;--widget-base-width:1200px;--widget-base-height:700px;--widget-visual-height:700px">
+<body class="widget-page widget-page-centered">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-calendar.html" data-widget-max-width="940" data-widget-height="546" style="--widget-max-width:940px;--widget-base-width:940px;--widget-base-height:546px;--widget-visual-height:546px">
     <section class="widget" data-widget-card aria-label="게임 로그 일기 캘린더 위젯">
       <div class="widget-dynamic-content" id="app"></div>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
@@ -113,72 +102,36 @@
     (() => {
       'use strict';
       const STORAGE_KEY='game-log-diary-4b-v2';
-      const LEGACY_STORAGE_KEY='game-log-diary-v1';
       const CHANNEL_NAME='game-log-diary';
       const WEEKDAYS=['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+      const MOOD_NAMES=['차가움','서늘함','보통','포근함','따뜻함'];
       const app=document.getElementById('app');
       function localKey(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`;}
       function fromKey(key){const [y,m,d]=key.split('-').map(Number);return new Date(y,m-1,d,12);}
       function formatDate(key){const d=fromKey(key);return `${d.getMonth()+1}월 ${d.getDate()}일 ${WEEKDAYS[d.getDay()]}`;}
       function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
       function clone(value){return JSON.parse(JSON.stringify(value));}
+      function moodValue(value){const n=Number(value);return Number.isInteger(n)&&n>=1&&n<=5?n:null;}
+      function cleanWords(value){return [...new Set((Array.isArray(value)?value:[]).map(item=>String(item).trim()).filter(Boolean))];}
       const TODAY=localKey(new Date());
       let memoryStore={entries:{}};
       function normalizeStore(value){return value&&typeof value==='object'&&value.entries&&typeof value.entries==='object'?{entries:value.entries}:{entries:{}};}
-      function readStore(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){memoryStore=normalizeStore(JSON.parse(raw));}else{const legacyRaw=localStorage.getItem(LEGACY_STORAGE_KEY);memoryStore=legacyRaw?normalizeStore(JSON.parse(legacyRaw)):{entries:{}};if(legacyRaw)localStorage.setItem(STORAGE_KEY,JSON.stringify(memoryStore));}}catch(_){}return clone(memoryStore);}
-      let store=readStore();
-      let channel=null;
-      try{if('BroadcastChannel'in window)channel=new BroadcastChannel(CHANNEL_NAME);}catch(_){}
-      function saveEntries(entries){const latest=readStore();latest.entries={...latest.entries,...clone(entries)};memoryStore=latest;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(latest));}catch(_){}store=clone(latest);try{channel?.postMessage({type:'changed'});}catch(_){}}
+      function readStore(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)memoryStore=normalizeStore(JSON.parse(raw));}catch(_){}return clone(memoryStore);}
+      let store=readStore(),channel=null;try{if('BroadcastChannel'in window)channel=new BroadcastChannel(CHANNEL_NAME);}catch(_){}
       const now=new Date();
       const ui={view:'calendar',year:now.getFullYear(),month:now.getMonth(),selectedDate:null,selectedPhoto:0};
-      function syncFromStorage(){store=readStore();if(ui.view==='detail'&&!store.entries[ui.selectedDate]){ui.view='calendar';ui.selectedDate=null;}render();}
-      window.addEventListener('storage',event=>{if(event.key===STORAGE_KEY)syncFromStorage();});
-      if(channel)channel.onmessage=event=>{if(event.data?.type==='changed')syncFromStorage();};
-      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncFromStorage();});
-      window.addEventListener('focus',syncFromStorage);
-
+      function entryMood(entry){return entry?.mode==='quest'?{mood:moodValue(entry.quest?.mood),tags:cleanWords(entry.quest?.moodTags)}:{mood:moodValue(entry?.mood),tags:cleanWords(entry?.moodTags)};}
+      function sync(){store=readStore();if(ui.view==='detail'&&!store.entries[ui.selectedDate]){ui.view='calendar';ui.selectedDate=null;}render();}
+      window.addEventListener('storage',event=>{if(event.key===STORAGE_KEY)sync();});if(channel)channel.onmessage=event=>{if(event.data?.type==='changed')sync();};window.addEventListener('focus',sync);
       function modePill(mode){const quest=mode==='quest';return `<span class="mode-pill ${quest?'q':'p'}"><span class="mode-mark">${quest?'Q':'P'}</span>${quest?'퀘스트':'일기'}</span>`;}
-      function monthKey(year,month){return `${year}-${String(month+1).padStart(2,'0')}`;}
-      function moveMonth(amount){const d=new Date(ui.year,ui.month+amount,1,12);ui.year=d.getFullYear();ui.month=d.getMonth();renderCalendar();}
-      function calendarDates(){
-        const first=new Date(ui.year,ui.month,1,12);const offset=(first.getDay()+6)%7;const days=new Date(ui.year,ui.month+1,0,12).getDate();const total=Math.ceil((offset+days)/7)*7;
-        return Array.from({length:total},(_,index)=>{const d=new Date(ui.year,ui.month,1-offset+index,12);return {date:d,key:localKey(d),inside:d.getMonth()===ui.month};});
-      }
+      function calendarDates(){const first=new Date(ui.year,ui.month,1,12),last=new Date(ui.year,ui.month+1,0,12),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last.getDate())/7)*7,start=new Date(ui.year,ui.month,1-offset,12);return Array.from({length:total},(_,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);return{date,key:localKey(date),inside:date.getMonth()===ui.month};});}
       function photoStyle(entry){return entry?.mode==='photo'&&entry.photos?.[0]?` style="background-image:url('${escapeHtml(entry.photos[0])}')"`:'';}
-      function renderCalendar(){
-        const prefix=monthKey(ui.year,ui.month);const count=Object.keys(store.entries).filter(key=>key.startsWith(prefix+'-')).length;
-        const weekdays=['월','화','수','목','금','토','일'];
-        const cells=calendarDates().map(({date,key,inside})=>{const entry=store.entries[key];const tag=entry?'button':'div';const classes=['calendar-cell',inside?'':'outside',key>TODAY?'future':'',entry?.mode||'',key===TODAY?'today':''].filter(Boolean).join(' ');return `<${tag} class="${classes}"${entry?' type="button" data-entry-date="'+key+'"':''}${photoStyle(entry)}><span class="cell-number">${date.getDate()}</span>${entry?.mode==='quest'?'<span class="cell-q">Q</span>':''}</${tag}>`;}).join('');
-        app.innerHTML=`<header class="calendar-head"><div class="month-controls"><button class="month-button" type="button" data-month="-1">‹</button><div class="month-title">${ui.year}년 ${ui.month+1}월</div><button class="month-button" type="button" data-month="1">›</button></div><div class="record-count">${count}편 기록</div></header><section class="calendar-wrap"><div class="weekday-grid">${weekdays.map(day=>`<div class="weekday">${day}</div>`).join('')}</div><div class="calendar-grid">${cells}</div></section><div class="legend"><span class="legend-item"><span class="legend-q">Q</span>퀘스트로 쓴 날</span><span class="legend-item"><span class="legend-photo"></span>사진이 칸을 채움</span><span class="legend-item"><span class="legend-today"></span>오늘</span></div>`;
-      }
-      function questDetails(entry){
-        const q=entry.quest||{};const parts=[];
-        if(q.job?.trim())parts.push(`<section class="detail-section"><div class="label">직업</div><div class="job">${escapeHtml(q.job)}</div></section>`);
-        if(q.conds?.length)parts.push(`<section class="detail-section"><div class="pills">${q.conds.map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join('')}</div></section>`);
-        if(q.main?.length)parts.push(`<section class="detail-section"><div class="label">오늘의 퀘스트</div><div class="plain-list">${q.main.map(x=>`<div class="plain-item${x.done?' done':''}">· ${escapeHtml(x.t)}</div>`).join('')}</div></section>`);
-        if(q.sub?.length)parts.push(`<section class="detail-section"><div class="label">서브 퀘스트</div><div class="plain-list">${q.sub.map(x=>`<div class="plain-item${x.done?' done':''}">· ${escapeHtml(x.t)}</div>`).join('')}</div></section>`);
-        if(q.event?.t?.trim()||q.event?.c?.trim())parts.push(`<section class="detail-section"><div class="event">${q.event.t?.trim()?`<p class="body-text">이벤트 — ${escapeHtml(q.event.t)}</p>`:''}${q.event.c?.trim()?`<div class="choice">→ ${escapeHtml(q.event.c)}</div>`:''}</div></section>`);
-        if(q.achieve?.length)parts.push(`<section class="detail-section"><div class="label">오늘의 업적</div><div class="pills">${q.achieve.map(x=>`<span class="pill">${escapeHtml(x)}</span>`).join('')}</div></section>`);
-        if(q.ending?.trim())parts.push(`<section class="detail-section"><div class="label">하루 엔딩로그</div><p class="body-text">${escapeHtml(q.ending)}</p></section>`);
-        return parts.join('');
-      }
-      function renderDetail(){
-        const entry=store.entries[ui.selectedDate];if(!entry){ui.view='calendar';renderCalendar();return;}
-        const keys=Object.keys(store.entries).sort();const index=keys.indexOf(ui.selectedDate);const photos=entry.mode==='photo'?(entry.photos||[]):[];ui.selectedPhoto=Math.min(ui.selectedPhoto,Math.max(0,photos.length-1));
-        const visual=entry.mode==='quest'?'<div class="detail-visual quest"></div>':photos.length?`<div class="detail-visual" style="background-image:url('${escapeHtml(photos[ui.selectedPhoto])}')"></div>`:'<div class="detail-visual photo-empty"></div>';
-        const content=entry.mode==='photo'?`<div class="detail-sections">${entry.text?.trim()?`<p class="body-text">${escapeHtml(entry.text)}</p>`:''}${photos.length>1?`<div class="photo-thumbs">${photos.map((src,i)=>`<button class="photo-thumb${i===ui.selectedPhoto?' active':''}" type="button" data-photo-index="${i}"><img src="${escapeHtml(src)}" alt=""></button>`).join('')}</div>`:''}</div>`:`<div class="detail-sections">${questDetails(entry)}</div>`;
-        app.innerHTML=`<section class="detail"><header class="detail-head"><button class="back-button" type="button" data-back>‹ 달력으로</button><div class="detail-index">${index+1} / ${keys.length}</div></header><div class="detail-grid">${visual}<div class="detail-copy"><div class="mode-line">${modePill(entry.mode)}<span class="detail-date">${formatDate(ui.selectedDate)}</span></div>${content}<div class="record-nav"><button class="record-button" type="button" data-record-nav="-1"${keys.length<2?' disabled':''}>‹</button><button class="record-button" type="button" data-record-nav="1"${keys.length<2?' disabled':''}>›</button></div></div></div></section>`;
-      }
+      function renderCalendar(){const monthPrefix=`${ui.year}-${String(ui.month+1).padStart(2,'0')}`,count=Object.keys(store.entries).filter(key=>key.startsWith(monthPrefix)).length,dates=calendarDates(),cells=dates.map(({date,key,inside})=>{const item=store.entries[key],tag=item?'button':'div',classes=['calendar-cell',inside?'':'outside',key>TODAY?'future':'',item?.mode||'',key===TODAY?'today':''].filter(Boolean).join(' ');return `<${tag} class="${classes}"${item?` type="button" data-entry-date="${key}"`:''}${photoStyle(item)}><span class="cell-number">${date.getDate()}</span>${item?.mode==='quest'?'<span class="cell-q">Q</span>':''}</${tag}>`;}).join('');app.innerHTML=`<header class="calendar-head"><div class="month-controls"><button class="month-button" type="button" data-month="-1" aria-label="이전 달">‹</button><div class="month-title">${ui.year}년 ${ui.month+1}월</div><button class="month-button" type="button" data-month="1" aria-label="다음 달">›</button></div><div class="record-count">${count}편 기록</div></header><section class="calendar-wrap"><div class="weekday-grid">${['월','화','수','목','금','토','일'].map(day=>`<div class="weekday">${day}</div>`).join('')}</div><div class="calendar-grid" style="grid-template-rows:repeat(${dates.length/7},minmax(0,1fr))">${cells}</div></section>`;}
+      function itemRows(items){return (Array.isArray(items)?items:[]).map(item=>`<div class="detail-item${item.done?' done':''}"><span class="state-dot"></span><span class="item-text">${escapeHtml(item.t)}</span></div>`).join('');}
+      function questDetails(entry){const q=entry.quest||{},parts=[];if(q.job?.trim())parts.push(`<section class="detail-section"><div class="job">${escapeHtml(q.job)}</div></section>`);if(q.conds?.length)parts.push(`<section class="detail-section"><div class="pills">${cleanWords(q.conds).map(item=>`<span class="pill">${escapeHtml(item)}</span>`).join('')}</div></section>`);if(q.main?.length){const done=q.main.filter(item=>item.done).length;parts.push(`<section class="detail-section"><div class="section-head"><div class="label">오늘의 퀘스트</div><div class="count">${done} / ${q.main.length}</div></div>${itemRows(q.main)}</section>`);}if(q.sub?.length)parts.push(`<section class="detail-section"><div class="label">서브 퀘스트</div>${itemRows(q.sub)}</section>`);if(q.event?.t?.trim()||q.event?.c?.trim())parts.push(`<section class="detail-section"><div class="label">발생한 이벤트</div><div class="quote">${q.event.t?.trim()?`<p class="body-text">${escapeHtml(q.event.t)}</p>`:''}${q.event.c?.trim()?`<div class="choice">→ ${escapeHtml(q.event.c)}</div>`:''}</div></section>`);if(q.achieve?.length)parts.push(`<section class="detail-section"><div class="label">오늘의 업적</div><div class="pills">${q.achieve.map(item=>`<span class="pill achievement-pill">${escapeHtml(item)}</span>`).join('')}</div></section>`);if(q.ending?.trim())parts.push(`<section class="detail-section"><div class="label">하루 엔딩로그</div><div class="quote"><p class="body-text">${escapeHtml(q.ending)}</p></div></section>`);return parts.join('');}
+      function renderDetail(){const entry=store.entries[ui.selectedDate];if(!entry){ui.view='calendar';renderCalendar();return;}const keys=Object.keys(store.entries).sort(),index=keys.indexOf(ui.selectedDate),photos=entry.mode==='photo'?(entry.photos||[]):[],mood=entryMood(entry),visual=entry.mode==='photo'&&photos.length?`<div class="detail-visual photo" style="background-image:url('${escapeHtml(photos[ui.selectedPhoto]||photos[0])}')"></div>`:'<div class="detail-visual"></div>',moodLine=`${mood.mood?`<span class="temperature-pill">온도 · ${MOOD_NAMES[mood.mood-1]}</span>`:''}${mood.tags.length?`<div class="pills">${mood.tags.map(tag=>`<span class="pill">${escapeHtml(tag)}</span>`).join('')}</div>`:''}`,content=entry.mode==='photo'?`<div class="detail-sections">${entry.text?.trim()?`<p class="body-text">${escapeHtml(entry.text)}</p>`:''}${photos.length>1?`<div class="photo-thumbs">${photos.map((src,i)=>`<button class="photo-thumb${i===ui.selectedPhoto?' active':''}" type="button" data-photo-index="${i}"><img src="${escapeHtml(src)}" alt=""></button>`).join('')}</div>`:''}</div>`:`<div class="detail-sections">${questDetails(entry)}</div>`;app.innerHTML=`<section class="detail"><header class="detail-head"><button class="back-button" type="button" data-back>‹ 달력으로</button><div class="detail-index">${index+1} / ${keys.length}</div></header><div class="detail-grid">${visual}<div class="detail-copy"><div class="mode-line">${modePill(entry.mode)}<span class="detail-date">${formatDate(ui.selectedDate)}</span></div>${moodLine?`<div class="detail-meta">${moodLine}</div>`:''}${content}<div class="record-nav"><button class="record-button" type="button" data-record-nav="-1"${keys.length<2?' disabled':''}>‹</button><button class="record-button" type="button" data-record-nav="1"${keys.length<2?' disabled':''}>›</button></div></div></div></section>`;}
       function render(){ui.view==='detail'?renderDetail():renderCalendar();}
-      app.addEventListener('click',event=>{
-        const target=event.target;
-        const month=target.closest('[data-month]');if(month){moveMonth(Number(month.dataset.month));return;}
-        const cell=target.closest('[data-entry-date]');if(cell){ui.selectedDate=cell.dataset.entryDate;ui.selectedPhoto=0;ui.view='detail';renderDetail();return;}
-        if(target.closest('[data-back]')){ui.view='calendar';renderCalendar();return;}
-        const photo=target.closest('[data-photo-index]');if(photo){ui.selectedPhoto=Number(photo.dataset.photoIndex);renderDetail();return;}
-        const nav=target.closest('[data-record-nav]');if(nav){const keys=Object.keys(store.entries).sort();if(keys.length<2)return;const current=keys.indexOf(ui.selectedDate);const next=(current+Number(nav.dataset.recordNav)+keys.length)%keys.length;ui.selectedDate=keys[next];ui.selectedPhoto=0;const d=fromKey(ui.selectedDate);ui.year=d.getFullYear();ui.month=d.getMonth();renderDetail();}
-      });
+      app.addEventListener('click',event=>{const target=event.target,month=target.closest('[data-month]');if(month){const date=new Date(ui.year,ui.month+Number(month.dataset.month),1,12);ui.year=date.getFullYear();ui.month=date.getMonth();renderCalendar();return;}const cell=target.closest('[data-entry-date]');if(cell){ui.selectedDate=cell.dataset.entryDate;ui.selectedPhoto=0;ui.view='detail';renderDetail();return;}if(target.closest('[data-back]')){ui.view='calendar';renderCalendar();return;}const photo=target.closest('[data-photo-index]');if(photo){ui.selectedPhoto=Number(photo.dataset.photoIndex);renderDetail();return;}const nav=target.closest('[data-record-nav]');if(nav){const keys=Object.keys(store.entries).sort();if(keys.length<2)return;const current=keys.indexOf(ui.selectedDate),next=(current+Number(nav.dataset.recordNav)+keys.length)%keys.length;ui.selectedDate=keys[next];ui.selectedPhoto=0;const date=fromKey(ui.selectedDate);ui.year=date.getFullYear();ui.month=date.getMonth();renderDetail();}});
       render();
     })();
   </script>
