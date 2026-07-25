@@ -24,7 +24,7 @@
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
-  const minimumScale = .1;
+  const minimumScale = .05;
   let requestedScale = 1;
   let renderedScale = 1;
   let baseHeight = defaultHeight;
@@ -58,7 +58,7 @@
   function maximumScale() {
     const widthLimit = window.innerWidth / Math.max(1, baseWidth);
     const heightLimit = window.innerHeight / Math.max(1, baseHeight);
-    return Math.max(.02, Math.min(1, widthLimit, heightLimit));
+    return Math.max(.02, Math.min(widthLimit, heightLimit));
   }
 
   function displayScale(value) {
