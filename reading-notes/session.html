@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 세션 기록</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --text-2:#33505C;
+      --secondary:#6B8794; --deep:#55707C; --muted:#93A5AD; --faint:#A2B4BC;
+      --done:#A9BAC2; --disabled:#C6D6DD; --border:#DCE7ED; --border-soft:#E1EAEE;
+      --border-faint:#E6EDF0; --surface:#FFFFFF; --surface-soft:#FAFCFD; --surface-edit:#F5F9FB;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0; color:var(--text); background:transparent;
+      font-family:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; color:inherit; }
+    button { cursor:pointer; }
+    .card {
+      width:620px; height:430px; padding:16px; overflow:hidden;
+      display:flex; flex-direction:column; gap:10px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .head { height:15px; min-height:15px; display:flex; align-items:center; gap:8px; }
+    .date { font-size:13px; font-weight:800; letter-spacing:-.02em; }
+    .session-no { color:var(--muted); font-size:9px; font-weight:700; }
+    .mp-pill {
+      margin-left:auto; padding:6px 9px; color:var(--action); background:var(--action-soft);
+      border:1px solid var(--border); border-radius:999px; font-size:10px; font-weight:800;
+    }
+    .book-row { height:28px; min-height:28px; display:flex; align-items:center; gap:8px; }
+    .books { min-width:0; display:flex; align-items:center; gap:6px; overflow:hidden; }
+    .book-chip, .add-book-trigger {
+      height:27px; flex:0 0 auto; padding:0 10px; border:1px solid transparent; border-radius:999px;
+      background:var(--surface-soft); color:var(--secondary); font-size:10px; font-weight:700;
+    }
+    .book-chip.is-selected { color:#fff; background:var(--action); }
+    .add-book-trigger { border-color:var(--border); background:#fff; }
+    .book-add { min-width:0; flex:1; display:flex; gap:5px; }
+    .book-add input { min-width:0; height:27px; flex:1; padding:0 9px; border:1px solid var(--border); border-radius:8px; outline:none; font-size:10px; font-weight:600; }
+    .book-add button { height:27px; padding:0 9px; border:0; border-radius:8px; background:var(--action); color:#fff; font-size:10px; font-weight:800; }
+    input:focus, textarea:focus { border-color:var(--action); outline:2px solid var(--action-soft); }
+    .page-row { height:28px; margin-left:auto; flex:0 0 auto; display:flex; align-items:center; gap:7px; color:var(--muted); font-size:9px; font-weight:700; }
+    .page-input { width:40px; height:28px; padding:0; text-align:center; border:1px solid var(--border); border-radius:8px; background:#fff; font-size:9px; font-weight:700; outline:none; }
+    .capture {
+      height:121px; min-height:121px; padding:10px; display:grid; grid-template-columns:1fr 58px; gap:7px;
+      border:1px dashed var(--disabled); border-radius:14px; background:var(--surface-soft);
+    }
+    .quote-input {
+      grid-column:1 / -1; width:100%; height:46px; min-height:46px; max-height:46px; resize:none;
+      padding:10px; border:1px solid var(--border); border-radius:9px; background:#fff;
+      font-size:11px; font-weight:600; line-height:1.45; outline:none;
+    }
+    .reaction-input { height:30px; min-width:0; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
+    .capture-button { height:30px; border:0; border-radius:9px; color:#fff; background:var(--action); font-size:10px; font-weight:800; }
+    .capture-hint { grid-column:1 / -1; color:var(--faint); font-size:9px; font-weight:600; line-height:1.2; }
+    .draft-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:7px; }
+    .section-head { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:800; }
+    .count { color:var(--muted); }
+    .draft-list {
+      min-height:0; flex:1; overflow:auto; padding:8px; border:1px dashed var(--disabled);
+      border-radius:12px; background:var(--surface-soft); scrollbar-width:thin; scrollbar-color:var(--disabled) transparent;
+    }
+    .draft-empty { height:100%; min-height:66px; display:grid; place-content:center; gap:4px; text-align:center; }
+    .draft-empty strong { font-size:11px; font-weight:800; }
+    .draft-empty span { color:var(--muted); font-size:9px; font-weight:600; }
+    .draft-item {
+      position:relative; padding:8px 30px 8px 10px; background:#fff; border:1px solid var(--border-faint);
+      border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.04); font-size:10px;
+    }
+    .draft-item + .draft-item { margin-top:6px; }
+    .draft-quote { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
+    .draft-meta { margin-top:3px; display:flex; gap:7px; color:var(--muted); font-size:8px; font-weight:600; }
+    .remove { position:absolute; top:7px; right:7px; width:20px; height:20px; padding:0; border:0; background:transparent; color:var(--muted); font-size:13px; font-weight:700; }
+    .foot { height:43px; min-height:43px; padding-top:10px; display:flex; align-items:center; gap:8px; border-top:1px solid var(--border-faint); }
+    .save { height:30px; padding:0 12px; border:0; border-radius:9px; background:var(--action); color:#fff; font-size:10px; font-weight:800; }
+    .save:disabled { cursor:not-allowed; background:var(--disabled); }
+    .save-hint { min-width:0; color:var(--muted); font-size:9px; font-weight:600; }
+    .new-session { margin-left:auto; padding:5px 0; border:0; background:transparent; color:var(--deep); font-size:9px; font-weight:700; }
+    .hidden { display:none !important; }
+    @media (max-width:520px) {
+      .books { overflow-x:auto; scrollbar-width:none; }
+      .capture-hint { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-session.html" data-widget-max-width="620" data-widget-height="430" data-widget-max-scale="4" style="--widget-max-width:620px;--widget-base-width:620px;--widget-base-height:430px;--widget-visual-height:430px">
+    <main class="card" data-widget-card aria-label="독서 세션 기록 위젯">
+      <header class="head">
+        <span class="date" id="todayLabel"></span>
+        <span class="session-no" id="sessionLabel">오늘 1번째 세션</span>
+        <span class="mp-pill hidden" id="mpPill" aria-live="polite"></span>
+      </header>
+      <div class="book-row">
+        <div class="books" id="bookRow"></div>
+        <div class="page-row" aria-label="읽은 페이지 범위">
+          <input class="page-input" id="pageFrom" inputmode="numeric" aria-label="시작 페이지" placeholder="138">
+          <span>–</span>
+          <input class="page-input" id="pageTo" inputmode="numeric" aria-label="끝 페이지" placeholder="176">
+          <span>p</span>
+        </div>
+      </div>
+      <section class="capture" aria-label="문장 담기">
+        <textarea class="quote-input" id="quoteInput" placeholder="문장을 붙여넣거나 옮겨 적으세요"></textarea>
+        <input class="reaction-input" id="reactionInput" placeholder="반응 한 줄 (선택)" aria-label="반응 한 줄">
+        <button class="capture-button" id="captureButton" type="button">담기</button>
+        <span class="capture-hint">⌘/Ctrl + Enter로 담고 계속 · 생각 한 줄은 문장 서랍에서</span>
+      </section>
+      <section class="draft-section">
+        <div class="section-head">이번 세션에 담은 문장 <span class="count" id="draftCount">0</span></div>
+        <div class="draft-list" id="draftList"></div>
+      </section>
+      <footer class="foot">
+        <button class="save" id="saveButton" type="button" disabled>세션 저장</button>
+        <span class="save-hint" id="saveHint">문장을 하나 담아주세요</span>
+        <button class="new-session" id="newSessionButton" type="button">다른 책으로 새 세션</button>
+      </footer>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const LIBRARY_KEY = 'reading-library-v1';
+      const QUOTES_KEY = 'reading-quotes-v1';
+      const NOTES_KEY = 'reading-notes-v1';
+      const CHANNEL = 'reading';
+      const clone = value => JSON.parse(JSON.stringify(value));
+      const makeDate = offset => {
+        const date = new Date(); date.setDate(date.getDate() - offset);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      };
+      const DEMO_BOOKS = [
+        { id:'demo-thinking', title:'생각에 관한 생각', author:'대니얼 카너먼', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-simple', title:'단순한 진심', author:'박웅현', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-grow', title:'함께 자라기', author:'김창준', field:'경영', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sapiens', title:'사피엔스', author:'유발 하라리', field:'심리', status:'done', star:4, one:'허구를 함께 믿는 힘', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-loonshots', title:'룬샷', author:'사피 바칼', field:'경영', status:'done', star:4, one:'아이디어와 실행 조직을 분리하기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-pragmatic', title:'실용주의 프로그래머', author:'앤드류 헌트', field:'기술', status:'done', star:5, one:'작은 어긋남을 놓치지 않기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sparks', title:'생각의 탄생', author:'루트번스타인', field:'창의', status:'done', star:4, one:'생각은 관찰에서 시작된다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-rules', title:'규칙 없음', author:'리드 헤이스팅스', field:'경영', status:'done', star:3, one:'자유에는 맥락이 필요하다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-1', title:'물고기는 존재하지 않는다', author:'룰루 밀러', field:'인문', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-2', title:'아티스트 웨이', author:'줄리아 캐머런', field:'창의', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-drop', title:'어려운 대화', author:'더글러스 스톤', field:'심리', status:'dropped', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'지금 필요한 주제와 거리가 있었음' }
+      ];
+      const DEMO_QUOTES = [
+        { id:'demo-q7', bookId:'demo-pragmatic', text:'깨진 창문을 그대로 두지 말 것.', page:'31', note:'작은 어긋남이 기준을 무너뜨린다.', thought:'', created:`${makeDate(1)}T09:00:00.000Z` },
+        { id:'demo-q6', bookId:'demo-thinking', text:'우리는 아는 것보다 이야기하기 쉬운 것을 믿는다.', page:'142', note:'', thought:'', created:`${makeDate(2)}T09:00:00.000Z` },
+        { id:'demo-q5', bookId:'demo-grow', text:'실력은 피드백의 속도에 비례한다.', page:'82', note:'', thought:'', created:`${makeDate(3)}T09:00:00.000Z` },
+        { id:'demo-q4', bookId:'demo-sapiens', text:'허구를 믿는 능력이 협력의 규모를 결정했다.', page:'49', note:'브랜드도 결국 허구를 함께 믿는 일.', thought:'**신뢰**가 규모를 만든다.', created:`${makeDate(5)}T09:00:00.000Z` },
+        { id:'demo-q3', bookId:'demo-grow', text:'학습은 개인의 재능이 아니라 팀의 습관이다.', page:'119', note:'회고를 격주로', thought:'', created:`${makeDate(7)}T09:00:00.000Z` },
+        { id:'demo-q2', bookId:'demo-simple', text:'말을 줄이면 뜻이 남는다.', page:'66', note:'', thought:'', created:`${makeDate(9)}T09:00:00.000Z` },
+        { id:'demo-q1', bookId:'demo-thinking', text:'직관은 빠르지만 게으르다.', page:'176', note:'판단이 급할 때일수록 절차를 믿자.', thought:'한 번 더 **확인**하기.', created:`${makeDate(12)}T09:00:00.000Z` },
+        { id:'demo-q0', bookId:'demo-thinking', text:'기억은 저장이 아니라 재구성이다.', page:'138', note:'', thought:'', created:`${makeDate(24)}T09:00:00.000Z` }
+      ];
+      const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
+      const els = {
+        today:document.getElementById('todayLabel'), session:document.getElementById('sessionLabel'), mp:document.getElementById('mpPill'),
+        books:document.getElementById('bookRow'), from:document.getElementById('pageFrom'), to:document.getElementById('pageTo'),
+        quote:document.getElementById('quoteInput'), reaction:document.getElementById('reactionInput'), capture:document.getElementById('captureButton'),
+        list:document.getElementById('draftList'), count:document.getElementById('draftCount'), save:document.getElementById('saveButton'),
+        saveHint:document.getElementById('saveHint'), fresh:document.getElementById('newSessionButton')
+      };
+      let books = [];
+      let selectedBookId = '';
+      let draft = [];
+      let sessionNumber = 1;
+      let addingBook = false;
+      let pillTimer = 0;
+
+      function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
+      function readLibrary() {
+        let raw = null; try { raw = localStorage.getItem(LIBRARY_KEY); } catch (_) {}
+        const value = safeParse(raw, null);
+        return value && Array.isArray(value.books) ? value : { books:clone(DEMO_BOOKS) };
+      }
+      function readQuotes() {
+        let raw = null; try { raw = localStorage.getItem(QUOTES_KEY); } catch (_) {}
+        const value = safeParse(raw, null);
+        return value && Array.isArray(value.quotes) ? value : { quotes:clone(DEMO_QUOTES) };
+      }
+      function readNotes() {
+        let raw = null; try { raw = localStorage.getItem(NOTES_KEY); } catch (_) {}
+        const value = safeParse(raw, null);
+        return value && value.byDate && typeof value.byDate === 'object' ? value : { byDate:{} };
+      }
+      function write(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { return false; }
+        if (channel) channel.postMessage({ type:'changed', key });
+        return true;
+      }
+      function uid(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
+      function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+      function formatToday() {
+        return new Intl.DateTimeFormat('ko-KR', { month:'long', day:'numeric', weekday:'long' }).format(new Date()).replaceAll(' ', ' ');
+      }
+      function syncBooks() {
+        books = readLibrary().books;
+        const reading = books.filter(book => book.status === 'reading');
+        if (!reading.some(book => book.id === selectedBookId)) selectedBookId = reading[0]?.id || '';
+        renderBooks();
+      }
+      function renderBooks() {
+        const reading = books.filter(book => book.status === 'reading');
+        const chips = reading.slice(0, 4).map(book => `<button class="book-chip ${book.id === selectedBookId ? 'is-selected' : ''}" type="button" data-book-id="${escapeHtml(book.id)}">${escapeHtml(book.title)}</button>`).join('');
+        const add = addingBook
+          ? `<div class="book-add"><input id="newBookTitle" maxlength="80" placeholder="책 제목"><button id="addBookButton" type="button">추가</button></div>`
+          : `<button class="add-book-trigger" id="addBookTrigger" type="button">＋ 책</button>`;
+        els.books.innerHTML = chips + add;
+        els.books.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => {
+          selectedBookId = button.dataset.bookId; renderBooks();
+        }));
+        const trigger = document.getElementById('addBookTrigger');
+        if (trigger) trigger.addEventListener('click', () => { addingBook = true; renderBooks(); document.getElementById('newBookTitle')?.focus(); });
+        const input = document.getElementById('newBookTitle');
+        const button = document.getElementById('addBookButton');
+        if (input) input.addEventListener('keydown', event => { if (event.key === 'Enter') addBook(); if (event.key === 'Escape') { addingBook = false; renderBooks(); } });
+        if (button) button.addEventListener('click', addBook);
+      }
+      function addBook() {
+        const title = document.getElementById('newBookTitle')?.value.trim();
+        if (!title) return;
+        const book = { id:uid('book'), title, author:'', field:'미분류', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' };
+        const latest = readLibrary();
+        if (!latest.books.some(item => item.id === book.id)) latest.books.push(book);
+        if (write(LIBRARY_KEY, latest)) { selectedBookId = book.id; addingBook = false; syncBooks(); }
+      }
+      function pageLabel() { return String(els.to.value.trim() || els.from.value.trim() || ''); }
+      function addDraft() {
+        const text = els.quote.value.trim();
+        if (!text || !selectedBookId) return;
+        draft.push({ id:uid('draft'), bookId:selectedBookId, text, page:pageLabel(), note:els.reaction.value.trim(), thought:'', created:new Date().toISOString() });
+        els.quote.value = ''; els.reaction.value = ''; renderDraft(); els.quote.focus();
+      }
+      function renderDraft() {
+        els.count.textContent = String(draft.length);
+        els.save.disabled = draft.length === 0;
+        els.saveHint.textContent = draft.length ? `${draft.length}문장을 세션에 저장합니다` : '문장을 하나 담아주세요';
+        if (!draft.length) {
+          els.list.innerHTML = `<div class="draft-empty"><strong>아직 담은 문장이 없어요</strong><span>한 문장만 던져놓고 나가도 됩니다</span></div>`;
+          return;
+        }
+        els.list.innerHTML = draft.map(item => `<article class="draft-item"><div class="draft-quote">${escapeHtml(item.text)}</div><div class="draft-meta"><span>${item.page ? `${escapeHtml(item.page)}p` : '페이지 없음'}</span>${item.note ? `<span>${escapeHtml(item.note)}</span>` : ''}</div><button class="remove" type="button" data-remove="${escapeHtml(item.id)}" aria-label="문장 제거">×</button></article>`).join('');
+        els.list.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => { draft = draft.filter(item => item.id !== button.dataset.remove); renderDraft(); }));
+      }
+      function mpValue(byDate) {
+        let used = 0;
+        for (let offset = 0; offset < 14; offset += 1) if (Number(byDate[makeDate(offset)]) > 0) used += 1;
+        return Math.min(20, Math.round((used / 14) * 20));
+      }
+      function showMp(amount) {
+        clearTimeout(pillTimer); els.mp.textContent = `MP +${amount}`; els.mp.classList.remove('hidden');
+        pillTimer = window.setTimeout(() => els.mp.classList.add('hidden'), 4000);
+      }
+      function saveSession() {
+        if (!draft.length) return;
+        const latestQuotes = readQuotes();
+        const existing = new Set(latestQuotes.quotes.map(item => item.id));
+        draft.forEach(item => { if (!existing.has(item.id)) latestQuotes.quotes.push(item); });
+        const notes = readNotes();
+        const before = mpValue(notes.byDate);
+        const today = makeDate(0);
+        notes.byDate[today] = Number(notes.byDate[today] || 0) + draft.length;
+        const after = mpValue(notes.byDate);
+        if (!write(QUOTES_KEY, latestQuotes)) return;
+        write(NOTES_KEY, notes);
+        draft = []; sessionNumber += 1; els.session.textContent = `오늘 ${sessionNumber}번째 세션`;
+        renderDraft(); showMp(Math.max(0, after - before));
+      }
+      function startFreshSession() {
+        const reading = books.filter(book => book.status === 'reading');
+        const index = Math.max(0, reading.findIndex(book => book.id === selectedBookId));
+        if (reading.length > 1) selectedBookId = reading[(index + 1) % reading.length].id;
+        draft = []; els.quote.value = ''; els.reaction.value = ''; els.from.value = ''; els.to.value = '';
+        sessionNumber += 1; els.session.textContent = `오늘 ${sessionNumber}번째 세션`; renderBooks(); renderDraft();
+      }
+      function externalSync() { syncBooks(); }
+
+      els.today.textContent = formatToday();
+      els.capture.addEventListener('click', addDraft);
+      els.quote.addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); addDraft(); } });
+      els.save.addEventListener('click', saveSession);
+      els.fresh.addEventListener('click', startFreshSession);
+      window.addEventListener('storage', event => { if ([LIBRARY_KEY, QUOTES_KEY, NOTES_KEY].includes(event.key)) externalSync(); });
+      window.addEventListener('visibilitychange', () => { if (!document.hidden) externalSync(); });
+      window.addEventListener('focus', externalSync);
+      if (channel) channel.addEventListener('message', externalSync);
+      syncBooks(); renderDraft();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>

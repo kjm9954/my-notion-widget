@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>문장 서랍</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --text-2:#33505C;
+      --secondary:#6B8794; --deep:#55707C; --muted:#93A5AD; --faint:#A2B4BC;
+      --done:#A9BAC2; --disabled:#C6D6DD; --border:#DCE7ED; --border-soft:#E1EAEE;
+      --border-faint:#E6EDF0; --surface:#FFFFFF; --surface-soft:#FAFCFD; --surface-edit:#F5F9FB;
+      --danger-border:#E4D5D5; --danger:#A56B6B;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0; color:var(--text); background:transparent;
+      font-family:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; color:inherit; }
+    button { cursor:pointer; }
+    .card {
+      width:380px; height:990px; padding:16px; overflow:hidden; position:relative;
+      display:flex; flex-direction:column; gap:10px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .fixed { flex:0 0 auto; display:flex; flex-direction:column; gap:10px; }
+    .banner {
+      height:74px; padding:10px 12px; display:grid; grid-template-columns:1fr 28px; grid-template-rows:auto 1fr auto;
+      gap:5px 8px; background:var(--action-soft); border-radius:14px;
+    }
+    .banner-title { align-self:center; color:var(--action); font-size:11px; font-weight:800; }
+    .rotate { width:28px; height:24px; padding:0; border:0; background:transparent; color:var(--action); font-size:14px; font-weight:800; }
+    .banner-quote { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:800; }
+    .banner-meta { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--deep); font-size:9px; font-weight:700; }
+    .banner.is-empty { display:flex; align-items:center; justify-content:center; text-align:center; color:var(--secondary); font-size:10px; font-weight:700; }
+    .search { width:100%; height:32px; padding:0 11px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
+    .search:focus, textarea:focus { border-color:var(--action); outline:2px solid var(--action-soft); }
+    .filters { min-height:28px; display:flex; align-items:center; gap:6px; overflow:hidden; }
+    .filter {
+      height:26px; flex:0 0 auto; padding:0 10px; border:1px solid transparent; border-radius:999px;
+      background:var(--surface-soft); color:var(--secondary); font-size:9px; font-weight:700;
+    }
+    .filter.is-selected { background:var(--action); color:#fff; }
+    .filter.more { border-color:var(--border); background:#fff; }
+    .list-shell { min-height:0; flex:1; position:relative; margin-top:3px; overflow:hidden; }
+    .quote-list {
+      height:100%; padding:0 9px 18px; overflow-y:auto; overflow-x:hidden;
+      scrollbar-width:thin; scrollbar-color:var(--disabled) transparent;
+    }
+    .quote-card {
+      width:100%; min-height:52px; padding:7px 10px; text-align:left; border:1px solid var(--border-faint);
+      border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(18,48,60,.04);
+    }
+    .quote-card + .quote-card { margin-top:5px; }
+    .quote-line { display:grid; grid-template-columns:2px minmax(0, 1fr) 10px; gap:9px; align-items:start; }
+    .line { width:2px; height:18px; margin-top:1px; background:var(--border); border-radius:999px; }
+    .quote-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; font-weight:800; line-height:1.45; }
+    .state-dot { width:9px; height:9px; margin-top:3px; border:1px solid var(--disabled); border-radius:50%; background:#fff; }
+    .state-dot.has-thought { border-color:var(--done); background:var(--done); }
+    .quote-subline { margin:5px 0 0 11px; display:flex; align-items:center; gap:8px; }
+    .quote-preview { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary); font-size:8px; font-weight:600; }
+    .quote-bottom { flex:0 0 auto; color:var(--muted); font-size:7px; font-weight:700; }
+    .empty { height:100%; min-height:180px; display:grid; place-content:center; gap:5px; text-align:center; }
+    .empty strong { font-size:12px; font-weight:800; }
+    .empty span { color:var(--muted); font-size:9px; font-weight:600; }
+    .overlay {
+      position:absolute; z-index:10; inset:8px; padding:14px; overflow:auto; display:flex; flex-direction:column; gap:13px;
+      border:1px solid var(--border); border-radius:14px; background:#fff; box-shadow:0 6px 18px rgba(18,48,60,.06);
+      scrollbar-width:thin; scrollbar-color:var(--disabled) transparent;
+    }
+    .overlay-head { min-height:28px; display:flex; align-items:center; gap:8px; }
+    .back, .delete { height:28px; padding:0 8px; border:0; border-radius:8px; background:var(--surface-soft); color:var(--deep); font-size:9px; font-weight:800; }
+    .delete { margin-left:auto; color:var(--danger); background:#fff; border:1px solid var(--danger-border); }
+    .detail-quote { padding-left:12px; border-left:2px solid var(--border); font-size:14px; font-weight:800; line-height:1.55; }
+    .detail-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px; color:var(--secondary); font-size:9px; font-weight:700; }
+    .field-pill { padding:4px 7px; border-radius:999px; color:var(--action); background:var(--action-soft); }
+    .detail-note { padding:10px; border-radius:9px; background:var(--surface-soft); color:var(--deep); font-size:10px; font-weight:600; line-height:1.5; }
+    .thought-label { display:flex; align-items:center; justify-content:space-between; font-size:10px; font-weight:800; }
+    .saved { color:var(--muted); font-size:8px; font-weight:700; }
+    .thought {
+      width:100%; min-height:220px; flex:1; resize:none; padding:12px; border:1px solid var(--border);
+      border-radius:12px; background:var(--surface-edit); font-size:11px; font-weight:600; line-height:1.6; outline:none;
+    }
+    .markdown { margin-top:-8px; color:var(--faint); font-size:8px; font-weight:600; }
+    .pager { min-height:32px; display:grid; grid-template-columns:72px 1fr 72px; align-items:center; gap:6px; }
+    .pager button { height:30px; border:1px solid var(--border); border-radius:9px; background:#fff; color:var(--deep); font-size:9px; font-weight:800; }
+    .pager button:disabled { cursor:not-allowed; color:var(--disabled); }
+    .pager span { text-align:center; color:var(--muted); font-size:9px; font-weight:700; }
+    .hidden { display:none !important; }
+    @media (max-width:340px) {
+      .card { padding:11px; gap:9px; }
+      .banner { height:74px; }
+      .quote-list { padding-inline:6px; }
+      .overlay { inset:5px; padding:11px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-drawer.html" data-widget-max-width="380" data-widget-height="990" data-widget-max-scale="4" style="--widget-max-width:380px;--widget-base-width:380px;--widget-base-height:990px;--widget-visual-height:990px">
+    <main class="card" data-widget-card aria-label="문장 서랍 위젯">
+      <div class="fixed" data-widget-fixed>
+        <section class="banner" id="waitingBanner"></section>
+        <input class="search" id="searchInput" type="search" placeholder="문장과 생각에서 검색" aria-label="문장과 생각 검색">
+        <nav class="filters" id="fieldFilters" aria-label="분야 필터"></nav>
+      </div>
+      <div class="list-shell" data-widget-list>
+        <div class="quote-list" id="quoteList"></div>
+        <section class="overlay hidden" id="detailOverlay" aria-label="문장 상세"></section>
+      </div>
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="문장 목록 세로 크기 조절"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const LIBRARY_KEY = 'reading-library-v1';
+      const QUOTES_KEY = 'reading-quotes-v1';
+      const CHANNEL = 'reading';
+      const clone = value => JSON.parse(JSON.stringify(value));
+      const isoAgo = days => { const date = new Date(); date.setDate(date.getDate() - days); date.setHours(9, 0, 0, 0); return date.toISOString(); };
+      const DEMO_BOOKS = [
+        { id:'demo-thinking', title:'생각에 관한 생각', author:'대니얼 카너먼', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-simple', title:'단순한 진심', author:'박웅현', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-grow', title:'함께 자라기', author:'김창준', field:'경영', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sapiens', title:'사피엔스', author:'유발 하라리', field:'심리', status:'done', star:4, one:'허구를 함께 믿는 힘', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-loonshots', title:'룬샷', author:'사피 바칼', field:'경영', status:'done', star:4, one:'아이디어와 실행 조직을 분리하기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-pragmatic', title:'실용주의 프로그래머', author:'앤드류 헌트', field:'기술', status:'done', star:5, one:'작은 어긋남을 놓치지 않기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sparks', title:'생각의 탄생', author:'루트번스타인', field:'창의', status:'done', star:4, one:'생각은 관찰에서 시작된다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-rules', title:'규칙 없음', author:'리드 헤이스팅스', field:'경영', status:'done', star:3, one:'자유에는 맥락이 필요하다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-1', title:'물고기는 존재하지 않는다', author:'룰루 밀러', field:'인문', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-2', title:'아티스트 웨이', author:'줄리아 캐머런', field:'창의', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-drop', title:'어려운 대화', author:'더글러스 스톤', field:'심리', status:'dropped', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'지금 필요한 주제와 거리가 있었음' }
+      ];
+      const DEMO_QUOTES = [
+        { id:'demo-q7', bookId:'demo-pragmatic', text:'깨진 창문을 그대로 두지 말 것.', page:'31', note:'작은 어긋남이 기준을 무너뜨린다.', thought:'', created:isoAgo(1) },
+        { id:'demo-q6', bookId:'demo-thinking', text:'우리는 아는 것보다 이야기하기 쉬운 것을 믿는다.', page:'142', note:'', thought:'', created:isoAgo(2) },
+        { id:'demo-q5', bookId:'demo-grow', text:'실력은 피드백의 속도에 비례한다.', page:'82', note:'', thought:'', created:isoAgo(3) },
+        { id:'demo-q4', bookId:'demo-sapiens', text:'허구를 믿는 능력이 협력의 규모를 결정했다.', page:'49', note:'브랜드도 결국 허구를 함께 믿는 일.', thought:'**신뢰**가 규모를 만든다.', created:isoAgo(5) },
+        { id:'demo-q3', bookId:'demo-grow', text:'학습은 개인의 재능이 아니라 팀의 습관이다.', page:'119', note:'회고를 격주로', thought:'', created:isoAgo(7) },
+        { id:'demo-q2', bookId:'demo-simple', text:'말을 줄이면 뜻이 남는다.', page:'66', note:'', thought:'', created:isoAgo(9) },
+        { id:'demo-q1', bookId:'demo-thinking', text:'직관은 빠르지만 게으르다.', page:'176', note:'판단이 급할 때일수록 절차를 믿자.', thought:'한 번 더 **확인**하기.', created:isoAgo(12) },
+        { id:'demo-q0', bookId:'demo-thinking', text:'기억은 저장이 아니라 재구성이다.', page:'138', note:'', thought:'', created:isoAgo(24) }
+      ];
+      const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
+      const els = {
+        banner:document.getElementById('waitingBanner'), search:document.getElementById('searchInput'), filters:document.getElementById('fieldFilters'),
+        list:document.getElementById('quoteList'), overlay:document.getElementById('detailOverlay')
+      };
+      let books = [];
+      let quotes = [];
+      let selectedField = '전체';
+      let fieldsExpanded = false;
+      let bannerIndex = 0;
+      let activeId = '';
+      let deleteArmed = false;
+
+      function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
+      function readLibrary() {
+        let raw = null; try { raw = localStorage.getItem(LIBRARY_KEY); } catch (_) {}
+        const value = safeParse(raw, null); return value && Array.isArray(value.books) ? value : { books:clone(DEMO_BOOKS) };
+      }
+      function readQuotes() {
+        let raw = null; try { raw = localStorage.getItem(QUOTES_KEY); } catch (_) {}
+        const value = safeParse(raw, null); return value && Array.isArray(value.quotes) ? value : { quotes:clone(DEMO_QUOTES) };
+      }
+      function writeQuotes(next) {
+        try { localStorage.setItem(QUOTES_KEY, JSON.stringify(next)); } catch (_) { return false; }
+        if (channel) channel.postMessage({ type:'changed', key:QUOTES_KEY }); return true;
+      }
+      function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+      function stripMarkdown(value) { return String(value || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/[*_`#>~-]/g, '').trim(); }
+      function bookFor(id) { return books.find(book => book.id === id) || { title:'알 수 없는 책', field:'미분류' }; }
+      function age(created) {
+        const start = new Date(created); const now = new Date();
+        const days = Math.max(0, Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000));
+        return days === 0 ? '오늘' : `${days}일`;
+      }
+      function waitingQuotes() { return quotes.filter(item => !String(item.thought || '').trim()).sort((a, b) => new Date(a.created) - new Date(b.created)); }
+      function filteredQuotes() {
+        const query = els.search.value.trim().toLocaleLowerCase('ko');
+        return quotes.filter(item => {
+          const book = bookFor(item.bookId);
+          const fieldMatch = selectedField === '전체' || book.field === selectedField;
+          const textMatch = !query || [item.text, item.note, item.thought].some(value => String(value || '').toLocaleLowerCase('ko').includes(query));
+          return fieldMatch && textMatch;
+        }).sort((a, b) => new Date(b.created) - new Date(a.created));
+      }
+      function renderBanner() {
+        const waiting = waitingQuotes();
+        if (!waiting.length) { els.banner.className = 'banner is-empty'; els.banner.innerHTML = '지금은 사유 대기 중인 문장이 없어요'; return; }
+        bannerIndex = ((bannerIndex % waiting.length) + waiting.length) % waiting.length;
+        const item = waiting[bannerIndex]; const book = bookFor(item.bookId);
+        els.banner.className = 'banner';
+        els.banner.innerHTML = `<div class="banner-title">사유 대기 중 · ${age(item.created)}</div><button class="rotate" type="button" aria-label="다른 문장 보기">↻</button><div class="banner-quote">${escapeHtml(item.text)}</div><div class="banner-meta">${escapeHtml(book.title)} · 아직 파고들지 않았어요</div>`;
+        els.banner.querySelector('.rotate').addEventListener('click', event => { event.stopPropagation(); bannerIndex = (bannerIndex + 1) % waiting.length; renderBanner(); });
+        els.banner.addEventListener('click', () => openDetail(item.id));
+      }
+      function renderFilters() {
+        const fieldCounts = quotes.reduce((counts, item) => {
+          const field = bookFor(item.bookId).field || '미분류'; counts[field] = (counts[field] || 0) + 1; return counts;
+        }, {});
+        const unique = Object.keys(fieldCounts).sort((a, b) => fieldCounts[b] - fieldCounts[a] || a.localeCompare(b, 'ko'));
+        const visible = fieldsExpanded ? unique : unique.slice(0, 2);
+        const chips = ['전체', ...visible].map(field => `<button class="filter ${field === selectedField ? 'is-selected' : ''}" type="button" data-field="${escapeHtml(field)}">${escapeHtml(field)}</button>`).join('');
+        const more = !fieldsExpanded && unique.length > 2 ? `<button class="filter more" type="button" id="moreFields">＋${unique.length - 2}</button>` : '';
+        els.filters.innerHTML = chips + more;
+        els.filters.querySelectorAll('[data-field]').forEach(button => button.addEventListener('click', () => {
+          selectedField = selectedField === button.dataset.field && button.dataset.field !== '전체' ? '전체' : button.dataset.field; renderFilters(); renderList();
+        }));
+        document.getElementById('moreFields')?.addEventListener('click', () => { fieldsExpanded = true; renderFilters(); });
+      }
+      function renderList() {
+        const list = filteredQuotes();
+        if (!list.length) { els.list.innerHTML = `<div class="empty"><strong>찾는 문장이 없어요</strong><span>검색어나 분야를 바꿔보세요</span></div>`; return; }
+        els.list.innerHTML = list.map(item => {
+          const book = bookFor(item.bookId); const preview = stripMarkdown(item.thought) || item.note || '생각 한 줄 아직 없음';
+          return `<button class="quote-card" type="button" data-quote-id="${escapeHtml(item.id)}"><span class="quote-line"><span class="line"></span><span class="quote-text">${escapeHtml(item.text)}</span><span class="state-dot ${String(item.thought || '').trim() ? 'has-thought' : ''}"></span></span><span class="quote-subline"><span class="quote-preview">${escapeHtml(preview)}</span><span class="quote-bottom">${escapeHtml(book.title)} · ${age(item.created)}</span></span></button>`;
+        }).join('');
+        els.list.querySelectorAll('[data-quote-id]').forEach(button => button.addEventListener('click', () => openDetail(button.dataset.quoteId)));
+      }
+      function openDetail(id) { activeId = id; deleteArmed = false; renderDetail(); }
+      function renderDetail() {
+        const item = quotes.find(quote => quote.id === activeId);
+        if (!item) { closeDetail(); return; }
+        const book = bookFor(item.bookId); const list = filteredQuotes(); const index = list.findIndex(quote => quote.id === item.id);
+        els.overlay.classList.remove('hidden');
+        els.overlay.innerHTML = `<div class="overlay-head"><button class="back" id="detailBack" type="button">← 목록</button><button class="delete" id="detailDelete" type="button">${deleteArmed ? '삭제할까요?' : '삭제'}</button></div><div class="detail-quote">${escapeHtml(item.text)}</div><div class="detail-meta"><span>${escapeHtml(book.title)}${item.page ? ` · ${escapeHtml(item.page)}p` : ''}</span><span class="field-pill">${escapeHtml(book.field || '미분류')}</span></div>${item.note ? `<div class="detail-note">${escapeHtml(item.note)}</div>` : ''}<label class="thought-label" for="thoughtInput"><span>생각 한 줄</span><span class="saved" id="savedLabel">저장됨</span></label><textarea class="thought" id="thoughtInput" placeholder="이 문장이 남긴 생각을 자유롭게 적어보세요">${escapeHtml(item.thought || '')}</textarea><div class="markdown">**굵게** 표시할 수 있어요</div><div class="pager"><button type="button" id="prevQuote" ${index <= 0 ? 'disabled' : ''}>← 이전</button><span>${Math.max(0, index) + 1} / ${list.length}</span><button type="button" id="nextQuote" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>`;
+        document.getElementById('detailBack').addEventListener('click', closeDetail);
+        document.getElementById('detailDelete').addEventListener('click', () => { if (!deleteArmed) { deleteArmed = true; renderDetail(); } else deleteQuote(item.id); });
+        document.getElementById('thoughtInput').addEventListener('input', event => saveThought(item.id, event.target.value));
+        document.getElementById('prevQuote').addEventListener('click', () => { if (index > 0) openDetail(list[index - 1].id); });
+        document.getElementById('nextQuote').addEventListener('click', () => { if (index >= 0 && index < list.length - 1) openDetail(list[index + 1].id); });
+      }
+      function closeDetail() { activeId = ''; deleteArmed = false; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); }
+      function saveThought(id, value) {
+        const latest = readQuotes(); const item = latest.quotes.find(quote => quote.id === id); if (!item) return;
+        item.thought = value; if (!writeQuotes(latest)) return;
+        const local = quotes.find(quote => quote.id === id); if (local) local.thought = value;
+        const label = document.getElementById('savedLabel'); if (label) label.textContent = '저장됨';
+      }
+      function deleteQuote(id) {
+        const latest = readQuotes(); latest.quotes = latest.quotes.filter(item => item.id !== id);
+        if (writeQuotes(latest)) { quotes = latest.quotes; closeDetail(); renderFilters(); }
+      }
+      function sync() {
+        books = readLibrary().books; quotes = readQuotes().quotes;
+        if (activeId && !quotes.some(item => item.id === activeId)) activeId = '';
+        renderBanner(); renderFilters(); renderList(); if (activeId) renderDetail();
+      }
+
+      els.search.addEventListener('input', renderList);
+      window.addEventListener('storage', event => { if ([LIBRARY_KEY, QUOTES_KEY].includes(event.key)) sync(); });
+      window.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+      window.addEventListener('focus', sync);
+      if (channel) channel.addEventListener('message', sync);
+      sync();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>

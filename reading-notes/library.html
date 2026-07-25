@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 서재</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --text-2:#33505C;
+      --secondary:#6B8794; --deep:#55707C; --muted:#93A5AD; --faint:#A2B4BC;
+      --done:#A9BAC2; --disabled:#C6D6DD; --border:#DCE7ED; --border-soft:#E1EAEE;
+      --border-faint:#E6EDF0; --surface:#FFFFFF; --surface-soft:#FAFCFD; --surface-edit:#F5F9FB;
+      --danger-border:#E4D5D5; --danger:#A56B6B;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0; color:var(--text); background:transparent;
+      font-family:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; color:inherit; }
+    button { cursor:pointer; }
+    .card {
+      width:1020px; min-height:318px; padding:16px; overflow:hidden;
+      display:flex; flex-direction:column; gap:12px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .head { height:28px; min-height:28px; display:flex; align-items:center; gap:9px; }
+    .title { font-size:13px; font-weight:800; letter-spacing:-.03em; }
+    .stats { color:var(--secondary); font-size:8px; font-weight:700; }
+    .search { width:150px; height:32px; margin-left:auto; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
+    .search:focus, input:focus, textarea:focus { border-color:var(--action); outline:2px solid var(--action-soft); }
+    .view-toggle { height:32px; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; color:var(--deep); font-size:9px; font-weight:800; }
+    .shelf { height:103px; }
+    .shelf.is-adding { height:135px; }
+    .shelf.is-adding .shelf-foot { height:34px; }
+    .shelf + .shelf { margin-top:14px; }
+    .shelf-head { height:15px; display:flex; align-items:center; gap:6px; }
+    .shelf-head strong { font-size:9px; font-weight:800; }
+    .shelf-count { color:var(--muted); font-size:8px; font-weight:700; }
+    .more-done { margin-left:auto; border:0; background:transparent; color:var(--secondary); font-size:9px; font-weight:700; }
+    .book-grid { height:84px; margin-top:4px; display:flex; align-items:stretch; gap:8px; overflow:hidden; }
+    .book-tile { width:56px; height:84px; flex:0 0 56px; padding:0; text-align:left; border:0; background:transparent; }
+    .cover-wrap { width:56px; height:84px; display:block; }
+    .cover {
+      width:56px; height:84px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:6px;
+      text-align:left; border:1px solid var(--border-faint); border-radius:6px; background:var(--surface-soft);
+      color:var(--text); font-size:8px; font-weight:700; line-height:1.3;
+    }
+    .cover img { width:100%; height:100%; object-fit:cover; }
+    .book-tile.is-active .cover { outline:2px solid var(--action); outline-offset:2px; }
+    .cover-title { display:block; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
+    .cover-author { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--done); font-size:7px; font-weight:700; }
+    .shelf-foot { height:14px; min-height:14px; margin-top:12px; display:flex; align-items:center; gap:8px; }
+    .shelf-summary { color:var(--secondary); font-size:8px; font-weight:700; }
+    .add-trigger { margin-left:auto; height:14px; padding:0; border:0; background:transparent; color:var(--secondary); font-size:8px; font-weight:800; }
+    .add-form { margin-left:auto; display:flex; gap:6px; }
+    .add-form input { width:125px; height:28px; padding:0 9px; border:1px solid var(--border); border-radius:8px; background:#fff; font-size:9px; font-weight:600; outline:none; }
+    .add-form button { height:28px; padding:0 9px; border:0; border-radius:8px; background:var(--action); color:#fff; font-size:9px; font-weight:800; }
+    .table-wrap { border:1px solid var(--border-faint); border-radius:14px; overflow:hidden; }
+    .table-head, .table-row { display:grid; grid-template-columns:86px minmax(150px, 1.1fr) minmax(170px, 1fr) 70px; gap:12px; align-items:center; }
+    .table-head { min-height:36px; padding:0 14px; background:var(--surface-soft); color:var(--muted); font-size:8px; font-weight:800; }
+    .table-row { width:100%; min-height:50px; padding:8px 14px; text-align:left; border:0; border-top:1px solid var(--border-faint); background:#fff; }
+    .table-row.is-active { background:var(--surface-edit); }
+    .status-pill { width:max-content; padding:5px 8px; border-radius:999px; color:var(--deep); background:var(--surface-soft); font-size:8px; font-weight:800; }
+    .status-pill.reading { color:var(--action); background:var(--action-soft); }
+    .table-title { min-width:0; }
+    .table-title strong, .table-title span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .table-title strong { font-size:10px; font-weight:800; }
+    .table-title span { margin-top:2px; color:var(--muted); font-size:8px; font-weight:600; }
+    .table-note { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary); font-size:9px; font-weight:600; }
+    .table-count { text-align:right; color:var(--secondary); font-size:9px; font-weight:700; }
+    .no-books { padding:70px 20px; text-align:center; color:var(--muted); font-size:10px; font-weight:700; }
+    .detail { padding:13px 0 0; border:0; border-top:1px solid var(--border-faint); background:#fff; }
+    .detail-head { height:15px; min-height:15px; display:flex; align-items:center; gap:8px; }
+    .detail-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; font-weight:800; }
+    .detail-subtitle { color:var(--muted); font-size:8px; font-weight:700; }
+    .close { margin-left:auto; width:auto; height:15px; padding:0; border:0; background:transparent; color:var(--secondary); font-size:8px; font-weight:700; }
+    .detail-grid { display:grid; grid-template-columns:132px minmax(0, 1fr); gap:14px; }
+    .detail-cover {
+      width:132px; height:198px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:10px; text-align:left;
+      border:1px solid var(--border-faint); border-radius:10px; background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
+    }
+    .detail-cover img { width:100%; height:100%; object-fit:cover; }
+    .status-row { height:22px; display:flex; align-items:center; gap:6px; }
+    .detail-controls { height:22px; display:flex; align-items:center; gap:8px; }
+    .status-button { height:22px; padding:0 9px; border:1px solid var(--border); border-radius:999px; background:#fff; color:var(--secondary); font-size:8px; font-weight:800; }
+    .status-button.is-selected { border-color:var(--action); color:#fff; background:var(--action); }
+    .fields { min-width:0; display:flex; flex-direction:column; gap:10px; }
+    .field-row { display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px; align-items:center; }
+    .field-row > label, .block-label { color:var(--secondary); font-size:9px; font-weight:800; }
+    .text-input { width:100%; height:32px; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
+    .stars { height:22px; margin-left:4px; display:flex; align-items:center; gap:4px; }
+    .star { width:15px; height:15px; padding:0; border:0; background:transparent; position:relative; }
+    .star::before { content:""; position:absolute; inset:3px; transform:rotate(45deg); border:1px solid var(--disabled); background:#fff; }
+    .star.is-on::before { border-color:var(--action); background:var(--action); }
+    .star-label { margin-left:3px; color:var(--muted); font-size:8px; font-weight:700; }
+    .quotes-block { min-height:70px; padding:10px; border:1px solid #F1F5F7; border-radius:12px; background:var(--surface-soft); }
+    .quotes-head { display:flex; align-items:center; justify-content:space-between; color:var(--secondary); font-size:9px; font-weight:800; }
+    .mini-quote { margin-top:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-left:8px; border-left:2px solid var(--border); font-size:9px; font-weight:700; }
+    .more-quotes { color:var(--muted); font-size:8px; font-weight:700; }
+    .status-panel { min-height:38px; padding:10px 12px; border:1px dashed var(--disabled); border-radius:12px; background:var(--surface-soft); }
+    .status-panel.done { display:grid; grid-template-columns:1fr; gap:10px; border-style:solid; border-color:var(--border-faint); }
+    .status-panel.dropped { border-color:var(--danger-border); background:#fff; }
+    .textarea-wrap { min-width:0; }
+    .textarea-wrap label { display:block; margin-bottom:6px; color:var(--secondary); font-size:9px; font-weight:800; }
+    .text-area { width:100%; height:54px; resize:none; padding:9px; border:1px solid var(--border-faint); border-radius:9px; background:var(--surface-edit); font-size:9px; font-weight:600; line-height:1.5; outline:none; }
+    .apply-head { min-height:20px; margin-bottom:6px; display:flex; align-items:center; gap:7px; }
+    .apply-head label { margin:0; }
+    .send { height:20px; margin-left:auto; padding:0 8px; border:0; border-radius:999px; background:var(--action-soft); color:var(--action); font-size:7px; font-weight:800; }
+    .sent { color:var(--action); font-size:8px; font-weight:800; }
+    .locked { min-height:38px; display:flex; align-items:center; gap:8px; text-align:left; }
+    .locked strong { font-size:10px; font-weight:800; }
+    .locked span { color:var(--muted); font-size:8px; font-weight:600; }
+    .drop-input { width:100%; height:34px; padding:0 10px; border:1px solid var(--danger-border); border-radius:9px; background:#fff; color:var(--danger); font-size:9px; font-weight:600; outline:none; }
+    .hidden { display:none !important; }
+    @media (max-width:760px) {
+      .card { padding:16px; gap:12px; }
+      .head { height:auto; flex-wrap:wrap; }
+      .search { order:3; width:calc(100% - 90px); margin-left:0; }
+      .view-toggle { order:4; margin-left:auto; }
+      .detail-grid { grid-template-columns:1fr; }
+      .detail-side { display:grid; grid-template-columns:100px 1fr; gap:12px; }
+      .detail-cover { width:100px; height:150px; }
+      .detail-controls { height:auto; flex-wrap:wrap; }
+      .status-panel.done { grid-template-columns:1fr; }
+      .table-head, .table-row { grid-template-columns:76px minmax(120px,1fr) 58px; }
+      .table-note { display:none; }
+    }
+    @media (max-width:480px) {
+      .card { padding:14px; }
+      .add-form { width:100%; margin-left:0; }
+      .add-form input { min-width:0; flex:1; }
+      .shelf-foot { flex-wrap:wrap; }
+      .field-row { grid-template-columns:1fr; gap:5px; }
+      .detail-side { grid-template-columns:82px 1fr; }
+      .detail-cover { width:82px; height:123px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-library.html" data-widget-max-width="1020" data-widget-height="318" data-widget-max-scale="4" style="--widget-max-width:1020px;--widget-base-width:1020px;--widget-base-height:318px;--widget-visual-height:318px">
+    <main class="card" data-widget-card aria-label="독서 서재 위젯">
+      <header class="head">
+        <span class="title">서재</span>
+        <span class="stats" id="libraryStats"></span>
+        <input class="search" id="searchInput" type="search" placeholder="제목 · 저자 검색" aria-label="제목 또는 저자 검색">
+        <button class="view-toggle" id="viewToggle" type="button">표로 보기</button>
+      </header>
+      <div id="libraryView"></div>
+      <section class="detail hidden" id="bookDetail" aria-label="책 상세"></section>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const LIBRARY_KEY = 'reading-library-v1';
+      const QUOTES_KEY = 'reading-quotes-v1';
+      const ENERGY_KEY = 'energy-compass-3a-v1';
+      const CHANNEL = 'reading';
+      const clone = value => JSON.parse(JSON.stringify(value));
+      const isoAgo = days => { const date = new Date(); date.setDate(date.getDate() - days); date.setHours(9, 0, 0, 0); return date.toISOString(); };
+      const DEMO_BOOKS = [
+        { id:'demo-thinking', title:'생각에 관한 생각', author:'대니얼 카너먼', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-simple', title:'단순한 진심', author:'박웅현', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-grow', title:'함께 자라기', author:'김창준', field:'경영', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sapiens', title:'사피엔스', author:'유발 하라리', field:'심리', status:'done', star:4, one:'허구를 함께 믿는 힘', cover:'', learned:'협력의 규모는 공통의 믿음에서 시작된다.', applying:'다음 프로젝트의 공통 언어를 먼저 정한다.', dropReason:'' },
+        { id:'demo-loonshots', title:'룬샷', author:'사피 바칼', field:'경영', status:'done', star:4, one:'아이디어와 실행 조직을 분리하기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-pragmatic', title:'실용주의 프로그래머', author:'앤드류 헌트', field:'기술', status:'done', star:5, one:'작은 어긋남을 놓치지 않기', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-sparks', title:'생각의 탄생', author:'루트번스타인', field:'창의', status:'done', star:4, one:'생각은 관찰에서 시작된다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-rules', title:'규칙 없음', author:'리드 헤이스팅스', field:'경영', status:'done', star:3, one:'자유에는 맥락이 필요하다', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-1', title:'물고기는 존재하지 않는다', author:'룰루 밀러', field:'인문', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-wish-2', title:'아티스트 웨이', author:'줄리아 캐머런', field:'창의', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
+        { id:'demo-drop', title:'어려운 대화', author:'더글러스 스톤', field:'심리', status:'dropped', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'지금 필요한 주제와 거리가 있었음' }
+      ];
+      const DEMO_QUOTES = [
+        { id:'demo-q7', bookId:'demo-pragmatic', text:'깨진 창문을 그대로 두지 말 것.', page:'31', note:'작은 어긋남이 기준을 무너뜨린다.', thought:'', created:isoAgo(1) },
+        { id:'demo-q6', bookId:'demo-thinking', text:'우리는 아는 것보다 이야기하기 쉬운 것을 믿는다.', page:'142', note:'', thought:'', created:isoAgo(2) },
+        { id:'demo-q5', bookId:'demo-grow', text:'실력은 피드백의 속도에 비례한다.', page:'82', note:'', thought:'', created:isoAgo(3) },
+        { id:'demo-q4', bookId:'demo-sapiens', text:'허구를 믿는 능력이 협력의 규모를 결정했다.', page:'49', note:'브랜드도 결국 허구를 함께 믿는 일.', thought:'**신뢰**가 규모를 만든다.', created:isoAgo(5) },
+        { id:'demo-q3', bookId:'demo-grow', text:'학습은 개인의 재능이 아니라 팀의 습관이다.', page:'119', note:'회고를 격주로', thought:'', created:isoAgo(7) },
+        { id:'demo-q2', bookId:'demo-simple', text:'말을 줄이면 뜻이 남는다.', page:'66', note:'', thought:'', created:isoAgo(9) },
+        { id:'demo-q1', bookId:'demo-thinking', text:'직관은 빠르지만 게으르다.', page:'176', note:'판단이 급할 때일수록 절차를 믿자.', thought:'한 번 더 **확인**하기.', created:isoAgo(12) },
+        { id:'demo-q0', bookId:'demo-thinking', text:'기억은 저장이 아니라 재구성이다.', page:'138', note:'', thought:'', created:isoAgo(24) }
+      ];
+      const statusMeta = { reading:'읽는 중', wishlist:'구입 예정', done:'완독', dropped:'중도포기' };
+      const statusOrder = { reading:0, wishlist:1, done:2, dropped:3 };
+      const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
+      const els = { stats:document.getElementById('libraryStats'), search:document.getElementById('searchInput'), toggle:document.getElementById('viewToggle'), view:document.getElementById('libraryView'), detail:document.getElementById('bookDetail') };
+      let books = [];
+      let quotes = [];
+      let viewMode = 'gallery';
+      let selectedBookId = '';
+      let doneExpanded = false;
+      let addingBook = false;
+      let sentBookId = '';
+
+      function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
+      function readLibrary() {
+        let raw = null; try { raw = localStorage.getItem(LIBRARY_KEY); } catch (_) {}
+        const value = safeParse(raw, null); return value && Array.isArray(value.books) ? value : { books:clone(DEMO_BOOKS) };
+      }
+      function readQuotes() {
+        let raw = null; try { raw = localStorage.getItem(QUOTES_KEY); } catch (_) {}
+        const value = safeParse(raw, null); return value && Array.isArray(value.quotes) ? value : { quotes:clone(DEMO_QUOTES) };
+      }
+      function writeLibrary(next) {
+        try { localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); } catch (_) { return false; }
+        if (channel) channel.postMessage({ type:'changed', key:LIBRARY_KEY }); return true;
+      }
+      function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+      function uid(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
+      function quoteCount(bookId) { return quotes.filter(item => item.bookId === bookId).length; }
+      function matches(book) { const q = els.search.value.trim().toLocaleLowerCase('ko'); return !q || [book.title, book.author].some(value => String(value || '').toLocaleLowerCase('ko').includes(q)); }
+      function shortAuthor(author) {
+        const parts = String(author || '저자 미입력').trim().split(/\s+/); return parts[parts.length - 1] || '저자 미입력';
+      }
+      function coverHtml(book) {
+        if (book.cover) return `<img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지">`;
+        return `<span class="cover-title">${escapeHtml(book.title)}</span><span class="cover-author">${escapeHtml(shortAuthor(book.author))}</span>`;
+      }
+      function tile(book) {
+        return `<button class="book-tile ${book.id === selectedBookId ? 'is-active' : ''}" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} · ${escapeHtml(book.author || '저자 미입력')}"><span class="cover-wrap"><span class="cover">${coverHtml(book)}</span></span></button>`;
+      }
+      function bindBookButtons() { els.view.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedBookId = button.dataset.bookId; render(); })); }
+      function renderHeader() {
+        els.stats.textContent = `올해 완독 ${books.filter(book => book.status === 'done').length}권 · 전체 ${books.length}권`;
+        els.toggle.textContent = viewMode === 'gallery' ? '표로 보기' : '서가로 보기';
+      }
+      function renderGallery() {
+        const filtered = books.filter(matches);
+        const reading = filtered.filter(book => book.status === 'reading').slice(0, 8);
+        const allDone = filtered.filter(book => book.status === 'done');
+        const done = doneExpanded ? allDone : allDone.slice(0, 6);
+        const wishlist = filtered.filter(book => book.status === 'wishlist').length;
+        const dropped = filtered.filter(book => book.status === 'dropped').length;
+        if (!filtered.length) { els.view.innerHTML = `<div class="no-books">찾는 책이 없어요</div>`; return; }
+        const addArea = addingBook ? `<div class="add-form"><input id="newTitle" placeholder="책 제목" maxlength="80"><input id="newAuthor" placeholder="저자" maxlength="60"><button id="createBook" type="button">추가</button></div>` : `<button class="add-trigger" id="addTrigger" type="button">＋ 책 추가</button>`;
+        els.view.innerHTML = `<section class="shelf"><div class="shelf-head"><strong>읽는 중</strong><span class="shelf-count">${reading.length}</span></div><div class="book-grid">${reading.map(tile).join('') || '<div class="no-books">읽는 중인 책이 없어요</div>'}</div></section><section class="shelf ${addingBook ? 'is-adding' : ''}"><div class="shelf-head"><strong>완독</strong><span class="shelf-count">${allDone.length}</span>${allDone.length > 6 ? `<button class="more-done" id="doneMore" type="button">${doneExpanded ? '접기' : `＋${allDone.length - 6} 더보기`}</button>` : ''}</div><div class="book-grid">${done.map(tile).join('') || '<div class="no-books">완독한 책이 없어요</div>'}</div><footer class="shelf-foot"><span class="shelf-summary">구입 예정 ${wishlist} · 중도포기 ${dropped}</span>${addArea}</footer></section>`;
+        bindBookButtons();
+        document.getElementById('doneMore')?.addEventListener('click', () => { doneExpanded = !doneExpanded; renderGallery(); });
+        document.getElementById('addTrigger')?.addEventListener('click', () => { addingBook = true; renderGallery(); document.getElementById('newTitle')?.focus(); });
+        document.getElementById('createBook')?.addEventListener('click', addBook);
+        ['newTitle', 'newAuthor'].forEach(id => document.getElementById(id)?.addEventListener('keydown', event => { if (event.key === 'Enter') addBook(); if (event.key === 'Escape') { addingBook = false; renderGallery(); } }));
+      }
+      function renderTable() {
+        const filtered = books.filter(matches).sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9) || a.title.localeCompare(b.title, 'ko'));
+        els.view.innerHTML = `<div class="table-wrap"><div class="table-head"><span>상태</span><span>책</span><span>한 줄</span><span>문장</span></div>${filtered.map(book => `<button class="table-row ${book.id === selectedBookId ? 'is-active' : ''}" type="button" data-book-id="${escapeHtml(book.id)}"><span class="status-pill ${escapeHtml(book.status)}">${statusMeta[book.status] || '미분류'}</span><span class="table-title"><strong>${escapeHtml(book.title)}</strong><span>${escapeHtml(book.author || '저자 미입력')}</span></span><span class="table-note">${escapeHtml(book.status === 'dropped' ? (book.dropReason || '중도포기 이유 없음') : (book.one || '한 줄 기록 없음'))}</span><span class="table-count">${quoteCount(book.id)}개</span></button>`).join('') || '<div class="no-books">찾는 책이 없어요</div>'}</div>`;
+        bindBookButtons();
+      }
+      function addBook() {
+        const title = document.getElementById('newTitle')?.value.trim(); const author = document.getElementById('newAuthor')?.value.trim(); if (!title) return;
+        const book = { id:uid('book'), title, author, field:'미분류', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' };
+        const latest = readLibrary(); latest.books.push(book);
+        if (writeLibrary(latest)) { books = latest.books; selectedBookId = book.id; addingBook = false; render(); }
+      }
+      function updateBook(id, patch) {
+        const latest = readLibrary(); const book = latest.books.find(item => item.id === id); if (!book) return false;
+        Object.assign(book, patch); if (!writeLibrary(latest)) return false; books = latest.books; return true;
+      }
+      function renderDetail() {
+        const book = books.find(item => item.id === selectedBookId);
+        if (!book) { els.detail.classList.add('hidden'); els.detail.innerHTML = ''; return; }
+        const bookQuotes = quotes.filter(item => item.bookId === book.id).sort((a, b) => new Date(b.created) - new Date(a.created));
+        const statusButtons = ['reading', 'done', 'dropped', 'wishlist'].map(value => `<button class="status-button ${book.status === value ? 'is-selected' : ''}" type="button" data-status="${value}">${statusMeta[value]}</button>`).join('');
+        const stars = [1,2,3,4,5].map(value => `<button class="star ${book.star >= value ? 'is-on' : ''}" type="button" data-star="${value}" aria-label="별점 ${value}점"></button>`).join('');
+        let panel = '';
+        if (book.status === 'done') {
+          panel = `<div class="status-panel done"><div class="block-label">완독 정리</div><div class="textarea-wrap"><label for="learnedInput">배운 것</label><textarea class="text-area" id="learnedInput" placeholder="이 책이 남긴 것">${escapeHtml(book.learned || '')}</textarea></div><div class="textarea-wrap"><div class="apply-head"><label for="applyingInput">적용할 것</label><span class="sent ${sentBookId === book.id ? '' : 'hidden'}" id="sentLabel">보냈어요</span><button class="send" id="sendEnergy" type="button">우선순위로 보내기</button></div><textarea class="text-area" id="applyingInput" placeholder="한 줄로 · 보내면 미분류 보관함에 담깁니다">${escapeHtml(book.applying || '')}</textarea></div></div>`;
+        } else if (book.status === 'dropped') {
+          panel = `<div class="status-panel dropped"><label class="block-label" for="dropInput">중도포기 이유</label><input class="drop-input" id="dropInput" value="${escapeHtml(book.dropReason || '')}" placeholder="멈춘 이유를 남겨두세요"></div>`;
+        } else {
+          panel = `<div class="status-panel locked"><strong>완독하면 정리 칸이 열려요</strong><span>배운 점과 적용할 점을 책 안에 남길 수 있어요</span></div>`;
+        }
+        els.detail.classList.remove('hidden');
+        els.detail.innerHTML = `<div class="detail-grid"><aside class="detail-side"><div class="detail-cover">${coverHtml(book)}</div></aside><div class="fields"><div class="detail-head"><span class="detail-title">${escapeHtml(book.title)}</span><span class="detail-subtitle">${escapeHtml(shortAuthor(book.author))} · ${escapeHtml(book.field || '미분류')}</span><button class="close" id="detailClose" type="button">닫기</button></div><div class="detail-controls"><div class="status-row">${statusButtons}</div><div class="stars">${stars}<span class="star-label">${book.star || '별점 없음'}</span></div></div><input class="text-input" id="oneInput" aria-label="이 책의 한 줄" value="${escapeHtml(book.one || '')}" placeholder="이 책의 한 줄"><div class="quotes-block"><div class="quotes-head"><span>이 책에서 담은 문장</span><span>${bookQuotes.length}</span></div>${bookQuotes.slice(0, 2).map(item => `<div class="mini-quote">${escapeHtml(item.text)}</div>`).join('') || '<div class="mini-quote">저장한 문장이 없어요</div>'}${bookQuotes.length > 2 ? `<div class="more-quotes">＋${bookQuotes.length - 2} 더보기</div>` : ''}</div>${panel}</div></div>`;
+        document.getElementById('detailClose').addEventListener('click', () => { selectedBookId = ''; render(); });
+        els.detail.querySelectorAll('[data-status]').forEach(button => button.addEventListener('click', () => { if (updateBook(book.id, { status:button.dataset.status })) render(); }));
+        els.detail.querySelectorAll('[data-star]').forEach(button => button.addEventListener('click', () => { const value = Number(button.dataset.star); if (updateBook(book.id, { star:book.star === value ? 0 : value })) render(); }));
+        bindImmediate('oneInput', book.id, 'one');
+        bindImmediate('learnedInput', book.id, 'learned'); bindImmediate('applyingInput', book.id, 'applying'); bindImmediate('dropInput', book.id, 'dropReason');
+        document.getElementById('sendEnergy')?.addEventListener('click', () => sendToEnergy(book.id));
+      }
+      function bindImmediate(elementId, bookId, property) {
+        const input = document.getElementById(elementId); if (!input) return;
+        input.addEventListener('input', event => {
+          const value = event.target.value; const local = books.find(book => book.id === bookId); if (local) local[property] = value;
+          updateBook(bookId, { [property]:value }); if (property === 'title') document.querySelector('.detail-title').textContent = value || '제목 없음';
+        });
+      }
+      function sendToEnergy(bookId) {
+        const book = books.find(item => item.id === bookId); const text = String(book?.applying || '').trim(); if (!book || !text) return;
+        let raw = null; try { raw = localStorage.getItem(ENERGY_KEY); } catch (_) {}
+        const energy = safeParse(raw, null); const next = energy && Array.isArray(energy.items) ? energy : { items:[], scope:'month' };
+        const duplicate = next.items.some(item => item.from === book.title && item.t === text);
+        if (!duplicate) next.items.push({ id:uid('energy'), t:text, quad:null, status:'todo', scope:'month', from:book.title });
+        try { localStorage.setItem(ENERGY_KEY, JSON.stringify(next)); } catch (_) { return; }
+        sentBookId = book.id; document.getElementById('sentLabel')?.classList.remove('hidden');
+      }
+      function render() { renderHeader(); if (viewMode === 'gallery') renderGallery(); else renderTable(); renderDetail(); }
+      function sync() {
+        books = readLibrary().books; quotes = readQuotes().quotes;
+        if (selectedBookId && !books.some(book => book.id === selectedBookId)) selectedBookId = '';
+        render();
+      }
+
+      els.toggle.addEventListener('click', () => { viewMode = viewMode === 'gallery' ? 'table' : 'gallery'; render(); });
+      els.search.addEventListener('input', render);
+      window.addEventListener('storage', event => { if ([LIBRARY_KEY, QUOTES_KEY].includes(event.key)) sync(); });
+      window.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+      window.addEventListener('focus', sync);
+      if (channel) channel.addEventListener('message', sync);
+      sync();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
