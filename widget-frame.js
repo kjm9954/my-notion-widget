@@ -122,7 +122,14 @@
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    scaleDrag = { pointerId: event.pointerId, x: event.clientX, scale: renderedScale };
+    scaleDrag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      scale: renderedScale,
+      width: baseWidth,
+      height: baseHeight
+    };
     scaleHandle.setPointerCapture?.(event.pointerId);
     document.body.classList.add('is-widget-scaling');
     updateFrame();
@@ -131,8 +138,12 @@
   scaleHandle.addEventListener('pointermove', event => {
     if (!scaleDrag || event.pointerId !== scaleDrag.pointerId) return;
     event.preventDefault();
-    const delta = event.clientX - scaleDrag.x;
-    applyScale(scaleDrag.scale + delta / Math.max(1, baseWidth), true);
+    const horizontalDelta = (event.clientX - scaleDrag.x) * 2 / Math.max(1, scaleDrag.width);
+    const verticalDelta = (event.clientY - scaleDrag.y) / Math.max(1, scaleDrag.height);
+    const scaleDelta = Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+      ? horizontalDelta
+      : verticalDelta;
+    applyScale(scaleDrag.scale + scaleDelta, true);
   });
 
   function finishScale(event) {
