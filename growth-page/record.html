@@ -42,7 +42,7 @@
 
     .card {
       width:100%;
-      min-height:700px;
+      min-height:660px;
       display:flex;
       flex-direction:column;
       gap:16px;
@@ -121,7 +121,7 @@
     }
     .day {
       min-width:0;
-      aspect-ratio:1 / 1;
+      aspect-ratio:1.15 / 1;
       display:flex;
       flex-direction:column;
       justify-content:space-between;
@@ -136,6 +136,7 @@
     }
     .day.has-record { background:var(--surface); border-color:var(--border-day); }
     .day.other-month { opacity:.3; }
+    .day.next-month { visibility:hidden; pointer-events:none; }
     .day.future { opacity:.35; }
     .day.selected { outline-color:#CFE2EA; }
     .day.today {
@@ -244,7 +245,7 @@
 
     @media (max-width:0px) {
       .shell { place-items:start center; padding:10px 8px; }
-      .card { width:min(380px, calc(100vw - 16px)); min-height:700px; padding:22px; }
+      .card { width:min(380px, calc(100vw - 16px)); min-height:660px; padding:22px; }
       .month-button { width:44px; height:44px; flex-basis:44px; }
       .header { min-height:44px; }
       .day { padding:5px; }
@@ -256,7 +257,7 @@
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-record.html" data-widget-max-width="1400" data-widget-height="1000" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:1000px;--widget-visual-height:1000px">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-record.html" data-widget-max-width="1400" data-widget-height="900" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:900px;--widget-visual-height:900px">
     <section class="card" id="card" data-widget-card aria-label="성장 기록 위젯">
       <header class="header" id="header"></header>
       <section class="calendar-shell" id="calendarShell" aria-label="월간 기록 캘린더">
@@ -380,10 +381,12 @@
           const counts = countsFor(key);
           const hasRecord = counts.diary > 0 || counts.reading > 0;
           const otherMonth = date.getMonth() !== month;
+          const nextMonth = otherMonth && date > first;
           const future = date > today;
           const classes = ['day'];
           if (hasRecord) classes.push('has-record');
           if (otherMonth) classes.push('other-month');
+          if (nextMonth) classes.push('next-month');
           if (future) classes.push('future');
           if (selectedKey === key) classes.push('selected');
           if (key === todayKey) classes.push('today');
