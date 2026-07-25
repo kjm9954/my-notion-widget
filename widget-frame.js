@@ -32,8 +32,8 @@
     return handle;
   }
 
-  const leftWidthHandle = viewportWidthHandle('left', '왼쪽에서 가로 크기 비율 고정 조절');
-  const rightWidthHandle = viewportWidthHandle('right', '오른쪽에서 가로 크기 비율 고정 조절');
+  const leftWidthHandle = viewportWidthHandle('left', '왼쪽에서 위젯 가로 크기 조절');
+  const rightWidthHandle = viewportWidthHandle('right', '오른쪽에서 위젯 가로 크기 조절');
 
   function viewportHeightHandle(position, label) {
     let handle = document.querySelector(`[data-widget-scale-position="${position}"]`);
@@ -48,8 +48,8 @@
     return handle;
   }
 
-  const topHeightHandle = viewportHeightHandle('top', '위쪽에서 세로 크기 비율 고정 조절');
-  const bottomHeightHandle = viewportHeightHandle('bottom', '아래쪽에서 세로 크기 비율 고정 조절');
+  const topHeightHandle = viewportHeightHandle('top', '위쪽에서 위젯 세로 크기 조절');
+  const bottomHeightHandle = viewportHeightHandle('bottom', '아래쪽에서 위젯 세로 크기 조절');
   const scaleHandles = [
     scaleHandle,
     topLeftHandle,
@@ -67,8 +67,10 @@
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
   const minimumScale = .05;
-  let requestedScale = 1;
-  let renderedScale = 1;
+  let requestedScaleX = 1;
+  let requestedScaleY = 1;
+  let renderedScaleX = 1;
+  let renderedScaleY = 1;
   let baseHeight = defaultHeight;
   let baseWidth = Math.min(maximumWidth, window.innerWidth);
   let requestedListHeight = null;
@@ -92,28 +94,30 @@
   }
 
   function saveSize() {
-    const value = { scale: requestedScale };
+    const value = { scaleX: requestedScaleX, scaleY: requestedScaleY };
     if (list) value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
-  function maximumScale() {
+  function maximumScale(axis = 'both') {
     const widthLimit = window.innerWidth / Math.max(1, baseWidth);
     const heightLimit = window.innerHeight / Math.max(1, baseHeight);
     if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) {
       return Math.max(minimumScale, configuredMaximumScale);
     }
+    if (axis === 'horizontal') return Math.max(.02, widthLimit);
+    if (axis === 'vertical') return Math.max(.02, heightLimit);
     return Math.max(.02, Math.min(widthLimit, heightLimit));
   }
 
-  function displayScale(value) {
-    const maximum = maximumScale();
+  function displayScale(value, axis) {
+    const maximum = maximumScale(axis);
     const minimum = Math.min(minimumScale, maximum);
     return Math.max(minimum, Math.min(maximum, number(value, 1)));
   }
 
-  function userScale(value) {
-    const maximum = maximumScale();
+  function userScale(value, axis) {
+    const maximum = maximumScale(axis);
     const minimum = Math.min(minimumScale, maximum);
     return Math.max(minimum, Math.min(maximum, number(value, 1)));
   }
@@ -125,20 +129,31 @@
       const measuredWidth = card.offsetWidth || Math.min(maximumWidth, window.innerWidth);
       baseHeight = measuredHeight;
       baseWidth = measuredWidth;
-      renderedScale = displayScale(requestedScale);
-      const visualHeight = baseHeight * renderedScale;
+      renderedScaleX = displayScale(requestedScaleX, 'horizontal');
+      renderedScaleY = displayScale(requestedScaleY, 'vertical');
+      const visualWidth = baseWidth * renderedScaleX;
+      const visualHeight = baseHeight * renderedScaleY;
       host.style.setProperty('--widget-max-width', `${maximumWidth}px`);
       host.style.setProperty('--widget-base-width', `${baseWidth}px`);
       host.style.setProperty('--widget-base-height', `${baseHeight}px`);
-      host.style.setProperty('--widget-scale', String(renderedScale));
+      host.style.setProperty('--widget-scale-x', String(renderedScaleX));
+      host.style.setProperty('--widget-scale-y', String(renderedScaleY));
       host.style.setProperty('--widget-visual-height', `${visualHeight}px`);
       card.style.setProperty('--widget-max-width', `${maximumWidth}px`);
-      card.style.setProperty('--widget-scale', String(renderedScale));
-      sizeLabel.textContent = `${Math.round(baseWidth * renderedScale)}×${Math.round(baseHeight * renderedScale)}`;
+      card.style.setProperty('--widget-scale-x', String(renderedScaleX));
+      card.style.setProperty('--widget-scale-y', String(renderedScaleY));
+      sizeLabel.textContent = `${Math.round(visualWidth)}×${Math.round(visualHeight)}`;
       scaleHandles.forEach(handle => {
-        handle.setAttribute('aria-valuemin', String(Math.round(Math.min(minimumScale, maximumScale()) * 100)));
-        handle.setAttribute('aria-valuemax', String(Math.round(maximumScale() * 100)));
-        handle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100)));
+        const axis = handle.dataset.widgetScaleAxis || 'both';
+        const maximum = maximumScale(axis);
+        const current = axis === 'horizontal'
+          ? requestedScaleX
+          : axis === 'vertical'
+            ? requestedScaleY
+            : Math.min(requestedScaleX, requestedScaleY);
+        handle.setAttribute('aria-valuemin', String(Math.round(Math.min(minimumScale, maximum) * 100)));
+        handle.setAttribute('aria-valuemax', String(Math.round(maximum * 100)));
+        handle.setAttribute('aria-valuenow', String(Math.round(current * 100)));
       });
       document.body.classList.toggle('is-widget-overflowing', visualHeight > window.innerHeight + .5);
       const rect = card.getBoundingClientRect();
@@ -167,8 +182,19 @@
     });
   }
 
-  function applyScale(value, fromUser = false) {
-    requestedScale = fromUser ? userScale(value) : Math.max(minimumScale, number(value, 1));
+  function applyScale(value, axis = 'both', fromUser = false) {
+    if (axis === 'horizontal' || axis === 'both') {
+      const nextX = typeof value === 'object' ? value.x : value;
+      requestedScaleX = fromUser
+        ? userScale(nextX, 'horizontal')
+        : Math.max(minimumScale, number(nextX, 1));
+    }
+    if (axis === 'vertical' || axis === 'both') {
+      const nextY = typeof value === 'object' ? value.y : value;
+      requestedScaleY = fromUser
+        ? userScale(nextY, 'vertical')
+        : Math.max(minimumScale, number(nextY, 1));
+    }
     updateFrame();
   }
 
@@ -184,7 +210,7 @@
   }
 
   function listMaximum(offset) {
-    return Math.max(40, window.innerHeight / Math.max(renderedScale, .1) - offset);
+    return Math.max(40, window.innerHeight / Math.max(renderedScaleY, .1) - offset);
   }
 
   function applyListHeight(value, fromUser = false) {
@@ -215,7 +241,8 @@
         y: event.clientY,
         direction: ['top-left', 'left', 'top'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
         axis: handle.dataset.widgetScaleAxis || 'both',
-        scale: renderedScale,
+        scaleX: renderedScaleX,
+        scaleY: renderedScaleY,
         width: baseWidth,
         height: baseHeight
       };
@@ -229,14 +256,18 @@
       event.preventDefault();
       const horizontalDelta = (event.clientX - scaleDrag.x) * 2 * scaleDrag.direction / Math.max(1, scaleDrag.width);
       const verticalDelta = (event.clientY - scaleDrag.y) * scaleDrag.direction / Math.max(1, scaleDrag.height);
-      const scaleDelta = scaleDrag.axis === 'horizontal'
-        ? horizontalDelta
-        : scaleDrag.axis === 'vertical'
-          ? verticalDelta
-        : Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+      if (scaleDrag.axis === 'horizontal') {
+        applyScale(scaleDrag.scaleX + horizontalDelta, 'horizontal', true);
+      } else if (scaleDrag.axis === 'vertical') {
+        applyScale(scaleDrag.scaleY + verticalDelta, 'vertical', true);
+      } else {
+        const scaleDelta = Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
           ? horizontalDelta
           : verticalDelta;
-      applyScale(scaleDrag.scale + scaleDelta, true);
+        const baseScale = Math.max(minimumScale, Math.min(scaleDrag.scaleX, scaleDrag.scaleY));
+        const factor = Math.max(.01, (baseScale + scaleDelta) / baseScale);
+        applyScale({ x: scaleDrag.scaleX * factor, y: scaleDrag.scaleY * factor }, 'both', true);
+      }
     });
 
     const finishScale = event => {
@@ -265,7 +296,16 @@
       if (!allowedKeys.includes(event.key)) return;
       event.preventDefault();
       const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
-      applyScale(requestedScale + direction * .05, true);
+      if (axis === 'horizontal') {
+        applyScale(requestedScaleX + direction * .05, 'horizontal', true);
+      } else if (axis === 'vertical') {
+        applyScale(requestedScaleY + direction * .05, 'vertical', true);
+      } else {
+        applyScale({
+          x: requestedScaleX + direction * .05,
+          y: requestedScaleY + direction * .05
+        }, 'both', true);
+      }
       saveSize();
     });
   });
@@ -283,7 +323,7 @@
     listHandle.addEventListener('pointermove', event => {
       if (!listDrag || event.pointerId !== listDrag.pointerId) return;
       event.preventDefault();
-      applyListHeight(listDrag.height + (event.clientY - listDrag.y) / Math.max(renderedScale, .1), true);
+      applyListHeight(listDrag.height + (event.clientY - listDrag.y) / Math.max(renderedScaleY, .1), true);
     });
 
     const finishList = event => {
@@ -305,9 +345,11 @@
   }
 
   const saved = readSize();
-  requestedScale = Math.max(minimumScale, number(saved.scale, 1));
+  const legacyScale = Math.max(minimumScale, number(saved.scale, 1));
+  requestedScaleX = Math.max(minimumScale, number(saved.scaleX, legacyScale));
+  requestedScaleY = Math.max(minimumScale, number(saved.scaleY, legacyScale));
   if (list) applyListHeight(number(saved.listH, list.offsetHeight));
-  applyScale(requestedScale);
+  applyScale({ x: requestedScaleX, y: requestedScaleY });
 
   new ResizeObserver(() => updateFrame()).observe(card);
   if (fixed) {
@@ -322,8 +364,10 @@
   window.addEventListener('storage', event => {
     if (event.key !== key) return;
     const next = readSize();
-    requestedScale = Math.max(minimumScale, number(next.scale, 1));
+    const nextLegacyScale = Math.max(minimumScale, number(next.scale, 1));
+    requestedScaleX = Math.max(minimumScale, number(next.scaleX, nextLegacyScale));
+    requestedScaleY = Math.max(minimumScale, number(next.scaleY, nextLegacyScale));
     if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
-    applyScale(requestedScale);
+    applyScale({ x: requestedScaleX, y: requestedScaleY });
   });
 })();

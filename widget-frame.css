@@ -41,7 +41,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   width: 100% !important;
   max-width: var(--widget-max-width, var(--widget-base-width));
   margin: 0 auto;
-  transform: scale(var(--widget-scale, 1));
+  transform: scale(var(--widget-scale-x, var(--widget-scale, 1)), var(--widget-scale-y, var(--widget-scale, 1)));
   transform-origin: top center;
   box-shadow: 0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06) !important;
 }
