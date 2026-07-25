@@ -19,13 +19,14 @@ body.widget-page.widget-page-centered {
 
 .widget-host {
   position: relative;
-  width: var(--widget-base-width);
+  width: 100%;
+  max-width: var(--widget-max-width, var(--widget-base-width));
   height: var(--widget-visual-height, var(--widget-base-height));
   min-height: 0 !important;
   display: flex !important;
   align-items: flex-start;
   justify-content: center;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   margin: 0 auto;
   padding: 0 !important;
   overflow: visible;
@@ -33,7 +34,8 @@ body.widget-page.widget-page-centered {
 
 [data-widget-card] {
   position: relative;
-  width: var(--widget-base-width) !important;
+  width: 100% !important;
+  max-width: var(--widget-max-width, var(--widget-base-width));
   margin: 0 auto;
   transform: scale(var(--widget-scale, 1));
   transform-origin: top center;

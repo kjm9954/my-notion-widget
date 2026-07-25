@@ -8,15 +8,18 @@
   if (!host || !card || !scaleHandle || !sizeLabel) return;
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
-  const defaultWidth = Number(host.dataset.widgetWidth) || card.offsetWidth;
+  const maximumWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
   const defaultHeight = Number(host.dataset.widgetHeight) || card.offsetHeight;
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
   const minimumScale = .7;
-  let scale = 1;
+  let requestedScale = 1;
+  let renderedScale = 1;
   let baseHeight = defaultHeight;
-  let listHeight = null;
+  let baseWidth = Math.min(maximumWidth, window.innerWidth);
+  let requestedListHeight = null;
+  let renderedListHeight = null;
   let scaleDrag = null;
   let listDrag = null;
   let frameRequest = 0;
@@ -36,18 +39,24 @@
   }
 
   function saveSize() {
-    const value = { scale };
-    if (list) value.listH = Math.round(listHeight ?? list.getBoundingClientRect().height / scale);
+    const value = { scale: requestedScale };
+    if (list) value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
   function maximumScale() {
-    const widthLimit = window.innerWidth / defaultWidth;
+    const widthLimit = window.innerWidth / Math.max(1, baseWidth);
     const heightLimit = window.innerHeight / Math.max(1, baseHeight);
-    return Math.max(.1, Math.min(widthLimit, heightLimit));
+    return Math.max(.1, Math.min(1, widthLimit, heightLimit));
   }
 
-  function clampScale(value) {
+  function displayScale(value) {
+    const maximum = maximumScale();
+    const minimum = Math.min(minimumScale, maximum);
+    return Math.max(minimum, Math.min(maximum, number(value, 1)));
+  }
+
+  function userScale(value) {
     const maximum = maximumScale();
     const minimum = Math.min(minimumScale, maximum);
     return Math.max(minimum, Math.min(maximum, number(value, 1)));
@@ -57,20 +66,24 @@
     cancelAnimationFrame(frameRequest);
     frameRequest = requestAnimationFrame(() => {
       const measuredHeight = card.offsetHeight || defaultHeight;
+      const measuredWidth = card.offsetWidth || Math.min(maximumWidth, window.innerWidth);
       baseHeight = measuredHeight;
-      scale = clampScale(scale);
-      host.style.setProperty('--widget-base-width', `${defaultWidth}px`);
+      baseWidth = measuredWidth;
+      renderedScale = displayScale(requestedScale);
+      host.style.setProperty('--widget-max-width', `${maximumWidth}px`);
+      host.style.setProperty('--widget-base-width', `${baseWidth}px`);
       host.style.setProperty('--widget-base-height', `${baseHeight}px`);
-      host.style.setProperty('--widget-scale', String(scale));
-      host.style.setProperty('--widget-visual-height', `${baseHeight * scale}px`);
-      card.style.setProperty('--widget-scale', String(scale));
-      sizeLabel.textContent = `${Math.round(defaultWidth * scale)}×${Math.round(baseHeight * scale)}`;
-      scaleHandle.setAttribute('aria-valuenow', String(Math.round(scale * 100)));
+      host.style.setProperty('--widget-scale', String(renderedScale));
+      host.style.setProperty('--widget-visual-height', `${baseHeight * renderedScale}px`);
+      card.style.setProperty('--widget-max-width', `${maximumWidth}px`);
+      card.style.setProperty('--widget-scale', String(renderedScale));
+      sizeLabel.textContent = `${Math.round(baseWidth * renderedScale)}×${Math.round(baseHeight * renderedScale)}`;
+      scaleHandle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100)));
     });
   }
 
-  function applyScale(value) {
-    scale = clampScale(value);
+  function applyScale(value, fromUser = false) {
+    requestedScale = fromUser ? userScale(value) : Math.max(.1, number(value, 1));
     updateFrame();
   }
 
@@ -86,17 +99,22 @@
   }
 
   function listMaximum(offset) {
-    return Math.max(160, window.innerHeight / Math.max(scale, .1) - offset);
+    return Math.max(40, window.innerHeight / Math.max(renderedScale, .1) - offset);
   }
 
-  function applyListHeight(value) {
+  function applyListHeight(value, fromUser = false) {
     if (!list) return;
     const offset = listOffset();
-    listHeight = Math.max(160, Math.min(listMaximum(offset), number(value, list.offsetHeight)));
-    list.style.flex = `0 0 ${listHeight}px`;
-    list.style.height = `${listHeight}px`;
-    card.style.height = `${offset + listHeight}px`;
-    listHandle?.setAttribute('aria-valuenow', String(Math.round(listHeight)));
+    const maximum = listMaximum(offset);
+    const desired = number(value, requestedListHeight ?? list.offsetHeight);
+    requestedListHeight = fromUser
+      ? Math.max(Math.min(160, maximum), Math.min(maximum, desired))
+      : Math.max(40, desired);
+    renderedListHeight = Math.max(40, Math.min(maximum, requestedListHeight));
+    list.style.flex = `0 0 ${renderedListHeight}px`;
+    list.style.height = `${renderedListHeight}px`;
+    card.style.height = `${offset + renderedListHeight}px`;
+    listHandle?.setAttribute('aria-valuenow', String(Math.round(requestedListHeight)));
     updateFrame();
   }
 
@@ -104,7 +122,7 @@
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    scaleDrag = { pointerId: event.pointerId, x: event.clientX, scale };
+    scaleDrag = { pointerId: event.pointerId, x: event.clientX, scale: renderedScale };
     scaleHandle.setPointerCapture?.(event.pointerId);
     document.body.classList.add('is-widget-scaling');
     updateFrame();
@@ -114,7 +132,7 @@
     if (!scaleDrag || event.pointerId !== scaleDrag.pointerId) return;
     event.preventDefault();
     const delta = event.clientX - scaleDrag.x;
-    applyScale(scaleDrag.scale + delta / defaultWidth);
+    applyScale(scaleDrag.scale + delta / Math.max(1, baseWidth), true);
   });
 
   function finishScale(event) {
@@ -137,7 +155,7 @@
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
     const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
-    applyScale(scale + direction * .05);
+    applyScale(requestedScale + direction * .05, true);
     saveSize();
   });
 
@@ -146,7 +164,7 @@
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-      listDrag = { pointerId: event.pointerId, y: event.clientY, height: list.offsetHeight, offset: listOffset() };
+      listDrag = { pointerId: event.pointerId, y: event.clientY, height: renderedListHeight ?? list.offsetHeight, offset: listOffset() };
       listHandle.setPointerCapture?.(event.pointerId);
       document.body.classList.add('is-widget-list-resizing');
     });
@@ -154,7 +172,7 @@
     listHandle.addEventListener('pointermove', event => {
       if (!listDrag || event.pointerId !== listDrag.pointerId) return;
       event.preventDefault();
-      applyListHeight(listDrag.height + (event.clientY - listDrag.y) / Math.max(scale, .1));
+      applyListHeight(listDrag.height + (event.clientY - listDrag.y) / Math.max(renderedScale, .1), true);
     });
 
     const finishList = event => {
@@ -170,31 +188,31 @@
     listHandle.addEventListener('keydown', event => {
       if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
       event.preventDefault();
-      applyListHeight(list.offsetHeight + (event.key === 'ArrowDown' ? 20 : -20));
+      applyListHeight((renderedListHeight ?? list.offsetHeight) + (event.key === 'ArrowDown' ? 20 : -20), true);
       saveSize();
     });
   }
 
   const saved = readSize();
-  scale = number(saved.scale, 1);
+  requestedScale = Math.max(.1, number(saved.scale, 1));
   if (list) applyListHeight(number(saved.listH, list.offsetHeight));
-  applyScale(scale);
+  applyScale(requestedScale);
 
   new ResizeObserver(() => updateFrame()).observe(card);
   if (fixed) {
     new ResizeObserver(() => {
-      if (!listDrag) applyListHeight(listHeight ?? list.offsetHeight);
+      if (!listDrag) applyListHeight(requestedListHeight ?? list.offsetHeight);
     }).observe(fixed);
   }
   window.addEventListener('resize', () => {
-    if (list && listHeight !== null) applyListHeight(listHeight);
+    if (list && requestedListHeight !== null) applyListHeight(requestedListHeight);
     else updateFrame();
   });
   window.addEventListener('storage', event => {
     if (event.key !== key) return;
     const next = readSize();
-    scale = number(next.scale, 1);
-    if (list) applyListHeight(number(next.listH, listHeight ?? list.offsetHeight));
-    applyScale(scale);
+    requestedScale = Math.max(.1, number(next.scale, 1));
+    if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
+    applyScale(requestedScale);
   });
 })();

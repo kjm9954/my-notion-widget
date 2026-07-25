@@ -18,7 +18,7 @@
     button, input, textarea { font:inherit; }
     button { color:inherit; }
     .shell { min-height:0; }
-    .widget { width:940px; min-height:620px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
+    .widget { width:100%; min-height:620px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
     .header, .editor-head, .entry-head, .section-head, .stat-row, .button-row { display:flex; align-items:center; }
     .header { min-height:34px; justify-content:space-between; gap:12px; }
     .date-title { font-size:13px; font-weight:800; }
@@ -149,7 +149,7 @@
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page">
-  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-today.html" data-widget-width="940" data-widget-height="620" style="--widget-base-width:940px;--widget-base-height:620px;--widget-visual-height:620px">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-today.html" data-widget-max-width="1200" data-widget-height="620" style="--widget-max-width:1200px;--widget-base-width:1200px;--widget-base-height:620px;--widget-visual-height:620px">
     <section class="widget" data-widget-card aria-label="게임 로그 일기 오늘 위젯">
       <div class="widget-dynamic-content" id="app"></div>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
