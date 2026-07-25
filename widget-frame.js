@@ -8,14 +8,14 @@
   if (!host || !card || !scaleHandle || !sizeLabel) return;
 
   scaleHandle.dataset.widgetScalePosition ||= 'bottom-right';
-  let topLeftHandle = card.querySelector('[data-widget-scale-position="top-left"]');
+  let topLeftHandle = document.querySelector('[data-widget-scale-position="top-left"]');
   if (!topLeftHandle) {
     topLeftHandle = scaleHandle.cloneNode(false);
     topLeftHandle.classList.add('widget-size-handle-top-left');
     topLeftHandle.dataset.widgetScalePosition = 'top-left';
     topLeftHandle.setAttribute('aria-label', '왼쪽 위에서 위젯 비율 고정 크기 조절');
-    card.appendChild(topLeftHandle);
   }
+  document.body.appendChild(topLeftHandle);
   const scaleHandles = [scaleHandle, topLeftHandle];
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
@@ -24,7 +24,7 @@
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
-  const minimumScale = .7;
+  const minimumScale = .1;
   let requestedScale = 1;
   let renderedScale = 1;
   let baseHeight = defaultHeight;
@@ -58,7 +58,7 @@
   function maximumScale() {
     const widthLimit = window.innerWidth / Math.max(1, baseWidth);
     const heightLimit = window.innerHeight / Math.max(1, baseHeight);
-    return Math.max(.1, Math.min(1, widthLimit, heightLimit));
+    return Math.max(.02, Math.min(1, widthLimit, heightLimit));
   }
 
   function displayScale(value) {
@@ -81,15 +81,24 @@
       baseHeight = measuredHeight;
       baseWidth = measuredWidth;
       renderedScale = displayScale(requestedScale);
+      const visualHeight = baseHeight * renderedScale;
       host.style.setProperty('--widget-max-width', `${maximumWidth}px`);
       host.style.setProperty('--widget-base-width', `${baseWidth}px`);
       host.style.setProperty('--widget-base-height', `${baseHeight}px`);
       host.style.setProperty('--widget-scale', String(renderedScale));
-      host.style.setProperty('--widget-visual-height', `${baseHeight * renderedScale}px`);
+      host.style.setProperty('--widget-visual-height', `${visualHeight}px`);
       card.style.setProperty('--widget-max-width', `${maximumWidth}px`);
       card.style.setProperty('--widget-scale', String(renderedScale));
       sizeLabel.textContent = `${Math.round(baseWidth * renderedScale)}×${Math.round(baseHeight * renderedScale)}`;
-      scaleHandles.forEach(handle => handle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100))));
+      scaleHandles.forEach(handle => {
+        handle.setAttribute('aria-valuemin', String(Math.round(Math.min(minimumScale, maximumScale()) * 100)));
+        handle.setAttribute('aria-valuemax', String(Math.round(maximumScale() * 100)));
+        handle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100)));
+      });
+      document.body.classList.toggle('is-widget-overflowing', visualHeight > window.innerHeight + .5);
+      const rect = card.getBoundingClientRect();
+      topLeftHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.left + 6))}px`;
+      topLeftHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.top + 6))}px`;
     });
   }
 

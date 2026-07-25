@@ -17,6 +17,10 @@ body.widget-page.widget-page-centered {
   align-items: center !important;
 }
 
+body.widget-page.widget-page-centered.is-widget-overflowing {
+  align-items: flex-start !important;
+}
+
 .widget-host {
   position: relative;
   width: 100%;
@@ -67,6 +71,8 @@ body.widget-page.widget-page-centered {
 }
 
 .widget-size-handle-top-left {
+  position: fixed;
+  z-index: 1000;
   top: 6px;
   right: auto;
   bottom: auto;
@@ -79,6 +85,7 @@ body.widget-page.widget-page-centered {
 }
 
 [data-widget-card]:hover .widget-size-handle,
+body.widget-page:hover .widget-size-handle-top-left,
 .widget-size-handle:focus-visible,
 body.is-widget-scaling .widget-size-handle {
   opacity: 1;
