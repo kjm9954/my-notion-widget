@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>생각 정리함 · 적기</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --action-soft:#E2F0F6;
+      --text:#12303C;
+      --secondary:#6B8794;
+      --muted:#93A5AD;
+      --faint:#A2B4BC;
+      --quiet:#A9BAC2;
+      --border:#DCE7ED;
+      --border-input:#E1EAEE;
+      --border-strong:#E6EDF0;
+      --border-soft:#F1F5F7;
+      --dashed:#C6D6DD;
+      --surface:#FFFFFF;
+      --surface-soft:#FAFCFD;
+      --surface-new:#F7FBFD;
+      --page:#F7F7F5;
+    }
+
+    * { box-sizing:border-box; }
+    html, body { width:100%; min-height:100%; }
+    body {
+      margin:0;
+      display:grid;
+      place-items:start center;
+      overflow:hidden;
+      color:var(--text);
+      background:var(--page);
+      font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; }
+    button { color:inherit; }
+
+    .card {
+      width:380px;
+      height:130px;
+      display:flex;
+      flex-direction:column;
+      gap:11px;
+      padding:18px;
+      overflow:hidden;
+      background:var(--surface);
+      border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08);
+    }
+    .card.cats-open { height:174px; }
+    .card.detail-open { height:226px; }
+    .card.cats-open.detail-open { height:274px; }
+
+    .entry-row {
+      height:36px;
+      display:flex;
+      flex:0 0 36px;
+      gap:7px;
+    }
+    .one-input, .detail-input {
+      color:var(--text);
+      background:var(--surface);
+      border:1px solid var(--border-input);
+      border-radius:9px;
+      outline:none;
+      font-size:12px;
+      font-weight:600;
+      transition:border-color .12s,outline-color .12s;
+    }
+    .one-input {
+      min-width:0;
+      height:36px;
+      flex:1 1 auto;
+      padding:0 11px;
+    }
+    .one-input::placeholder, .detail-input::placeholder { color:var(--faint); opacity:1; }
+    .one-input:focus, .detail-input:focus {
+      border-color:var(--action);
+      outline:1px solid var(--action);
+      outline-offset:-1px;
+    }
+    .add-button {
+      height:36px;
+      min-width:58px;
+      flex:0 0 auto;
+      padding:0 13px;
+      color:var(--surface);
+      background:var(--action);
+      border:1px solid var(--action);
+      border-radius:9px;
+      font-size:11px;
+      font-weight:800;
+      cursor:pointer;
+      transition:color .12s,outline-color .12s;
+    }
+    .add-button:focus-visible, .chip:focus-visible, .detail-toggle:focus-visible {
+      outline:2px solid var(--secondary);
+      outline-offset:2px;
+    }
+
+    .chip-row {
+      min-width:0;
+      display:flex;
+      align-items:flex-start;
+      gap:7px;
+    }
+    .chips {
+      min-width:0;
+      display:flex;
+      flex:1 1 auto;
+      flex-wrap:nowrap;
+      gap:5px;
+      overflow-x:auto;
+      scrollbar-width:none;
+    }
+    .chips::-webkit-scrollbar { display:none; }
+    .card.cats-open .chips { flex-wrap:wrap; overflow-x:hidden; }
+    .chip {
+      min-width:0;
+      min-height:26px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:4px 9px;
+      overflow:hidden;
+      color:var(--secondary);
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:999px;
+      font-size:10px;
+      font-weight:700;
+      line-height:1;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      cursor:pointer;
+      transition:color .12s,background-color .12s,border-color .12s,outline-color .12s;
+    }
+    .chip.selected {
+      color:var(--surface);
+      background:var(--action);
+      border-color:var(--action);
+    }
+    .chip.more {
+      position:sticky;
+      right:0;
+      z-index:1;
+      color:var(--muted);
+      background:var(--surface);
+      border-style:dashed;
+      border-color:var(--dashed);
+    }
+    .card.cats-open .chip.more { position:static; }
+    .detail-toggle {
+      min-height:26px;
+      display:inline-flex;
+      flex:0 0 auto;
+      align-items:center;
+      padding:0 1px;
+      color:var(--muted);
+      background:transparent;
+      border:0;
+      border-radius:9px;
+      font-size:11px;
+      font-weight:700;
+      white-space:nowrap;
+      cursor:pointer;
+      transition:color .12s,outline-color .12s;
+    }
+    .detail-toggle:hover { color:var(--secondary); }
+
+    .detail-wrap { flex:0 0 74px; }
+    .detail-input {
+      width:100%;
+      height:74px;
+      display:block;
+      padding:10px 11px;
+      resize:none;
+      line-height:1.55;
+    }
+
+    @media (max-width:399px) {
+      .card { width:320px; }
+      .chip, .detail-toggle { min-height:40px; padding-top:6px; padding-bottom:6px; }
+      .card.cats-open { height:130px; }
+      .card.detail-open, .card.cats-open.detail-open { height:226px; }
+      .card.cats-open .chips { flex-wrap:nowrap; overflow-x:auto; }
+      .card.cats-open .chip.more { position:sticky; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="card" aria-label="생각 적기 위젯">
+    <form class="entry-row" id="entryForm" autocomplete="off">
+      <input class="one-input" id="oneInput" maxlength="240" placeholder="떠오른 생각을 한 줄로" aria-label="한 줄 내용">
+      <button class="add-button" type="submit">추가</button>
+    </form>
+
+    <div class="chip-row">
+      <div class="chips" id="categoryChips" aria-label="카테고리 선택"></div>
+      <button class="detail-toggle" id="detailToggle" type="button" aria-expanded="false">＋ 상세</button>
+    </div>
+
+    <div class="detail-wrap" id="detailWrap" hidden>
+      <textarea class="detail-input" id="detailInput" maxlength="4000" placeholder="상세 내용 (선택)" aria-label="상세 내용"></textarea>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const KEY = 'thought-box-v1';
+      const CHANNEL = 'thought-box';
+      const DEFAULT_CATS = ['아이디어', '방향성'];
+      const card = document.getElementById('card');
+      const form = document.getElementById('entryForm');
+      const oneInput = document.getElementById('oneInput');
+      const detailInput = document.getElementById('detailInput');
+      const detailWrap = document.getElementById('detailWrap');
+      const detailToggle = document.getElementById('detailToggle');
+      const categoryChips = document.getElementById('categoryChips');
+
+      let memoryStore = emptyStore();
+      let store = readStore();
+      let selectedCat = store.cats[0];
+      let detailOpen = false;
+      let catsOpen = false;
+      let channel = null;
+
+      try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
+
+      function emptyStore() {
+        return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
+      }
+
+      function normalize(raw) {
+        const source = raw && typeof raw === 'object' ? raw : {};
+        const cats = [];
+        const incomingCats = Array.isArray(source.cats) ? source.cats : DEFAULT_CATS;
+        incomingCats.forEach((cat) => {
+          const clean = typeof cat === 'string' ? cat.trim() : '';
+          if (clean && !cats.includes(clean) && cats.length < 10) cats.push(clean);
+        });
+        if (!cats.length) cats.push(...DEFAULT_CATS);
+
+        const items = (Array.isArray(source.items) ? source.items : []).map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const one = typeof item.one === 'string' ? item.one.trim() : '';
+          if (!one) return null;
+          const created = Number.isFinite(Number(item.created)) ? Number(item.created) : Date.now();
+          const opened = Number.isFinite(Number(item.opened)) ? Number(item.opened) : created;
+          const itemCat = typeof item.cat === 'string' && cats.includes(item.cat) ? item.cat : cats[0];
+          return {
+            id: String(item.id || makeId()),
+            one,
+            detail: typeof item.detail === 'string' ? item.detail : '',
+            cat: itemCat,
+            created,
+            opened
+          };
+        }).filter(Boolean);
+
+        const catOpened = {};
+        if (source.catOpened && typeof source.catOpened === 'object') {
+          cats.forEach((cat) => {
+            const value = Number(source.catOpened[cat]);
+            if (Number.isFinite(value) && value > 0) catOpened[cat] = value;
+          });
+        }
+        return { items, cats, catOpened };
+      }
+
+      function readStore() {
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw) memoryStore = normalize(JSON.parse(raw));
+        } catch (_) {
+          memoryStore = normalize(memoryStore);
+        }
+        return normalize(memoryStore);
+      }
+
+      function updateStore(mutator) {
+        const latest = readStore();
+        mutator(latest);
+        memoryStore = normalize(latest);
+        try { localStorage.setItem(KEY, JSON.stringify(memoryStore)); } catch (_) {}
+        store = normalize(memoryStore);
+        try { if (channel) channel.postMessage({ type: 'changed' }); } catch (_) {}
+      }
+
+      function makeId() {
+        try { return crypto.randomUUID(); } catch (_) {
+          return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+      }
+
+      function sync() {
+        store = readStore();
+        if (!store.cats.includes(selectedCat)) selectedCat = store.cats[0];
+        renderCats();
+      }
+
+      function renderCats() {
+        categoryChips.replaceChildren();
+        const visibleCats = catsOpen ? store.cats : store.cats.slice(0, 5);
+        visibleCats.forEach((cat) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `chip${cat === selectedCat ? ' selected' : ''}`;
+          button.textContent = cat;
+          button.title = cat;
+          button.setAttribute('aria-pressed', String(cat === selectedCat));
+          button.addEventListener('click', () => {
+            selectedCat = cat;
+            renderCats();
+          });
+          categoryChips.appendChild(button);
+        });
+
+        if (store.cats.length > 5) {
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'chip more';
+          more.textContent = catsOpen ? '접기' : `＋${store.cats.length - 5}`;
+          more.setAttribute('aria-expanded', String(catsOpen));
+          more.addEventListener('click', () => {
+            catsOpen = !catsOpen;
+            card.classList.toggle('cats-open', catsOpen);
+            renderCats();
+          });
+          categoryChips.appendChild(more);
+        } else if (catsOpen) {
+          catsOpen = false;
+          card.classList.remove('cats-open');
+        }
+      }
+
+      detailToggle.addEventListener('click', () => {
+        detailOpen = !detailOpen;
+        detailWrap.hidden = !detailOpen;
+        detailToggle.textContent = detailOpen ? '− 접기' : '＋ 상세';
+        detailToggle.setAttribute('aria-expanded', String(detailOpen));
+        card.classList.toggle('detail-open', detailOpen);
+        if (detailOpen) detailInput.focus();
+      });
+
+      oneInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || event.isComposing) return;
+        event.preventDefault();
+        form.requestSubmit();
+      });
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const one = oneInput.value.trim();
+        if (!one) return;
+        const now = Date.now();
+        const item = {
+          id: makeId(),
+          one,
+          detail: detailOpen ? detailInput.value : '',
+          cat: store.cats.includes(selectedCat) ? selectedCat : store.cats[0],
+          created: now,
+          opened: now
+        };
+        updateStore((latest) => {
+          if (!latest.cats.includes(item.cat)) item.cat = latest.cats[0];
+          latest.items.push(item);
+        });
+        oneInput.value = '';
+        detailInput.value = '';
+        detailOpen = false;
+        detailWrap.hidden = true;
+        detailToggle.textContent = '＋ 상세';
+        detailToggle.setAttribute('aria-expanded', 'false');
+        card.classList.remove('detail-open');
+        sync();
+        oneInput.focus();
+      });
+
+      window.addEventListener('storage', (event) => {
+        if (event.key === KEY) sync();
+      });
+      window.addEventListener('focus', sync);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) sync();
+      });
+      if (channel) channel.addEventListener('message', (event) => {
+        if (!event.data || event.data.type === 'changed') sync();
+      });
+
+      renderCats();
+    })();
+  </script>
+</body>
+</html>

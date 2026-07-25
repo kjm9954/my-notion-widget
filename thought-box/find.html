@@ -1,0 +1,1157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>생각 정리함 · 찾기</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --action-soft:#E2F0F6;
+      --text:#12303C;
+      --secondary:#6B8794;
+      --secondary-deep:#55707C;
+      --muted:#93A5AD;
+      --faint:#A2B4BC;
+      --quiet:#A9BAC2;
+      --border:#DCE7ED;
+      --border-input:#E1EAEE;
+      --border-strong:#E6EDF0;
+      --border-soft:#F1F5F7;
+      --dashed:#C6D6DD;
+      --surface:#FFFFFF;
+      --surface-soft:#FAFCFD;
+      --surface-new:#F7FBFD;
+      --page:#F7F7F5;
+      --danger-border:#E4D5D5;
+      --danger:#A56B6B;
+    }
+
+    * { box-sizing:border-box; }
+    html, body { width:100%; height:100%; }
+    body {
+      margin:0;
+      display:grid;
+      place-items:start center;
+      overflow:hidden;
+      color:var(--text);
+      background:var(--page);
+      font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; }
+    button { color:inherit; }
+
+    .card {
+      position:relative;
+      width:380px;
+      height:920px;
+      display:flex;
+      flex-direction:column;
+      gap:11px;
+      padding:18px;
+      overflow:hidden;
+      background:var(--surface);
+      border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08);
+    }
+
+    .fixed {
+      height:148px;
+      display:flex;
+      flex:0 0 148px;
+      flex-direction:column;
+      gap:11px;
+      overflow:visible;
+    }
+    .fixed.managing { height:auto; flex-basis:auto; }
+
+    .banner {
+      height:60px;
+      display:flex;
+      flex:0 0 60px;
+      flex-direction:column;
+      justify-content:center;
+      gap:6px;
+      padding:12px 13px;
+      overflow:hidden;
+      background:var(--action-soft);
+      border-radius:12px;
+      outline:2px solid transparent;
+      outline-offset:-2px;
+      cursor:pointer;
+      transition:outline-color .12s,color .12s;
+    }
+    .banner:focus-visible { outline-color:var(--action); }
+    .banner.empty { cursor:default; }
+    .banner-top {
+      min-width:0;
+      display:flex;
+      align-items:center;
+      gap:7px;
+    }
+    .banner-label {
+      min-width:0;
+      overflow:hidden;
+      color:var(--action);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.06em;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .banner-refresh {
+      min-height:22px;
+      display:inline-flex;
+      flex:0 0 auto;
+      align-items:center;
+      margin-left:auto;
+      padding:0;
+      color:var(--action);
+      background:transparent;
+      border:0;
+      border-radius:9px;
+      font-size:9px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .banner-one {
+      overflow:hidden;
+      color:var(--text);
+      font-size:13px;
+      font-weight:700;
+      line-height:1.2;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .banner-empty-copy {
+      color:var(--secondary-deep);
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .search {
+      width:100%;
+      height:36px;
+      flex:0 0 36px;
+      padding:0 11px;
+      color:var(--text);
+      background:var(--surface);
+      border:1px solid var(--border-input);
+      border-radius:9px;
+      outline:none;
+      font-size:12px;
+      font-weight:600;
+      transition:border-color .12s,outline-color .12s;
+    }
+    .search::placeholder { color:var(--faint); opacity:1; }
+    .search:focus {
+      border-color:var(--action);
+      outline:1px solid var(--action);
+      outline-offset:-1px;
+    }
+
+    .filter-block {
+      position:relative;
+      height:30px;
+      min-height:30px;
+      flex:0 0 30px;
+    }
+    .filter-row {
+      height:22px;
+      display:flex;
+      align-items:center;
+      gap:5px;
+    }
+    .filter-chips {
+      min-width:0;
+      display:flex;
+      flex:1 1 auto;
+      align-items:center;
+      gap:5px;
+      overflow-x:auto;
+      scrollbar-width:none;
+    }
+    .filter-chips::-webkit-scrollbar { display:none; }
+    .chip {
+      min-height:22px;
+      display:inline-flex;
+      flex:0 0 auto;
+      align-items:center;
+      justify-content:center;
+      max-width:102px;
+      padding:3px 8px;
+      overflow:hidden;
+      color:var(--secondary);
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:999px;
+      outline:2px solid transparent;
+      outline-offset:1px;
+      font-size:10px;
+      font-weight:700;
+      line-height:1;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      cursor:pointer;
+      transition:color .12s,background-color .12s,border-color .12s,outline-color .12s;
+    }
+    .chip.selected {
+      color:var(--surface);
+      background:var(--action);
+      border-color:var(--action);
+    }
+    .chip.more {
+      color:var(--muted);
+      border-style:dashed;
+      border-color:var(--dashed);
+    }
+    .chip:focus-visible, .manage-button:focus-visible, .text-button:focus-visible,
+    .danger-button:focus-visible, .confirm-delete:focus-visible, .cancel-delete:focus-visible {
+      outline:2px solid var(--secondary);
+      outline-offset:2px;
+    }
+    .manage-button {
+      min-height:22px;
+      display:inline-flex;
+      flex:0 0 auto;
+      align-items:center;
+      padding:0 1px;
+      color:var(--muted);
+      background:transparent;
+      border:0;
+      border-radius:9px;
+      font-size:9px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .filter-caption {
+      position:absolute;
+      left:1px;
+      top:23px;
+      max-width:100%;
+      overflow:hidden;
+      color:var(--quiet);
+      font-size:9px;
+      font-weight:700;
+      line-height:1;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .manage-panel {
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+      padding-top:11px;
+      border-top:1px solid var(--border-soft);
+    }
+    .manage-row {
+      min-height:36px;
+      display:flex;
+      align-items:center;
+      gap:7px;
+    }
+    .cat-name, .new-cat {
+      min-width:0;
+      height:36px;
+      flex:1 1 auto;
+      padding:0 10px;
+      color:var(--text);
+      background:var(--surface);
+      border:1px solid var(--border-input);
+      border-radius:9px;
+      outline:none;
+      font-size:12px;
+      font-weight:600;
+    }
+    .cat-name:focus, .new-cat:focus { border-color:var(--action); }
+    .new-cat { background:var(--surface-soft); border-style:dashed; border-color:var(--dashed); }
+    .cat-count {
+      min-width:30px;
+      color:var(--quiet);
+      font-size:9px;
+      font-weight:700;
+      text-align:right;
+      white-space:nowrap;
+    }
+    .manage-delete {
+      min-height:32px;
+      padding:0 8px;
+      color:var(--danger);
+      background:var(--surface);
+      border:1px solid var(--danger-border);
+      border-radius:9px;
+      font-size:9px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .manage-delete:disabled { color:var(--quiet); border-color:var(--border-soft); cursor:not-allowed; }
+    .done-button {
+      min-height:36px;
+      flex:0 0 auto;
+      padding:0 10px;
+      color:var(--secondary);
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:9px;
+      font-size:11px;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    .list {
+      min-height:0;
+      display:flex;
+      flex:1 1 auto;
+      flex-direction:column;
+      gap:7px;
+      overflow-y:auto;
+      overscroll-behavior:contain;
+      scrollbar-color:var(--dashed) transparent;
+    }
+    .item {
+      width:100%;
+      display:flex;
+      flex:0 0 auto;
+      flex-direction:column;
+      gap:6px;
+      padding:10px 11px;
+      color:var(--text);
+      text-align:left;
+      background:var(--surface);
+      border:1px solid var(--border-soft);
+      border-radius:10px;
+      outline:2px solid transparent;
+      outline-offset:-2px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05);
+      cursor:pointer;
+      transition:color .12s,outline-color .12s,border-color .12s,background-color .12s;
+    }
+    .item:hover, .item:focus-visible { outline-color:var(--border); }
+    .item.new {
+      background:var(--surface-new);
+      border-color:#CFE2EA;
+    }
+    .item-title-row { display:flex; align-items:flex-start; gap:6px; }
+    .new-mark {
+      width:12px;
+      height:12px;
+      display:inline-flex;
+      flex:0 0 12px;
+      align-items:center;
+      justify-content:center;
+      margin-top:2px;
+      color:var(--action);
+      background:var(--action-soft);
+      border-radius:999px;
+      font-size:8px;
+      font-weight:800;
+      line-height:1;
+    }
+    .item-one {
+      min-width:0;
+      color:var(--text);
+      font-size:12px;
+      font-weight:700;
+      line-height:1.45;
+      overflow-wrap:anywhere;
+    }
+    .item-preview {
+      display:-webkit-box;
+      overflow:hidden;
+      color:var(--secondary);
+      font-size:11px;
+      font-weight:600;
+      line-height:1.55;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:2;
+      overflow-wrap:anywhere;
+    }
+    .item-meta { display:flex; align-items:center; gap:8px; }
+    .item-cat, .item-age {
+      font-size:9px;
+      font-weight:700;
+      line-height:1;
+    }
+    .item-cat { color:var(--secondary); }
+    .item-age { margin-left:auto; color:var(--quiet); }
+    .empty-list {
+      min-height:92px;
+      display:grid;
+      flex:0 0 auto;
+      place-items:center;
+      padding:16px;
+      color:var(--muted);
+      background:var(--surface-soft);
+      border:1px dashed var(--dashed);
+      border-radius:12px;
+      font-size:11px;
+      font-weight:700;
+      text-align:center;
+    }
+
+    .overlay {
+      position:absolute;
+      z-index:10;
+      top:92px;
+      right:12px;
+      bottom:12px;
+      left:12px;
+      display:flex;
+      flex-direction:column;
+      gap:11px;
+      padding:15px;
+      overflow-y:auto;
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:14px;
+      box-shadow:0 -10px 30px rgba(18,48,60,.14);
+    }
+    .overlay[hidden] { display:none; }
+    .overlay-top {
+      min-height:34px;
+      display:flex;
+      flex:0 0 auto;
+      align-items:center;
+      gap:7px;
+    }
+    .text-button, .danger-button, .confirm-delete, .cancel-delete {
+      min-height:34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:9px;
+      font-size:11px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .text-button {
+      padding:0 4px;
+      color:var(--secondary);
+      background:transparent;
+      border:0;
+    }
+    .danger-button {
+      margin-left:auto;
+      padding:0 10px;
+      color:var(--danger);
+      background:var(--surface);
+      border:1px solid var(--danger-border);
+    }
+    .delete-question {
+      color:var(--danger);
+      font-size:10px;
+      font-weight:700;
+    }
+    .confirm-delete {
+      margin-left:auto;
+      padding:0 10px;
+      color:var(--surface);
+      background:var(--danger);
+      border:1px solid var(--danger);
+    }
+    .cancel-delete {
+      padding:0 9px;
+      color:var(--secondary);
+      background:var(--surface);
+      border:1px solid var(--border);
+    }
+
+    .open-one {
+      width:100%;
+      min-height:88px;
+      flex:0 0 auto;
+      padding:0;
+      resize:none;
+      color:var(--text);
+      background:transparent;
+      border:0;
+      border-radius:9px;
+      outline:none;
+      font-size:15px;
+      font-weight:800;
+      line-height:1.45;
+      overflow-wrap:anywhere;
+    }
+    .open-one:focus-visible { outline:1px solid var(--border-input); outline-offset:4px; }
+    .open-cats {
+      display:flex;
+      flex:0 0 auto;
+      align-items:flex-start;
+      gap:5px;
+    }
+    .open-chip-list {
+      min-width:0;
+      display:flex;
+      flex:1 1 auto;
+      flex-wrap:wrap;
+      gap:5px;
+    }
+    .open-age {
+      min-height:22px;
+      display:inline-flex;
+      flex:0 0 auto;
+      align-items:center;
+      color:var(--quiet);
+      font-size:9px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .divider { height:1px; flex:0 0 1px; background:var(--border-soft); }
+    .detail-empty {
+      width:100%;
+      padding:16px;
+      color:var(--secondary-deep);
+      background:var(--surface-soft);
+      border:1px dashed var(--dashed);
+      border-radius:10px;
+      font-size:11px;
+      font-weight:700;
+      text-align:left;
+      cursor:pointer;
+    }
+    .open-detail {
+      width:100%;
+      min-height:260px;
+      flex:1 1 auto;
+      padding:10px 11px;
+      resize:none;
+      color:var(--text);
+      background:var(--surface-soft);
+      border:1px solid var(--border-input);
+      border-radius:9px;
+      outline:none;
+      font-size:12px;
+      font-weight:600;
+      line-height:1.75;
+    }
+    .open-detail:focus { border-color:var(--action); }
+
+    @media (max-width:399px) {
+      .card { width:320px; height:920px; }
+      .chip, .manage-button, .banner-refresh { min-height:40px; padding-top:6px; padding-bottom:6px; }
+      .filter-row { height:40px; }
+      .filter-block { height:48px; min-height:48px; flex-basis:48px; }
+      .filter-caption { top:41px; }
+      .fixed { height:166px; flex-basis:166px; }
+      .fixed.managing { height:auto; flex-basis:auto; }
+      .manage-delete, .done-button, .text-button, .danger-button, .confirm-delete, .cancel-delete { min-height:40px; }
+      .item { min-height:40px; }
+      .overlay { left:12px; right:12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="card" aria-label="생각 찾기 위젯">
+    <section class="fixed" id="fixedArea" aria-label="검색과 필터">
+      <div class="banner" id="banner" role="button" tabindex="0"></div>
+      <input class="search" id="searchInput" type="search" autocomplete="off" placeholder="한 줄 내용과 상세 내용에서 검색" aria-label="생각 검색">
+      <div class="filter-block">
+        <div class="filter-row">
+          <div class="filter-chips" id="filterChips" aria-label="카테고리 필터"></div>
+          <button class="manage-button" id="manageButton" type="button" aria-expanded="false">관리</button>
+        </div>
+        <div class="filter-caption" id="filterCaption" hidden></div>
+      </div>
+      <div class="manage-panel" id="managePanel" hidden></div>
+    </section>
+
+    <section class="list" id="itemList" aria-label="생각 목록"></section>
+    <section class="overlay" id="overlay" aria-label="열린 생각" hidden></section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const KEY = 'thought-box-v1';
+      const CHANNEL = 'thought-box';
+      const DAY = 24 * 60 * 60 * 1000;
+      const DEFAULT_CATS = ['아이디어', '방향성'];
+      const fixedArea = document.getElementById('fixedArea');
+      const banner = document.getElementById('banner');
+      const searchInput = document.getElementById('searchInput');
+      const filterChips = document.getElementById('filterChips');
+      const filterCaption = document.getElementById('filterCaption');
+      const manageButton = document.getElementById('manageButton');
+      const managePanel = document.getElementById('managePanel');
+      const itemList = document.getElementById('itemList');
+      const overlay = document.getElementById('overlay');
+
+      let memoryStore = emptyStore();
+      let store = readStore();
+      let query = '';
+      let selectedCat = '';
+      let catsOpen = false;
+      let managing = false;
+      let bannerId = '';
+      let openId = '';
+      let openedBefore = 0;
+      let detailEditing = false;
+      let deleteConfirm = false;
+      let savedListScroll = 0;
+      let channel = null;
+
+      try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
+
+      function emptyStore() {
+        return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
+      }
+
+      function makeId() {
+        try { return crypto.randomUUID(); } catch (_) {
+          return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+      }
+
+      function normalize(raw) {
+        const source = raw && typeof raw === 'object' ? raw : {};
+        const cats = [];
+        const incomingCats = Array.isArray(source.cats) ? source.cats : DEFAULT_CATS;
+        incomingCats.forEach((cat) => {
+          const clean = typeof cat === 'string' ? cat.trim() : '';
+          if (clean && !cats.includes(clean) && cats.length < 10) cats.push(clean);
+        });
+        if (!cats.length) cats.push(...DEFAULT_CATS);
+
+        const items = (Array.isArray(source.items) ? source.items : []).map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const one = typeof item.one === 'string' ? item.one.trim() : '';
+          if (!one) return null;
+          const created = Number.isFinite(Number(item.created)) ? Number(item.created) : Date.now();
+          const opened = Number.isFinite(Number(item.opened)) ? Number(item.opened) : created;
+          return {
+            id: String(item.id || makeId()),
+            one,
+            detail: typeof item.detail === 'string' ? item.detail : '',
+            cat: typeof item.cat === 'string' && cats.includes(item.cat) ? item.cat : cats[0],
+            created,
+            opened
+          };
+        }).filter(Boolean);
+
+        const catOpened = {};
+        if (source.catOpened && typeof source.catOpened === 'object') {
+          cats.forEach((cat) => {
+            const value = Number(source.catOpened[cat]);
+            if (Number.isFinite(value) && value > 0) catOpened[cat] = value;
+          });
+        }
+        return { items, cats, catOpened };
+      }
+
+      function readStore() {
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw) memoryStore = normalize(JSON.parse(raw));
+        } catch (_) {
+          memoryStore = normalize(memoryStore);
+        }
+        return normalize(memoryStore);
+      }
+
+      function updateStore(mutator) {
+        const latest = readStore();
+        mutator(latest);
+        memoryStore = normalize(latest);
+        try { localStorage.setItem(KEY, JSON.stringify(memoryStore)); } catch (_) {}
+        store = normalize(memoryStore);
+        try { if (channel) channel.postMessage({ type: 'changed' }); } catch (_) {}
+      }
+
+      function daysSince(value) {
+        const time = Number(value);
+        if (!Number.isFinite(time) || time <= 0) return 0;
+        return Math.max(0, Math.floor((Date.now() - time) / DAY));
+      }
+
+      function itemById(id) {
+        return store.items.find((item) => item.id === id) || null;
+      }
+
+      function sync() {
+        const currentScroll = itemList.scrollTop;
+        store = readStore();
+        if (selectedCat && !store.cats.includes(selectedCat)) selectedCat = '';
+        if (openId && !itemById(openId)) {
+          openId = '';
+          overlay.hidden = true;
+        }
+        chooseBanner(false);
+        renderBanner();
+        renderFilters();
+        if (managing) renderManage();
+        renderList();
+        itemList.scrollTop = openId ? savedListScroll : currentScroll;
+        if (openId) renderOverlay();
+      }
+
+      function staleItems() {
+        return store.items.filter((item) => daysSince(item.opened) >= 30);
+      }
+
+      function chooseBanner(forceDifferent) {
+        const candidates = staleItems();
+        if (!candidates.length) {
+          bannerId = '';
+          return;
+        }
+        if (!forceDifferent && candidates.some((item) => item.id === bannerId)) return;
+        const pool = forceDifferent && candidates.length > 1
+          ? candidates.filter((item) => item.id !== bannerId)
+          : candidates;
+        bannerId = pool[Math.floor(Math.random() * pool.length)].id;
+      }
+
+      function renderBanner() {
+        banner.replaceChildren();
+        const item = itemById(bannerId);
+        banner.classList.toggle('empty', !item);
+        banner.setAttribute('aria-disabled', String(!item));
+        if (!item) {
+          const empty = document.createElement('div');
+          empty.className = 'banner-empty-copy';
+          empty.textContent = '최근에 다 들여다봤어요';
+          banner.appendChild(empty);
+          return;
+        }
+
+        const top = document.createElement('div');
+        top.className = 'banner-top';
+        const label = document.createElement('div');
+        label.className = 'banner-label';
+        label.textContent = `오래 안 본 생각 · ${daysSince(item.opened)}일`;
+        const refresh = document.createElement('button');
+        refresh.type = 'button';
+        refresh.className = 'banner-refresh';
+        refresh.textContent = '↻ 다른 생각';
+        refresh.addEventListener('click', (event) => {
+          event.stopPropagation();
+          chooseBanner(true);
+          renderBanner();
+        });
+        top.append(label, refresh);
+
+        const one = document.createElement('div');
+        one.className = 'banner-one';
+        one.textContent = item.one;
+        banner.append(top, one);
+      }
+
+      function renderFilters() {
+        filterChips.replaceChildren();
+        const visible = catsOpen ? store.cats : store.cats.slice(0, 3);
+        visible.forEach((cat) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `chip${cat === selectedCat ? ' selected' : ''}`;
+          button.textContent = cat;
+          button.title = cat;
+          button.setAttribute('aria-pressed', String(cat === selectedCat));
+          button.addEventListener('click', () => {
+            selectedCat = selectedCat === cat ? '' : cat;
+            renderFilters();
+            renderList();
+          });
+          filterChips.appendChild(button);
+        });
+
+        if (store.cats.length > 3) {
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'chip more';
+          more.textContent = catsOpen ? '접기' : `＋${store.cats.length - 3}`;
+          more.setAttribute('aria-expanded', String(catsOpen));
+          more.addEventListener('click', () => {
+            catsOpen = !catsOpen;
+            renderFilters();
+            if (catsOpen) filterChips.scrollLeft = filterChips.scrollWidth;
+          });
+          filterChips.appendChild(more);
+        } else {
+          catsOpen = false;
+        }
+
+        if (selectedCat) {
+          const fallback = store.items
+            .filter((item) => item.cat === selectedCat && item.opened > item.created)
+            .reduce((latest, item) => Math.max(latest, item.opened), 0);
+          const lastOpened = store.catOpened[selectedCat] || fallback || Date.now();
+          filterCaption.textContent = `'${selectedCat}' 를 마지막으로 열어본 날 ${daysSince(lastOpened)}일 전`;
+          filterCaption.hidden = false;
+        } else {
+          filterCaption.hidden = true;
+          filterCaption.textContent = '';
+        }
+      }
+
+      function renderManage() {
+        managePanel.replaceChildren();
+        store.cats.forEach((cat) => {
+          let currentName = cat;
+          const row = document.createElement('div');
+          row.className = 'manage-row';
+          const input = document.createElement('input');
+          input.className = 'cat-name';
+          input.value = cat;
+          input.maxLength = 30;
+          input.setAttribute('aria-label', `${cat} 이름`);
+          input.addEventListener('input', () => {
+            const next = input.value.trim();
+            if (!next || next === currentName || store.cats.some((name) => name === next && name !== currentName)) return;
+            const before = currentName;
+            updateStore((latest) => {
+              const index = latest.cats.indexOf(before);
+              if (index < 0 || latest.cats.includes(next)) return;
+              latest.cats[index] = next;
+              latest.items.forEach((item) => { if (item.cat === before) item.cat = next; });
+              if (latest.catOpened[before]) {
+                latest.catOpened[next] = latest.catOpened[before];
+                delete latest.catOpened[before];
+              }
+            });
+            if (selectedCat === before) selectedCat = next;
+            currentName = next;
+            renderFilters();
+            renderList();
+          });
+          input.addEventListener('blur', () => {
+            if (!input.value.trim() || input.value.trim() !== currentName) input.value = currentName;
+          });
+
+          const count = document.createElement('span');
+          count.className = 'cat-count';
+          count.textContent = `${store.items.filter((item) => item.cat === cat).length}개`;
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'manage-delete';
+          remove.textContent = '삭제';
+          remove.disabled = store.cats.length === 1;
+          remove.addEventListener('click', () => deleteCategory(currentName));
+          row.append(input, count, remove);
+          managePanel.appendChild(row);
+        });
+
+        const addRow = document.createElement('div');
+        addRow.className = 'manage-row';
+        const addInput = document.createElement('input');
+        addInput.className = 'new-cat';
+        addInput.maxLength = 30;
+        addInput.placeholder = '새 카테고리 이름 + Enter';
+        addInput.setAttribute('aria-label', '새 카테고리 이름');
+        addInput.disabled = store.cats.length >= 10;
+        addInput.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' || event.isComposing) return;
+          event.preventDefault();
+          const name = addInput.value.trim();
+          if (!name || store.cats.length >= 10 || store.cats.includes(name)) return;
+          updateStore((latest) => {
+            if (latest.cats.length < 10 && !latest.cats.includes(name)) latest.cats.push(name);
+          });
+          renderFilters();
+          renderManage();
+        });
+        const done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'done-button';
+        done.textContent = '완료';
+        done.addEventListener('click', closeManage);
+        addRow.append(addInput, done);
+        managePanel.appendChild(addRow);
+      }
+
+      function deleteCategory(cat) {
+        if (store.cats.length <= 1 || !store.cats.includes(cat)) return;
+        updateStore((latest) => {
+          if (latest.cats.length <= 1 || !latest.cats.includes(cat)) return;
+          latest.cats = latest.cats.filter((name) => name !== cat);
+          const destination = latest.cats[0];
+          latest.items.forEach((item) => { if (item.cat === cat) item.cat = destination; });
+          delete latest.catOpened[cat];
+        });
+        if (selectedCat === cat) selectedCat = '';
+        renderFilters();
+        renderManage();
+        renderList();
+        if (openId) renderOverlay();
+      }
+
+      function closeManage() {
+        managing = false;
+        fixedArea.classList.remove('managing');
+        managePanel.hidden = true;
+        manageButton.textContent = '관리';
+        manageButton.setAttribute('aria-expanded', 'false');
+      }
+
+      function filteredItems() {
+        const needle = query.toLocaleLowerCase('ko');
+        return store.items
+          .filter((item) => !selectedCat || item.cat === selectedCat)
+          .filter((item) => !needle || `${item.one}\n${item.detail}`.toLocaleLowerCase('ko').includes(needle))
+          .sort((a, b) => b.created - a.created);
+      }
+
+      function renderList() {
+        const scroll = openId ? savedListScroll : itemList.scrollTop;
+        itemList.replaceChildren();
+        const items = filteredItems();
+        if (!items.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-list';
+          empty.textContent = query ? '검색 결과가 없습니다' : '이 카테고리는 비어 있습니다';
+          itemList.appendChild(empty);
+          itemList.scrollTop = 0;
+          return;
+        }
+
+        items.forEach((item) => {
+          const isNew = item.opened <= item.created;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `item${isNew ? ' new' : ''}`;
+          card.addEventListener('click', () => openItem(item.id));
+
+          const titleRow = document.createElement('div');
+          titleRow.className = 'item-title-row';
+          if (isNew) {
+            const mark = document.createElement('span');
+            mark.className = 'new-mark';
+            mark.textContent = '✓';
+            mark.setAttribute('aria-label', '새 항목');
+            titleRow.appendChild(mark);
+          }
+          const title = document.createElement('span');
+          title.className = 'item-one';
+          title.textContent = item.one;
+          titleRow.appendChild(title);
+          card.appendChild(titleRow);
+
+          if (item.detail.trim()) {
+            const preview = document.createElement('div');
+            preview.className = 'item-preview';
+            preview.textContent = `${item.detail.trim().slice(0, 64)}…`;
+            card.appendChild(preview);
+          }
+
+          const meta = document.createElement('div');
+          meta.className = 'item-meta';
+          const cat = document.createElement('span');
+          cat.className = 'item-cat';
+          cat.textContent = item.cat;
+          const age = document.createElement('span');
+          age.className = 'item-age';
+          age.textContent = `${daysSince(item.opened)}일`;
+          meta.append(cat, age);
+          card.appendChild(meta);
+          itemList.appendChild(card);
+        });
+        itemList.scrollTop = scroll;
+      }
+
+      function openItem(id) {
+        const item = itemById(id);
+        if (!item) return;
+        savedListScroll = itemList.scrollTop;
+        openId = id;
+        openedBefore = item.opened;
+        detailEditing = Boolean(item.detail.trim());
+        deleteConfirm = false;
+        closeManage();
+        const now = Math.max(Date.now(), item.created + 1);
+        updateStore((latest) => {
+          const target = latest.items.find((entry) => entry.id === id);
+          if (!target) return;
+          target.opened = now;
+          latest.catOpened[target.cat] = now;
+        });
+        chooseBanner(false);
+        renderBanner();
+        renderFilters();
+        renderOverlay();
+      }
+
+      function closeOverlay() {
+        openId = '';
+        detailEditing = false;
+        deleteConfirm = false;
+        overlay.hidden = true;
+        renderList();
+        itemList.scrollTop = savedListScroll;
+      }
+
+      function renderOverlay() {
+        const item = itemById(openId);
+        if (!item) {
+          overlay.hidden = true;
+          return;
+        }
+        overlay.replaceChildren();
+        overlay.hidden = false;
+
+        const top = document.createElement('div');
+        top.className = 'overlay-top';
+        if (deleteConfirm) {
+          const question = document.createElement('span');
+          question.className = 'delete-question';
+          question.textContent = '삭제할까요?';
+          const confirm = document.createElement('button');
+          confirm.type = 'button';
+          confirm.className = 'confirm-delete';
+          confirm.textContent = '삭제';
+          confirm.addEventListener('click', confirmDelete);
+          const cancel = document.createElement('button');
+          cancel.type = 'button';
+          cancel.className = 'cancel-delete';
+          cancel.textContent = '취소';
+          cancel.addEventListener('click', () => { deleteConfirm = false; renderOverlay(); });
+          top.append(question, confirm, cancel);
+        } else {
+          const back = document.createElement('button');
+          back.type = 'button';
+          back.className = 'text-button';
+          back.textContent = '‹ 목록';
+          back.addEventListener('click', closeOverlay);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'danger-button';
+          remove.textContent = '삭제';
+          remove.addEventListener('click', () => { deleteConfirm = true; renderOverlay(); });
+          top.append(back, remove);
+        }
+
+        const one = document.createElement('textarea');
+        one.className = 'open-one';
+        one.rows = 3;
+        one.maxLength = 240;
+        one.value = item.one;
+        one.setAttribute('aria-label', '한 줄 내용 수정');
+        one.addEventListener('input', () => {
+          const value = one.value.trim();
+          if (!value) return;
+          updateStore((latest) => {
+            const target = latest.items.find((entry) => entry.id === openId);
+            if (target) target.one = value;
+          });
+          renderBanner();
+        });
+        one.addEventListener('blur', () => {
+          if (!one.value.trim()) one.value = itemById(openId)?.one || '';
+        });
+
+        const catRow = document.createElement('div');
+        catRow.className = 'open-cats';
+        const catList = document.createElement('div');
+        catList.className = 'open-chip-list';
+        store.cats.forEach((cat) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `chip${cat === item.cat ? ' selected' : ''}`;
+          button.textContent = cat;
+          button.addEventListener('click', () => {
+            const now = Date.now();
+            updateStore((latest) => {
+              const target = latest.items.find((entry) => entry.id === openId);
+              if (!target || !latest.cats.includes(cat)) return;
+              target.cat = cat;
+              latest.catOpened[cat] = now;
+            });
+            renderFilters();
+            renderOverlay();
+          });
+          catList.appendChild(button);
+        });
+        const age = document.createElement('span');
+        age.className = 'open-age';
+        age.textContent = `${daysSince(openedBefore)}일 만에 열어봄`;
+        catRow.append(catList, age);
+
+        const divider = document.createElement('div');
+        divider.className = 'divider';
+        overlay.append(top, one, catRow, divider);
+
+        if (!detailEditing && !item.detail.trim()) {
+          const empty = document.createElement('button');
+          empty.type = 'button';
+          empty.className = 'detail-empty';
+          empty.textContent = '＋ 상세 추가하기';
+          empty.addEventListener('click', () => {
+            detailEditing = true;
+            renderOverlay();
+            overlay.querySelector('.open-detail')?.focus();
+          });
+          overlay.appendChild(empty);
+        } else {
+          const detail = document.createElement('textarea');
+          detail.className = 'open-detail';
+          detail.value = item.detail;
+          detail.maxLength = 4000;
+          detail.setAttribute('aria-label', '상세 내용 수정');
+          detail.addEventListener('input', () => {
+            updateStore((latest) => {
+              const target = latest.items.find((entry) => entry.id === openId);
+              if (target) target.detail = detail.value;
+            });
+          });
+          overlay.appendChild(detail);
+        }
+      }
+
+      function confirmDelete() {
+        const deleting = openId;
+        updateStore((latest) => {
+          latest.items = latest.items.filter((item) => item.id !== deleting);
+        });
+        openId = '';
+        deleteConfirm = false;
+        overlay.hidden = true;
+        chooseBanner(false);
+        renderBanner();
+        renderFilters();
+        renderList();
+        itemList.scrollTop = savedListScroll;
+        if (managing) renderManage();
+      }
+
+      banner.addEventListener('click', () => {
+        if (bannerId) openItem(bannerId);
+      });
+      banner.addEventListener('keydown', (event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && bannerId) {
+          event.preventDefault();
+          openItem(bannerId);
+        }
+      });
+      searchInput.addEventListener('input', () => {
+        query = searchInput.value.trim();
+        renderList();
+      });
+      manageButton.addEventListener('click', () => {
+        managing = !managing;
+        fixedArea.classList.toggle('managing', managing);
+        managePanel.hidden = !managing;
+        manageButton.textContent = managing ? '완료' : '관리';
+        manageButton.setAttribute('aria-expanded', String(managing));
+        if (managing) renderManage();
+      });
+      window.addEventListener('storage', (event) => {
+        if (event.key === KEY) sync();
+      });
+      window.addEventListener('focus', sync);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) sync();
+      });
+      if (channel) channel.addEventListener('message', (event) => {
+        if (!event.data || event.data.type === 'changed') sync();
+      });
+
+      chooseBanner(false);
+      renderBanner();
+      renderFilters();
+      renderList();
+    })();
+  </script>
+</body>
+</html>
