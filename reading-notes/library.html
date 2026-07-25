@@ -23,7 +23,7 @@
     button, input, textarea { font:inherit; color:inherit; }
     button { cursor:pointer; }
     .card {
-      width:1020px; min-height:318px; padding:16px; overflow:hidden;
+      width:620px; min-height:318px; padding:16px; overflow:hidden;
       display:flex; flex-direction:column; gap:12px; background:var(--surface); border-radius:18px;
       box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
@@ -32,7 +32,6 @@
     .stats { color:var(--secondary); font-size:8px; font-weight:700; }
     .search { width:150px; height:32px; margin-left:auto; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; font-size:10px; font-weight:600; outline:none; }
     .search:focus, input:focus, textarea:focus { border-color:var(--action); outline:2px solid var(--action-soft); }
-    .view-toggle { height:32px; padding:0 10px; border:1px solid var(--border); border-radius:9px; background:#fff; color:var(--deep); font-size:9px; font-weight:800; }
     .shelf { height:103px; }
     .shelf.is-adding { height:135px; }
     .shelf.is-adding .shelf-foot { height:34px; }
@@ -59,19 +58,6 @@
     .add-form { margin-left:auto; display:flex; gap:6px; }
     .add-form input { width:125px; height:28px; padding:0 9px; border:1px solid var(--border); border-radius:8px; background:#fff; font-size:9px; font-weight:600; outline:none; }
     .add-form button { height:28px; padding:0 9px; border:0; border-radius:8px; background:var(--action); color:#fff; font-size:9px; font-weight:800; }
-    .table-wrap { border:1px solid var(--border-faint); border-radius:14px; overflow:hidden; }
-    .table-head, .table-row { display:grid; grid-template-columns:86px minmax(150px, 1.1fr) minmax(170px, 1fr) 70px; gap:12px; align-items:center; }
-    .table-head { min-height:36px; padding:0 14px; background:var(--surface-soft); color:var(--muted); font-size:8px; font-weight:800; }
-    .table-row { width:100%; min-height:50px; padding:8px 14px; text-align:left; border:0; border-top:1px solid var(--border-faint); background:#fff; }
-    .table-row.is-active { background:var(--surface-edit); }
-    .status-pill { width:max-content; padding:5px 8px; border-radius:999px; color:var(--deep); background:var(--surface-soft); font-size:8px; font-weight:800; }
-    .status-pill.reading { color:var(--action); background:var(--action-soft); }
-    .table-title { min-width:0; }
-    .table-title strong, .table-title span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .table-title strong { font-size:10px; font-weight:800; }
-    .table-title span { margin-top:2px; color:var(--muted); font-size:8px; font-weight:600; }
-    .table-note { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary); font-size:9px; font-weight:600; }
-    .table-count { text-align:right; color:var(--secondary); font-size:9px; font-weight:700; }
     .no-books { padding:70px 20px; text-align:center; color:var(--muted); font-size:10px; font-weight:700; }
     .detail { padding:13px 0 0; border:0; border-top:1px solid var(--border-faint); background:#fff; }
     .detail-head { height:15px; min-height:15px; display:flex; align-items:center; gap:8px; }
@@ -116,18 +102,15 @@
     .locked span { color:var(--muted); font-size:8px; font-weight:600; }
     .drop-input { width:100%; height:34px; padding:0 10px; border:1px solid var(--danger-border); border-radius:9px; background:#fff; color:var(--danger); font-size:9px; font-weight:600; outline:none; }
     .hidden { display:none !important; }
-    @media (max-width:760px) {
+    @media (max-width:520px) {
       .card { padding:16px; gap:12px; }
       .head { height:auto; flex-wrap:wrap; }
       .search { order:3; width:calc(100% - 90px); margin-left:0; }
-      .view-toggle { order:4; margin-left:auto; }
       .detail-grid { grid-template-columns:1fr; }
       .detail-side { display:grid; grid-template-columns:100px 1fr; gap:12px; }
       .detail-cover { width:100px; height:150px; }
       .detail-controls { height:auto; flex-wrap:wrap; }
       .status-panel.done { grid-template-columns:1fr; }
-      .table-head, .table-row { grid-template-columns:76px minmax(120px,1fr) 58px; }
-      .table-note { display:none; }
     }
     @media (max-width:480px) {
       .card { padding:14px; }
@@ -142,13 +125,12 @@
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-library.html" data-widget-max-width="1020" data-widget-height="318" data-widget-max-scale="4" style="--widget-max-width:1020px;--widget-base-width:1020px;--widget-base-height:318px;--widget-visual-height:318px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-library-v2.html" data-widget-max-width="620" data-widget-height="318" data-widget-max-scale="4" style="--widget-max-width:620px;--widget-base-width:620px;--widget-base-height:318px;--widget-visual-height:318px">
     <main class="card" data-widget-card aria-label="독서 서재 위젯">
       <header class="head">
         <span class="title">서재</span>
         <span class="stats" id="libraryStats"></span>
         <input class="search" id="searchInput" type="search" placeholder="제목 · 저자 검색" aria-label="제목 또는 저자 검색">
-        <button class="view-toggle" id="viewToggle" type="button">표로 보기</button>
       </header>
       <div id="libraryView"></div>
       <section class="detail hidden" id="bookDetail" aria-label="책 상세"></section>
@@ -189,12 +171,10 @@
         { id:'demo-q0', bookId:'demo-thinking', text:'기억은 저장이 아니라 재구성이다.', page:'138', note:'', thought:'', created:isoAgo(24) }
       ];
       const statusMeta = { reading:'읽는 중', wishlist:'구입 예정', done:'완독', dropped:'중도포기' };
-      const statusOrder = { reading:0, wishlist:1, done:2, dropped:3 };
       const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
-      const els = { stats:document.getElementById('libraryStats'), search:document.getElementById('searchInput'), toggle:document.getElementById('viewToggle'), view:document.getElementById('libraryView'), detail:document.getElementById('bookDetail') };
+      const els = { stats:document.getElementById('libraryStats'), search:document.getElementById('searchInput'), view:document.getElementById('libraryView'), detail:document.getElementById('bookDetail') };
       let books = [];
       let quotes = [];
-      let viewMode = 'gallery';
       let selectedBookId = '';
       let doneExpanded = false;
       let addingBook = false;
@@ -215,7 +195,6 @@
       }
       function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
       function uid(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
-      function quoteCount(bookId) { return quotes.filter(item => item.bookId === bookId).length; }
       function matches(book) { const q = els.search.value.trim().toLocaleLowerCase('ko'); return !q || [book.title, book.author].some(value => String(value || '').toLocaleLowerCase('ko').includes(q)); }
       function shortAuthor(author) {
         const parts = String(author || '저자 미입력').trim().split(/\s+/); return parts[parts.length - 1] || '저자 미입력';
@@ -230,7 +209,6 @@
       function bindBookButtons() { els.view.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedBookId = button.dataset.bookId; render(); })); }
       function renderHeader() {
         els.stats.textContent = `올해 완독 ${books.filter(book => book.status === 'done').length}권 · 전체 ${books.length}권`;
-        els.toggle.textContent = viewMode === 'gallery' ? '표로 보기' : '서가로 보기';
       }
       function renderGallery() {
         const filtered = books.filter(matches);
@@ -247,11 +225,6 @@
         document.getElementById('addTrigger')?.addEventListener('click', () => { addingBook = true; renderGallery(); document.getElementById('newTitle')?.focus(); });
         document.getElementById('createBook')?.addEventListener('click', addBook);
         ['newTitle', 'newAuthor'].forEach(id => document.getElementById(id)?.addEventListener('keydown', event => { if (event.key === 'Enter') addBook(); if (event.key === 'Escape') { addingBook = false; renderGallery(); } }));
-      }
-      function renderTable() {
-        const filtered = books.filter(matches).sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9) || a.title.localeCompare(b.title, 'ko'));
-        els.view.innerHTML = `<div class="table-wrap"><div class="table-head"><span>상태</span><span>책</span><span>한 줄</span><span>문장</span></div>${filtered.map(book => `<button class="table-row ${book.id === selectedBookId ? 'is-active' : ''}" type="button" data-book-id="${escapeHtml(book.id)}"><span class="status-pill ${escapeHtml(book.status)}">${statusMeta[book.status] || '미분류'}</span><span class="table-title"><strong>${escapeHtml(book.title)}</strong><span>${escapeHtml(book.author || '저자 미입력')}</span></span><span class="table-note">${escapeHtml(book.status === 'dropped' ? (book.dropReason || '중도포기 이유 없음') : (book.one || '한 줄 기록 없음'))}</span><span class="table-count">${quoteCount(book.id)}개</span></button>`).join('') || '<div class="no-books">찾는 책이 없어요</div>'}</div>`;
-        bindBookButtons();
       }
       function addBook() {
         const title = document.getElementById('newTitle')?.value.trim(); const author = document.getElementById('newAuthor')?.value.trim(); if (!title) return;
@@ -302,14 +275,13 @@
         try { localStorage.setItem(ENERGY_KEY, JSON.stringify(next)); } catch (_) { return; }
         sentBookId = book.id; document.getElementById('sentLabel')?.classList.remove('hidden');
       }
-      function render() { renderHeader(); if (viewMode === 'gallery') renderGallery(); else renderTable(); renderDetail(); }
+      function render() { renderHeader(); renderGallery(); renderDetail(); }
       function sync() {
         books = readLibrary().books; quotes = readQuotes().quotes;
         if (selectedBookId && !books.some(book => book.id === selectedBookId)) selectedBookId = '';
         render();
       }
 
-      els.toggle.addEventListener('click', () => { viewMode = viewMode === 'gallery' ? 'table' : 'gallery'; render(); });
       els.search.addEventListener('input', render);
       window.addEventListener('storage', event => { if ([LIBRARY_KEY, QUOTES_KEY].includes(event.key)) sync(); });
       window.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
