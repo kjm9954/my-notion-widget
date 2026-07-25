@@ -14,25 +14,26 @@
     }
     * { box-sizing:border-box; }
     html, body { min-height:100%; }
-    body { margin:0; color:#12303C; background:#F7F7F5; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
+    body { margin:0; color:#12303C; background:transparent; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
     button { font:inherit; color:inherit; }
-    .shell { min-height:100vh; display:grid; place-items:center; padding:24px 16px; }
-    .widget { width:min(940px,calc(100vw - 32px)); min-height:700px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.05),0 10px 34px rgba(18,48,60,.08); }
+    .shell { min-height:0; }
+    .widget { width:940px; min-height:700px; display:flex; flex-direction:column; gap:16px; padding:22px; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
     .calendar-head, .month-controls, .detail-head, .mode-line, .section-head, .record-nav { display:flex; align-items:center; }
     .calendar-head { min-height:34px; justify-content:space-between; gap:16px; }
     .month-controls { gap:8px; }
     .month-button { width:34px; height:34px; padding:0; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
     .month-title { min-width:104px; text-align:center; font-size:13px; font-weight:800; }
     .record-count { color:#6B8794; font-size:11px; font-weight:700; }
-    .calendar-wrap { display:flex; flex-direction:column; gap:8px; }
+    .calendar-wrap { display:flex; flex-direction:column; gap:8px; background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px; }
     .weekday-grid, .calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
     .weekday { padding:2px 6px; color:#A9BAC2; font-size:9px; font-weight:700; text-align:left; }
-    .calendar-cell { position:relative; min-width:0; aspect-ratio:1/1; padding:6px; overflow:hidden; text-align:left; background:#FFFFFF; border:1px solid #F1F5F7; border-radius:10px; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .12s ease,background-color .12s ease; }
+    .calendar-cell { position:relative; min-width:0; aspect-ratio:1/1; padding:6px; overflow:hidden; text-align:left; background:transparent; border:1px solid transparent; border-radius:10px; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .12s ease,background-color .12s ease; }
     button.calendar-cell { cursor:pointer; }
-    .calendar-cell.outside { opacity:.32; }
-    .calendar-cell.today { outline-color:#0E5C7A; }
-    .calendar-cell.quest { background:var(--q-tint); border-color:transparent; }
-    .calendar-cell.photo { background-position:center; background-size:cover; border-color:transparent; }
+    .calendar-cell.outside { opacity:.3; }
+    .calendar-cell.future { opacity:.35; }
+    .calendar-cell.today { background:#FFFFFF; outline-color:#0E5C7A; }
+    .calendar-cell.quest { background:#FFFFFF; border-color:#E6EDF0; }
+    .calendar-cell.photo { background-color:#FFFFFF; background-position:center; background-size:cover; border-color:#E6EDF0; }
     .cell-number { display:inline-flex; min-height:18px; align-items:center; padding:2px 5px; color:#A9BAC2; border-radius:999px; font-size:9px; font-weight:800; line-height:1; }
     .calendar-cell.quest .cell-number { color:#3E5A66; }
     .calendar-cell.photo .cell-number { color:#12303C; background:rgba(255,255,255,.82); }
@@ -79,8 +80,8 @@
     .record-nav { justify-content:flex-end; gap:6px; margin-top:auto; padding-top:12px; }
     .record-button { width:34px; height:34px; padding:0; color:#6B8794; background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
     .record-button:disabled { color:#A9BAC2; background:#FAFCFD; cursor:default; }
-    @media (min-width:640px) and (max-width:999px) { .widget { width:min(720px,calc(100vw - 32px)); } }
-    @media (max-width:639px) {
+    @media (min-width:2px) and (max-width:1px) { .widget { width:min(720px,calc(100vw - 32px)); } }
+    @media (max-width:0px) {
       .shell { place-items:start center; padding:10px 8px; }
       .widget { width:min(380px,calc(100vw - 16px)); min-height:700px; padding:22px; }
       .month-button, .record-button { width:44px; height:44px; }
@@ -98,9 +99,16 @@
       .photo-thumb { width:52px; height:52px; }
     }
   </style>
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body>
-  <main class="shell"><section class="widget" id="app" aria-label="게임 로그 일기 캘린더 위젯"></section></main>
+<body class="widget-page">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-calendar.html" data-widget-width="940" data-widget-height="700" style="--widget-base-width:940px;--widget-base-height:700px;--widget-visual-height:700px">
+    <section class="widget" data-widget-card aria-label="게임 로그 일기 캘린더 위젯">
+      <div class="widget-dynamic-content" id="app"></div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </section>
+  </main>
   <script>
     (() => {
       'use strict';
@@ -141,7 +149,7 @@
       function renderCalendar(){
         const prefix=monthKey(ui.year,ui.month);const count=Object.keys(store.entries).filter(key=>key.startsWith(prefix+'-')).length;
         const weekdays=['월','화','수','목','금','토','일'];
-        const cells=calendarDates().map(({date,key,inside})=>{const entry=store.entries[key];const tag=entry?'button':'div';const classes=['calendar-cell',inside?'':'outside',entry?.mode||'',key===TODAY?'today':''].filter(Boolean).join(' ');return `<${tag} class="${classes}"${entry?' type="button" data-entry-date="'+key+'"':''}${photoStyle(entry)}><span class="cell-number">${date.getDate()}</span>${entry?.mode==='quest'?'<span class="cell-q">Q</span>':''}</${tag}>`;}).join('');
+        const cells=calendarDates().map(({date,key,inside})=>{const entry=store.entries[key];const tag=entry?'button':'div';const classes=['calendar-cell',inside?'':'outside',key>TODAY?'future':'',entry?.mode||'',key===TODAY?'today':''].filter(Boolean).join(' ');return `<${tag} class="${classes}"${entry?' type="button" data-entry-date="'+key+'"':''}${photoStyle(entry)}><span class="cell-number">${date.getDate()}</span>${entry?.mode==='quest'?'<span class="cell-q">Q</span>':''}</${tag}>`;}).join('');
         app.innerHTML=`<header class="calendar-head"><div class="month-controls"><button class="month-button" type="button" data-month="-1">‹</button><div class="month-title">${ui.year}년 ${ui.month+1}월</div><button class="month-button" type="button" data-month="1">›</button></div><div class="record-count">${count}편 기록</div></header><section class="calendar-wrap"><div class="weekday-grid">${weekdays.map(day=>`<div class="weekday">${day}</div>`).join('')}</div><div class="calendar-grid">${cells}</div></section><div class="legend"><span class="legend-item"><span class="legend-q">Q</span>퀘스트로 쓴 날</span><span class="legend-item"><span class="legend-photo"></span>사진이 칸을 채움</span><span class="legend-item"><span class="legend-today"></span>오늘</span></div>`;
       }
       function questDetails(entry){
@@ -174,5 +182,6 @@
       render();
     })();
   </script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>
