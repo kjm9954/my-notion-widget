@@ -31,8 +31,6 @@
     html, body { min-height:100%; }
     body {
       margin:0;
-      display:grid;
-      place-items:start center;
       color:var(--text);
       background:var(--page);
       font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
@@ -40,9 +38,16 @@
     }
     button { font:inherit; color:inherit; }
 
+    .shell {
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:24px 16px;
+    }
+
     .card {
-      width:min(404px, 100vw);
-      height:480px;
+      width:min(940px, calc(100vw - 32px));
+      min-height:700px;
       display:flex;
       flex-direction:column;
       gap:12px;
@@ -230,8 +235,13 @@
       cursor:pointer;
     }
 
+    @media (min-width:640px) and (max-width:999px) {
+      .card { width:min(720px, calc(100vw - 32px)); }
+    }
+
     @media (max-width:639px) {
-      .card { width:100vw; padding:18px 14px; }
+      .shell { place-items:start center; padding:10px 8px; }
+      .card { width:min(380px, calc(100vw - 16px)); min-height:700px; padding:22px; }
       .month-button { width:44px; height:44px; flex-basis:44px; }
       .header { min-height:44px; }
       .day { padding:5px; }
@@ -242,20 +252,22 @@
   </style>
 </head>
 <body>
-  <main class="card" id="card" aria-label="성장 기록 위젯">
-    <header class="header" id="header"></header>
-    <section class="calendar-shell" id="calendarShell" aria-label="월간 기록 캘린더">
-      <div class="weekdays" aria-hidden="true">
-        <span class="weekday">월</span><span class="weekday">화</span><span class="weekday">수</span><span class="weekday">목</span><span class="weekday">금</span><span class="weekday">토</span><span class="weekday">일</span>
+  <main class="shell">
+    <section class="card" id="card" aria-label="성장 기록 위젯">
+      <header class="header" id="header"></header>
+      <section class="calendar-shell" id="calendarShell" aria-label="월간 기록 캘린더">
+        <div class="weekdays" aria-hidden="true">
+          <span class="weekday">월</span><span class="weekday">화</span><span class="weekday">수</span><span class="weekday">목</span><span class="weekday">금</span><span class="weekday">토</span><span class="weekday">일</span>
+        </div>
+        <div class="days" id="days"></div>
+      </section>
+      <div class="legend" aria-label="범례">
+        <span class="legend-item"><span class="legend-dot legend-diary"></span>일기</span>
+        <span class="legend-item"><span class="legend-dot legend-reading"></span>독서 노트</span>
+        <span class="legend-item"><span class="legend-today"></span>오늘</span>
       </div>
-      <div class="days" id="days"></div>
+      <section class="detail-row" id="detailRow" aria-live="polite"></section>
     </section>
-    <div class="legend" aria-label="범례">
-      <span class="legend-item"><span class="legend-dot legend-diary"></span>일기</span>
-      <span class="legend-item"><span class="legend-dot legend-reading"></span>독서 노트</span>
-      <span class="legend-item"><span class="legend-today"></span>오늘</span>
-    </div>
-    <section class="detail-row" id="detailRow" aria-live="polite"></section>
   </main>
 
   <script>

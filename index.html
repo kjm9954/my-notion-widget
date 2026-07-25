@@ -52,6 +52,7 @@
     }
 
     .widget {
+      position: relative;
       width: min(940px, calc(100vw - 32px));
       display: flex;
       flex-direction: column;
@@ -62,6 +63,46 @@
       border-radius: 18px;
       box-shadow: 0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
     }
+
+    .widget-resize-handle {
+      position: absolute;
+      z-index: 20;
+      right: 4px;
+      bottom: 4px;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      opacity: 0;
+      color: #A9BAC2;
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      outline: none;
+      cursor: nwse-resize;
+      touch-action: none;
+      transition: opacity .12s ease, color .12s ease;
+    }
+
+    .widget-resize-handle::before {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      width: 10px;
+      height: 10px;
+      content: "";
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      border-radius: 0 0 3px 0;
+    }
+
+    .widget:hover .widget-resize-handle,
+    .widget-resize-handle:focus-visible,
+    body.is-widget-resizing .widget-resize-handle {
+      opacity: 1;
+    }
+
+    .widget-resize-handle:focus-visible { color: #0E5C7A; }
+    body.is-widget-resizing { cursor: nwse-resize; user-select: none; }
 
     .header {
       min-width: 0;
@@ -709,6 +750,8 @@
         border-radius: 16px;
       }
 
+      .widget-resize-handle { opacity: .55; }
+
       .header {
         gap: 8px;
       }
@@ -905,6 +948,7 @@
       <header class="header" id="header"></header>
       <section id="mainContent"></section>
       <section class="bottom-bar collapsed" id="bottomBar" data-drop-tray="true"></section>
+      <button class="widget-resize-handle" id="widgetResizeHandle" type="button" aria-label="위젯 비율 고정 크기 조절"></button>
     </section>
   </main>
 
@@ -913,6 +957,7 @@
       'use strict';
 
       const STORAGE_KEY = 'energy-compass-3a-v2';
+      const SIZE_KEY = 'energy-compass-size-v1';
       const ORDER = ['S', 'D', 'M', 'O'];
       const QUADRANTS = {
         O: { full: '기회를 찾는 업무', short: '기회' },
@@ -964,8 +1009,10 @@
         justDragged: false
       };
       let pointerDrag = null;
+      let widgetResize = null;
 
       const widget = document.getElementById('widget');
+      const widgetResizeHandle = document.getElementById('widgetResizeHandle');
       const header = document.getElementById('header');
       const mainContent = document.getElementById('mainContent');
       const bottomBar = document.getElementById('bottomBar');
@@ -975,6 +1022,54 @@
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items, scope: state.scope }));
         } catch (_) {
           // 저장이 막혀도 현재 세션의 위젯은 계속 동작한다.
+        }
+      }
+
+      function layoutMode() {
+        if (window.innerWidth < 640) return 'mobile';
+        if (window.innerWidth < 1000) return 'tablet';
+        return 'desktop';
+      }
+
+      function defaultWidgetWidth() {
+        if (layoutMode() === 'mobile') return Math.min(380, window.innerWidth - 16);
+        if (layoutMode() === 'tablet') return Math.min(720, window.innerWidth - 32);
+        return Math.min(940, window.innerWidth - 32);
+      }
+
+      function readWidgetSize() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(SIZE_KEY));
+          if (!parsed || parsed.mode !== layoutMode()) return null;
+          if (!Number.isFinite(Number(parsed.width)) || !Number.isFinite(Number(parsed.ratio))) return null;
+          return { width:Number(parsed.width), ratio:Number(parsed.ratio), mode:parsed.mode };
+        } catch (_) { return null; }
+      }
+
+      function applyWidgetSize(width, ratio) {
+        const minimum = Math.max(280, defaultWidgetWidth());
+        const maximum = Math.max(minimum, window.innerWidth - (layoutMode() === 'mobile' ? 16 : 32));
+        const safeRatio = Math.max(.7, Math.min(3, Number(ratio) || 1.7));
+        const safeWidth = Math.max(minimum, Math.min(maximum, Math.round(Number(width) || minimum)));
+        const safeHeight = Math.round(safeWidth / safeRatio);
+        widget.style.width = `${safeWidth}px`;
+        widget.style.height = `${safeHeight}px`;
+        widgetResizeHandle.setAttribute('aria-valuemin', String(Math.round(minimum)));
+        widgetResizeHandle.setAttribute('aria-valuemax', String(Math.round(maximum)));
+        widgetResizeHandle.setAttribute('aria-valuenow', String(safeWidth));
+        return { width:safeWidth, height:safeHeight, ratio:safeRatio, mode:layoutMode() };
+      }
+
+      function saveWidgetSize(size) {
+        try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (_) {}
+      }
+
+      function restoreWidgetSize() {
+        const saved = readWidgetSize();
+        if (saved) applyWidgetSize(saved.width, saved.ratio);
+        else {
+          widget.style.removeProperty('width');
+          widget.style.removeProperty('height');
         }
       }
 
@@ -1293,6 +1388,61 @@
         setTimeout(() => { ui.justDragged = false; }, 80);
       }
 
+      widgetResizeHandle.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = widget.getBoundingClientRect();
+        widgetResize = {
+          pointerId:event.pointerId,
+          x:event.clientX,
+          y:event.clientY,
+          width:rect.width,
+          height:rect.height,
+          ratio:rect.width / rect.height
+        };
+        widgetResizeHandle.setPointerCapture?.(event.pointerId);
+        document.body.classList.add('is-widget-resizing');
+      });
+      widgetResizeHandle.addEventListener('pointermove', event => {
+        if (!widgetResize || event.pointerId !== widgetResize.pointerId) return;
+        event.preventDefault();
+        const dx = event.clientX - widgetResize.x;
+        const dy = event.clientY - widgetResize.y;
+        const projection = (dx * widgetResize.width + dy * widgetResize.height)
+          / (widgetResize.width ** 2 + widgetResize.height ** 2);
+        applyWidgetSize(widgetResize.width * (1 + projection), widgetResize.ratio);
+      });
+      function finishWidgetResize(event) {
+        if (!widgetResize || event.pointerId !== widgetResize.pointerId) return;
+        const rect = widget.getBoundingClientRect();
+        const saved = applyWidgetSize(rect.width, widgetResize.ratio);
+        if (widgetResizeHandle.hasPointerCapture?.(event.pointerId)) widgetResizeHandle.releasePointerCapture(event.pointerId);
+        widgetResize = null;
+        document.body.classList.remove('is-widget-resizing');
+        saveWidgetSize(saved);
+      }
+      widgetResizeHandle.addEventListener('pointerup', finishWidgetResize);
+      widgetResizeHandle.addEventListener('pointercancel', finishWidgetResize);
+      widgetResizeHandle.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      widgetResizeHandle.addEventListener('keydown', event => {
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = widget.getBoundingClientRect();
+        const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
+        const saved = applyWidgetSize(rect.width + direction * 40, rect.width / rect.height);
+        saveWidgetSize(saved);
+      });
+
+      window.addEventListener('storage', event => {
+        if (event.key === SIZE_KEY) restoreWidgetSize();
+      });
+      window.addEventListener('resize', restoreWidgetSize);
+
       widget.addEventListener('click', event => {
         const target = event.target;
         const scopeButton = target.closest('[data-scope]');
@@ -1478,6 +1628,7 @@
       widget.addEventListener('pointercancel', event => endPointerDrag(event, true));
 
       render();
+      restoreWidgetSize();
       if (!restored) save();
     })();
   </script>
