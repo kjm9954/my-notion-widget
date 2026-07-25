@@ -44,6 +44,8 @@
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
   const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
   const defaultWidth = Math.min(designWidth, Math.max(1, window.innerWidth));
+  host.style.setProperty('--widget-content-width', `${defaultWidth}px`);
+  card.style.setProperty('--widget-content-width', `${defaultWidth}px`);
   const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight;
   const initialNaturalHeight = card.offsetHeight || declaredHeight;
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
@@ -108,10 +110,16 @@
     frameRequest = requestAnimationFrame(() => {
       renderedWidth = visibleDimension(requestedWidth, minimumWidth, maximumWidth());
       renderedHeight = visibleDimension(requestedHeight, minimumHeight, maximumHeight());
+      const contentScale = Math.max(.01, Math.min(
+        renderedWidth / Math.max(1, defaultWidth),
+        renderedHeight / Math.max(1, naturalHeight)
+      ));
       host.style.setProperty('--widget-base-width', `${defaultWidth}px`);
       host.style.setProperty('--widget-base-height', `${naturalHeight}px`);
       host.style.setProperty('--widget-visual-width', `${renderedWidth}px`);
       host.style.setProperty('--widget-visual-height', `${renderedHeight}px`);
+      host.style.setProperty('--widget-content-scale', String(contentScale));
+      card.style.setProperty('--widget-content-scale', String(contentScale));
       host.dataset.widgetSizeReady = 'true';
       sizeLabel.textContent = `${Math.round(renderedWidth)}×${Math.round(renderedHeight)}`;
 

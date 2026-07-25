@@ -28,7 +28,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   height: var(--widget-visual-height, var(--widget-base-height));
   min-height: 0 !important;
   display: flex !important;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   flex: 0 0 auto;
   margin: 0 auto;
@@ -40,11 +40,14 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
 }
 
 [data-widget-card] {
-  position: relative;
-  width: 100% !important;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--widget-content-width, 100%) !important;
   max-width: none;
-  margin: 0 auto;
-  transform: none;
+  margin: 0;
+  transform: translate(-50%, -50%) scale(var(--widget-content-scale, 1));
+  transform-origin: center;
   box-shadow: none !important;
 }
 
