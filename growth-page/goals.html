@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>목표 계층</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --action-soft:#E2F0F6;
+      --text:#12303C;
+      --secondary:#6B8794;
+      --secondary-deep:#55707C;
+      --muted:#93A5AD;
+      --faint:#A2B4BC;
+      --done:#A9BAC2;
+      --border:#DCE7ED;
+      --border-soft:#E1EAEE;
+      --border-faint:#F1F5F7;
+      --surface:#FFFFFF;
+      --surface-soft:#FAFCFD;
+      --surface-edit:#F7FBFD;
+      --page:#F7F7F5;
+      --disabled:#C6D6DD;
+      --danger-border:#E4D5D5;
+      --danger:#A56B6B;
+    }
+
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0;
+      display:grid;
+      place-items:start center;
+      color:var(--text);
+      background:var(--page);
+      font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, select { font:inherit; }
+    button { color:inherit; }
+
+    .card {
+      width:min(720px, 100vw);
+      height:268px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding:18px;
+      overflow:hidden;
+      background:var(--surface);
+      border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+    }
+    .card.expanded {
+      height:auto;
+      min-height:268px;
+      max-height:360px;
+    }
+
+    .header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex:0 0 auto;
+    }
+    .segments {
+      display:flex;
+      gap:2px;
+      padding:3px;
+      background:var(--border-faint);
+      border-radius:9px;
+    }
+    .segment {
+      min-height:28px;
+      padding:4px 10px;
+      border:0;
+      border-radius:7px;
+      background:transparent;
+      color:#8AA0AA;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      transition:color .12s, background-color .12s, box-shadow .12s;
+    }
+    .segment.active {
+      color:var(--text);
+      background:var(--surface);
+      box-shadow:0 1px 2px rgba(18,48,60,.10);
+    }
+    .summary {
+      color:var(--secondary);
+      font-size:11px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    .goal-list {
+      min-height:92px;
+      display:flex;
+      flex:1 1 auto;
+      flex-direction:column;
+      overflow-x:hidden;
+      overflow-y:auto;
+      scrollbar-width:thin;
+      scrollbar-color:var(--border) transparent;
+    }
+    .goal-row {
+      min-height:45px;
+      display:flex;
+      flex:0 0 auto;
+      align-items:center;
+      gap:8px;
+      padding:8px 2px;
+      border-bottom:1px solid var(--border-faint);
+      transition:opacity .12s;
+    }
+    .goal-row.done { opacity:.55; }
+    .check-button {
+      width:32px;
+      height:32px;
+      display:grid;
+      flex:0 0 auto;
+      place-items:center;
+      padding:0;
+      border:0;
+      background:transparent;
+      cursor:pointer;
+    }
+    .check-circle {
+      width:15px;
+      height:15px;
+      display:block;
+      background:var(--surface);
+      border:1.5px solid var(--disabled);
+      border-radius:999px;
+    }
+    .goal-row.done .check-circle { background:var(--disabled); }
+    .goal-name {
+      min-width:0;
+      flex:1 1 auto;
+      padding:0;
+      overflow:hidden;
+      border:0;
+      background:transparent;
+      color:var(--text);
+      font-size:12px;
+      font-weight:600;
+      line-height:1.4;
+      text-align:left;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      cursor:text;
+    }
+    .goal-row.done .goal-name {
+      color:var(--done);
+      text-decoration:line-through;
+    }
+    .goal-meta {
+      max-width:180px;
+      flex:0 0 auto;
+      overflow:hidden;
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+      line-height:1.3;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .edit-input {
+      min-width:0;
+      height:30px;
+      flex:1 1 auto;
+      padding:0 9px;
+      border:1px solid #CFE2EA;
+      border-radius:8px;
+      outline:0;
+      background:var(--surface-edit);
+      color:var(--text);
+      font-size:12px;
+      font-weight:600;
+    }
+    .edit-action {
+      min-height:30px;
+      flex:0 0 auto;
+      padding:0 5px;
+      border:0;
+      background:transparent;
+      font-size:10px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .edit-delete { color:var(--danger); }
+    .edit-done { color:var(--muted); }
+
+    .empty {
+      min-height:92px;
+      display:grid;
+      place-items:center;
+      color:var(--faint);
+      border:1px dashed var(--disabled);
+      border-radius:10px;
+      font-size:11px;
+      font-weight:700;
+    }
+    .footer-area {
+      display:flex;
+      flex:0 0 auto;
+      flex-direction:column;
+      gap:8px;
+    }
+    .add-trigger {
+      min-height:30px;
+      align-self:flex-start;
+      padding:0 2px;
+      border:0;
+      background:transparent;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .composer {
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto auto auto;
+      gap:7px;
+      align-items:center;
+    }
+    .composer.month { grid-template-columns:minmax(0, 1fr) minmax(136px, auto) auto auto; }
+    .composer-input, .parent-select {
+      height:34px;
+      min-width:0;
+      padding:0 10px;
+      border:1px solid var(--border-soft);
+      border-radius:9px;
+      outline:0;
+      background:var(--surface);
+      color:var(--text);
+      font-size:11px;
+      font-weight:600;
+    }
+    .composer-input:focus, .parent-select:focus { border-color:#CFE2EA; }
+    .composer-input::placeholder { color:var(--faint); }
+    .parent-select { color:var(--secondary); }
+    .small-button {
+      height:34px;
+      padding:0 10px;
+      border:1px solid var(--border-soft);
+      border-radius:9px;
+      background:var(--surface);
+      color:var(--muted);
+      font-size:10px;
+      font-weight:700;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+    .add-button {
+      border-color:var(--action);
+      background:var(--action);
+      color:var(--surface);
+    }
+
+    .delete-confirm {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--danger-border);
+      border-radius:10px;
+      background:var(--surface);
+    }
+    .delete-copy {
+      min-width:0;
+      flex:1 1 auto;
+      color:var(--danger);
+      font-size:11px;
+      font-weight:700;
+      line-height:1.35;
+    }
+    .delete-note {
+      display:block;
+      margin-top:2px;
+      color:var(--muted);
+      font-size:9px;
+      font-weight:700;
+    }
+    .confirm-actions {
+      display:flex;
+      flex:0 0 auto;
+      gap:5px;
+    }
+    .confirm-button {
+      min-height:30px;
+      padding:0 8px;
+      border:1px solid var(--danger-border);
+      border-radius:8px;
+      background:var(--surface);
+      color:var(--secondary);
+      font-size:10px;
+      font-weight:700;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+    .confirm-danger {
+      border-color:var(--danger);
+      background:var(--danger);
+      color:var(--surface);
+    }
+    .undo-line {
+      align-self:flex-end;
+      color:var(--done);
+      font-size:9px;
+      font-weight:700;
+    }
+    .undo-button {
+      padding:0;
+      border:0;
+      background:transparent;
+      color:var(--action);
+      font-size:9px;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    @media (max-width:639px) {
+      .card { width:100vw; padding:18px 14px; }
+      .segment, .add-trigger, .edit-action, .small-button, .confirm-button { min-height:40px; }
+      .check-button { width:40px; height:40px; }
+      .goal-name, .undo-button { min-height:40px; }
+      .goal-name { display:flex; align-items:center; }
+      .edit-input, .composer-input, .parent-select { height:40px; }
+      .goal-meta { display:none; }
+      .goal-row { min-height:52px; }
+      .composer, .composer.month {
+        grid-template-columns:1fr auto auto;
+        grid-template-rows:auto auto;
+      }
+      .composer-input { grid-column:1 / -1; }
+      .parent-select { grid-column:1; grid-row:2; }
+      .composer:not(.month) .small-button:first-of-type { grid-column:2; }
+      .delete-confirm { align-items:flex-start; flex-direction:column; }
+      .confirm-actions { width:100%; flex-wrap:wrap; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="card" aria-label="목표 계층 위젯">
+    <header class="header" id="header"></header>
+    <section class="goal-list" id="goalList" aria-live="polite"></section>
+    <section class="footer-area" id="footerArea"></section>
+  </main>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = 'growth-goals-v1';
+      const card = document.getElementById('card');
+      const header = document.getElementById('header');
+      const goalList = document.getElementById('goalList');
+      const footerArea = document.getElementById('footerArea');
+
+      let memoryState = { goals: [] };
+      const ui = {
+        scope: 'year',
+        editingId: null,
+        composerOpen: false,
+        pendingDeleteId: null,
+        undo: null
+      };
+
+      function clone(value) { return JSON.parse(JSON.stringify(value)); }
+      function makeId() { return `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, char => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[char]);
+      }
+      function normalize(data) {
+        const goals = Array.isArray(data?.goals) ? data.goals : [];
+        return {
+          goals: goals.filter(goal => goal && (goal.scope === 'year' || goal.scope === 'month')).map(goal => ({
+            id: String(goal.id || makeId()),
+            scope: goal.scope,
+            t: String(goal.t ?? ''),
+            done: Boolean(goal.done),
+            parent: goal.scope === 'month' && goal.parent ? String(goal.parent) : null
+          }))
+        };
+      }
+      function readState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          memoryState = raw ? normalize(JSON.parse(raw)) : { goals: [] };
+        } catch (_) {}
+        return clone(memoryState);
+      }
+      function saveState() {
+        memoryState = normalize(state);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryState)); } catch (_) {}
+      }
+
+      let state = readState();
+      const byId = id => state.goals.find(goal => goal.id === id) || null;
+      const currentGoals = () => state.goals
+        .filter(goal => goal.scope === ui.scope)
+        .sort((a, b) => Number(a.done) - Number(b.done));
+
+      function renderHeader() {
+        const goals = currentGoals();
+        const done = goals.filter(goal => goal.done).length;
+        header.innerHTML = `
+          <div class="segments" aria-label="목표 기간">
+            <button class="segment${ui.scope === 'year' ? ' active' : ''}" type="button" data-scope="year">올해</button>
+            <button class="segment${ui.scope === 'month' ? ' active' : ''}" type="button" data-scope="month">이번 달</button>
+          </div>
+          <div class="summary">${goals.length}개 중 ${done}개 완료</div>
+        `;
+      }
+
+      function goalMeta(goal) {
+        if (goal.scope === 'year') {
+          const count = state.goals.filter(item => item.scope === 'month' && item.parent === goal.id).length;
+          return `이번 달 ${count}`;
+        }
+        return byId(goal.parent)?.t || '연결 없음';
+      }
+
+      function renderList() {
+        const goals = currentGoals();
+        if (!goals.length) {
+          goalList.innerHTML = `<div class="empty">${ui.scope === 'year' ? '올해 목표가 아직 없습니다' : '이번 달 목표가 아직 없습니다'}</div>`;
+          return;
+        }
+        goalList.innerHTML = goals.map(goal => {
+          const editing = ui.editingId === goal.id;
+          return `
+            <div class="goal-row${goal.done ? ' done' : ''}" data-goal-row="${escapeHtml(goal.id)}">
+              <button class="check-button" type="button" data-toggle="${escapeHtml(goal.id)}" aria-label="${goal.done ? '미완료로 변경' : '완료로 변경'}"><span class="check-circle"></span></button>
+              ${editing ? `
+                <input class="edit-input" data-edit-input="${escapeHtml(goal.id)}" value="${escapeHtml(goal.t)}" aria-label="목표 이름 수정">
+                <button class="edit-action edit-delete" type="button" data-delete-request="${escapeHtml(goal.id)}">삭제</button>
+                <button class="edit-action edit-done" type="button" data-edit-done>완료</button>
+              ` : `
+                <button class="goal-name" type="button" data-edit="${escapeHtml(goal.id)}">${escapeHtml(goal.t)}</button>
+                <span class="goal-meta">${escapeHtml(goalMeta(goal))}</span>
+              `}
+            </div>
+          `;
+        }).join('');
+      }
+
+      function composerHtml() {
+        const years = state.goals.filter(goal => goal.scope === 'year').sort((a, b) => Number(a.done) - Number(b.done));
+        const select = ui.scope === 'month' ? `
+          <select class="parent-select" data-parent-select aria-label="연간 목표 연결">
+            <option value="">연결 없음</option>
+            ${years.map(goal => `<option value="${escapeHtml(goal.id)}">${escapeHtml(goal.t)}</option>`).join('')}
+          </select>
+        ` : '';
+        return `
+          <div class="composer${ui.scope === 'month' ? ' month' : ''}">
+            <input class="composer-input" data-new-goal placeholder="${ui.scope === 'year' ? '올해 목표' : '이번 달 목표'}" aria-label="새 목표 이름">
+            ${select}
+            <button class="small-button add-button" type="button" data-add>추가</button>
+            <button class="small-button" type="button" data-compose-cancel>취소</button>
+          </div>
+        `;
+      }
+
+      function deleteConfirmHtml(goal) {
+        const children = goal.scope === 'year'
+          ? state.goals.filter(item => item.scope === 'month' && item.parent === goal.id)
+          : [];
+        const hasChildren = children.length > 0;
+        return `
+          <div class="delete-confirm">
+            <div class="delete-copy">
+              ‘${escapeHtml(goal.t)}’ 를 삭제할까요?
+              ${hasChildren ? `<span class="delete-note">딸린 이번 달 목표 ${children.length}개는 지워지지 않고 연결만 풀립니다.</span>` : ''}
+            </div>
+            <div class="confirm-actions">
+              <button class="confirm-button confirm-danger" type="button" data-delete-mode="${hasChildren ? 'unlink' : 'single'}">${hasChildren ? '연결만 해제하고 삭제' : '삭제'}</button>
+              ${hasChildren ? '<button class="confirm-button" type="button" data-delete-mode="cascade">함께 삭제</button>' : ''}
+              <button class="confirm-button" type="button" data-delete-cancel>취소</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderFooter() {
+        const pending = ui.pendingDeleteId ? byId(ui.pendingDeleteId) : null;
+        const undo = ui.undo && ui.undo.scope === ui.scope ? `
+          <div class="undo-line">‘${escapeHtml(ui.undo.name)}’ 삭제됨 · <button class="undo-button" type="button" data-undo>되돌리기</button></div>
+        ` : '';
+        footerArea.innerHTML = `
+          ${ui.composerOpen ? composerHtml() : '<button class="add-trigger" type="button" data-compose-open>＋ 목표 추가</button>'}
+          ${pending ? deleteConfirmHtml(pending) : ''}
+          ${undo}
+        `;
+        card.classList.toggle('expanded', Boolean(ui.composerOpen || pending || undo));
+      }
+
+      function render(options = {}) {
+        renderHeader();
+        renderList();
+        renderFooter();
+        if (options.focusEdit) requestAnimationFrame(() => document.querySelector('[data-edit-input]')?.focus());
+        if (options.focusComposer) requestAnimationFrame(() => document.querySelector('[data-new-goal]')?.focus());
+      }
+
+      function addGoal() {
+        const input = document.querySelector('[data-new-goal]');
+        const title = input?.value.trim();
+        if (!title) { input?.focus(); return; }
+        const select = document.querySelector('[data-parent-select]');
+        state.goals.push({
+          id: makeId(),
+          scope: ui.scope,
+          t: title,
+          done: false,
+          parent: ui.scope === 'month' && select?.value ? select.value : null
+        });
+        ui.composerOpen = false;
+        ui.undo = null;
+        saveState();
+        render();
+      }
+
+      function performDelete(mode) {
+        const goal = byId(ui.pendingDeleteId);
+        if (!goal) return;
+        const previous = clone(state.goals);
+        if (goal.scope === 'year' && mode === 'unlink') {
+          state.goals.forEach(item => { if (item.parent === goal.id) item.parent = null; });
+          state.goals = state.goals.filter(item => item.id !== goal.id);
+        } else if (goal.scope === 'year' && mode === 'cascade') {
+          state.goals = state.goals.filter(item => item.id !== goal.id && item.parent !== goal.id);
+        } else {
+          state.goals = state.goals.filter(item => item.id !== goal.id);
+        }
+        ui.undo = { name: goal.t, goals: previous, scope: goal.scope };
+        ui.pendingDeleteId = null;
+        ui.editingId = null;
+        saveState();
+        render();
+      }
+
+      card.addEventListener('click', event => {
+        const target = event.target;
+        const scopeButton = target.closest('[data-scope]');
+        if (scopeButton) {
+          ui.scope = scopeButton.dataset.scope;
+          ui.editingId = null;
+          ui.composerOpen = false;
+          ui.pendingDeleteId = null;
+          render();
+          return;
+        }
+        const toggle = target.closest('[data-toggle]');
+        if (toggle) {
+          const goal = byId(toggle.dataset.toggle);
+          if (!goal) return;
+          goal.done = !goal.done;
+          ui.editingId = null;
+          ui.pendingDeleteId = null;
+          ui.undo = null;
+          saveState();
+          render();
+          return;
+        }
+        const edit = target.closest('[data-edit]');
+        if (edit) {
+          ui.editingId = edit.dataset.edit;
+          ui.composerOpen = false;
+          ui.pendingDeleteId = null;
+          render({ focusEdit: true });
+          return;
+        }
+        if (target.closest('[data-edit-done]')) {
+          ui.editingId = null;
+          render();
+          return;
+        }
+        const requestDelete = target.closest('[data-delete-request]');
+        if (requestDelete) {
+          ui.pendingDeleteId = requestDelete.dataset.deleteRequest;
+          ui.composerOpen = false;
+          render();
+          return;
+        }
+        if (target.closest('[data-delete-cancel]')) {
+          ui.pendingDeleteId = null;
+          render();
+          return;
+        }
+        const deleteMode = target.closest('[data-delete-mode]');
+        if (deleteMode) { performDelete(deleteMode.dataset.deleteMode); return; }
+        if (target.closest('[data-undo]') && ui.undo) {
+          state.goals = clone(ui.undo.goals);
+          ui.undo = null;
+          saveState();
+          render();
+          return;
+        }
+        if (target.closest('[data-compose-open]')) {
+          ui.composerOpen = true;
+          ui.editingId = null;
+          ui.pendingDeleteId = null;
+          render({ focusComposer: true });
+          return;
+        }
+        if (target.closest('[data-compose-cancel]')) {
+          ui.composerOpen = false;
+          render();
+          return;
+        }
+        if (target.closest('[data-add]')) addGoal();
+      });
+
+      card.addEventListener('input', event => {
+        const input = event.target.closest('[data-edit-input]');
+        if (!input) return;
+        const goal = byId(input.dataset.editInput);
+        if (!goal) return;
+        goal.t = input.value;
+        ui.undo = null;
+        saveState();
+      });
+
+      card.addEventListener('keydown', event => {
+        if (event.target.matches('[data-new-goal]') && event.key === 'Enter') {
+          event.preventDefault();
+          addGoal();
+          return;
+        }
+        if (event.target.matches('[data-edit-input]')) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            ui.editingId = null;
+            render();
+          } else if (event.key === 'Escape') {
+            ui.editingId = null;
+            render();
+          }
+        }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

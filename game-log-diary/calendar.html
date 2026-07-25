@@ -104,7 +104,8 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY='game-log-diary-v1';
+      const STORAGE_KEY='game-log-diary-4b-v2';
+      const LEGACY_STORAGE_KEY='game-log-diary-v1';
       const CHANNEL_NAME='game-log-diary';
       const WEEKDAYS=['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
       const app=document.getElementById('app');
@@ -116,7 +117,7 @@
       const TODAY=localKey(new Date());
       let memoryStore={entries:{}};
       function normalizeStore(value){return value&&typeof value==='object'&&value.entries&&typeof value.entries==='object'?{entries:value.entries}:{entries:{}};}
-      function readStore(){try{const raw=localStorage.getItem(STORAGE_KEY);memoryStore=raw?normalizeStore(JSON.parse(raw)):{entries:{}};}catch(_){}return clone(memoryStore);}
+      function readStore(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){memoryStore=normalizeStore(JSON.parse(raw));}else{const legacyRaw=localStorage.getItem(LEGACY_STORAGE_KEY);memoryStore=legacyRaw?normalizeStore(JSON.parse(legacyRaw)):{entries:{}};if(legacyRaw)localStorage.setItem(STORAGE_KEY,JSON.stringify(memoryStore));}}catch(_){}return clone(memoryStore);}
       let store=readStore();
       let channel=null;
       try{if('BroadcastChannel'in window)channel=new BroadcastChannel(CHANNEL_NAME);}catch(_){}

@@ -152,7 +152,8 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY = 'game-log-diary-v1';
+      const STORAGE_KEY = 'game-log-diary-4b-v2';
+      const LEGACY_STORAGE_KEY = 'game-log-diary-v1';
       const CHANNEL_NAME = 'game-log-diary';
       const CONDITIONS = ['의욕 충만','피로 누적','집중력 저하','기분 좋음','불안','여유'];
       const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
@@ -176,7 +177,13 @@
       function readStore() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
-          memoryStore = raw ? normalizeStore(JSON.parse(raw)) : {entries:{}};
+          if (raw) {
+            memoryStore = normalizeStore(JSON.parse(raw));
+          } else {
+            const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+            memoryStore = legacyRaw ? normalizeStore(JSON.parse(legacyRaw)) : {entries:{}};
+            if (legacyRaw) localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryStore));
+          }
         } catch (_) {}
         return clone(memoryStore);
       }
@@ -201,7 +208,14 @@
         announceChange();
       }
 
-      const ui = { screen:'home', selectedDate:TODAY, questStep:1, questDraft:null, photoDraft:null, pending:{2:'',3:'',5:''} };
+      function initialDate() {
+        try {
+          const candidate = new URLSearchParams(location.search).get('date');
+          if (candidate && /^\d{4}-\d{2}-\d{2}$/.test(candidate) && localKey(fromKey(candidate)) === candidate) return candidate;
+        } catch (_) {}
+        return TODAY;
+      }
+      const ui = { screen:'home', selectedDate:initialDate(), questStep:1, questDraft:null, photoDraft:null, pending:{2:'',3:'',5:''} };
       function emptyQuest() { return {job:'',conds:[],main:[],sub:[],event:{t:'',c:''},achieve:[],ending:''}; }
       function isEditing() { return ui.screen === 'quest' || ui.screen === 'photo'; }
       function syncFromStorage() { store = readStore(); if (!isEditing()) render(); }
