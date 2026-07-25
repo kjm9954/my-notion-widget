@@ -7,6 +7,17 @@
   const sizeLabel = card?.querySelector('[data-widget-size-label]');
   if (!host || !card || !scaleHandle || !sizeLabel) return;
 
+  scaleHandle.dataset.widgetScalePosition ||= 'bottom-right';
+  let topLeftHandle = card.querySelector('[data-widget-scale-position="top-left"]');
+  if (!topLeftHandle) {
+    topLeftHandle = scaleHandle.cloneNode(false);
+    topLeftHandle.classList.add('widget-size-handle-top-left');
+    topLeftHandle.dataset.widgetScalePosition = 'top-left';
+    topLeftHandle.setAttribute('aria-label', '왼쪽 위에서 위젯 비율 고정 크기 조절');
+    card.appendChild(topLeftHandle);
+  }
+  const scaleHandles = [scaleHandle, topLeftHandle];
+
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
   const maximumWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
   const defaultHeight = Number(host.dataset.widgetHeight) || card.offsetHeight;
@@ -78,7 +89,7 @@
       card.style.setProperty('--widget-max-width', `${maximumWidth}px`);
       card.style.setProperty('--widget-scale', String(renderedScale));
       sizeLabel.textContent = `${Math.round(baseWidth * renderedScale)}×${Math.round(baseHeight * renderedScale)}`;
-      scaleHandle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100)));
+      scaleHandles.forEach(handle => handle.setAttribute('aria-valuenow', String(Math.round(requestedScale * 100))));
     });
   }
 
@@ -118,56 +129,60 @@
     updateFrame();
   }
 
-  scaleHandle.addEventListener('pointerdown', event => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    scaleDrag = {
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      scale: renderedScale,
-      width: baseWidth,
-      height: baseHeight
+  scaleHandles.forEach(handle => {
+    handle.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      scaleDrag = {
+        handle,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        direction: handle.dataset.widgetScalePosition === 'top-left' ? -1 : 1,
+        scale: renderedScale,
+        width: baseWidth,
+        height: baseHeight
+      };
+      handle.setPointerCapture?.(event.pointerId);
+      document.body.classList.add('is-widget-scaling');
+      updateFrame();
+    });
+
+    handle.addEventListener('pointermove', event => {
+      if (!scaleDrag || scaleDrag.handle !== handle || event.pointerId !== scaleDrag.pointerId) return;
+      event.preventDefault();
+      const horizontalDelta = (event.clientX - scaleDrag.x) * 2 * scaleDrag.direction / Math.max(1, scaleDrag.width);
+      const verticalDelta = (event.clientY - scaleDrag.y) * scaleDrag.direction / Math.max(1, scaleDrag.height);
+      const scaleDelta = Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+        ? horizontalDelta
+        : verticalDelta;
+      applyScale(scaleDrag.scale + scaleDelta, true);
+    });
+
+    const finishScale = event => {
+      if (!scaleDrag || scaleDrag.handle !== handle || event.pointerId !== scaleDrag.pointerId) return;
+      if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      scaleDrag = null;
+      document.body.classList.remove('is-widget-scaling');
+      updateFrame();
+      saveSize();
     };
-    scaleHandle.setPointerCapture?.(event.pointerId);
-    document.body.classList.add('is-widget-scaling');
-    updateFrame();
-  });
 
-  scaleHandle.addEventListener('pointermove', event => {
-    if (!scaleDrag || event.pointerId !== scaleDrag.pointerId) return;
-    event.preventDefault();
-    const horizontalDelta = (event.clientX - scaleDrag.x) * 2 / Math.max(1, scaleDrag.width);
-    const verticalDelta = (event.clientY - scaleDrag.y) / Math.max(1, scaleDrag.height);
-    const scaleDelta = Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
-      ? horizontalDelta
-      : verticalDelta;
-    applyScale(scaleDrag.scale + scaleDelta, true);
-  });
+    handle.addEventListener('pointerup', finishScale);
+    handle.addEventListener('pointercancel', finishScale);
+    handle.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
 
-  function finishScale(event) {
-    if (!scaleDrag || event.pointerId !== scaleDrag.pointerId) return;
-    if (scaleHandle.hasPointerCapture?.(event.pointerId)) scaleHandle.releasePointerCapture(event.pointerId);
-    scaleDrag = null;
-    document.body.classList.remove('is-widget-scaling');
-    updateFrame();
-    saveSize();
-  }
-
-  scaleHandle.addEventListener('pointerup', finishScale);
-  scaleHandle.addEventListener('pointercancel', finishScale);
-  scaleHandle.addEventListener('click', event => {
-    event.preventDefault();
-    event.stopPropagation();
-  });
-
-  scaleHandle.addEventListener('keydown', event => {
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-    event.preventDefault();
-    const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
-    applyScale(requestedScale + direction * .05, true);
-    saveSize();
+    handle.addEventListener('keydown', event => {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
+      applyScale(requestedScale + direction * .05, true);
+      saveSize();
+    });
   });
 
   if (list && listHandle) {
