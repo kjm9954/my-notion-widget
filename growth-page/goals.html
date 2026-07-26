@@ -207,6 +207,7 @@
       });
       window.addEventListener('focus',sync);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+      Store.watch(sync);
       render();
       sync();
     })();

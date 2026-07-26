@@ -148,7 +148,7 @@
       });
       card.addEventListener('change',event=>{const rename=event.target.closest('[data-rename]');if(!rename)return;const index=Number(rename.dataset.rename),old=store.cats[index],value=rename.value.trim();if(!old||!value||store.cats.some((cat,i)=>cat===value&&i!==index)){renderManage();return;}update(latest=>{latest.cats[index]=value;latest.items.forEach(item=>{if(item.cat===old)item.cat=value;});if(latest.catOpened[old]){latest.catOpened[value]=latest.catOpened[old];delete latest.catOpened[old];}});if(filterCat===old)filterCat=value;renderAll();});
       card.addEventListener('input',event=>{if(event.target.matches('[data-open-one]')){const value=event.target.value;update(latest=>{const item=latest.items.find(entry=>entry.id===openId);if(item&&value.trim())item.one=value;});renderList();renderBanner();}if(event.target.matches('[data-open-detail]')){const value=event.target.value;update(latest=>{const item=latest.items.find(entry=>entry.id===openId);if(item)item.detail=value;});renderList();}});
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);
       chooseBanner(false);renderAll();sync();
     })();
   </script>

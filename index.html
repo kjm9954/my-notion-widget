@@ -558,13 +558,6 @@
       border-color: #0E5C7A;
     }
 
-    .tray-help {
-      color: #A2B4BC;
-      font-size: 10px;
-      font-weight: 500;
-      line-height: 1.35;
-    }
-
     .bottom-bar.edit {
       display: flex;
       flex-direction: column;
@@ -1144,7 +1137,6 @@
               ${unclassified.map(item => `<button class="tray-chip" type="button" draggable="true" data-drag-id="${escapeHtml(item.id)}" data-item-id="${escapeHtml(item.id)}"><span data-title-id="${escapeHtml(item.id)}">${escapeHtml(item.t)}</span></button>`).join('')}
             </div>
             <input class="new-item-input" type="text" data-new-item placeholder="${placeholder}" aria-label="새 항목">
-            <div class="tray-help">항목을 분면으로 끌어놓거나, 눌러서 O·D·S·M 버튼으로 배치하세요.</div>
             ${dragActions}
           `;
           return;
@@ -1495,6 +1487,7 @@
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) sync();
       });
+      Store.watch(sync);
 
       render();
       sync();

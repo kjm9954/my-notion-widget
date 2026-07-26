@@ -1156,6 +1156,7 @@
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) sync();
       });
+      Store.watch(sync);
 
       chooseBanner(false);
       renderBanner();

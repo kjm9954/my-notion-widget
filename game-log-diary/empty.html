@@ -48,7 +48,7 @@
       function render(){const days=missing(),shown=expanded?days:days.slice(0,7),remaining=days.length-shown.length;count.textContent=`최근 30일 중 ${days.length}`;if(!days.length){content.className='complete';content.innerHTML='<span class="check">✓</span><span class="complete-copy">최근 30일, 다 채웠어요</span>';return;}content.className=`chip-area${expanded?' expanded':''}`;content.innerHTML=`${shown.map(key=>`<a class="pill" href="today.html?date=${key}&motion=swap" target="_blank" rel="noopener">${label(key)}</a>`).join('')}${remaining>0||expanded&&days.length>7?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
       async function sync(){try{writtenDates=await Store.getWrittenDates();render();}catch(_){count.textContent='불러오기 실패';}}
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});sync();
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

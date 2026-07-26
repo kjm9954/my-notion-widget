@@ -62,7 +62,7 @@
       function render(){const all=materials,limit=visibleLimit(),capacity=expanded?limit*2:limit,shownCount=all.length>limit?Math.min(all.length,Math.max(1,capacity-1)):all.length,shown=all.slice(0,shownCount),remaining=all.length-shown.length;count.textContent=`${all.length}개`;content.classList.toggle('expanded',expanded);content.closest('.widget').style.minHeight=expanded&&all.length>limit?'128px':'96px';if(!all.length){content.innerHTML='<div class="empty"><span class="empty-title">오늘은 아직 재료가 없어요</span></div>';return;}content.innerHTML=`${shown.map(item=>`<span class="pill">${marker(item)}<span class="pill-text">${escapeHtml(item.text)}</span></span>`).join('')}${all.length>limit?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
       async function sync(){try{const [thoughts,diary]=await Promise.all([Store.getMaterials(),Store.loadDiary(TODAY)]);materials=[...diaryMaterials(diary),...(Array.isArray(thoughts)?thoughts:[]).map(item=>({type:'thought',text:String(item.one??item.content??'').trim()})).filter(item=>item.text)];render();}catch(_){count.textContent='불러오기 실패';}}
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});window.addEventListener('resize',render);sync();
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});window.addEventListener('resize',render);Store.watch(sync);sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

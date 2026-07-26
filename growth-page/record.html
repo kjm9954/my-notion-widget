@@ -444,7 +444,7 @@
       });
 
       async function sync(){try{const dates=await Store.getWrittenDates();activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};render();}catch(_){header.innerHTML='<span class="month-summary">불러오기 실패</span>';}}
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});render();sync();
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

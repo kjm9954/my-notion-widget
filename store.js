@@ -2,6 +2,44 @@
 // 위젯은 이 파일의 함수만 부른다. 직접 fetch/localStorage 하지 않는다.
 
 const API = "https://notion-widget.wldnjsdkk.workers.dev";
+const STORE_CHANNEL = "notion-widget-store-v1";
+const storeListeners = new Set();
+let storeChannel = null;
+
+try {
+  storeChannel = new BroadcastChannel(STORE_CHANNEL);
+  storeChannel.addEventListener("message", () => {
+    storeListeners.forEach(listener => listener());
+  });
+} catch (_) {}
+
+function announceChange(path) {
+  try { storeChannel?.postMessage({ type: "changed", path, at: Date.now() }); } catch (_) {}
+}
+
+function watch(callback, interval = 3000) {
+  let running = false;
+  let queued = false;
+  const run = () => {
+    if (document.hidden) return;
+    const active = document.activeElement;
+    if (active && (active.matches("input, textarea, select") || active.isContentEditable)) return;
+    if (running) { queued = true; return; }
+    running = true;
+    Promise.resolve(callback()).catch(() => {}).finally(() => {
+      running = false;
+      if (queued) { queued = false; run(); }
+    });
+  };
+  storeListeners.add(run);
+  const timer = setInterval(run, Math.max(1000, Number(interval) || 3000));
+  const stop = () => {
+    clearInterval(timer);
+    storeListeners.delete(run);
+  };
+  window.addEventListener("pagehide", stop, { once: true });
+  return stop;
+}
 
 // 공통 요청 헬퍼
 async function apiGet(path) {
@@ -18,6 +56,7 @@ async function apiPost(path, body) {
   });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "요청 실패");
+  announceChange(path);
   return data;
 }
 
@@ -180,4 +219,5 @@ window.Store = {
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
+  watch,
 };

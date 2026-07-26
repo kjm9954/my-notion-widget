@@ -520,7 +520,7 @@
       });
 
       async function sync(){try{const [dates,hp]=await Promise.all([Store.getWrittenDates(),Store.getHP()]);activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};serverHp=Number(hp)||20;if(!settingsOpen)renderMain();}catch(_){if(!settingsOpen)renderMain();}}
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});render();sync();
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>
