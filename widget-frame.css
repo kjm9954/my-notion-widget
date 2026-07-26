@@ -33,9 +33,9 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   align-items: flex-start !important;
 }
 
-/* The frame is always exactly the scaled card: width/height come from one
-   shared scale, so a wide or short embed can never leave an empty white band
-   around the content. The fallbacks keep that true before the script runs. */
+/* The frame always matches the card. Corner handles use a shared scale, while
+   axis handles change the card's layout width or height without stretching its
+   controls. The fallbacks keep the frame fitted before the script runs. */
 .widget-host {
   position: relative;
   width: var(--widget-visual-width, var(--widget-base-width, 100%));

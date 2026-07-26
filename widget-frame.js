@@ -224,6 +224,8 @@
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
   const ABSOLUTE_MINIMUM_SCALE = .08;
+  const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
+  const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
 
   let contentWidth = designWidth;
   host.style.setProperty('--widget-content-width', `${contentWidth}px`);
@@ -233,6 +235,8 @@
   let requestedScale = 1;
   let renderedScale = 1;
   let scaleLocked = false;
+  let widthLocked = false;
+  let heightLocked = false;
   let requestedListHeight = null;
   let renderedListHeight = null;
   let listLocked = false;
@@ -256,7 +260,14 @@
   }
 
   function saveSize() {
-    const value = { scale: requestedScale, scaleLocked };
+    const value = {
+      scale: requestedScale,
+      scaleLocked,
+      contentW: Math.round(contentWidth),
+      widthLocked,
+      frameH: Math.round(naturalHeight),
+      heightLocked
+    };
     if (list) {
       value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
       value.listLocked = listLocked;
@@ -267,10 +278,12 @@
   /* The widget never letterboxes: the white frame is always exactly the scaled
      card, so a wide or short embed can never leave an empty band around it. */
   function maximumScale() {
-    if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) return configuredMaximumScale;
     const byWidth = Math.max(1, window.innerWidth) / contentWidth;
     const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
-    return Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(byWidth, byHeight));
+    const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
+      ? configuredMaximumScale
+      : Number.POSITIVE_INFINITY;
+    return Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, byWidth, byHeight));
   }
 
   function minimumScale() {
@@ -278,7 +291,8 @@
   }
 
   function measureContentWidth() {
-    return designWidth;
+    if (widthLocked || sizeDrag) return contentWidth;
+    return clampAxisSize(designWidth, MINIMUM_CONTENT_WIDTH, maximumContentWidth(requestedScale));
   }
 
   function scaleFromSaved(saved, fallback) {
@@ -286,7 +300,7 @@
     const axisScales = ['scaleX', 'scaleY'].map(name => Number(saved[name])).filter(Number.isFinite);
     if (axisScales.length) return Math.min(...axisScales);
     const legacy = [];
-    if (Number.isFinite(Number(saved.width))) legacy.push(Number(saved.width) / contentWidth);
+    if (Number.isFinite(Number(saved.width))) legacy.push(Number(saved.width) / designWidth);
     if (Number.isFinite(Number(saved.height))) legacy.push(Number(saved.height) / naturalHeight);
     if (legacy.length) return Math.min(...legacy);
     return fallback;
@@ -321,13 +335,13 @@
     sizeHandles.forEach(handle => {
       const axis = handle.dataset.widgetScaleAxis || 'both';
       if (axis === 'horizontal') {
-        handle.setAttribute('aria-valuemin', String(Math.round(contentWidth * minimumScale())));
-        handle.setAttribute('aria-valuemax', String(Math.round(contentWidth * maximumScale())));
+        handle.setAttribute('aria-valuemin', String(Math.round(MINIMUM_CONTENT_WIDTH * renderedScale)));
+        handle.setAttribute('aria-valuemax', String(Math.round(window.innerWidth)));
         handle.setAttribute('aria-valuenow', String(Math.round(visualWidth)));
         handle.setAttribute('aria-valuetext', `가로 ${Math.round(visualWidth)}픽셀`);
       } else if (axis === 'vertical') {
-        handle.setAttribute('aria-valuemin', String(Math.round(naturalHeight * minimumScale())));
-        handle.setAttribute('aria-valuemax', String(Math.round(naturalHeight * maximumScale())));
+        handle.setAttribute('aria-valuemin', String(Math.round(MINIMUM_FRAME_HEIGHT * renderedScale)));
+        handle.setAttribute('aria-valuemax', String(Math.round(window.innerHeight)));
         handle.setAttribute('aria-valuenow', String(Math.round(visualHeight)));
         handle.setAttribute('aria-valuetext', `세로 ${Math.round(visualHeight)}픽셀`);
       } else {
@@ -377,7 +391,33 @@
     requestedScale = fromUser
       ? Math.max(minimumScale(), Math.min(maximumScale(), value))
       : Math.max(ABSOLUTE_MINIMUM_SCALE, value);
-    if (fromUser) scaleLocked = true;
+    if (fromUser) {
+      scaleLocked = true;
+      widthLocked = true;
+    }
+    updateFrame();
+  }
+
+  function maximumContentWidth(scale = renderedScale || requestedScale || 1) {
+    return Math.max(1, window.innerWidth) / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
+  }
+
+  function maximumFrameHeight(scale = renderedScale || requestedScale || 1) {
+    return Math.max(1, window.innerHeight) / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
+  }
+
+  function clampAxisSize(value, minimum, maximum) {
+    const safeMaximum = Math.max(1, maximum);
+    return Math.max(Math.min(minimum, safeMaximum), Math.min(safeMaximum, number(value, minimum)));
+  }
+
+  function applyContentWidth(value, fromUser = false, scale = renderedScale || requestedScale || 1) {
+    const next = clampAxisSize(value, MINIMUM_CONTENT_WIDTH, maximumContentWidth(scale));
+    if (fromUser) widthLocked = true;
+    if (Math.abs(next - contentWidth) < .5) return;
+    contentWidth = next;
+    host.style.setProperty('--widget-content-width', `${contentWidth}px`);
+    card.style.setProperty('--widget-content-width', `${contentWidth}px`);
     updateFrame();
   }
 
@@ -408,19 +448,43 @@
     updateFrame();
   }
 
+  function applyFrameHeight(value, fromUser = false, scale = renderedScale || requestedScale || 1) {
+    const next = clampAxisSize(value, MINIMUM_FRAME_HEIGHT, maximumFrameHeight(scale));
+    if (list) {
+      applyListHeight(next - listOffset(), fromUser);
+      heightLocked = listLocked;
+      return;
+    }
+    if (fromUser) heightLocked = true;
+    naturalHeight = next;
+    card.style.height = `${naturalHeight}px`;
+    updateFrame();
+  }
+
+  function lockAxisResize(axis) {
+    requestedScale = renderedScale;
+    scaleLocked = true;
+    if (axis === 'horizontal') applyFrameHeight(naturalHeight, true, renderedScale);
+    if (axis === 'vertical') widthLocked = true;
+  }
+
   sizeHandles.forEach(handle => {
     handle.addEventListener('pointerdown', event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
+      const axis = handle.dataset.widgetScaleAxis || 'both';
+      if (axis !== 'both') lockAxisResize(axis);
       sizeDrag = {
         handle,
         pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         direction: ['top-left', 'left', 'top'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
-        axis: handle.dataset.widgetScaleAxis || 'both',
+        axis,
         scale: renderedScale,
+        contentWidth,
+        naturalHeight,
         width: contentWidth * renderedScale,
         height: naturalHeight * renderedScale
       };
@@ -435,9 +499,10 @@
       const widthDelta = (event.clientX - sizeDrag.x) * 2 * sizeDrag.direction;
       const heightDelta = (event.clientY - sizeDrag.y) * 2 * sizeDrag.direction;
       if (sizeDrag.axis === 'horizontal') {
-        applyScale((sizeDrag.width + widthDelta) / contentWidth, true);
+        applyContentWidth((sizeDrag.width + widthDelta) / sizeDrag.scale, true, sizeDrag.scale);
+        applyFrameHeight(sizeDrag.naturalHeight, true, sizeDrag.scale);
       } else if (sizeDrag.axis === 'vertical') {
-        applyScale((sizeDrag.height + heightDelta) / naturalHeight, true);
+        applyFrameHeight((sizeDrag.height + heightDelta) / sizeDrag.scale, true, sizeDrag.scale);
       } else {
         const widthRatio = widthDelta / Math.max(1, sizeDrag.width);
         const heightRatio = heightDelta / Math.max(1, sizeDrag.height);
@@ -472,10 +537,11 @@
       if (!allowedKeys.includes(event.key)) return;
       event.preventDefault();
       const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
+      if (axis !== 'both') lockAxisResize(axis);
       if (axis === 'horizontal') {
-        applyScale((contentWidth * renderedScale + direction * 20) / contentWidth, true);
+        applyContentWidth(contentWidth + direction * 20 / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale), true);
       } else if (axis === 'vertical') {
-        applyScale((naturalHeight * renderedScale + direction * 20) / naturalHeight, true);
+        applyFrameHeight(naturalHeight + direction * 20 / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale), true);
       } else {
         applyScale(renderedScale * (1 + direction * .05), true);
       }
@@ -518,13 +584,20 @@
   }
 
   const saved = readSize();
-  scaleLocked = saved.scaleLocked === true || ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(property => Object.prototype.hasOwnProperty.call(saved, property));
+  const hasOwn = property => Object.prototype.hasOwnProperty.call(saved, property);
+  scaleLocked = saved.scaleLocked === true || (!hasOwn('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(hasOwn));
   requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(saved, 1));
+  widthLocked = saved.widthLocked === true || (!hasOwn('widthLocked') && hasOwn('contentW'));
+  applyContentWidth(number(saved.contentW, designWidth), false, requestedScale);
+  heightLocked = saved.heightLocked === true || (!hasOwn('heightLocked') && hasOwn('frameH'));
   listLocked = saved.listLocked === true || (Object.prototype.hasOwnProperty.call(saved, 'listH') && !Object.prototype.hasOwnProperty.call(saved, 'listLocked'));
-  if (list) applyListHeight(number(saved.listH, list.offsetHeight));
+  if (list && heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
+  else if (list) applyListHeight(number(saved.listH, list.offsetHeight));
+  else if (heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
   commitFrame();
 
   new ResizeObserver(() => {
+    if (heightLocked || sizeDrag) return;
     const measured = Math.max(1, card.offsetHeight || naturalHeight);
     if (Math.abs(measured - naturalHeight) < .5) return;
     naturalHeight = measured;
@@ -533,7 +606,9 @@
 
   if (fixed) {
     new ResizeObserver(() => {
-      if (!listDrag) applyListHeight(requestedListHeight ?? list.offsetHeight);
+      if (listDrag) return;
+      if (heightLocked) applyFrameHeight(naturalHeight);
+      else applyListHeight(requestedListHeight ?? list.offsetHeight);
     }).observe(fixed);
   }
 
@@ -550,10 +625,16 @@
   window.addEventListener('storage', event => {
     if (event.key !== key) return;
     const next = readSize();
-    scaleLocked = next.scaleLocked === true || ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(property => Object.prototype.hasOwnProperty.call(next, property));
+    const owns = property => Object.prototype.hasOwnProperty.call(next, property);
+    scaleLocked = next.scaleLocked === true || (!owns('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(owns));
     requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(next, 1));
+    widthLocked = next.widthLocked === true || (!owns('widthLocked') && owns('contentW'));
+    applyContentWidth(number(next.contentW, designWidth), false, requestedScale);
+    heightLocked = next.heightLocked === true || (!owns('heightLocked') && owns('frameH'));
     listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
-    if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
+    if (list && heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+    else if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
+    else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
     updateFrame();
   });
 })();
