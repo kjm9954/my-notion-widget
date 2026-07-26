@@ -33,8 +33,8 @@
       color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
     }
     .chip.is-selected { color:#FFFFFF; background:var(--action); }
-    .body { min-height:0; flex:1; display:flex; align-items:flex-start; gap:16px; }
-    .featured { width:112px; flex:0 0 112px; display:flex; flex-direction:column; gap:7px; }
+    .body { min-height:0; flex:1; display:flex; align-items:stretch; gap:16px; }
+    .featured { width:112px; flex:0 0 112px; align-self:stretch; display:flex; flex-direction:column; gap:7px; }
     .featured-cover, .grid-cover {
       width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:flex-end; padding:9px;
       text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
@@ -42,14 +42,13 @@
     .featured-cover.has-image, .grid-cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border-soft); }
     .grid-cover { padding:7px; border-radius:9px; }
     .featured-cover img, .grid-cover img { width:100%; height:100%; display:block; object-fit:cover; }
-    .cover-title { color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; word-break:keep-all; }
     .featured-title {
       overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
       color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
     }
     .featured-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
     .bought {
-      min-height:34px; width:100%; padding:7px 0; border:1px solid var(--border); border-radius:8px;
+      min-height:34px; width:100%; margin-top:auto; padding:7px 0; border:1px solid var(--border); border-radius:8px;
       background:#FFFFFF; color:var(--action); font-size:10px; font-weight:700; text-align:center;
       transition:color .12s, border-color .12s;
     }
@@ -130,8 +129,8 @@
         const tag = interactive ? 'button' : 'div';
         const attributes = interactive ? ` type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} 대표로 보기"` : '';
         return book.cover
-          ? `<${tag} class="${type} has-image"${attributes}><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"><span class="cover-title" hidden>${escapeHtml(book.title)}</span></${tag}>`
-          : `<${tag} class="${type}"${attributes}><span class="cover-title">${escapeHtml(book.title)}</span></${tag}>`;
+          ? `<${tag} class="${type} has-image"${attributes}><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"></${tag}>`
+          : `<${tag} class="${type}"${attributes}></${tag}>`;
       }
 
       function bindCoverFallbacks() {
@@ -139,8 +138,6 @@
           const shell = image.parentElement;
           shell.classList.remove('has-image');
           image.remove();
-          const title = shell.querySelector('.cover-title');
-          if (title) title.hidden = false;
         }, { once:true }));
       }
 
@@ -179,7 +176,7 @@
         const shown = expanded ? remaining : remaining.slice(0, 7);
         const hiddenCount = remaining.length - shown.length;
         content.innerHTML = `
-          <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">✓ 샀다</button></section>
+          <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">구매 완료</button></section>
           ${remaining.length ? `<section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>` : ''}`;
         document.getElementById('bought')?.addEventListener('click', buySelected);
         document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
