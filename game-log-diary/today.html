@@ -177,9 +177,10 @@
       let moodByDate={};
       let requestMessage='';
       let busy=false;
+      let loadSequence=0;
       function initialDate(){try{const key=new URLSearchParams(location.search).get('date');if(key&&/^\d{4}-\d{2}-\d{2}$/.test(key)&&localKey(fromKey(key))===key)return key;}catch(_){}return localKey(new Date());}
       const TODAY=localKey(new Date());
-      const ui={screen:'home',selectedDate:initialDate(),originalDate:null,questStep:1,questDraft:null,photoDraft:null,pending:{2:'',3:'',5:''},wordInputOpen:false,showTodayComposer:false,confirmingDelete:false,sharedMood:{mood:null,moodTags:[]}};
+      const ui={screen:'home',selectedDate:initialDate(),originalDate:null,questStep:1,questDraft:null,photoDraft:null,pending:{2:'',3:'',5:''},wordInputOpen:false,showTodayComposer:false,confirmingDeleteDate:null,sharedMood:{mood:null,moodTags:[]}};
       let lastRenderedHp=null;
       let initialSwap=new URLSearchParams(location.search).get('motion')==='swap';
       function entryMood(entry){return entry?.mode==='quest'?{mood:moodValue(entry.quest?.mood),moodTags:cleanWords(entry.quest?.moodTags)}:{mood:moodValue(entry?.mood),moodTags:cleanWords(entry?.moodTags)};}
@@ -192,9 +193,38 @@
       function renderFailure(message){app.innerHTML=`<section class="empty-block"><div class="empty-title">${escapeHtml(message)}</div><div class="empty-copy">네트워크 연결을 확인해주세요</div><div class="empty-actions"><button class="secondary-button" type="button" data-retry>다시 시도</button></div></section>`;}
       function streakFromDates(){const set=new Set(writtenDates);let streak=0,cursor=fromKey(TODAY);while(set.has(localKey(cursor))){streak++;cursor=addDays(cursor,-1);}return streak;}
       function latestPastDate(){return writtenDates.filter(key=>key<TODAY).sort().at(-1)||null;}
-      async function loadHomeData(showLoading=true){if(!window.Store){renderFailure('저장소를 불러오지 못했습니다');return;}if(showLoading&&!isEditing())renderLoading();busy=true;try{const [dates,hp,words]=await Promise.all([Store.getWrittenDates(),Store.getHP(),Store.loadMoodWords()]);writtenDates=Array.isArray(dates)?[...new Set(dates.filter(key=>/^\d{4}-\d{2}-\d{2}$/.test(key)))]:[];currentHp=Number.isFinite(Number(hp))?Number(hp):20;customWords=cleanWords(words).filter(word=>!PRESET_WORDS.includes(word)).slice(0,16);const targetDates=[ui.selectedDate],fallback=ui.selectedDate===TODAY&&!ui.showTodayComposer&&!writtenDates.includes(TODAY)?latestPastDate():null;if(fallback)targetDates.push(fallback);const rows=await Promise.all([...new Set(targetDates)].map(async date=>{const [diary,mood]=await Promise.all([Store.loadDiary(date),Store.getMoodOfDate(date)]);return{date,entry:normalizeDiary(diary),mood:moodValue(mood)};}));store={entries:{}};moodByDate={};rows.forEach(({date,entry,mood})=>{if(entry)store.entries[date]=entry;moodByDate[date]=mood;});requestMessage='';busy=false;if(!isEditing())render();}catch(_){busy=false;requestMessage='';if(isEditing()){requestMessage='불러오기 실패, 다시 시도';render();}else renderFailure('불러오기 실패, 다시 시도');}}
-      window.addEventListener('focus',()=>{if(!isEditing())loadHomeData(false);});
-      Store.watch(()=>{if(!isEditing())return loadHomeData(false);});
+      function homeDataSignature(entries=store.entries,dates=writtenDates,hp=currentHp,words=customWords,moods=moodByDate){return JSON.stringify({dates:[...dates].sort(),hp,words,rows:Object.keys(entries).sort().map(date=>[date,entries[date],moods[date]??null])});}
+      async function loadHomeData(showLoading=true,forceRender=showLoading){
+        if(!window.Store){renderFailure('저장소를 불러오지 못했습니다');return;}
+        const loadId=++loadSequence,blocking=showLoading;
+        if(showLoading&&!isEditing())renderLoading();
+        if(blocking)busy=true;
+        try{
+          const [dates,hp,words]=await Promise.all([Store.getWrittenDates(),Store.getHP(),Store.loadMoodWords()]);
+          const nextWrittenDates=Array.isArray(dates)?[...new Set(dates.filter(key=>/^\d{4}-\d{2}-\d{2}$/.test(key)))].sort():[];
+          const nextHp=Number.isFinite(Number(hp))?Number(hp):20;
+          const nextWords=cleanWords(words).filter(word=>!PRESET_WORDS.includes(word)).slice(0,16);
+          const fallback=ui.selectedDate===TODAY&&!ui.showTodayComposer&&!nextWrittenDates.includes(TODAY)?nextWrittenDates.filter(key=>key<TODAY).at(-1)||null:null;
+          const targetDates=[...new Set([ui.selectedDate,fallback].filter(Boolean))];
+          const rows=await Promise.all(targetDates.map(async date=>{const [diary,mood]=await Promise.all([Store.loadDiary(date),Store.getMoodOfDate(date)]);return{date,entry:normalizeDiary(diary),mood:moodValue(mood)};}));
+          if(loadId!==loadSequence||(!forceRender&&(busy||isEditing()||ui.confirmingDeleteDate)))return;
+          const nextEntries={},nextMoods={};
+          rows.forEach(({date,entry,mood})=>{if(entry)nextEntries[date]=entry;nextMoods[date]=mood;});
+          const changed=homeDataSignature()!==homeDataSignature(nextEntries,nextWrittenDates,nextHp,nextWords,nextMoods);
+          writtenDates=nextWrittenDates;currentHp=nextHp;customWords=nextWords;store={entries:nextEntries};moodByDate=nextMoods;requestMessage='';
+          if(blocking)busy=false;
+          if(!isEditing()&&(forceRender||changed))render();
+        }catch(_){
+          if(loadId!==loadSequence)return;
+          if(blocking)busy=false;
+          requestMessage='';
+          if(isEditing()){requestMessage='불러오기 실패, 다시 시도';render();}
+          else if(showLoading||forceRender)renderFailure('불러오기 실패, 다시 시도');
+        }
+      }
+      function refreshHomeData(){if(!busy&&!isEditing()&&!ui.confirmingDeleteDate)return loadHomeData(false);}
+      window.addEventListener('focus',refreshHomeData);
+      Store.watch(refreshHomeData);
 
       function modePill(mode){const quest=mode==='quest';return `<span class="mode-pill ${quest?'q':'p'}"><span class="mode-mark">${quest?'Q':'P'}</span>${quest?'퀘스트':'사진'}</span>`;}
       function temperaturePill(value){return value?`<span class="temperature-pill">온도 · ${MOOD_NAMES[value-1]}</span>`:'';}
@@ -206,7 +236,7 @@
       function renderStats(value,startHp=value.hp){return `<section class="stats"><div class="stat-row"><span class="hp-label">HP</span><span class="hp-value">${value.hp}</span><span class="hp-track"><span class="hp-fill" style="width:${startHp}%"></span></span><span class="streak">연속 ${value.streak}일</span></div></section>`;}
       function renderEmpty(){return `<section class="empty-block"><div class="empty-title">오늘의 로그가 비어 있습니다</div><div class="empty-copy">한 섹션만 쓰고 저장해도 됩니다</div><div class="empty-actions"><button class="primary" type="button" data-start="quest">퀘스트로 쓰기</button><button class="secondary-button" type="button" data-start="photo">사진으로 쓰기</button></div></section>`;}
       function homeSelection(){const direct=store.entries[ui.selectedDate];if(direct)return{entry:direct,date:ui.selectedDate,fallback:false};if(ui.selectedDate===TODAY&&!ui.showTodayComposer){const date=latestPastDate();if(date)return{entry:store.entries[date],date,fallback:true};}return{entry:null,date:ui.selectedDate,fallback:false};}
-      function renderHome(){const selected=homeSelection(),mood=moodValue(moodByDate[selected.date]??entryMood(selected.entry).mood),actions=selected.entry?(ui.confirmingDelete?`<div class="header-actions"><span class="delete-confirm-copy">삭제할까요?</span><button class="confirm-delete" type="button" data-confirm-delete="${selected.date}">삭제</button><button class="cancel-delete" type="button" data-cancel-delete>취소</button></div>`:`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button><button class="edit-button delete-action" type="button" data-delete-request>삭제</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`):'',value=stats(),startHp=lastRenderedHp===null?value.hp:lastRenderedHp;lastRenderedHp=value.hp;app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood)}</div>${requestStatus()}${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats(value,startHp)}`;if(startHp!==value.hp)requestAnimationFrame(()=>{const fill=app.querySelector('.hp-fill');if(fill)fill.style.width=`${value.hp}%`;});if(initialSwap){app.classList.add('motion-swap');initialSwap=false;}}
+      function renderHome(){const selected=homeSelection(),mood=moodValue(moodByDate[selected.date]??entryMood(selected.entry).mood),confirming=ui.confirmingDeleteDate===selected.date,actions=selected.entry?(confirming?`<div class="header-actions"><span class="delete-confirm-copy">삭제할까요?</span><button class="confirm-delete" type="button" data-confirm-delete="${selected.date}"${busy?' disabled':''}>${busy?'삭제 중…':'삭제'}</button><button class="cancel-delete" type="button" data-cancel-delete${busy?' disabled':''}>취소</button></div>`:`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button><button class="edit-button delete-action" type="button" data-delete-request="${selected.date}">삭제</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`):'',value=stats(),startHp=lastRenderedHp===null?value.hp:lastRenderedHp;lastRenderedHp=value.hp;app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood)}</div>${requestStatus()}${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats(value,startHp)}`;if(startHp!==value.hp)requestAnimationFrame(()=>{const fill=app.querySelector('.hp-fill');if(fill)fill.style.width=`${value.hp}%`;});if(initialSwap){app.classList.add('motion-swap');initialSwap=false;}}
 
       const STEPS=[['오늘을 단어로 고르면?','여러 개 골라도 되고, 안 골라도 됩니다'],['오늘의 퀘스트는?','꼭 해야 했던 일들'],['서브 퀘스트가 있었나요?','곁다리로 처리한 일들'],['오늘 발생한 이벤트는?','돌발 상황과 그때 고른 선택지'],['오늘의 업적은?','잘한 일, 작아도 괜찮습니다'],['하루 엔딩로그','마무리 한두 줄']];
       function allWords(){return cleanWords([...PRESET_WORDS,...customWords,...cleanWords(currentDraft()?.moodTags)]);}
@@ -223,8 +253,8 @@
       function beginPhoto(edit=false,preserve=false){const existing=store.entries[ui.selectedDate];if(!preserve){ui.originalDate=edit?ui.selectedDate:null;syncShared(entryMood(existing));}if(!preserve||!ui.photoDraft)ui.photoDraft=edit&&existing?.mode==='photo'?{photos:[...(existing.photos||[])],text:String(existing.text??''),mood:moodValue(existing.mood),moodTags:cleanWords(existing.moodTags)}:{photos:[],text:'',mood:null,moodTags:[]};applyShared(ui.photoDraft);ui.wordInputOpen=false;ui.screen='photo';render();}
       function updateMood(){const draft=currentDraft();if(!draft)return;syncShared(draft);}
       function commitPending(){const value=(ui.pending[ui.questStep]||'').trim();if(!value)return;if(ui.questStep===2)ui.questDraft.main.push({t:value,done:false});if(ui.questStep===3)ui.questDraft.sub.push({t:value,done:false});if(ui.questStep===5)ui.questDraft.achieve.push(value);ui.pending[ui.questStep]='';}
-      async function persistEntry(date,entry){if(busy)return false;busy=true;requestMessage='저장 중…';render();const originalDate=ui.originalDate;try{await Store.saveDiary(diaryPayload(date,entry));if(originalDate&&originalDate!==date)await Store.deleteDiary(originalDate);ui.originalDate=null;ui.screen='home';ui.showTodayComposer=false;ui.confirmingDelete=false;requestMessage='';busy=false;await loadHomeData(false);return true;}catch(_){busy=false;requestMessage='저장 실패, 다시 시도';render();return false;}}
-      async function deleteEntry(date){if(busy)return;busy=true;requestMessage='삭제 중…';renderHome();try{await Store.deleteDiary(date);ui.confirmingDelete=false;ui.showTodayComposer=false;requestMessage='';busy=false;await loadHomeData(false);}catch(_){busy=false;requestMessage='삭제 실패, 다시 시도';renderHome();}}
+      async function persistEntry(date,entry){if(busy)return false;loadSequence++;busy=true;requestMessage='저장 중…';render();const originalDate=ui.originalDate;try{await Store.saveDiary(diaryPayload(date,entry));if(originalDate&&originalDate!==date)await Store.deleteDiary(originalDate);ui.originalDate=null;ui.screen='home';ui.showTodayComposer=false;ui.confirmingDeleteDate=null;requestMessage='';busy=false;await loadHomeData(false,true);return true;}catch(_){busy=false;requestMessage='저장 실패, 다시 시도';render();return false;}}
+      async function deleteEntry(date){if(busy)return;loadSequence++;busy=true;requestMessage='삭제 중…';renderHome();try{await Store.deleteDiary(date);ui.confirmingDeleteDate=null;ui.showTodayComposer=ui.selectedDate===TODAY;requestMessage='';busy=false;await loadHomeData(false,true);}catch(_){busy=false;requestMessage='삭제 실패, 다시 시도';renderHome();}}
       async function saveQuest(){commitPending();applyShared(ui.questDraft);return persistEntry(ui.selectedDate,{mode:'quest',quest:clone(ui.questDraft)});}
       async function savePhoto(){applyShared(ui.photoDraft);return persistEntry(ui.selectedDate,{mode:'photo',photos:[...ui.photoDraft.photos],text:ui.photoDraft.text,mood:ui.photoDraft.mood,moodTags:[...ui.photoDraft.moodTags]});}
       async function toggleTask(date,type,index){const entry=clone(store.entries[date]);if(entry?.mode!=='quest'||!entry.quest?.[type]?.[index])return;entry.quest[type][index].done=!entry.quest[type][index].done;await persistEntry(date,entry);}
@@ -239,11 +269,12 @@
         if(start){start.dataset.start==='quest'?beginQuest():beginPhoto();return;}
         const edit=target.closest('[data-edit-date]');
         if(edit){ui.selectedDate=edit.dataset.editDate;const entry=store.entries[ui.selectedDate];entry?.mode==='photo'?beginPhoto(true):beginQuest(true);return;}
-        if(target.closest('[data-delete-request]')){ui.confirmingDelete=true;renderHome();return;}
-        if(target.closest('[data-cancel-delete]')){ui.confirmingDelete=false;renderHome();return;}
+        const deleteRequest=target.closest('[data-delete-request]');
+        if(deleteRequest){ui.confirmingDeleteDate=deleteRequest.dataset.deleteRequest;renderHome();return;}
+        if(target.closest('[data-cancel-delete]')){ui.confirmingDeleteDate=null;renderHome();return;}
         const confirmDelete=target.closest('[data-confirm-delete]');
         if(confirmDelete){await deleteEntry(confirmDelete.dataset.confirmDelete);return;}
-        if(target.closest('[data-write-today]')){ui.selectedDate=TODAY;ui.showTodayComposer=true;ui.confirmingDelete=false;renderHome();return;}
+        if(target.closest('[data-write-today]')){ui.selectedDate=TODAY;ui.showTodayComposer=true;ui.confirmingDeleteDate=null;renderHome();return;}
         const toggle=target.closest('[data-toggle-task]');
         if(toggle){await toggleTask(toggle.dataset.date,toggle.dataset.toggleTask,Number(toggle.dataset.index));return;}
         if(target.closest('[data-cancel]')){ui.originalDate=null;ui.screen='home';ui.showTodayComposer=false;requestMessage='';render();return;}
