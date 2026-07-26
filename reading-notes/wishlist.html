@@ -53,7 +53,7 @@
       transition:color .12s, border-color .12s;
     }
     .grid-shell {
-      min-width:0; flex:1; padding:13px; display:grid; grid-template-columns:repeat(auto-fill, 84px);
+      min-width:0; min-height:154px; flex:1; padding:13px; display:grid; grid-template-columns:repeat(auto-fill, 84px);
       justify-content:start; align-content:start; gap:11px; background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:12px;
     }
     .grid-cover { width:84px; border-radius:9px; cursor:pointer; }
@@ -145,7 +145,8 @@
           category = button.dataset.category;
           selectedId = filteredBooks()[0]?.id ?? null;
           expanded = false;
-          render();
+          chips.querySelectorAll('[data-category]').forEach(chip => chip.classList.toggle('is-selected', chip.dataset.category === category));
+          renderContent();
         }));
       }
 
@@ -173,7 +174,7 @@
         const hiddenCount = remaining.length - shown.length;
         content.innerHTML = `
           <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">구매 완료</button></section>
-          ${remaining.length ? `<section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>` : ''}`;
+          <section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>`;
         document.getElementById('bought')?.addEventListener('click', buySelected);
         document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
         content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); renderContent(); }));
