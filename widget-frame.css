@@ -9,7 +9,7 @@
   --t-mark: 800ms;
   --ease: cubic-bezier(.2,.6,.2,1);
   --breath-lo: .55;
-  --breath-dur: 8s;
+  --breath-dur: 3s;
 }
 
 html,
@@ -286,7 +286,7 @@ a:active,
 
 .idle.is-empty {
   --breath-lo: .8;
-  --breath-dur: 12s;
+  --breath-dur: 3s;
 }
 
 .idle-owner {
@@ -312,11 +312,8 @@ a:active,
 }
 
 body.is-widget-hidden .idle,
-.card:hover .idle,
 .card:focus-within .idle,
-[data-widget-card]:hover .idle,
 [data-widget-card]:focus-within .idle,
-.idle:hover,
 .idle.is-paused,
 body.has-widget-expanded .idle {
   animation-play-state: paused;
