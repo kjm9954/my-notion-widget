@@ -37,15 +37,17 @@
     .year-row.is-current .year-label { color:var(--action); font-weight:700; }
     .year-row.is-current .year-count { color:var(--action); font-size:16px; }
     .year-row.is-old .year-label, .year-row.is-old .year-count { color:var(--muted); }
-    .recent-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:11px; }
-    .recent-list { min-height:0; flex:1; display:flex; flex-direction:column; gap:9px; }
+    .recent-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:7px; }
+    .recent-list { min-height:0; flex:1; display:flex; flex-direction:column; gap:5px; }
     .book-item { min-height:66px; display:flex; align-items:center; gap:11px; }
     .cover {
-      width:44px; aspect-ratio:2 / 3; flex:0 0 auto; overflow:hidden; display:flex; align-items:flex-end;
+      position:relative; width:44px; aspect-ratio:2 / 3; flex:0 0 auto; overflow:hidden; display:flex; align-items:center; justify-content:center;
       padding:7px; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:9px;
     }
     .cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border); }
     .cover img { width:100%; height:100%; display:block; object-fit:cover; }
+    .cover-initial { color:var(--inactive); font-size:18px; font-weight:800; line-height:1; }
+    .cover-name { position:absolute; right:6px; bottom:6px; left:6px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.15; }
     .book-copy { min-width:0; display:flex; flex-direction:column; gap:5px; }
     .book-title {
       overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
@@ -60,9 +62,6 @@
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
     @media (max-width:639px) {
       .total-number { font-size:40px; }
-      .cover { width:40px; }
-      .book-item { min-height:60px; }
-      .book-item:nth-child(n+4) { display:none; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
@@ -85,7 +84,8 @@
         { title:'밝은 밤', author:'최은영', date:'7월 21일', cover:null },
         { title:'코스모스', author:'칼 세이건', date:'7월 14일', cover:null },
         { title:'물고기는 존재하지 않는다', author:'룰루 밀러', date:'7월 5일', cover:null },
-        { title:'함께 자라기', author:'김창준', date:'6월 28일', cover:null }
+        { title:'함께 자라기', author:'김창준', date:'6월 28일', cover:null },
+        { title:'사피엔스', author:'유발 하라리', date:'6월 19일', cover:null }
       ]
     };
 
@@ -93,15 +93,16 @@
       const card = document.querySelector('.card');
       const content = document.getElementById('content');
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+      const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
       const cover = book => book.cover
         ? `<div class="cover has-image"><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"></div>`
-        : `<div class="cover" aria-hidden="true"></div>`;
+        : `<div class="cover">${placeholderMarkup(book)}</div>`;
 
       function bindCoverFallbacks() {
         content.querySelectorAll('.cover.has-image img').forEach(image => image.addEventListener('error', () => {
           const shell = image.parentElement;
           shell.classList.remove('has-image');
-          image.remove();
+          shell.innerHTML = placeholderMarkup({ title:image.alt.replace(/ 표지$/, '') });
         }, { once:true }));
       }
 
@@ -112,7 +113,7 @@
           return;
         }
         const years = DATA.years.filter(item => Number.isFinite(item.n) && item.n > 0).slice(0, 3);
-        const recent = DATA.recent.slice(0, 4);
+        const recent = DATA.recent.slice(0, 5);
         content.style.display = 'contents';
         content.innerHTML = `
           <section class="total-block"><span class="eyebrow">지금까지</span><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권</span></div></section>

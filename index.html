@@ -142,7 +142,7 @@
       height: 100%;
       background: #0E5C7A;
       border-radius: inherit;
-      transition: width .12s ease;
+      transition: width var(--t-open) var(--ease);
     }
 
     .matrix-stage {
@@ -226,7 +226,9 @@
       overflow: hidden;
       background: var(--q-tint);
       border-radius: 14px;
-      transition: outline-color .12s ease, background-color .12s ease;
+      outline: 1px dashed transparent;
+      outline-offset: -1px;
+      transition: outline-color var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
     }
 
     .quadrant-head {
@@ -295,7 +297,7 @@
       touch-action: none;
       outline: 1.5px solid transparent;
       outline-offset: -1.5px;
-      transition: outline-color .12s ease, opacity .12s ease;
+      transition: outline-color var(--t-color) var(--ease), opacity var(--t-close) var(--ease);
     }
 
     .item-card.selected {
@@ -377,8 +379,8 @@
     }
 
     .drop-active {
-      outline: 2px solid #0E5C7A !important;
-      outline-offset: -2px !important;
+      outline: 1px dashed #C6D6DD !important;
+      outline-offset: -1px !important;
     }
 
     .mobile-main {
@@ -388,7 +390,7 @@
     .bottom-bar {
       min-width: 0;
       position: relative;
-      transition: outline-color .12s ease, background-color .12s ease;
+      transition: outline-color var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
     }
 
     .drag-action-zones {
@@ -421,7 +423,7 @@
       font-size: 12px;
       font-weight: 800;
       line-height: 1.2;
-      transition: outline-color .12s ease, background-color .12s ease;
+      transition: outline-color var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
     }
 
     .drag-tray-zone {
@@ -528,7 +530,7 @@
       white-space: nowrap;
       cursor: grab;
       touch-action: none;
-      transition: opacity .12s ease;
+      transition: opacity var(--t-close) var(--ease);
     }
 
     .new-item-input,
@@ -771,7 +773,7 @@
         outline: 2px solid transparent;
         outline-offset: -2px;
         cursor: pointer;
-        transition: outline-color .12s ease, background-color .12s ease;
+        transition: outline-color var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
       }
 
       .mobile-q-button.selected {
@@ -836,7 +838,7 @@
         outline: 1.5px solid transparent;
         outline-offset: -1.5px;
         cursor: grab;
-        transition: outline-color .12s ease, opacity .12s ease;
+        transition: outline-color var(--t-color) var(--ease), opacity var(--t-close) var(--ease);
       }
 
       .mobile-item.selected {
@@ -971,7 +973,8 @@
         selectedId: null,
         mobileQ: 'S',
         draggingId: null,
-        justDragged: false
+        justDragged: false,
+        justDroppedId: null
       };
       let pointerDrag = null;
 
@@ -1040,9 +1043,10 @@
         const children = item.scope === 'month' ? childCount(item.id) : 0;
         const selected = ui.selectedId === item.id ? ' selected' : '';
         const done = item.st === 'done' ? ' done' : '';
+        const dropped = ui.justDroppedId === item.id ? ' motion-new' : '';
         const className = mobile ? 'mobile-item' : 'item-card';
         return `
-          <div class="${className}${selected}${done}" draggable="true" data-drag-id="${escapeHtml(item.id)}" data-item-id="${escapeHtml(item.id)}" role="button" tabindex="0">
+          <div class="${className}${selected}${done}${dropped}" draggable="true" data-drag-id="${escapeHtml(item.id)}" data-item-id="${escapeHtml(item.id)}" role="button" tabindex="0">
             ${parent ? `<div class="parent-caption">↑ <span data-parent-title-id="${escapeHtml(parent.id)}">${escapeHtml(parent.t)}</span></div>` : ''}
             <div class="item-body">
               <span class="state-dot state-${item.st}" aria-hidden="true"></span>
@@ -1278,8 +1282,10 @@
 
         item.q = targets.qTarget ? targets.qTarget.dataset.dropQ : null;
         if (targets.qTarget) ui.mobileQ = targets.qTarget.dataset.dropQ;
+        ui.justDroppedId = item.id;
         save();
         render();
+        setTimeout(() => { ui.justDroppedId = null; }, 800);
         return true;
       }
 

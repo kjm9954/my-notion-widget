@@ -30,18 +30,23 @@
     .chips { margin-left:auto; display:flex; align-items:center; gap:5px; }
     .chip {
       min-height:28px; padding:5px 11px; border:0; border-radius:999px; background:var(--pill);
-      color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
+      color:var(--secondary); font-size:10px; font-weight:700;
     }
     .chip.is-selected { color:#FFFFFF; background:var(--action); }
     .body { min-height:0; flex:1; display:flex; align-items:flex-start; gap:16px; }
-    .featured { width:112px; flex:0 0 112px; align-self:start; display:flex; flex-direction:column; gap:7px; }
+    .featured { width:112px; flex:0 0 112px; align-self:start; display:flex; flex-direction:column; gap:7px; transition:opacity var(--t-close) var(--ease); }
+    .featured.is-closing { opacity:0; }
     .featured-cover, .grid-cover {
-      width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:flex-end; padding:9px;
-      text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+      position:relative; width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:9px;
+      text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:9px;
     }
     .featured-cover.has-image, .grid-cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border-soft); }
     .grid-cover { padding:7px; border-radius:9px; }
     .featured-cover img, .grid-cover img { width:100%; height:100%; display:block; object-fit:cover; }
+    .cover-initial { color:var(--inactive); font-weight:800; line-height:1; }
+    .featured-cover .cover-initial { font-size:44px; }
+    .grid-cover .cover-initial { font-size:34px; }
+    .cover-name { position:absolute; right:8px; bottom:8px; left:8px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; }
     .featured-title {
       overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
       color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
@@ -50,7 +55,7 @@
     .bought {
       min-height:34px; width:100%; margin-top:0; padding:7px 0; border:1px solid var(--border); border-radius:8px;
       background:#FFFFFF; color:var(--action); font-size:10px; font-weight:700; text-align:center;
-      transition:color .12s, border-color .12s;
+      transition:color var(--t-color) var(--ease), border-color var(--t-color) var(--ease);
     }
     .grid-shell {
       min-width:0; min-height:154px; flex:1; padding:13px; display:grid; grid-template-columns:repeat(auto-fill, 84px);
@@ -118,7 +123,10 @@
       let category = '전체';
       let selectedId = books[0]?.id ?? null;
       let expanded = false;
+      let swapFeatured = false;
+      let buying = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+      const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
 
       function filteredBooks() { return category === '전체' ? books : books.filter(book => book.cat === category); }
       function coverMarkup(book, type, interactive = false) {
@@ -126,14 +134,15 @@
         const attributes = interactive ? ` type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} 대표로 보기"` : '';
         return book.cover
           ? `<${tag} class="${type} has-image"${attributes}><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"></${tag}>`
-          : `<${tag} class="${type}"${attributes}></${tag}>`;
+          : `<${tag} class="${type}"${attributes}>${placeholderMarkup(book)}</${tag}>`;
       }
 
       function bindCoverFallbacks() {
         content.querySelectorAll('.has-image img').forEach(image => image.addEventListener('error', () => {
           const shell = image.parentElement;
           shell.classList.remove('has-image');
-          image.remove();
+          const book = books.find(item => image.alt === `${item.title} 표지`);
+          shell.innerHTML = placeholderMarkup(book || { title:image.alt.replace(/ 표지$/, '') });
         }, { once:true }));
       }
 
@@ -145,16 +154,26 @@
           category = button.dataset.category;
           selectedId = filteredBooks()[0]?.id ?? null;
           expanded = false;
+          swapFeatured = true;
           chips.querySelectorAll('[data-category]').forEach(chip => chip.classList.toggle('is-selected', chip.dataset.category === category));
           renderContent();
         }));
       }
 
       function buySelected() {
-        books = books.filter(book => book.id !== selectedId);
-        selectedId = filteredBooks()[0]?.id ?? null;
-        expanded = false;
-        render();
+        if (buying) return;
+        buying = true;
+        const featured = content.querySelector('.featured');
+        const finish = () => {
+          books = books.filter(book => book.id !== selectedId);
+          selectedId = filteredBooks()[0]?.id ?? null;
+          expanded = false;
+          swapFeatured = true;
+          buying = false;
+          render();
+        };
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches || !featured) finish();
+        else { featured.classList.add('is-closing'); window.setTimeout(finish, 160); }
       }
 
       function renderContent() {
@@ -173,12 +192,13 @@
         const shown = expanded ? remaining : remaining.slice(0, 12);
         const hiddenCount = remaining.length - shown.length;
         content.innerHTML = `
-          <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">구매 완료</button></section>
+          <section class="featured${swapFeatured ? ' motion-swap' : ''}">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">구매 완료</button></section>
           <section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>`;
         document.getElementById('bought')?.addEventListener('click', buySelected);
         document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
-        content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); renderContent(); }));
+        content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); swapFeatured = true; renderContent(); }));
         bindCoverFallbacks();
+        swapFeatured = false;
       }
 
       function render() {

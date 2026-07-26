@@ -25,21 +25,23 @@
     }
     .cover-row { min-width:0; flex:0 0 auto; display:flex; align-items:center; gap:11px; }
     .cover-button {
-      width:66px; aspect-ratio:2 / 3; flex:0 0 auto; padding:0; overflow:hidden; display:flex; align-items:flex-end;
+      position:relative; width:66px; aspect-ratio:2 / 3; flex:0 0 auto; padding:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;
       text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:9px;
-      opacity:.55; outline:0; transition:opacity .12s, outline-color .12s;
+      opacity:.55; outline:0; transition:opacity var(--t-color) var(--ease), outline-color var(--t-color) var(--ease);
     }
     .cover-button.is-selected { opacity:1; outline:2px solid var(--action); outline-offset:-2px; }
-    .cover-button.has-image { background:#F1F5F7; border:1px solid var(--border); }
+    .cover-button.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border); }
     .cover-button img { width:100%; height:100%; display:block; object-fit:cover; }
-    .quote-panel { min-width:0; flex:1; padding-left:13px; display:flex; flex-direction:column; justify-content:center; gap:7px; border-left:2px solid var(--quote); }
+    .cover-initial { color:var(--inactive); font-size:26px; font-weight:800; line-height:1; }
+    .cover-name { position:absolute; right:8px; bottom:8px; left:8px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; }
+    .quote-panel { position:relative; min-width:0; flex:1; padding-left:13px; display:flex; flex-direction:column; justify-content:center; gap:7px; }
+    .quote-rule { position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--quote); }
     .quote-line {
       overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
       color:var(--text); font-size:12px; font-weight:600; line-height:1.65;
     }
     .quote-foot { display:flex; align-items:center; gap:12px; }
     .quote-meta { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
-    .open-book { margin-left:auto; flex:0 0 auto; padding:6px 0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:700; }
     .empty-state {
       width:100%; min-height:96px; padding:18px; display:grid; place-content:center; gap:6px; text-align:center;
       background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
@@ -51,7 +53,6 @@
       .cover-row { width:100%; overflow-x:auto; scrollbar-width:none; }
       .cover-row::-webkit-scrollbar { display:none; }
       .quote-panel { width:100%; margin-top:12px; flex:none; }
-      .open-book { min-height:40px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
@@ -71,16 +72,20 @@
       { title:'밝은 밤', author:'최은영', cover:null, line:'서로의 삶을 오래 바라보는 일은 그 자체로 다정함이었다.', url:'' },
       { title:'사피엔스', author:'유발 하라리', cover:null, line:'인간은 함께 상상할 수 있었기에 낯선 이들과 협력할 수 있었다.', url:'' },
       { title:'함께 자라기', author:'김창준', cover:null, line:'학습은 혼자 쌓는 능력이 아니라 함께 만드는 환경이다.', url:'' },
-      { title:'물고기는 존재하지 않는다', author:'룰루 밀러', cover:null, line:'혼돈 속에서도 우리는 다시 이름을 붙이고 살아간다.', url:'' }
+      { title:'물고기는 존재하지 않는다', author:'룰루 밀러', cover:null, line:'혼돈 속에서도 우리는 다시 이름을 붙이고 살아간다.', url:'' },
+      { title:'생각에 관한 생각', author:'대니얼 카너먼', cover:null, line:'빠른 직관과 느린 판단 사이에 더 나은 선택의 여지가 있다.', url:'' },
+      { title:'실용주의 프로그래머', author:'앤드류 헌트', cover:null, line:'작은 어긋남을 바로잡는 습관이 시스템의 기준을 지킨다.', url:'' },
+      { title:'규칙 없음', author:'리드 헤이스팅스', cover:null, line:'자유가 작동하려면 충분한 맥락과 분명한 책임이 필요하다.', url:'' }
     ];
 
     (() => {
       const content = document.getElementById('content');
       let selectedIndex = 0;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+      const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
       const coverMarkup = (book, index) => book.cover
         ? `<button class="cover-button has-image ${index === selectedIndex ? 'is-selected' : ''}" type="button" data-book-index="${index}" aria-label="${escapeHtml(book.title)} 선택"><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"></button>`
-        : `<button class="cover-button ${index === selectedIndex ? 'is-selected' : ''}" type="button" data-book-index="${index}" aria-label="${escapeHtml(book.title)} 선택"></button>`;
+        : `<button class="cover-button ${index === selectedIndex ? 'is-selected' : ''}" type="button" data-book-index="${index}" aria-label="${escapeHtml(book.title)} 선택">${placeholderMarkup(book)}</button>`;
 
       function openBook(book) {
         if (book?.url) window.open(book.url, '_blank', 'noopener');
@@ -90,13 +95,24 @@
         content.querySelectorAll('[data-book-index]').forEach(button => button.addEventListener('click', () => {
           const next = Number(button.dataset.bookIndex);
           if (next === selectedIndex) openBook(DATA[next]);
-          else { selectedIndex = next; render(); }
+          else {
+            selectedIndex = next;
+            content.querySelectorAll('[data-book-index]').forEach((cover, index) => cover.classList.toggle('is-selected', index === selectedIndex));
+            const book = DATA[selectedIndex];
+            const panel = content.querySelector('.quote-panel');
+            if (panel && book?.line) {
+              panel.querySelector('.quote-line').textContent = book.line;
+              panel.querySelector('.quote-meta').textContent = `${book.author} · ${book.title}`;
+              panel.classList.remove('motion-swap');
+              void panel.offsetWidth;
+              panel.classList.add('motion-swap');
+            } else render();
+          }
         }));
-        document.getElementById('openBook')?.addEventListener('click', () => openBook(DATA[selectedIndex]));
         content.querySelectorAll('.cover-button.has-image img').forEach(image => image.addEventListener('error', () => {
           const shell = image.parentElement;
           shell.classList.remove('has-image');
-          image.remove();
+          shell.innerHTML = placeholderMarkup(DATA[Number(shell.dataset.bookIndex)] || { title:image.alt.replace(/ 표지$/, '') });
         }, { once:true }));
       }
 
@@ -107,8 +123,8 @@
         }
         const selected = DATA[selectedIndex] || DATA[0];
         content.innerHTML = `
-          <div class="cover-row" aria-label="인생책 표지 목록">${DATA.slice(0, 5).map(coverMarkup).join('')}</div>
-          ${selected.line ? `<section class="quote-panel"><div class="quote-line">${escapeHtml(selected.line)}</div><div class="quote-foot"><span class="quote-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.title)}</span><button class="open-book" id="openBook" type="button">책 페이지 열기 ›</button></div></section>` : ''}`;
+          <div class="cover-row" aria-label="인생책 표지 목록">${DATA.slice(0, 8).map(coverMarkup).join('')}</div>
+          ${selected.line ? `<section class="quote-panel"><span class="quote-rule" aria-hidden="true"></span><div class="quote-line">${escapeHtml(selected.line)}</div><div class="quote-foot"><span class="quote-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.title)}</span></div></section>` : ''}`;
         bind();
       }
 

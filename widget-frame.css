@@ -1,3 +1,15 @@
+/* Shared motion system for every embedded widget. */
+:root {
+  --t-color: 120ms;
+  --t-press: 90ms;
+  --t-open: 180ms;
+  --t-swap: 200ms;
+  --t-close: 160ms;
+  --t-gauge: 400ms;
+  --t-mark: 800ms;
+  --ease: cubic-bezier(.2,.6,.2,1);
+}
+
 html,
 body {
   background: transparent !important;
@@ -72,7 +84,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   outline: none;
   cursor: nwse-resize;
   touch-action: none;
-  transition: opacity .12s ease, border-color .12s ease;
+  transition: opacity var(--t-color) var(--ease), border-color var(--t-color) var(--ease);
 }
 
 .widget-size-handle-top-left {
@@ -111,7 +123,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   outline: none;
   cursor: ew-resize;
   touch-action: none;
-  transition: opacity .12s ease, background-color .12s ease;
+  transition: opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
 }
 
 .widget-height-handle {
@@ -127,7 +139,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   outline: none;
   cursor: ns-resize;
   touch-action: none;
-  transition: opacity .12s ease, background-color .12s ease;
+  transition: opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
 }
 
 body.widget-page:hover .widget-size-handle,
@@ -195,7 +207,7 @@ body.is-widget-scaling .widget-size-label {
   cursor: ns-resize;
   touch-action: none;
   transform: translateX(-50%);
-  transition: opacity .12s ease, background-color .12s ease;
+  transition: opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
 }
 
 [data-widget-card]:hover .widget-list-resize-handle,
@@ -208,6 +220,70 @@ body.is-widget-list-resizing .widget-list-resize-handle {
   background: #0E5C7A;
 }
 
+button,
+a,
+[role="button"],
+input,
+textarea,
+select {
+  transition-property: color, background-color, border-color, outline-color;
+  transition-duration: var(--t-color);
+  transition-timing-function: var(--ease);
+}
+
+button:not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle):active,
+a:active,
+[role="button"]:active {
+  transform: scale(.98);
+  transition: transform var(--t-press) var(--ease), border-color var(--t-color) var(--ease);
+}
+
+@media (hover: hover) {
+  button:hover,
+  a:hover,
+  [role="button"]:hover,
+  input:hover,
+  textarea:hover,
+  select:hover {
+    border-color: #CFE2EA;
+  }
+}
+
+.chip.selected,
+.chip.is-selected,
+.segment.active {
+  outline: 2px solid #0E5C7A;
+  outline-offset: -2px;
+}
+
+@keyframes quote-breath {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+.quote-rule {
+  animation: quote-breath 8s var(--ease) infinite;
+}
+
+@keyframes content-swap {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes calendar-swap {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes item-mark {
+  from { background-color: #E2F0F6; }
+  to { background-color: transparent; }
+}
+
+.motion-swap { animation: content-swap var(--t-swap) var(--ease); }
+.motion-calendar-swap { animation: calendar-swap 140ms var(--ease); }
+.motion-new { animation: item-mark var(--t-mark) var(--ease); }
+
 body.is-widget-scaling,
 body.is-widget-list-resizing {
   user-select: none;
@@ -219,5 +295,12 @@ body.is-widget-list-resizing {
   .widget-height-handle,
   .widget-list-resize-handle {
     display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

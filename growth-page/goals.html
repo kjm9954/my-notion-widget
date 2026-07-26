@@ -20,7 +20,7 @@
     .year-title { font-size:15px; font-weight:850; }
     .summary { display:flex; align-items:center; gap:9px; color:var(--secondary); font-size:11px; font-weight:750; white-space:nowrap; }
     .track { width:88px; height:5px; overflow:hidden; background:var(--border-soft); border-radius:999px; }
-    .fill { height:100%; background:var(--action); border-radius:inherit; transition:width .15s; }
+    .fill { height:100%; background:var(--action); border-radius:inherit; transition:width var(--t-open) var(--ease); }
     .goals-grid { min-height:0; display:grid; flex:1 1 auto; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
     .goal-column { min-width:0; min-height:338px; display:flex; flex-direction:column; padding:11px; background:var(--surface-soft); border:1px solid var(--border-soft); border-radius:14px; }
     .goal-column.accent { background:var(--surface); border-color:#CFE2EA; }
@@ -37,15 +37,17 @@
     .check { width:26px; height:28px; display:grid; flex:0 0 26px; place-items:center; padding:0; border:0; background:transparent; cursor:pointer; }
     .check::before { content:""; width:14px; height:14px; background:var(--surface); border:1.5px solid #C6D6DD; border-radius:50%; }
     .goal-row.done .check::before { background:#C6D6DD; }
-    .goal-name { min-width:0; flex:1 1 auto; padding:0; overflow:hidden; border:0; background:transparent; font-size:11px; font-weight:650; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
-    .goal-row.done .goal-name { color:var(--done); text-decoration:line-through; }
+    .goal-name { position:relative; min-width:0; flex:1 1 auto; padding:0; overflow:hidden; border:0; background:transparent; font-size:11px; font-weight:650; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
+    .goal-name::after { content:""; position:absolute; left:0; top:50%; width:0; height:1px; background:var(--done); transition:width var(--t-open) var(--ease); }
+    .goal-row.done .goal-name { color:var(--done); }
+    .goal-row.done .goal-name::after { width:100%; }
     .goal-meta { max-width:34%; overflow:hidden; color:var(--done); font-size:8px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
     .edit-input { min-width:0; height:29px; flex:1 1 auto; padding:0 8px; border:1px solid #CFE2EA; border-radius:8px; outline:0; background:#F7FBFD; font-size:11px; font-weight:650; }
     .text-action { min-height:28px; padding:0 3px; border:0; background:transparent; color:var(--muted); font-size:9px; font-weight:750; cursor:pointer; }
     .text-action.danger { color:var(--danger); }
     .column-footer { display:flex; flex-direction:column; gap:6px; padding-top:7px; }
     .add-trigger { min-height:29px; width:100%; padding:0 4px; border:1px dashed transparent; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:750; text-align:left; cursor:pointer; }
-    .add-trigger:hover,.add-trigger:focus-visible { border-color:var(--border); }
+    .add-trigger:hover,.add-trigger:focus-visible { border-color:#CFE2EA; }
     .composer { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:5px; }
     .composer.has-parent { grid-template-columns:minmax(0,1fr); }
     .composer-input,.parent-select { width:100%; height:31px; min-width:0; padding:0 8px; border:1px solid var(--border); border-radius:8px; outline:0; background:var(--surface); font-size:10px; font-weight:650; }
@@ -182,7 +184,7 @@
       }
       card.addEventListener('click',event=>{
         const target=event.target;
-        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;ui.undo=null;save();render();}return;}
+        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:180;setTimeout(()=>render(),delay);}return;}
         const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';ui.deleting='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
         const del=target.closest('[data-delete-request]');if(del){ui.deleting=del.dataset.deleteRequest;ui.composer='';render();return;}

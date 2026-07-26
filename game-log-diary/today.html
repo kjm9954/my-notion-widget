@@ -61,7 +61,7 @@
     .hp-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .hp-value { color:var(--secondary); font-size:11px; font-weight:700; }
     .hp-track { height:5px; min-width:60px; max-width:220px; flex:1; overflow:hidden; background:#EDF2F4; border-radius:3px; }
-    .hp-fill { display:block; height:100%; background:var(--action); border-radius:3px; }
+    .hp-fill { display:block; height:100%; background:var(--action); border-radius:3px; transition:width var(--t-gauge) var(--ease); }
     .streak { margin-left:auto; }
 
     .editor { min-height:0; display:flex; flex:1; flex-direction:column; gap:10px; }
@@ -88,7 +88,7 @@
     .mood-box { display:flex; flex-direction:column; gap:8px; padding:9px; background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px; }
     .word-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
     .word-grid.photo { grid-template-columns:repeat(4,minmax(0,1fr)); }
-    .word-button { min-width:0; height:32px; padding:0 7px; overflow:hidden; color:var(--secondary); background:#FFFFFF; border:1px solid #E1EAEE; border-radius:8px; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+    .word-button { min-width:0; height:32px; padding:0 7px; overflow:hidden; color:var(--secondary); background:#FFFFFF; border:1px solid #E1EAEE; border-radius:8px; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; transition:background-color var(--t-color) var(--ease), border-color var(--t-color) var(--ease), color var(--t-color) var(--ease); }
     .word-grid.photo .word-button { height:30px; }
     .word-button.active { color:#FFFFFF; background:var(--action); border-color:var(--action); }
     .custom-row { min-height:24px; gap:7px; }
@@ -100,7 +100,7 @@
     .mood-caption { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .mood-name { min-height:15px; color:var(--action); font-size:12px; font-weight:800; }
     .temperature-track { display:flex; gap:4px; }
-    .temperature-part { height:30px; flex:1; padding:0; background:#FFFFFF; border:1px solid #E1EAEE; border-radius:8px; cursor:pointer; }
+    .temperature-part { height:30px; flex:1; padding:0; background:#FFFFFF; border:1px solid #E1EAEE; border-radius:8px; cursor:pointer; transition:background-color var(--t-color) var(--ease), border-color var(--t-color) var(--ease); }
     .temperature-part.before { background:var(--action-soft); border-color:#CFE2EA; }
     .temperature-part.active { background:var(--action); border-color:var(--action); }
     .temperature-ends { display:flex; justify-content:space-between; color:var(--done); font-size:9px; font-weight:700; }
@@ -176,6 +176,8 @@
       function initialDate(){try{const key=new URLSearchParams(location.search).get('date');if(key&&/^\d{4}-\d{2}-\d{2}$/.test(key)&&localKey(fromKey(key))===key)return key;}catch(_){}return localKey(new Date());}
       const TODAY=localKey(new Date());
       const ui={screen:'home',selectedDate:initialDate(),questStep:1,questDraft:null,photoDraft:null,pending:{2:'',3:'',5:''},wordInputOpen:false,showTodayComposer:false,sharedMood:{mood:null,moodTags:[]}};
+      let lastRenderedHp=null;
+      let initialSwap=new URLSearchParams(location.search).get('motion')==='swap';
       function entryMood(entry){return entry?.mode==='quest'?{mood:moodValue(entry.quest?.mood),moodTags:cleanWords(entry.quest?.moodTags)}:{mood:moodValue(entry?.mood),moodTags:cleanWords(entry?.moodTags)};}
       function syncShared(source){ui.sharedMood={mood:moodValue(source?.mood),moodTags:cleanWords(source?.moodTags)};}
       function applyShared(target){target.mood=ui.sharedMood.mood;target.moodTags=[...ui.sharedMood.moodTags];}
@@ -193,11 +195,11 @@
       function renderQuestEntry(entry,date){const q=normalizeQuest(entry.quest),parts=[];if(q.moodTags.length||q.conds.length)parts.push(`<section class="quest-section">${moodPills(q.moodTags,q.conds)}</section>`);if(q.job.trim())parts.push(`<section class="quest-section"><div class="job">${escapeHtml(q.job)}</div></section>`);if(q.main.length){const done=q.main.filter(item=>item.done).length;parts.push(`<section class="quest-section"><div class="section-head"><div class="label">오늘의 퀘스트 · ${done} / ${q.main.length}</div></div>${questItems(q.main,'main',date)}</section>`);}if(q.sub.length){parts.push(`<section class="quest-section"><div class="section-head"><div class="label">서브 퀘스트</div></div>${questItems(q.sub,'sub',date)}</section>`);}if(q.event.t?.trim()||q.event.c?.trim())parts.push(`<section class="quest-section"><div class="label">발생한 이벤트</div><div class="quote">${q.event.t?.trim()?`<p class="body-text">${escapeHtml(q.event.t)}</p>`:''}${q.event.c?.trim()?`<div class="choice">→ ${escapeHtml(q.event.c)}</div>`:''}</div></section>`);if(q.achieve.length)parts.push(`<section class="quest-section"><div class="label">오늘의 업적</div><div class="pills">${q.achieve.map(item=>`<span class="pill achievement-pill">${escapeHtml(item)}</span>`).join('')}</div></section>`);if(q.ending.trim())parts.push(`<section class="quest-section"><div class="label">하루 엔딩로그</div><div class="quote"><p class="body-text">${escapeHtml(q.ending)}</p></div></section>`);return parts.join('');}
       function renderEntry(entry,date){if(entry.mode==='photo'){const photos=Array.isArray(entry.photos)?entry.photos:[];const content=[];if(entry.moodTags?.length)content.push(`<section class="quest-section">${moodPills(entry.moodTags)}</section>`);if(photos.length)content.push(`<div class="thumb-row">${photos.map(src=>`<img class="view-thumb" src="${escapeHtml(src)}" alt="">`).join('')}</div>`);if(entry.text?.trim())content.push(`<p class="body-text">${escapeHtml(entry.text)}</p>`);return `<section class="entry-block"><div class="photo-view">${content.join('')}</div></section>`;}return `<section class="entry-block">${renderQuestEntry(entry,date)}</section>`;}
       function stats(){const start=fromKey(TODAY);let used=0;for(let i=0;i<14;i++){if(store.entries[localKey(addDays(start,-i))])used++;}let streak=0,cursor=start;while(store.entries[localKey(cursor)]){streak++;cursor=addDays(cursor,-1);}return{hp:Math.max(20,Math.round(used/14*100)),streak};}
-      function renderStats(){const value=stats();return `<section class="stats"><div class="stat-row"><span class="hp-label">HP</span><span class="hp-value">${value.hp}</span><span class="hp-track"><span class="hp-fill" style="width:${value.hp}%"></span></span><span class="streak">연속 ${value.streak}일</span></div></section>`;}
+      function renderStats(value,startHp=value.hp){return `<section class="stats"><div class="stat-row"><span class="hp-label">HP</span><span class="hp-value">${value.hp}</span><span class="hp-track"><span class="hp-fill" style="width:${startHp}%"></span></span><span class="streak">연속 ${value.streak}일</span></div></section>`;}
       function renderEmpty(){return `<section class="empty-block"><div class="empty-title">오늘의 로그가 비어 있습니다</div><div class="empty-copy">한 섹션만 쓰고 저장해도 됩니다</div><div class="empty-actions"><button class="primary" type="button" data-start="quest">퀘스트로 쓰기</button><button class="secondary-button" type="button" data-start="photo">사진으로 쓰기</button></div></section>`;}
       function latestPastDate(){return Object.keys(store.entries).filter(key=>key<TODAY).sort().at(-1)||null;}
       function homeSelection(){const direct=store.entries[ui.selectedDate];if(direct)return{entry:direct,date:ui.selectedDate,fallback:false};if(ui.selectedDate===TODAY&&!ui.showTodayComposer){const date=latestPastDate();if(date)return{entry:store.entries[date],date,fallback:true};}return{entry:null,date:ui.selectedDate,fallback:false};}
-      function renderHome(){const selected=homeSelection(),mood=entryMood(selected.entry),actions=selected.entry?`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`:'';app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood.mood)}</div>${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats()}`;}
+      function renderHome(){const selected=homeSelection(),mood=entryMood(selected.entry),actions=selected.entry?`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`:'',value=stats(),startHp=lastRenderedHp===null?value.hp:lastRenderedHp;lastRenderedHp=value.hp;app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood.mood)}</div>${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats(value,startHp)}`;if(startHp!==value.hp)requestAnimationFrame(()=>{const fill=app.querySelector('.hp-fill');if(fill)fill.style.width=`${value.hp}%`;});if(initialSwap){app.classList.add('motion-swap');initialSwap=false;}}
 
       const STEPS=[['오늘을 단어로 고르면?','여러 개 골라도 되고, 안 골라도 됩니다'],['오늘의 퀘스트는?','꼭 해야 했던 일들'],['서브 퀘스트가 있었나요?','곁다리로 처리한 일들'],['오늘 발생한 이벤트는?','돌발 상황과 그때 고른 선택지'],['오늘의 업적은?','잘한 일, 작아도 괜찮습니다'],['하루 엔딩로그','마무리 한두 줄']];
       function allWords(){return [...PRESET_WORDS,...customWords.filter(word=>!PRESET_WORDS.includes(word))];}
