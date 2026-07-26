@@ -1,34 +1,41 @@
-/* Idle breath: keep exactly one target alive in each widget, prefer the whole
-   empty block when the current view is empty, and pause whenever attention is
-   elsewhere. A shared helper also lets removed rows close their own place. */
+/* Shared motion v2: choose only the small non-text targets named by the design
+   system, relay them in two-second steps, and pause whenever attention is on
+   the widget. A shared helper also lets removed rows close their own place. */
 (() => {
   'use strict';
 
   const card = document.querySelector('[data-widget-card]');
   const file = decodeURIComponent(location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const targets = {
-    'index.html': { selector:'.quadrant.is-selected', kind:'outline' },
-    'thoughts.html': { selector:'.banner-age, .entry-hint', empty:'.empty-list' },
-    'find.html': { selector:'.banner-label, .filter-caption:not([hidden]), .manage-button', empty:'.empty-list' },
-    'add.html': { selector:'.detail-toggle' },
-    'quote-drawer.html': { selector:'.today-quote .quote-rule', empty:'.empty-state' },
-    'life-books.html': { selector:'.quote-panel .quote-rule', empty:'.empty-state' },
-    'reading-count.html': { selector:'.eyebrow', empty:'.empty-state' },
-    'wishlist.html': { selector:'.bought', kind:'border', empty:'.all-empty, .filter-empty' },
-    'drawer.html': { selector:'.banner-title', empty:'.quote-list > .empty' },
-    'library.html': { selector:'.title', empty:'#libraryView > .no-books' },
-    'session.html': { selector:'.capture-hint', empty:'.draft-list:has(.draft-empty)' },
-    'today.html': { selector:'.date-title', empty:'.empty-block' },
-    'calendar.html': { selector:'.today-ring' },
-    'mood.html': { selector:'.control-label', empty:'.history > .empty' },
-    'achieve.html': { selector:'.title', empty:'#content.empty' },
-    'empty.html': { selector:'.title' },
-    'material.html': { selector:'.label-block .title', empty:'.chip-area > .empty' },
-    'stats.html': { selector:'.meter-label' },
-    'goals.html': { selector:'.goal-column.accent .column-label, .column-label', empty:'.goal-column .empty' },
-    'record.html': { selector:'.legend-item' }
+    'quote-drawer.html': { selector:'.quote-item', kind:'dot', max:3, empty:'.empty-state' },
+    'thoughts.html': { selector:'.item', kind:'dot', max:3, filter:'aged', empty:'.empty-list' },
+    'life-books.html': { selector:'.cover-button.is-selected', kind:'outline', max:1, empty:'.empty-state' },
+    'reading-count.html': { selector:'.year-row', kind:'dot', max:3, empty:'.empty-state' },
+    'wishlist.html': { selector:'.grid-cover', kind:'outline', max:3, empty:'.all-empty, .filter-empty' },
+    'today.html': { selector:'.empty-actions button', kind:'dot', max:3, empty:'.empty-block' },
+    'calendar.html': { selector:'.today-ring', max:1 },
+    'material.html': { selector:'.pill > .done-marker, .pill > .thought-marker, .pill > .q-marker', max:3, empty:'.chip-area > .empty' },
+    'empty.html': { selector:'.chip-area .pill', kind:'dot', max:3, complete:'.complete' },
+    'mood.html': { selector:'.temperature-part.active', max:1, empty:'.history > .empty' },
+    'achieve.html': { selector:'#content.list .row', kind:'dot', max:3, empty:'#content.empty' },
+    'index.html': { selector:'.quadrant-list .item-card:first-child .state-dot', max:4 },
+    'stats.html': { selector:'.meter', kind:'dot', max:3 },
+    'goals.html': { selector:'.goal-row:not(.done) .check', max:3, empty:'.goals-grid .empty' },
+    'find.html': { empty:'.empty-list' },
+    'drawer.html': { empty:'.quote-list > .empty' },
+    'library.html': { empty:'#libraryView > .no-books' },
+    'session.html': { empty:'.draft-list:has(.draft-empty)' },
+    'record.html': { disabled:true },
+    'add.html': { disabled:true }
   };
-  const fallbackSelector = '.title, .card-title, .date-title, .month-title, .column-label, .meter-label, .label, .section-head';
+  const genericEmptySelector = '.empty-state, .empty-block, .empty-list, .all-empty, .filter-empty, .no-books, .draft-empty';
+  const fileOrder = [
+    'quote-drawer.html', 'thoughts.html', 'life-books.html', 'reading-count.html', 'wishlist.html',
+    'today.html', 'calendar.html', 'material.html', 'empty.html', 'mood.html', 'achieve.html',
+    'index.html', 'stats.html', 'goals.html', 'record.html', 'find.html', 'add.html',
+    'drawer.html', 'library.html', 'session.html'
+  ];
+  const fileOffset = Math.max(0, fileOrder.indexOf(file) % 5) * .7;
   let idleSyncQueued = false;
 
   function isVisible(element) {
@@ -37,26 +44,33 @@
     return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
   }
 
-  function firstVisible(selector) {
-    if (!selector) return null;
-    for (const part of selector.split(',').map(value => value.trim()).filter(Boolean)) {
-      const match = Array.from(document.querySelectorAll(part)).find(isVisible);
-      if (match) return match;
-    }
-    return null;
+  function visibleMatches(selector) {
+    if (!selector) return [];
+    const matches = [];
+    selector.split(',').map(value => value.trim()).filter(Boolean).forEach(part => {
+      document.querySelectorAll(part).forEach(element => {
+        if (isVisible(element) && !matches.includes(element)) matches.push(element);
+      });
+    });
+    return matches;
   }
 
-  function idleNode(owner, kind) {
+  function firstVisible(selector) {
+    return visibleMatches(selector)[0] || null;
+  }
+
+  function relayNode(owner, kind) {
     if (!owner || !kind) return owner;
     owner.classList.add('idle-owner');
-    let overlay = Array.from(owner.children).find(child => child.hasAttribute('data-idle-outline'));
+    owner.setAttribute('data-idle-relay-owner', '');
+    let overlay = Array.from(owner.children).find(child => child.hasAttribute('data-idle-relay'));
     if (!overlay) {
       overlay = document.createElement('span');
-      overlay.setAttribute('data-idle-outline', '');
+      overlay.setAttribute('data-idle-relay', '');
       overlay.setAttribute('aria-hidden', 'true');
       owner.appendChild(overlay);
     }
-    const className = `idle-outline idle-outline-${kind}`;
+    const className = kind === 'dot' ? 'idle-relay-dot' : `idle-outline idle-outline-${kind}`;
     if (overlay.className !== className) overlay.className = className;
     return overlay;
   }
@@ -70,20 +84,52 @@
     idleSyncQueued = false;
     if (!card) return;
     const config = targets[file] || {};
-    const emptyTarget = firstVisible(config.empty);
-    const owner = emptyTarget || firstVisible(config.selector) || firstVisible(fallbackSelector) || card;
-    const target = idleNode(owner, emptyTarget ? '' : config.kind);
-    const current = Array.from(document.querySelectorAll('.idle'));
+    const completed = firstVisible(config.complete);
+    let owners = config.disabled || completed ? [] : visibleMatches(config.selector);
+    if (config.filter === 'aged') {
+      owners = owners.filter(element => {
+        const text = element.querySelector('.item-meta')?.textContent || '';
+        const match = text.match(/(\d+)일 전/);
+        return match && Number(match[1]) >= 30;
+      });
+    }
+    if (owners.length > 4) owners = owners.slice(0, 1);
+    else owners = owners.slice(0, Math.min(4, Math.max(0, Number(config.max) || 4)));
 
-    current.forEach(element => {
-      if (element !== target) element.classList.remove('idle', 'is-empty', 'is-paused');
+    let emptyTarget = null;
+    if (!owners.length && !config.disabled && !completed) {
+      emptyTarget = firstVisible(config.empty || genericEmptySelector);
+      if (emptyTarget) owners = [emptyTarget];
+    }
+
+    const selectedOwners = new Set(owners);
+    const relayTargets = owners.map(owner => relayNode(owner, emptyTarget ? 'empty' : config.kind));
+    const selectedTargets = new Set(relayTargets);
+
+    document.querySelectorAll('.idle').forEach(element => {
+      if (selectedTargets.has(element)) return;
+      element.classList.remove('idle', 'is-empty', 'is-paused');
+      element.style.removeProperty('--idle-delay');
+      element.style.removeProperty('--idle-dur');
     });
-    document.querySelectorAll('.idle-owner').forEach(element => {
-      if (element !== owner) element.classList.remove('idle-owner');
+    document.querySelectorAll('[data-idle-relay]').forEach(element => {
+      if (!selectedTargets.has(element)) element.remove();
     });
-    target.classList.add('idle');
-    target.classList.toggle('is-empty', Boolean(emptyTarget));
-    target.classList.toggle('is-paused', document.visibilityState !== 'visible');
+    document.querySelectorAll('[data-idle-relay-owner]').forEach(element => {
+      if (!selectedOwners.has(element)) {
+        element.classList.remove('idle-owner');
+        element.removeAttribute('data-idle-relay-owner');
+      }
+    });
+
+    relayTargets.forEach((target, index) => {
+      const stagger = relayTargets.length === 1 ? 0 : index * 2;
+      target.classList.add('idle');
+      target.classList.toggle('is-empty', Boolean(emptyTarget));
+      target.classList.toggle('is-paused', document.visibilityState !== 'visible');
+      target.style.setProperty('--idle-delay', `${fileOffset + stagger}s`);
+      target.style.setProperty('--idle-dur', emptyTarget ? '10s' : '6s');
+    });
     document.body.classList.toggle('has-widget-expanded', hasExpandedState());
   }
 
@@ -93,19 +139,19 @@
     queueMicrotask(syncIdle);
   }
 
-  function syncBreath() {
+  function syncRelay() {
     const hidden = document.visibilityState !== 'visible';
     document.body.classList.toggle('is-widget-hidden', hidden);
     document.querySelectorAll('.idle').forEach(element => element.classList.toggle('is-paused', hidden));
     queueIdleSync();
   }
 
-  document.addEventListener('visibilitychange', syncBreath);
+  document.addEventListener('visibilitychange', syncRelay);
   if (card) {
     new MutationObserver(queueIdleSync).observe(card, { childList:true, subtree:true });
     ['click', 'input', 'change'].forEach(type => card.addEventListener(type, () => setTimeout(queueIdleSync, 0)));
   }
-  syncBreath();
+  syncRelay();
   queueIdleSync();
 
   window.widgetMotion = {
@@ -121,7 +167,8 @@
       let settled = false;
       const once = () => { if (settled) return; settled = true; finish(); };
       element.addEventListener('animationend', once, { once: true });
-      setTimeout(once, 260);
+      const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-close')) || 160;
+      setTimeout(once, duration * 2);
     }
   };
 })();

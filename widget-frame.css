@@ -8,8 +8,6 @@
   --t-gauge: 400ms;
   --t-mark: 800ms;
   --ease: cubic-bezier(.2,.6,.2,1);
-  --breath-lo: .55;
-  --breath-dur: 3s;
 }
 
 html,
@@ -183,17 +181,18 @@ body.is-widget-scaling .widget-height-handle {
   z-index: 39;
   right: 6px;
   bottom: 25px;
-  display: none;
+  opacity: 0;
   color: #A9BAC2;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
   white-space: nowrap;
+  transition: opacity var(--t-swap) var(--ease);
 }
 
 body.is-widget-scaling .widget-size-label {
-  display: block;
+  opacity: 1;
 }
 
 .widget-list-resize-handle {
@@ -236,11 +235,62 @@ select {
   transition-timing-function: var(--ease);
 }
 
-button:not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle):active,
-a:active,
-[role="button"]:active {
-  transform: scale(.98);
-  transition: transform var(--t-press) var(--ease), border-color var(--t-color) var(--ease);
+.primary:active,
+.add-button:active,
+.done-button:active,
+.small-button.primary:active,
+.descend-button:active,
+.capture-button:active,
+.save:active,
+.book-add button:active,
+.add-form button:active {
+  background: #12303C;
+  transform: scale(.985);
+  transition: background-color var(--t-press) var(--ease), transform var(--t-press) var(--ease);
+}
+
+.confirm-delete:active,
+.confirm-danger:active {
+  background: #A56B6B;
+  transform: scale(.985);
+  transition: background-color var(--t-press) var(--ease), transform var(--t-press) var(--ease);
+}
+
+body.widget-page .chip:active,
+body.widget-page .pill:active,
+body.widget-page .segment:active,
+body.widget-page .book-chip:active,
+body.widget-page .filter:active,
+body.widget-page .status-button:active,
+body.widget-page .temperature-part:active,
+body.widget-page .word-button:active,
+body.widget-page .q-choice:active,
+body.widget-page .more:active,
+body.widget-page .small-button:not(.primary):active {
+  color: #0E5C7A;
+  background: #E2F0F6;
+  transform: none;
+  transition: color var(--t-press) var(--ease), background-color var(--t-press) var(--ease);
+}
+
+body.widget-page input:focus,
+body.widget-page textarea:focus,
+body.widget-page select:focus {
+  border-color: #0E5C7A;
+}
+
+.cover-button:active,
+.featured-cover:active,
+.grid-cover:active,
+.calendar-cell:active,
+.day:active,
+.item-card:active,
+.mobile-item:active,
+.photo-thumb:active {
+  outline: 2px solid #0E5C7A;
+  outline-offset: -2px;
+  transform: none;
+  transition: outline-color var(--t-color) var(--ease);
 }
 
 @media (hover: hover) {
@@ -273,20 +323,21 @@ a:active,
   outline-offset: -2px;
 }
 
-/* Idle breath — the only always-on animation, and only ever on one element
-   per widget. It changes opacity and nothing else. */
-@keyframes idle-breath {
-  0%, 100% { opacity: var(--breath-lo); }
-  50% { opacity: 1; }
+/* Idle relay — the only always-on animation. Targets share one keyframe and
+   are offset by the runtime in two-second steps. Opacity is the only value
+   that changes. */
+@keyframes idle-relay {
+  0%, 100% { opacity: .22; }
+  8%, 20% { opacity: 1; }
 }
 
 .idle {
-  animation: idle-breath var(--breath-dur) var(--ease) infinite;
+  animation: idle-relay var(--idle-dur, 6s) var(--ease) infinite;
+  animation-delay: var(--idle-delay, 0s);
 }
 
 .idle.is-empty {
-  --breath-lo: .8;
-  --breath-dur: 3s;
+  --idle-dur: 10s;
 }
 
 .idle-owner {
@@ -311,7 +362,27 @@ a:active,
   border: 1px solid #0E5C7A;
 }
 
+.idle-outline-empty {
+  border: 1px dashed #0E5C7A;
+}
+
+.idle-relay-dot {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  z-index: 2;
+  width: 6px;
+  height: 6px;
+  display: block;
+  border-radius: 50%;
+  background: #0E5C7A;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 body.is-widget-hidden .idle,
+.card:hover .idle,
+[data-widget-card]:hover .idle,
 .card:focus-within .idle,
 [data-widget-card]:focus-within .idle,
 .idle.is-paused,
@@ -320,18 +391,18 @@ body.has-widget-expanded .idle {
 }
 
 @keyframes content-swap {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes calendar-swap {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes item-mark {
-  from { background-color: #E2F0F6; }
-  to { background-color: transparent; }
+@keyframes mark-fade {
+  0% { background: #E2F0F6; }
+  100% { background: transparent; }
 }
 
 /* Removal: the row fades, then its place closes and the rows below pull up. */
@@ -352,7 +423,20 @@ body.has-widget-expanded .idle {
 
 .motion-swap { animation: content-swap var(--t-swap) var(--ease); }
 .motion-calendar-swap { animation: calendar-swap var(--t-swap) var(--ease); }
-.motion-new { animation: item-mark var(--t-mark) var(--ease); }
+.motion-new { animation: mark-fade var(--t-mark) var(--ease) 1 both; }
+
+.panel {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--t-swap) var(--ease), transform var(--t-swap) var(--ease);
+}
+
+.panel.is-on {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 .motion-close {
   overflow: hidden;

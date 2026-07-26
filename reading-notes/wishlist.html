@@ -159,8 +159,8 @@
           buying = false;
           render();
         };
-        if (matchMedia('(prefers-reduced-motion: reduce)').matches || !featured) finish();
-        else { featured.classList.add('is-closing'); window.setTimeout(finish, 160); }
+        if (featured && window.widgetMotion) window.widgetMotion.close(featured, finish);
+        else finish();
       }
 
       function renderContent() {
