@@ -192,10 +192,14 @@
       color:var(--secondary);
       text-decoration:none;
       white-space:nowrap;
-      transition:border-color var(--t-color) var(--ease);
+      transition:width var(--t-open) var(--ease), padding var(--t-open) var(--ease), color var(--t-color) var(--ease), border-color var(--t-color) var(--ease);
     }
     .shortcut:hover, .shortcut:focus-visible {
+      width:auto;
+      gap:6px;
+      padding:0 11px;
       border-color:#CFE2EA;
+      color:var(--action);
     }
     .shortcut-icon {
       width:12px;
@@ -211,6 +215,11 @@
       font-size:10px;
       font-weight:700;
       opacity:0;
+      transition:width var(--t-open) var(--ease), opacity var(--t-open) var(--ease);
+    }
+    .shortcut:hover .shortcut-label, .shortcut:focus-visible .shortcut-label {
+      width:auto;
+      opacity:1;
     }
 
     .settings-view {
