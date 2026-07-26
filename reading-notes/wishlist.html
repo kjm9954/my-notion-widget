@@ -20,7 +20,7 @@
     }
     button { font:inherit; color:inherit; cursor:pointer; }
     .card {
-      width:100%; max-width:1040px; min-height:390px; margin:0 auto; padding:20px; overflow:hidden;
+      width:100%; max-width:1400px; margin:0 auto; padding:20px; overflow:hidden;
       display:flex; flex-direction:column; gap:14px; background:var(--surface); border-radius:18px;
       box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
@@ -33,8 +33,8 @@
       color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
     }
     .chip.is-selected { color:#FFFFFF; background:var(--action); }
-    .body { min-height:0; flex:1; display:flex; align-items:stretch; gap:16px; }
-    .featured { width:112px; flex:0 0 112px; align-self:stretch; display:flex; flex-direction:column; gap:7px; }
+    .body { min-height:0; flex:1; display:flex; align-items:flex-start; gap:16px; }
+    .featured { width:112px; flex:0 0 112px; align-self:start; display:flex; flex-direction:column; gap:7px; }
     .featured-cover, .grid-cover {
       width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:flex-end; padding:9px;
       text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
@@ -48,17 +48,17 @@
     }
     .featured-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
     .bought {
-      min-height:34px; width:100%; margin-top:auto; padding:7px 0; border:1px solid var(--border); border-radius:8px;
+      min-height:34px; width:100%; margin-top:0; padding:7px 0; border:1px solid var(--border); border-radius:8px;
       background:#FFFFFF; color:var(--action); font-size:10px; font-weight:700; text-align:center;
       transition:color .12s, border-color .12s;
     }
     .grid-shell {
-      min-width:0; flex:1; padding:13px; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr));
-      align-content:start; gap:11px; background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:12px;
+      min-width:0; flex:1; padding:13px; display:grid; grid-template-columns:repeat(auto-fill, 84px);
+      justify-content:start; align-content:start; gap:11px; background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:12px;
     }
-    .grid-cover { border-radius:9px; cursor:pointer; }
+    .grid-cover { width:84px; border-radius:9px; cursor:pointer; }
     .more {
-      width:100%; aspect-ratio:2 / 3; padding:0; display:grid; place-items:center; border:1px dashed var(--inactive);
+      width:84px; aspect-ratio:2 / 3; padding:0; display:grid; place-items:center; border:1px dashed var(--inactive);
       border-radius:9px; background:var(--surface-soft); color:var(--muted); font-size:10px; font-weight:800;
     }
     .filter-empty, .all-empty {
@@ -69,10 +69,6 @@
     .all-empty { width:100%; flex:1; }
     .filter-empty strong, .all-empty strong { color:var(--title); font-size:12px; font-weight:800; }
     .filter-empty span, .all-empty span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
-    @media (max-width:999px) {
-      .featured { width:96px; flex-basis:96px; }
-      .grid-shell { grid-template-columns:repeat(5, minmax(0, 1fr)); }
-    }
     @media (max-width:639px) {
       .card { min-height:0; }
       .header { align-items:flex-start; flex-wrap:wrap; }
@@ -80,15 +76,15 @@
       .chips::-webkit-scrollbar { display:none; }
       .chip { min-height:40px; flex:0 0 auto; }
       .body { flex-direction:column; }
-      .featured { width:84px; flex-basis:auto; }
+      .featured { flex-basis:auto; }
       .bought { min-height:40px; }
-      .grid-shell { width:100%; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      .grid-shell { width:100%; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-wishlist.html" data-widget-max-width="1040" data-widget-height="390" data-widget-max-scale="4" style="--widget-max-width:1040px;--widget-base-width:1040px;--widget-base-height:390px;--widget-visual-height:390px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-wishlist.html" data-widget-max-width="1400" data-widget-height="390" data-widget-max-scale="4" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:390px;--widget-visual-height:390px">
     <main class="card" data-widget-card aria-label="구매 예정 책 위젯">
       <header class="header"><span class="title">구매 예정</span><span class="count" id="count"></span><nav class="chips" id="chips" aria-label="분야 필터"></nav></header>
       <div class="body" id="content"></div>
@@ -173,7 +169,7 @@
         if (!filtered.some(book => book.id === selectedId)) selectedId = filtered[0].id;
         const selected = filtered.find(book => book.id === selectedId);
         const remaining = filtered.filter(book => book.id !== selectedId);
-        const shown = expanded ? remaining : remaining.slice(0, 7);
+        const shown = expanded ? remaining : remaining.slice(0, 12);
         const hiddenCount = remaining.length - shown.length;
         content.innerHTML = `
           <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">구매 완료</button></section>
