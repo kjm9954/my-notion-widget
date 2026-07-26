@@ -18,7 +18,7 @@
     .chip-area { min-height:0; display:flex; flex:1; flex-wrap:wrap; align-content:flex-start; gap:5px; padding:8px; overflow:hidden; background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px; }
     .chip-area:not(.expanded) { max-height:73px; }
     .pill, .more { min-height:25px; display:inline-flex; align-items:center; padding:0 8px; border-radius:999px; font-size:10px; font-weight:700; text-decoration:none; }
-    .pill { color:#6B8794; background:#F5F9FB; border:0; }
+    .pill { color:#6B8794; background:#F5F9FB; border:1px solid transparent; transition:border-color var(--t-color) var(--ease); }
     .more { color:#93A5AD; background:#FFFFFF; border:1px dashed #C6D6DD; cursor:pointer; }
     .complete { min-height:68px; display:flex; flex:1; align-items:center; justify-content:center; gap:8px; color:#0E5C7A; background:#E2F0F6; border-radius:12px; }
     .check { width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#FFFFFF; border-radius:50%; font-size:12px; font-weight:800; }
@@ -45,7 +45,7 @@
       function read(){try{const parsed=JSON.parse(localStorage.getItem(KEY)||'{}');if(parsed?.entries&&typeof parsed.entries==='object')memory={entries:parsed.entries};}catch(_){}return memory;}
       function missing(){const entries=read().entries,today=new Date();return Array.from({length:30},(_,index)=>localKey(addDays(today,-index-1))).filter(key=>!entries[key]);}
       function label(key){const [,month,day]=key.split('-').map(Number);return `${month}월 ${day}`;}
-      function render(){const days=missing(),shown=expanded?days:days.slice(0,7),remaining=days.length-shown.length;count.textContent=`최근 30일 중 ${days.length}`;if(!days.length){content.className='complete';content.innerHTML='<span class="check">✓</span><span class="complete-copy">최근 30일, 다 채웠어요</span>';return;}content.className=`chip-area${expanded?' expanded':''}`;content.innerHTML=`${shown.map(key=>`<a class="pill" href="today.html?date=${key}" target="_blank" rel="noopener">${label(key)}</a>`).join('')}${remaining>0||expanded&&days.length>7?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
+      function render(){const days=missing(),shown=expanded?days:days.slice(0,7),remaining=days.length-shown.length;count.textContent=`최근 30일 중 ${days.length}`;if(!days.length){content.className='complete';content.innerHTML='<span class="check">✓</span><span class="complete-copy">최근 30일, 다 채웠어요</span>';return;}content.className=`chip-area${expanded?' expanded':''}`;content.innerHTML=`${shown.map(key=>`<a class="pill" href="today.html?date=${key}&motion=swap" target="_blank" rel="noopener">${label(key)}</a>`).join('')}${remaining>0||expanded&&days.length>7?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
       window.addEventListener('storage',event=>{if(event.key===KEY)render();});window.addEventListener('focus',render);render();
     })();

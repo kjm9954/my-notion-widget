@@ -44,14 +44,15 @@
     .book-tile { width:56px; height:84px; flex:0 0 56px; padding:0; text-align:left; border:0; background:transparent; }
     .cover-wrap { width:56px; height:84px; display:block; }
     .cover {
-      width:56px; height:84px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:6px;
-      text-align:left; border:1px solid var(--border-faint); border-radius:6px; background:var(--surface-soft);
+      position:relative; width:56px; height:84px; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:6px;
+      text-align:left; border:1px dashed var(--disabled); border-radius:9px; background:var(--surface-soft);
       color:var(--text); font-size:8px; font-weight:700; line-height:1.3;
     }
+    .cover.has-image, .detail-cover.has-image { padding:0; border-style:solid; border-color:var(--border-faint); }
     .cover img { width:100%; height:100%; object-fit:cover; }
     .book-tile.is-active .cover { outline:2px solid var(--action); outline-offset:2px; }
-    .cover-title { display:block; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
-    .cover-author { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--done); font-size:7px; font-weight:700; }
+    .cover-initial { color:var(--disabled); font-size:22px; font-weight:800; line-height:1; }
+    .cover-name { position:absolute; right:6px; bottom:6px; left:6px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.2; }
     .shelf-foot { height:14px; min-height:14px; margin-top:12px; display:flex; align-items:center; gap:8px; }
     .shelf-summary { color:var(--secondary); font-size:8px; font-weight:700; }
     .add-trigger { margin-left:auto; height:14px; padding:0; border:0; background:transparent; color:var(--secondary); font-size:8px; font-weight:800; }
@@ -66,10 +67,12 @@
     .close { margin-left:auto; width:auto; height:15px; padding:0; border:0; background:transparent; color:var(--secondary); font-size:8px; font-weight:700; }
     .detail-grid { display:grid; grid-template-columns:132px minmax(0, 1fr); gap:14px; }
     .detail-cover {
-      width:132px; height:198px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:10px; text-align:left;
-      border:1px solid var(--border-faint); border-radius:10px; background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
+      position:relative; width:132px; height:198px; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:10px; text-align:left;
+      border:1px dashed var(--disabled); border-radius:9px; background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
     }
     .detail-cover img { width:100%; height:100%; object-fit:cover; }
+    .detail-cover .cover-initial { font-size:53px; }
+    .detail-cover .cover-name { right:10px; bottom:8px; left:10px; }
     .status-row { height:22px; display:flex; align-items:center; gap:6px; }
     .detail-controls { height:22px; display:flex; align-items:center; gap:8px; }
     .status-button { height:22px; padding:0 9px; border:1px solid var(--border); border-radius:999px; background:#fff; color:var(--secondary); font-size:8px; font-weight:800; }
@@ -109,6 +112,7 @@
       .detail-grid { grid-template-columns:1fr; }
       .detail-side { display:grid; grid-template-columns:100px 1fr; gap:12px; }
       .detail-cover { width:100px; height:150px; }
+      .detail-cover .cover-initial { font-size:40px; }
       .detail-controls { height:auto; flex-wrap:wrap; }
       .status-panel.done { grid-template-columns:1fr; }
     }
@@ -120,6 +124,7 @@
       .field-row { grid-template-columns:1fr; gap:5px; }
       .detail-side { grid-template-columns:82px 1fr; }
       .detail-cover { width:82px; height:123px; }
+      .detail-cover .cover-initial { font-size:33px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
@@ -199,13 +204,18 @@
       function shortAuthor(author) {
         const parts = String(author || '저자 미입력').trim().split(/\s+/); return parts[parts.length - 1] || '저자 미입력';
       }
+      function placeholderCover(book) {
+        const title = String(book?.title || '책');
+        return `<span class="cover-initial" aria-hidden="true">${escapeHtml(title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(title)}</span>`;
+      }
       function coverHtml(book) {
         if (book.cover) return `<img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지">`;
-        return `<span class="cover-title">${escapeHtml(book.title)}</span><span class="cover-author">${escapeHtml(shortAuthor(book.author))}</span>`;
+        return placeholderCover(book);
       }
       function tile(book) {
-        return `<button class="book-tile ${book.id === selectedBookId ? 'is-active' : ''}" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} · ${escapeHtml(book.author || '저자 미입력')}"><span class="cover-wrap"><span class="cover">${coverHtml(book)}</span></span></button>`;
+        return `<button class="book-tile ${book.id === selectedBookId ? 'is-active' : ''}" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} · ${escapeHtml(book.author || '저자 미입력')}"><span class="cover-wrap"><span class="cover${book.cover ? ' has-image' : ''}">${coverHtml(book)}</span></span></button>`;
       }
+      function bindCoverFallbacks(root) { root?.querySelectorAll('.has-image img').forEach(image => image.addEventListener('error', () => { const shell=image.parentElement; shell.classList.remove('has-image'); shell.innerHTML=placeholderCover({ title:image.alt.replace(/ 표지$/, '') }); }, { once:true })); }
       function bindBookButtons() { els.view.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedBookId = button.dataset.bookId; render(); })); }
       function renderHeader() {
         els.stats.textContent = `올해 완독 ${books.filter(book => book.status === 'done').length}권 · 전체 ${books.length}권`;
@@ -220,6 +230,7 @@
         if (!filtered.length) { els.view.innerHTML = `<div class="no-books">찾는 책이 없어요</div>`; return; }
         const addArea = addingBook ? `<div class="add-form"><input id="newTitle" placeholder="책 제목" maxlength="80"><input id="newAuthor" placeholder="저자" maxlength="60"><button id="createBook" type="button">추가</button></div>` : `<button class="add-trigger" id="addTrigger" type="button">＋ 책 추가</button>`;
         els.view.innerHTML = `<section class="shelf"><div class="shelf-head"><strong>읽는 중</strong><span class="shelf-count">${reading.length}</span></div><div class="book-grid">${reading.map(tile).join('') || '<div class="no-books">읽는 중인 책이 없어요</div>'}</div></section><section class="shelf ${addingBook ? 'is-adding' : ''}"><div class="shelf-head"><strong>완독</strong><span class="shelf-count">${allDone.length}</span>${allDone.length > 6 ? `<button class="more-done" id="doneMore" type="button">${doneExpanded ? '접기' : `＋${allDone.length - 6} 더보기`}</button>` : ''}</div><div class="book-grid">${done.map(tile).join('') || '<div class="no-books">완독한 책이 없어요</div>'}</div><footer class="shelf-foot"><span class="shelf-summary">구입 예정 ${wishlist} · 중도포기 ${dropped}</span>${addArea}</footer></section>`;
+        bindCoverFallbacks(els.view);
         bindBookButtons();
         document.getElementById('doneMore')?.addEventListener('click', () => { doneExpanded = !doneExpanded; renderGallery(); });
         document.getElementById('addTrigger')?.addEventListener('click', () => { addingBook = true; renderGallery(); document.getElementById('newTitle')?.focus(); });
@@ -251,7 +262,8 @@
           panel = `<div class="status-panel locked"><strong>완독하면 정리 칸이 열려요</strong><span>배운 점과 적용할 점을 책 안에 남길 수 있어요</span></div>`;
         }
         els.detail.classList.remove('hidden');
-        els.detail.innerHTML = `<div class="detail-grid"><aside class="detail-side"><div class="detail-cover">${coverHtml(book)}</div></aside><div class="fields"><div class="detail-head"><span class="detail-title">${escapeHtml(book.title)}</span><span class="detail-subtitle">${escapeHtml(shortAuthor(book.author))} · ${escapeHtml(book.field || '미분류')}</span><button class="close" id="detailClose" type="button">닫기</button></div><div class="detail-controls"><div class="status-row">${statusButtons}</div><div class="stars">${stars}<span class="star-label">${book.star || '별점 없음'}</span></div></div><input class="text-input" id="oneInput" aria-label="이 책의 한 줄" value="${escapeHtml(book.one || '')}" placeholder="이 책의 한 줄"><div class="quotes-block"><div class="quotes-head"><span>이 책에서 담은 문장</span><span>${bookQuotes.length}</span></div>${bookQuotes.slice(0, 2).map(item => `<div class="mini-quote">${escapeHtml(item.text)}</div>`).join('') || '<div class="mini-quote">저장한 문장이 없어요</div>'}${bookQuotes.length > 2 ? `<div class="more-quotes">＋${bookQuotes.length - 2} 더보기</div>` : ''}</div>${panel}</div></div>`;
+        els.detail.innerHTML = `<div class="detail-grid"><aside class="detail-side"><div class="detail-cover${book.cover ? ' has-image' : ''}">${coverHtml(book)}</div></aside><div class="fields"><div class="detail-head"><span class="detail-title">${escapeHtml(book.title)}</span><span class="detail-subtitle">${escapeHtml(shortAuthor(book.author))} · ${escapeHtml(book.field || '미분류')}</span><button class="close" id="detailClose" type="button">닫기</button></div><div class="detail-controls"><div class="status-row">${statusButtons}</div><div class="stars">${stars}<span class="star-label">${book.star || '별점 없음'}</span></div></div><input class="text-input" id="oneInput" aria-label="이 책의 한 줄" value="${escapeHtml(book.one || '')}" placeholder="이 책의 한 줄"><div class="quotes-block"><div class="quotes-head"><span>이 책에서 담은 문장</span><span>${bookQuotes.length}</span></div>${bookQuotes.slice(0, 2).map(item => `<div class="mini-quote">${escapeHtml(item.text)}</div>`).join('') || '<div class="mini-quote">저장한 문장이 없어요</div>'}${bookQuotes.length > 2 ? `<div class="more-quotes">＋${bookQuotes.length - 2} 더보기</div>` : ''}</div>${panel}</div></div>`;
+        bindCoverFallbacks(els.detail);
         document.getElementById('detailClose').addEventListener('click', () => { selectedBookId = ''; render(); });
         els.detail.querySelectorAll('[data-status]').forEach(button => button.addEventListener('click', () => { if (updateBook(book.id, { status:button.dataset.status })) render(); }));
         els.detail.querySelectorAll('[data-star]').forEach(button => button.addEventListener('click', () => { const value = Number(button.dataset.star); if (updateBook(book.id, { star:book.star === value ? 0 : value })) render(); }));

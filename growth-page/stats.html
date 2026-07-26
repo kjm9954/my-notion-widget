@@ -101,9 +101,8 @@
       font-size:9px;
       font-weight:700;
       cursor:pointer;
-      transition:color .12s;
+      transition:color var(--t-color) var(--ease);
     }
-    .settings-trigger:hover, .settings-trigger:focus-visible { color:var(--secondary); }
 
     .level-line {
       display:flex;
@@ -163,7 +162,7 @@
     .meter-fill {
       height:100%;
       border-radius:3px;
-      transition:width .12s;
+      transition:width var(--t-gauge) var(--ease);
     }
     .hp-fill { background:var(--action); }
     .mp-fill { background:var(--disabled); }
@@ -193,14 +192,10 @@
       color:var(--secondary);
       text-decoration:none;
       white-space:nowrap;
-      transition:width .12s, padding .12s, color .12s, border-color .12s;
+      transition:border-color var(--t-color) var(--ease);
     }
     .shortcut:hover, .shortcut:focus-visible {
-      width:auto;
-      gap:6px;
-      padding:0 11px;
-      border-color:var(--action);
-      color:var(--action);
+      border-color:#CFE2EA;
     }
     .shortcut-icon {
       width:12px;
@@ -216,11 +211,6 @@
       font-size:10px;
       font-weight:700;
       opacity:0;
-      transition:width .12s, opacity .12s;
-    }
-    .shortcut:hover .shortcut-label, .shortcut:focus-visible .shortcut-label {
-      width:auto;
-      opacity:1;
     }
 
     .settings-view {
@@ -450,6 +440,22 @@
 
       function renderMain() {
         const current = metrics();
+        const meters = card.querySelector('.meters');
+        if (meters) {
+          const status = card.querySelector('.status-row');
+          if (status) status.outerHTML = renderStatus(current.anomalies).trim();
+          const level = card.querySelector('.level');
+          const tenureText = card.querySelector('.tenure');
+          const values = card.querySelectorAll('.meter-value');
+          const fills = card.querySelectorAll('.meter-fill');
+          if (level) level.textContent = `Lv.${current.level}`;
+          if (tenureText) tenureText.textContent = `D+${current.days}`;
+          if (values[0]) values[0].textContent = current.hp;
+          if (values[1]) values[1].textContent = current.mp;
+          if (fills[0]) fills[0].style.width = `${current.hp}%`;
+          if (fills[1]) fills[1].style.width = `${current.mp}%`;
+          return;
+        }
         card.innerHTML = `
           ${renderStatus(current.anomalies)}
           <div class="level-line"><span class="level">Lv.${current.level}</span><span class="tenure">D+${current.days}</span></div>

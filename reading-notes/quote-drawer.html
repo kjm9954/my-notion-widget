@@ -30,7 +30,9 @@
     .header { min-height:40px; display:flex; align-items:center; }
     .title { color:var(--title); font-size:12px; font-weight:800; }
     .refresh { width:40px; height:40px; margin-left:auto; padding:0; border:0; background:transparent; color:var(--muted); font-size:12px; font-weight:700; }
-    .today-quote { padding:3px 0 3px 14px; border-left:2px solid var(--quote); }
+    .refresh.is-turning { animation:refresh-turn 400ms var(--ease); }
+    .today-quote { position:relative; padding:3px 0 3px 14px; }
+    .today-quote .quote-rule { position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--quote); }
     .today-text { max-width:760px; color:var(--text); font-size:15px; font-weight:600; line-height:1.7; }
     .today-source { margin-top:6px; color:var(--faint); font-size:9px; font-weight:700; }
     .search {
@@ -41,7 +43,7 @@
     .filters { min-height:28px; display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
     .chip {
       min-height:28px; padding:5px 11px; border:0; border-radius:999px; background:var(--pill);
-      color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
+      color:var(--secondary); font-size:10px; font-weight:700;
     }
     .chip.is-selected { color:#FFFFFF; background:var(--action); }
     .chip.more { border:1px dashed var(--inactive); background:#FFFFFF; color:var(--muted); }
@@ -56,7 +58,8 @@
     .quote-meta { margin-top:7px; display:flex; align-items:center; gap:10px; }
     .quote-book { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
     .quote-age { flex:0 0 auto; color:var(--inactive); font-size:9px; font-weight:700; }
-    .detail { margin:0 13px; padding:12px 0 13px; border-top:1px solid var(--border-faint); }
+    .detail { max-height:220px; margin:0 13px; padding:12px 0 13px; overflow:hidden; border-top:1px solid var(--border-faint); animation:detail-open var(--t-open) var(--ease); }
+    .detail.is-closing { max-height:0; padding-top:0; padding-bottom:0; opacity:0; transition:max-height var(--t-open) var(--ease), padding var(--t-open) var(--ease), opacity var(--t-open) var(--ease); }
     .detail-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .thought { margin-top:8px; color:var(--deep); font-size:12px; font-weight:600; line-height:1.7; white-space:pre-wrap; }
     .thought.is-empty { color:var(--muted); }
@@ -77,6 +80,8 @@
     .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
     .hidden { display:none !important; }
+    @keyframes refresh-turn { to { transform:rotate(360deg); } }
+    @keyframes detail-open { from { max-height:0; padding-top:0; padding-bottom:0; opacity:0; } to { max-height:220px; opacity:1; } }
     @media (max-width:639px) {
       .today-text { font-size:14px; }
       .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
@@ -141,7 +146,10 @@
       function renderToday() {
         if (!items.length) return;
         const item = items[todayIndex % items.length];
-        todayQuote.innerHTML = `<div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
+        todayQuote.innerHTML = `<span class="quote-rule" aria-hidden="true"></span><div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
+        todayQuote.classList.remove('motion-swap');
+        void todayQuote.offsetWidth;
+        todayQuote.classList.add('motion-swap');
       }
 
       function renderFilters() {
@@ -176,9 +184,12 @@
       function bindList() {
         quoteList.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => {
           const id = Number(button.dataset.open);
-          activeId = activeId === id ? null : id;
-          editingId = null;
-          renderList();
+          const scrollTop = quoteList.scrollTop;
+          const openDetail = button.closest('.quote-item')?.querySelector('.detail');
+          if (activeId === id && openDetail && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            openDetail.classList.add('is-closing');
+            window.setTimeout(() => { activeId = null; editingId = null; renderList(scrollTop); }, 180);
+          } else { activeId = activeId === id ? null : id; editingId = null; renderList(scrollTop); }
         }));
         quoteList.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => {
           const id = Number(button.dataset.edit);
@@ -187,18 +198,21 @@
             if (item) item.note = document.getElementById('thoughtInput')?.value.trim() || '';
             editingId = null;
           } else editingId = id;
-          renderList();
+          const saved = editingId === null;
+          renderList(quoteList.scrollTop);
+          if (saved) quoteList.querySelector(`[data-open="${id}"]`)?.closest('.quote-item')?.querySelector('.thought')?.classList.add('motion-swap');
           if (editingId === id) document.getElementById('thoughtInput')?.focus();
         }));
       }
 
-      function renderList() {
+      function renderList(scrollTop = quoteList.scrollTop) {
         const result = filteredItems().slice(0, 5);
         if (!result.length) {
           quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
           return;
         }
         quoteList.innerHTML = result.map(item => `<article class="quote-item"><button class="quote-summary" type="button" data-open="${item.id}"><div class="quote-text">${escapeHtml(item.text)}</div><div class="quote-meta"><span class="quote-book">${escapeHtml(item.book)}</span><span class="quote-age">${escapeHtml(item.ago)}</span></div></button>${activeId === item.id ? renderDetail(item) : ''}</article>`).join('');
+        quoteList.scrollTop = scrollTop;
         bindList();
       }
 
@@ -209,7 +223,7 @@
         quoteList.innerHTML = `<section class="empty-state"><strong>아직 옮겨둔 문장이 없어요</strong><span>책 페이지에서 문장을 적어두면 이 서랍에 모입니다</span></section>`;
       }
 
-      refresh.addEventListener('click', () => { if (items.length > 1) todayIndex = (todayIndex + 1) % items.length; renderToday(); });
+      refresh.addEventListener('click', () => { if (items.length > 1) todayIndex = (todayIndex + 1) % items.length; refresh.classList.remove('is-turning'); void refresh.offsetWidth; refresh.classList.add('is-turning'); renderToday(); });
       search.addEventListener('input', () => { activeId = null; editingId = null; renderList(); });
       if (!items.length) renderEmpty();
       else { renderToday(); renderFilters(); renderList(); }

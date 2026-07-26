@@ -76,9 +76,9 @@
       font-weight:700;
       line-height:1;
       cursor:pointer;
-      transition:color .12s, border-color .12s;
+      transition:border-color var(--t-color) var(--ease);
     }
-    .month-button:hover, .month-button:focus-visible { color:var(--text); border-color:var(--secondary); }
+    .month-button:hover, .month-button:focus-visible { border-color:#CFE2EA; }
     .month-title {
       min-width:104px;
       color:var(--text);
@@ -132,7 +132,7 @@
       outline-offset:-1.5px;
       background:transparent;
       cursor:pointer;
-      transition:outline-color .12s, color .12s;
+      transition:outline-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
     }
     .day.has-record { background:var(--surface); border-color:var(--border-day); }
     .day.other-month { opacity:.3; }
