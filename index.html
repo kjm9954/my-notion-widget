@@ -920,11 +920,11 @@
     </section>
   </main>
 
+  <script src="store.js"></script>
   <script>
     (() => {
       'use strict';
 
-      const STORAGE_KEY = 'energy-compass-3a-v2';
       const ORDER = ['S', 'D', 'M', 'O'];
       const QUADRANTS = {
         O: { full: '기회를 찾는 업무', short: '기회' },
@@ -937,37 +937,7 @@
         month: '2026년 7월'
       };
 
-      const seedItems = [];
-
-      const cloneSeed = () => seedItems.map(item => ({ ...item }));
-
-      function loadState() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return null;
-          const parsed = JSON.parse(raw);
-          if (!parsed || !Array.isArray(parsed.items)) return null;
-          const items = parsed.items
-            .filter(item => item && typeof item.id === 'string' && typeof item.t === 'string')
-            .map(item => ({
-              id: item.id,
-              scope: item.scope === 'month' ? 'month' : 'week',
-              q: ['O', 'D', 'S', 'M'].includes(item.q) ? item.q : null,
-              st: ['todo', 'doing', 'done'].includes(item.st) ? item.st : 'todo',
-              t: item.t,
-              p: typeof item.p === 'string' ? item.p : null
-            }));
-          return {
-            items,
-            scope: parsed.scope === 'month' ? 'month' : 'week'
-          };
-        } catch (_) {
-          return null;
-        }
-      }
-
-      const restored = loadState();
-      const state = restored || { items: cloneSeed(), scope: 'week' };
+      const state = { items: [], scope: 'week' };
       const ui = {
         bottomState: 'collapsed',
         selectedId: null,
@@ -977,18 +947,54 @@
         justDroppedId: null
       };
       let pointerDrag = null;
+      const titleTimers = new Map();
 
       const widget = document.getElementById('widget');
       const header = document.getElementById('header');
       const mainContent = document.getElementById('mainContent');
       const bottomBar = document.getElementById('bottomBar');
 
-      function save() {
+      function normalizeItem(item) {
+        if (!item || typeof item.id !== 'string' || typeof item.t !== 'string') return null;
+        return {
+          id: item.id,
+          source: item.source,
+          sourceId: item.sourceId,
+          scope: item.scope === 'month' ? 'month' : 'week',
+          q: ['O', 'D', 'S', 'M'].includes(item.q) ? item.q : null,
+          st: ['todo', 'doing', 'done'].includes(item.st) ? item.st : 'todo',
+          t: item.t,
+          p: typeof item.p === 'string' ? item.p : null
+        };
+      }
+
+      async function sync() {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items, scope: state.scope }));
-        } catch (_) {
-          // 저장이 막혀도 현재 세션의 위젯은 계속 동작한다.
-        }
+          const loaded = await Store.loadIndexState();
+          state.items = (Array.isArray(loaded?.items) ? loaded.items : []).map(normalizeItem).filter(Boolean);
+          state.scope = loaded?.scope === 'month' ? 'month' : 'week';
+          if (ui.selectedId && !state.items.some(item => item.id === ui.selectedId)) {
+            ui.selectedId = null;
+            ui.bottomState = 'collapsed';
+          }
+          render();
+        } catch (_) {}
+      }
+
+      function itemPatch(item) {
+        return { t: item.t, scope: item.scope, q: item.q, st: item.st, p: item.p };
+      }
+
+      function persistItem(item) {
+        return Store.updateIndexItem(item.id, itemPatch(item)).catch(() => sync());
+      }
+
+      function queueTitleSave(item) {
+        clearTimeout(titleTimers.get(item.id));
+        titleTimers.set(item.id, setTimeout(() => {
+          titleTimers.delete(item.id);
+          persistItem(item);
+        }, 180));
       }
 
       function escapeHtml(value) {
@@ -1199,16 +1205,16 @@
         state.scope = scope;
         ui.selectedId = null;
         ui.bottomState = 'collapsed';
-        save();
         render();
+        Store.saveIndexScope(scope).catch(() => sync());
       }
 
       function updateItem(mutator) {
         const item = ui.selectedId ? findItem(ui.selectedId) : null;
         if (!item) return;
         mutator(item);
-        save();
         render();
+        persistItem(item);
       }
 
       function deleteWithChildren(id) {
@@ -1226,26 +1232,19 @@
         state.items = state.items.filter(item => !toDelete.has(item.id));
         ui.selectedId = null;
         ui.bottomState = 'collapsed';
-        save();
         render();
+        Promise.all([...toDelete].map(itemId => Store.deleteIndexItem(itemId))).catch(() => sync());
       }
 
       function descendToWeek(item) {
-        const child = {
-          id: makeId(),
-          scope: 'week',
-          q: item.q,
-          st: 'todo',
-          t: item.t,
-          p: item.id
-        };
-        state.items.push(child);
+        item.scope = 'week';
         state.scope = 'week';
-        ui.selectedId = child.id;
+        ui.selectedId = item.id;
         ui.bottomState = 'edit';
-        if (child.q) ui.mobileQ = child.q;
-        save();
+        if (item.q) ui.mobileQ = item.q;
         render();
+        persistItem(item);
+        Store.saveIndexScope('week').catch(() => sync());
       }
 
       function setDropHighlight(target) {
@@ -1283,8 +1282,8 @@
         item.q = targets.qTarget ? targets.qTarget.dataset.dropQ : null;
         if (targets.qTarget) ui.mobileQ = targets.qTarget.dataset.dropQ;
         ui.justDroppedId = item.id;
-        save();
         render();
+        persistItem(item);
         setTimeout(() => { ui.justDroppedId = null; }, 800);
         return true;
       }
@@ -1383,7 +1382,7 @@
         const item = findItem(input.dataset.titleInput);
         if (!item) return;
         item.t = input.value;
-        save();
+        queueTitleSave(item);
         document.querySelectorAll(`[data-title-id="${CSS.escape(item.id)}"]`).forEach(node => {
           node.textContent = item.t;
         });
@@ -1398,17 +1397,16 @@
           event.preventDefault();
           const title = newInput.value.trim();
           if (!title) return;
-          state.items.push({
-            id: makeId(),
-            scope: state.scope,
-            q: null,
-            st: 'todo',
-            t: title,
-            p: null
+          newInput.disabled = true;
+          Store.addIndexItem(title, state.scope, null).then(result => {
+            const added = normalizeItem(result?.data);
+            if (added) state.items.push(added);
+            render();
+            requestAnimationFrame(() => document.querySelector('[data-new-item]')?.focus());
+          }).catch(() => {
+            newInput.disabled = false;
+            newInput.focus();
           });
-          save();
-          render();
-          requestAnimationFrame(() => document.querySelector('[data-new-item]')?.focus());
           return;
         }
 
@@ -1493,8 +1491,13 @@
       widget.addEventListener('pointerup', event => endPointerDrag(event));
       widget.addEventListener('pointercancel', event => endPointerDrag(event, true));
 
+      window.addEventListener('focus', sync);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) sync();
+      });
+
       render();
-      if (!restored) save();
+      sync();
     })();
   </script>
   <script src="widget-frame.js"></script>

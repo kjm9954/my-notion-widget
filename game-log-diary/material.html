@@ -47,27 +47,22 @@
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
     </section>
   </main>
+  <script src="../store.js"></script>
   <script>
     (()=>{
       'use strict';
-      const DIARY_KEY='game-log-diary-4b-v2',THOUGHT_KEY='thought-box-v1',ENERGY_KEYS=['energy-compass-3a-v1','energy-compass-3a-v2'];
       const content=document.getElementById('content'),count=document.getElementById('count');
-      let expanded=false;
+      let expanded=false,materials=[];
       function localKey(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`;}
       function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
-      function read(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch(_){return null;}}
       const TODAY=localKey(new Date());
-      function dateKey(value){if(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}/.test(value))return value.slice(0,10);const number=Number(value);if(Number.isFinite(number)&&number>0)return localKey(new Date(number));return'';}
-      function diaryMaterials(){const entry=read(DIARY_KEY)?.entries?.[TODAY];if(entry?.mode!=='quest')return[];const q=entry.quest||{};return [...(Array.isArray(q.main)?q.main:[]),...(Array.isArray(q.sub)?q.sub:[])].filter(item=>item?.done&&String(item.t??'').trim()).map(item=>({type:'done',text:String(item.t).trim()}));}
-      function energyMaterials(){let source=null;for(const key of ENERGY_KEYS){source=read(key);if(Array.isArray(source?.items))break;}return (Array.isArray(source?.items)?source.items:[]).filter(item=>['O','D','S','M'].includes(item?.q)&&dateKey(item.placedAt??item.updatedAt??item.createdAt??item.date)===TODAY&&String(item.t??'').trim()).map(item=>({type:'energy',q:item.q,text:String(item.t).trim()}));}
-      function thoughtMaterials(){const source=read(THOUGHT_KEY);return (Array.isArray(source?.items)?source.items:[]).filter(item=>dateKey(item?.created)===TODAY&&String(item.one??'').trim()).map(item=>({type:'thought',text:String(item.one).trim()}));}
-      function items(){return [...diaryMaterials(),...energyMaterials(),...thoughtMaterials()];}
+      function diaryMaterials(entry){if(entry?.mode!=='quest')return[];const q=entry.quest||{};return [...(Array.isArray(q.main)?q.main:[]),...(Array.isArray(q.sub)?q.sub:[])].filter(item=>item?.done&&String(item.t??'').trim()).map(item=>({type:'done',text:String(item.t).trim()}));}
       function marker(item){if(item.type==='done')return'<span class="done-marker"></span>';if(item.type==='thought')return'<span class="thought-marker"></span>';return `<span class="q-marker q-${item.q}">${item.q}</span>`;}
       function visibleLimit(){return Math.max(2,Math.floor((Math.min(window.innerWidth,1020)-160)/120));}
-      function render(){const all=items(),limit=visibleLimit(),capacity=expanded?limit*2:limit,shownCount=all.length>limit?Math.min(all.length,Math.max(1,capacity-1)):all.length,shown=all.slice(0,shownCount),remaining=all.length-shown.length;count.textContent=`${all.length}개`;content.classList.toggle('expanded',expanded);content.closest('.widget').style.minHeight=expanded&&all.length>limit?'128px':'96px';if(!all.length){content.innerHTML='<div class="empty"><span class="empty-title">오늘은 아직 재료가 없어요</span></div>';return;}content.innerHTML=`${shown.map(item=>`<span class="pill">${marker(item)}<span class="pill-text">${escapeHtml(item.text)}</span></span>`).join('')}${all.length>limit?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
+      function render(){const all=materials,limit=visibleLimit(),capacity=expanded?limit*2:limit,shownCount=all.length>limit?Math.min(all.length,Math.max(1,capacity-1)):all.length,shown=all.slice(0,shownCount),remaining=all.length-shown.length;count.textContent=`${all.length}개`;content.classList.toggle('expanded',expanded);content.closest('.widget').style.minHeight=expanded&&all.length>limit?'128px':'96px';if(!all.length){content.innerHTML='<div class="empty"><span class="empty-title">오늘은 아직 재료가 없어요</span></div>';return;}content.innerHTML=`${shown.map(item=>`<span class="pill">${marker(item)}<span class="pill-text">${escapeHtml(item.text)}</span></span>`).join('')}${all.length>limit?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
-      window.addEventListener('storage',event=>{if([DIARY_KEY,THOUGHT_KEY,...ENERGY_KEYS].includes(event.key))render();});
-      window.addEventListener('focus',render);window.addEventListener('resize',render);render();
+      async function sync(){try{const [thoughts,diary]=await Promise.all([Store.getMaterials(),Store.loadDiary(TODAY)]);materials=[...diaryMaterials(diary),...(Array.isArray(thoughts)?thoughts:[]).map(item=>({type:'thought',text:String(item.one??item.content??'').trim()})).filter(item=>item.text)];render();}catch(_){count.textContent='불러오기 실패';}}
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});window.addEventListener('resize',render);sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

@@ -95,12 +95,13 @@
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
     </main>
   </div>
+  <script src="../store.js"></script>
   <script>
     (()=>{
       'use strict';
-      const KEY='thought-box-v1',DAY=86400000,DEFAULT_CATS=['아이디어','방향성'];
+      const DAY=86400000,DEFAULT_CATS=['아이디어','방향성'];
       const card=document.getElementById('card'),fixed=document.getElementById('fixedArea'),form=document.getElementById('entryForm'),oneInput=document.getElementById('oneInput'),detailInput=document.getElementById('detailInput'),detailToggle=document.getElementById('detailToggle'),entryHint=document.getElementById('entryHint'),banner=document.getElementById('banner'),search=document.getElementById('searchInput'),filterChips=document.getElementById('filterChips'),filterCaption=document.getElementById('filterCaption'),manageButton=document.getElementById('manageButton'),managePanel=document.getElementById('managePanel'),list=document.getElementById('itemList'),overlay=document.getElementById('overlay');
-      let memory=empty(),store=read(),filterCat='',query='',detailOpen=false,detailEditing=false,managing=false,bannerId='',openId='',openedBefore=0,confirming=false,newId='';
+      let store=empty(),filterCat='',query='',detailOpen=false,detailEditing=false,managing=false,bannerId='',openId='',openedBefore=0,confirming=false,newId='',saveTimer=0,revision=0,saving=false;
       function empty(){return{items:[],cats:DEFAULT_CATS.slice(),catOpened:{}};}
       function id(){try{return crypto.randomUUID();}catch(_){return`${Date.now()}-${Math.random().toString(36).slice(2)}`;}}
       function normalize(raw){
@@ -108,8 +109,9 @@
         const items=(Array.isArray(source.items)?source.items:[]).map(item=>{if(!item||typeof item!=='object')return null;const one=typeof item.one==='string'?item.one.trim():'';if(!one)return null;const created=Number(item.created)||Date.now(),opened=Number(item.opened)||created;return{id:String(item.id||id()),one,detail:typeof item.detail==='string'?item.detail:'',cat:cats.includes(item.cat)?item.cat:cats[0],created,opened};}).filter(Boolean);
         const catOpened={};cats.forEach(cat=>{const value=Number(source.catOpened?.[cat]);if(value>0)catOpened[cat]=value;});return{items,cats,catOpened};
       }
-      function read(){try{const raw=localStorage.getItem(KEY);if(raw)memory=normalize(JSON.parse(raw));}catch(_){}return normalize(memory);}
-      function update(mutator){const latest=read();mutator(latest);memory=normalize(latest);try{localStorage.setItem(KEY,JSON.stringify(memory));}catch(_){}store=normalize(memory);}
+      function update(mutator){mutator(store);store=normalize(store);revision+=1;clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}
+      async function persist(){saveTimer=0;if(saving)return;saving=true;const current=revision,snapshot=normalize(store);try{await Store.saveThoughtState(snapshot);}catch(_){}saving=false;if(revision!==current)persist();}
+      async function sync(){if(saving||saveTimer)return;try{store=normalize(await Store.loadThoughtState());if(filterCat&&!store.cats.includes(filterCat))filterCat='';renderAll();if(openId)renderOverlay();}catch(_){banner.className='banner empty';banner.innerHTML='<div class="banner-empty">불러오기 실패 · 잠시 후 다시 열어주세요</div>';}}
       function itemById(itemId){return store.items.find(item=>item.id===itemId)||null;}
       function days(ts){return Math.max(0,Math.floor((Date.now()-ts)/DAY));}
       function chooseBanner(force=false){const candidates=store.items.filter(item=>days(item.opened)>=30);const pool=candidates.length?candidates:store.items.slice().sort((a,b)=>a.opened-b.opened).slice(0,Math.min(5,store.items.length));if(!pool.length){bannerId='';return;}const options=force&&pool.length>1?pool.filter(item=>item.id!==bannerId):pool;bannerId=options[Math.floor(Math.random()*options.length)].id;}
@@ -146,8 +148,8 @@
       });
       card.addEventListener('change',event=>{const rename=event.target.closest('[data-rename]');if(!rename)return;const index=Number(rename.dataset.rename),old=store.cats[index],value=rename.value.trim();if(!old||!value||store.cats.some((cat,i)=>cat===value&&i!==index)){renderManage();return;}update(latest=>{latest.cats[index]=value;latest.items.forEach(item=>{if(item.cat===old)item.cat=value;});if(latest.catOpened[old]){latest.catOpened[value]=latest.catOpened[old];delete latest.catOpened[old];}});if(filterCat===old)filterCat=value;renderAll();});
       card.addEventListener('input',event=>{if(event.target.matches('[data-open-one]')){const value=event.target.value;update(latest=>{const item=latest.items.find(entry=>entry.id===openId);if(item&&value.trim())item.one=value;});renderList();renderBanner();}if(event.target.matches('[data-open-detail]')){const value=event.target.value;update(latest=>{const item=latest.items.find(entry=>entry.id===openId);if(item)item.detail=value;});renderList();}});
-      window.addEventListener('storage',event=>{if(event.key===KEY){store=read();renderAll();if(openId)renderOverlay();}});
-      chooseBanner(false);renderAll();
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+      chooseBanner(false);renderAll();sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

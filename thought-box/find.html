@@ -575,12 +575,11 @@
   </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
     (() => {
       'use strict';
 
-      const KEY = 'thought-box-v1';
-      const CHANNEL = 'thought-box';
       const DAY = 24 * 60 * 60 * 1000;
       const DEFAULT_CATS = ['아이디어', '방향성'];
       const card = document.getElementById('card');
@@ -594,8 +593,7 @@
       const itemList = document.getElementById('itemList');
       const overlay = document.getElementById('overlay');
 
-      let memoryStore = emptyStore();
-      let store = readStore();
+      let store = emptyStore();
       let query = '';
       let selectedCat = '';
       let catsOpen = false;
@@ -606,9 +604,9 @@
       let detailEditing = false;
       let deleteConfirm = false;
       let savedListScroll = 0;
-      let channel = null;
-
-      try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
+      let saveTimer = 0;
+      let revision = 0;
+      let saving = false;
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -656,23 +654,23 @@
         return { items, cats, catOpened };
       }
 
-      function readStore() {
-        try {
-          const raw = localStorage.getItem(KEY);
-          if (raw) memoryStore = normalize(JSON.parse(raw));
-        } catch (_) {
-          memoryStore = normalize(memoryStore);
-        }
-        return normalize(memoryStore);
+      function updateStore(mutator) {
+        mutator(store);
+        store = normalize(store);
+        revision += 1;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(persist, 180);
       }
 
-      function updateStore(mutator) {
-        const latest = readStore();
-        mutator(latest);
-        memoryStore = normalize(latest);
-        try { localStorage.setItem(KEY, JSON.stringify(memoryStore)); } catch (_) {}
-        store = normalize(memoryStore);
-        try { if (channel) channel.postMessage({ type: 'changed' }); } catch (_) {}
+      async function persist() {
+        saveTimer = 0;
+        if (saving) return;
+        saving = true;
+        const current = revision;
+        const snapshot = normalize(store);
+        try { await Store.saveThoughtState(snapshot); } catch (_) {}
+        saving = false;
+        if (revision !== current) persist();
       }
 
       function daysSince(value) {
@@ -685,9 +683,10 @@
         return store.items.find((item) => item.id === id) || null;
       }
 
-      function sync() {
+      async function sync() {
+        if (saving || saveTimer) return;
         const currentScroll = itemList.scrollTop;
-        store = readStore();
+        try { store = normalize(await Store.loadThoughtState()); } catch (_) { return; }
         if (selectedCat && !store.cats.includes(selectedCat)) selectedCat = '';
         if (openId && !itemById(openId)) {
           openId = '';
@@ -1153,21 +1152,16 @@
         manageButton.setAttribute('aria-expanded', String(managing));
         if (managing) renderManage();
       });
-      window.addEventListener('storage', (event) => {
-        if (event.key === KEY) sync();
-      });
       window.addEventListener('focus', sync);
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) sync();
-      });
-      if (channel) channel.addEventListener('message', (event) => {
-        if (!event.data || event.data.type === 'changed') sync();
       });
 
       chooseBanner(false);
       renderBanner();
       renderFilters();
       renderList();
+      sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

@@ -312,11 +312,10 @@
     </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
     (() => {
       const SETTINGS_KEY = 'growth-stats-v1';
-      const DIARY_KEY = 'game-log-diary-4b-v2';
-      const READING_KEY = 'reading-notes-v1';
       const card = document.getElementById('card');
       const shortcutMeta = [
         { glyph: '◲', label: '일기', placeholder: '일기 페이지 주소' },
@@ -327,6 +326,8 @@
       let settings = readSettings();
       let settingsOpen = false;
       let statusExpanded = false;
+      let activity = { diary:{}, reading:{} };
+      let serverHp = 20;
 
       function clone(value) { return JSON.parse(JSON.stringify(value)); }
       function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
@@ -360,23 +361,6 @@
         memorySettings = normalizeSettings(settings);
         try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(memorySettings)); } catch (_) {}
       }
-      function safeRead(key) {
-        try {
-          const raw = localStorage.getItem(key);
-          return raw === null ? { found: false, value: null } : { found: true, value: JSON.parse(raw) };
-        } catch (_) { return { found: false, value: null }; }
-      }
-      function readActivity() {
-        const diarySource = safeRead(DIARY_KEY);
-        const readingSource = safeRead(READING_KEY);
-        const diary = diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object'
-          ? diarySource.value.entries
-          : {};
-        const reading = readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object'
-          ? readingSource.value.byDate
-          : {};
-        return { diary, reading };
-      }
       function tenure() {
         const start = parseKey(settings.start) || localDay();
         const days = Math.max(0, dayDiff(start));
@@ -385,8 +369,8 @@
       function recentPercent(keys) {
         const recorded = new Set(keys);
         let days = 0;
-        for (let offset = 0; offset < 14; offset += 1) if (recorded.has(keyDaysAgo(offset))) days += 1;
-        return Math.round((days / 14) * 100);
+        for (let offset = 0; offset < 7; offset += 1) if (recorded.has(keyDaysAgo(offset))) days += 1;
+        return Math.max(20, Math.round((days / 7) * 100));
       }
       function gapFromLast(keys) {
         const today = localDay();
@@ -396,7 +380,6 @@
         return dayDiff(latest, today);
       }
       function metrics() {
-        const activity = readActivity();
         const diaryKeys = Object.keys(activity.diary).filter(key => Boolean(activity.diary[key]));
         const readingKeys = Object.keys(activity.reading).filter(key => Number(activity.reading[key]) > 0);
         const diaryGap = gapFromLast(diaryKeys);
@@ -406,7 +389,7 @@
         if (readingGap !== null && readingGap >= 7) anomalies.push(`독서 공백 ${readingGap}일`);
         return {
           ...tenure(),
-          hp: recentPercent(diaryKeys),
+          hp: serverHp,
           mp: recentPercent(readingKeys),
           anomalies
         };
@@ -533,10 +516,11 @@
 
       window.addEventListener('storage', event => {
         if (event.key === SETTINGS_KEY) settings = readSettings();
-        if ([SETTINGS_KEY, DIARY_KEY, READING_KEY].includes(event.key) && !settingsOpen) renderMain();
+        if (event.key === SETTINGS_KEY && !settingsOpen) renderMain();
       });
 
-      render();
+      async function sync(){try{const [dates,hp]=await Promise.all([Store.getWrittenDates(),Store.getHP()]);activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};serverHp=Number(hp)||20;if(!settingsOpen)renderMain();}catch(_){if(!settingsOpen)renderMain();}}
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});render();sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

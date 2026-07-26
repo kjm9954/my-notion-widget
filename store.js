@@ -59,8 +59,15 @@ async function saveMoodWords(words) {
 }
 
 // ───────── 생각 ─────────
+async function loadThoughtState() {
+  return (await apiGet("/api/thoughts/state")).data;
+}
+async function saveThoughtState(state) {
+  return (await apiPost("/api/thoughts/state", state)).data;
+}
 async function addThought(content, category) {
-  return apiPost("/api/thoughts/add", { content, category });
+  const body = content && typeof content === "object" ? content : { content, category };
+  return apiPost("/api/thoughts/add", body);
 }
 async function loadThoughts(filter = {}) {
   const q = new URLSearchParams();
@@ -77,6 +84,12 @@ async function deleteThought(id) {
 }
 
 // ───────── 목표 ─────────
+async function loadGoalState() {
+  return (await apiGet("/api/goals/state")).data;
+}
+async function saveGoalState(state) {
+  return (await apiPost("/api/goals/state", state)).data;
+}
 async function addGoal(title, scope, parentId) {
   return apiPost("/api/goals/add", { title, scope, parentId });
 }
@@ -87,8 +100,28 @@ async function loadGoals(scope) {
 async function toggleGoalDone(id) {
   return apiPost("/api/goals/toggle", { id });
 }
-async function deleteGoal(id) {
-  return apiPost("/api/goals/delete", { id });
+async function updateGoal(id, patch) {
+  return apiPost("/api/goals/update", { id, ...patch });
+}
+async function deleteGoal(id, cascade = false) {
+  return apiPost("/api/goals/delete", { id, cascade });
+}
+
+// ───────── 에너지 나침반 ─────────
+async function loadIndexState() {
+  return (await apiGet("/api/index/state")).data;
+}
+async function saveIndexScope(scope) {
+  return apiPost("/api/index/scope", { scope });
+}
+async function addIndexItem(title, scope, parent = null) {
+  return apiPost("/api/index/add", { title, scope, parent });
+}
+async function updateIndexItem(id, patch) {
+  return apiPost("/api/index/update", { id, patch });
+}
+async function deleteIndexItem(id) {
+  return apiPost("/api/index/delete", { id });
 }
 
 // ───────── 계산 (저장 안 함, 호출 시 계산) ─────────
@@ -114,6 +147,22 @@ async function getTodayAchievements() {
     .map(g => g.title);
   return [...fromDiary, ...fromGoals];
 }
+async function getAchievements() {
+  const [diaries, goals] = await Promise.all([
+    loadDiaryRange("0000-01-01", "9999-12-31"),
+    loadGoals(),
+  ]);
+  const fromDiary = diaries.flatMap(diary => (Array.isArray(diary.achievements) ? diary.achievements : [])
+    .map((text, index) => ({ id: `diary:${diary.date}:${index}:${text}`, date: diary.date, text: String(text || "").trim(), source: "diary" }))
+    .filter(item => item.text));
+  const fromGoals = goals.filter(goal => goal.done && goal.completedAt).map(goal => ({
+    id: `goal:${goal.id}`,
+    date: todayStr(new Date(goal.completedAt)),
+    text: goal.title,
+    source: "goal",
+  }));
+  return [...fromDiary, ...fromGoals].sort((a, b) => b.date.localeCompare(a.date));
+}
 async function getMaterials() {
   const all = await loadThoughts();
   return all.filter(t => isToday(t.createdAt));
@@ -127,7 +176,8 @@ async function getMoodOfDate(date) {
 window.Store = {
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,
   loadMoodWords, saveMoodWords,
-  addThought, loadThoughts, updateThought, deleteThought,
-  addGoal, loadGoals, toggleGoalDone, deleteGoal,
-  getHP, getTodayAchievements, getMaterials, getMoodOfDate,
+  loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
+  loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
+  loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,
+  getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
 };

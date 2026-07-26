@@ -35,19 +35,20 @@
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
     </section>
   </main>
+  <script src="../store.js"></script>
   <script>
     (()=>{
       'use strict';
-      const KEY='game-log-diary-4b-v2',content=document.getElementById('content'),count=document.getElementById('count');
-      let expanded=false,memory={entries:{}};
+      const content=document.getElementById('content'),count=document.getElementById('count');
+      let expanded=false,writtenDates=[];
       function localKey(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`;}
       function addDays(date,amount){const next=new Date(date);next.setDate(next.getDate()+amount);return next;}
-      function read(){try{const parsed=JSON.parse(localStorage.getItem(KEY)||'{}');if(parsed?.entries&&typeof parsed.entries==='object')memory={entries:parsed.entries};}catch(_){}return memory;}
-      function missing(){const entries=read().entries,today=new Date();return Array.from({length:30},(_,index)=>localKey(addDays(today,-index-1))).filter(key=>!entries[key]);}
+      function missing(){const written=new Set(writtenDates),today=new Date();return Array.from({length:30},(_,index)=>localKey(addDays(today,-index-1))).filter(key=>!written.has(key));}
       function label(key){const [,month,day]=key.split('-').map(Number);return `${month}월 ${day}`;}
       function render(){const days=missing(),shown=expanded?days:days.slice(0,7),remaining=days.length-shown.length;count.textContent=`최근 30일 중 ${days.length}`;if(!days.length){content.className='complete';content.innerHTML='<span class="check">✓</span><span class="complete-copy">최근 30일, 다 채웠어요</span>';return;}content.className=`chip-area${expanded?' expanded':''}`;content.innerHTML=`${shown.map(key=>`<a class="pill" href="today.html?date=${key}&motion=swap" target="_blank" rel="noopener">${label(key)}</a>`).join('')}${remaining>0||expanded&&days.length>7?`<button class="more" type="button" data-more>${expanded?'접기':`＋${remaining}`}</button>`:''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;expanded=!expanded;render();});
-      window.addEventListener('storage',event=>{if(event.key===KEY)render();});window.addEventListener('focus',render);render();
+      async function sync(){try{writtenDates=await Store.getWrittenDates();render();}catch(_){count.textContent='불러오기 실패';}}
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

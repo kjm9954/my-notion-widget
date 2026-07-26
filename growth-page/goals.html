@@ -86,10 +86,10 @@
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
     </main>
   </div>
+  <script src="../store.js"></script>
   <script>
     (() => {
       'use strict';
-      const KEY='growth-goals-v1';
       const now=new Date();
       const currentHalf=now.getMonth()<6?'h1':'h2';
       const columns=[
@@ -102,8 +102,10 @@
       const header=document.getElementById('header');
       const grid=document.getElementById('goalsGrid');
       const bottom=document.getElementById('bottomLine');
-      let memory={goals:[]};
-      let state=read();
+      let state={goals:[]};
+      let saveTimer=0;
+      let revision=0;
+      let saving=false;
       const ui={editing:'',composer:'',deleting:'',undo:null,showPast:false};
 
       function id(){return `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;}
@@ -114,11 +116,13 @@
         return {goals:(Array.isArray(raw?.goals)?raw.goals:[]).filter(goal=>goal&&valid.includes(goal.scope)).map(goal=>({
           id:String(goal.id||id()), scope:goal.scope, t:String(goal.t??''), done:Boolean(goal.done),
           parent:goal.scope==='year'?null:(goal.parent?String(goal.parent):null),
-          createdAt:Number(goal.createdAt)||Date.now()
+          createdAt:Number(goal.createdAt)||Date.now(),
+          completedAt:goal.done&&goal.completedAt?String(goal.completedAt):null
         }))};
       }
-      function read(){try{const raw=localStorage.getItem(KEY);if(raw)memory=normalize(JSON.parse(raw));}catch(_){}return clone(memory);}
-      function save(){memory=normalize(state);try{localStorage.setItem(KEY,JSON.stringify(memory));}catch(_){}}
+      function save(){state=normalize(state);revision+=1;clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}
+      async function persist(){saveTimer=0;if(saving)return;saving=true;const current=revision,snapshot=normalize(state);try{await Store.saveGoalState(snapshot);}catch(_){}saving=false;if(revision!==current)persist();}
+      async function sync(){if(saving||saveTimer)return;try{state=normalize(await Store.loadGoalState());render();}catch(_){} }
       function byId(goalId){return state.goals.find(goal=>goal.id===goalId)||null;}
       function goalsFor(scope){return state.goals.filter(goal=>goal.scope===scope).sort((a,b)=>Number(a.done)-Number(b.done)||a.createdAt-b.createdAt);}
       function descendants(rootId){
@@ -173,7 +177,7 @@
         const box=card.querySelector(`[data-composer="${scope}"]`),input=box?.querySelector('[data-new-goal]');
         const title=input?.value.trim();if(!title){input?.focus();return;}
         const parent=box.querySelector('[data-parent-select]')?.value||null;
-        state.goals.push({id:id(),scope,t:title,done:false,parent,createdAt:Date.now()});ui.composer='';ui.undo=null;save();render();
+        state.goals.push({id:id(),scope,t:title,done:false,parent,createdAt:Date.now(),completedAt:null});ui.composer='';ui.undo=null;save();render();
       }
       function remove(mode){
         const goal=byId(ui.deleting);if(!goal)return;
@@ -184,7 +188,7 @@
       }
       card.addEventListener('click',event=>{
         const target=event.target;
-        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:180;setTimeout(()=>render(),delay);}return;}
+        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:180;setTimeout(()=>render(),delay);}return;}
         const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';ui.deleting='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
         const del=target.closest('[data-delete-request]');if(del){ui.deleting=del.dataset.deleteRequest;ui.composer='';render();return;}
@@ -201,7 +205,10 @@
         if(event.target.matches('[data-new-goal]')&&event.key==='Enter'){event.preventDefault();add(event.target.closest('[data-composer]').dataset.composer);}
         if(event.target.matches('[data-edit-input]')&&(event.key==='Enter'||event.key==='Escape')){event.preventDefault();ui.editing='';render();}
       });
+      window.addEventListener('focus',sync);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
       render();
+      sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

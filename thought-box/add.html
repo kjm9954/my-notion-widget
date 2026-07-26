@@ -216,12 +216,11 @@
   </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
     (() => {
       'use strict';
 
-      const KEY = 'thought-box-v1';
-      const CHANNEL = 'thought-box';
       const DEFAULT_CATS = ['아이디어', '방향성'];
       const card = document.getElementById('card');
       const form = document.getElementById('entryForm');
@@ -231,14 +230,13 @@
       const detailToggle = document.getElementById('detailToggle');
       const categoryChips = document.getElementById('categoryChips');
 
-      let memoryStore = emptyStore();
-      let store = readStore();
+      let store = emptyStore();
       let selectedCat = store.cats[0];
       let detailOpen = false;
       let catsOpen = false;
-      let channel = null;
-
-      try { channel = new BroadcastChannel(CHANNEL); } catch (_) {}
+      let saveTimer = 0;
+      let revision = 0;
+      let saving = false;
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -281,23 +279,23 @@
         return { items, cats, catOpened };
       }
 
-      function readStore() {
-        try {
-          const raw = localStorage.getItem(KEY);
-          if (raw) memoryStore = normalize(JSON.parse(raw));
-        } catch (_) {
-          memoryStore = normalize(memoryStore);
-        }
-        return normalize(memoryStore);
+      function updateStore(mutator) {
+        mutator(store);
+        store = normalize(store);
+        revision += 1;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(persist, 180);
       }
 
-      function updateStore(mutator) {
-        const latest = readStore();
-        mutator(latest);
-        memoryStore = normalize(latest);
-        try { localStorage.setItem(KEY, JSON.stringify(memoryStore)); } catch (_) {}
-        store = normalize(memoryStore);
-        try { if (channel) channel.postMessage({ type: 'changed' }); } catch (_) {}
+      async function persist() {
+        saveTimer = 0;
+        if (saving) return;
+        saving = true;
+        const current = revision;
+        const snapshot = normalize(store);
+        try { await Store.saveThoughtState(snapshot); } catch (_) {}
+        saving = false;
+        if (revision !== current) persist();
       }
 
       function makeId() {
@@ -306,10 +304,13 @@
         }
       }
 
-      function sync() {
-        store = readStore();
-        if (!store.cats.includes(selectedCat)) selectedCat = store.cats[0];
-        renderCats();
+      async function sync() {
+        if (saving || saveTimer) return;
+        try {
+          store = normalize(await Store.loadThoughtState());
+          if (!store.cats.includes(selectedCat)) selectedCat = store.cats[0];
+          renderCats();
+        } catch (_) {}
       }
 
       function renderCats() {
@@ -386,22 +387,17 @@
         detailToggle.textContent = '＋ 상세';
         detailToggle.setAttribute('aria-expanded', 'false');
         card.classList.remove('detail-open');
-        sync();
+        renderCats();
         oneInput.focus();
       });
 
-      window.addEventListener('storage', (event) => {
-        if (event.key === KEY) sync();
-      });
       window.addEventListener('focus', sync);
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) sync();
       });
-      if (channel) channel.addEventListener('message', (event) => {
-        if (!event.data || event.data.type === 'changed') sync();
-      });
 
       renderCats();
+      sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

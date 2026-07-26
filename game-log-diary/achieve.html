@@ -37,18 +37,18 @@
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
     </section>
   </main>
+  <script src="../store.js"></script>
   <script>
     (()=>{
       'use strict';
-      const KEY='game-log-diary-4b-v2',content=document.getElementById('content'),count=document.getElementById('count'),title=document.getElementById('title');
-      let limit=10,memory={entries:{}},knownIds=null;
+      const content=document.getElementById('content'),count=document.getElementById('count'),title=document.getElementById('title');
+      let limit=10,achievements=[],knownIds=null;
       function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
-      function read(){try{const parsed=JSON.parse(localStorage.getItem(KEY)||'{}');if(parsed?.entries&&typeof parsed.entries==='object')memory={entries:parsed.entries};}catch(_){}return memory;}
-      function items(){const entries=read().entries;return Object.keys(entries).sort().reverse().flatMap(key=>{const entry=entries[key],values=entry?.mode==='quest'&&Array.isArray(entry.quest?.achieve)?entry.quest.achieve:[];return values.map((value,index)=>({id:`${key}:${index}:${String(value??'')}`,key,text:String(value??'').trim()})).filter(item=>item.text);});}
       function dateLabel(key){const [,month,day]=key.split('-').map(Number);return `${month}.${day}`;}
-      function render(){const all=items(),shown=all.slice(0,Math.min(limit,30)),currentIds=new Set(all.map(item=>item.id)),added=knownIds?new Set(all.filter(item=>!knownIds.has(item.id)).map(item=>item.id)):new Set();knownIds=currentIds;count.textContent=`${all.length}`;title.classList.toggle('idle',all.length>0);if(!all.length){content.className='empty idle is-empty';content.innerHTML='<div class="empty-title">첫 업적을 기다리고 있어요</div><div class="empty-copy">오늘 일기의 업적 칸에 한 줄만</div>';return;}content.className='list';content.innerHTML=`${shown.map(item=>`<a class="row${added.has(item.id)?' motion-new':''}" href="today.html?date=${item.key}" target="_blank" rel="noopener"><span class="row-text">${escapeHtml(item.text)}</span><span class="date">${dateLabel(item.key)}</span></a>`).join('')}${limit<Math.min(all.length,30)?'<button class="more" type="button" data-more>더보기</button>':''}`;}
+      function render(){const all=achievements,shown=all.slice(0,Math.min(limit,30)),currentIds=new Set(all.map(item=>item.id)),added=knownIds?new Set(all.filter(item=>!knownIds.has(item.id)).map(item=>item.id)):new Set();knownIds=currentIds;count.textContent=`${all.length}`;title.classList.toggle('idle',all.length>0);if(!all.length){content.className='empty idle is-empty';content.innerHTML='<div class="empty-title">첫 업적을 기다리고 있어요</div><div class="empty-copy">오늘 일기의 업적 또는 완료한 목표가 표시됩니다</div>';return;}content.className='list';content.innerHTML=`${shown.map(item=>`<a class="row${added.has(item.id)?' motion-new':''}" href="${item.source==='goal'?'../growth-page/goals.html':`today.html?date=${item.date}`}" target="_blank" rel="noopener"><span class="row-text">${escapeHtml(item.text)}</span><span class="date">${dateLabel(item.date)}</span></a>`).join('')}${limit<Math.min(all.length,30)?'<button class="more" type="button" data-more>더보기</button>':''}`;}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;limit=Math.min(30,limit+10);render();});
-      window.addEventListener('storage',event=>{if(event.key===KEY)render();});window.addEventListener('focus',render);render();
+      async function sync(){try{achievements=await Store.getAchievements();render();}catch(_){content.className='empty idle is-empty';content.innerHTML='<div class="empty-title">불러오기 실패</div><div class="empty-copy">잠시 후 다시 열어주세요</div>';}}
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>

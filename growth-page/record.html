@@ -277,11 +277,10 @@
     </section>
   </main>
 
+  <script src="../store.js"></script>
   <script>
     (() => {
       const SETTINGS_KEY = 'growth-stats-v1';
-      const DIARY_KEY = 'game-log-diary-4b-v2';
-      const READING_KEY = 'reading-notes-v1';
       const header = document.getElementById('header');
       const calendarShell = document.getElementById('calendarShell');
       const daysElement = document.getElementById('days');
@@ -291,7 +290,7 @@
       let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
       let selectedKey = null;
       let settings = readSettings();
-      let activity = readActivity();
+      let activity = { diary:{}, reading:{} };
 
       function pad(value) { return String(value).padStart(2, '0'); }
       function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
@@ -309,14 +308,6 @@
         const urls = source.found && Array.isArray(source.value?.urls) ? source.value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
         while (urls.length < 3) urls.push('');
         return { urls };
-      }
-      function readActivity() {
-        const diarySource = safeRead(DIARY_KEY);
-        const readingSource = safeRead(READING_KEY);
-        return {
-          diary: diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object' ? diarySource.value.entries : {},
-          reading: readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object' ? readingSource.value.byDate : {}
-        };
       }
       function countsFor(key) {
         return {
@@ -449,11 +440,11 @@
 
       window.addEventListener('storage', event => {
         if (event.key === SETTINGS_KEY) settings = readSettings();
-        if (event.key === DIARY_KEY || event.key === READING_KEY) activity = readActivity();
-        if ([SETTINGS_KEY, DIARY_KEY, READING_KEY].includes(event.key)) render();
+        if (event.key === SETTINGS_KEY) render();
       });
 
-      render();
+      async function sync(){try{const dates=await Store.getWrittenDates();activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};render();}catch(_){header.innerHTML='<span class="month-summary">불러오기 실패</span>';}}
+      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});render();sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>
