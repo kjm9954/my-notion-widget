@@ -123,31 +123,7 @@
       const LIBRARY_KEY = 'reading-library-v1';
       const QUOTES_KEY = 'reading-quotes-v1';
       const CHANNEL = 'reading';
-      const clone = value => JSON.parse(JSON.stringify(value));
-      const isoAgo = days => { const date = new Date(); date.setDate(date.getDate() - days); date.setHours(9, 0, 0, 0); return date.toISOString(); };
-      const DEMO_BOOKS = [
-        { id:'demo-thinking', title:'생각에 관한 생각', author:'대니얼 카너먼', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-simple', title:'단순한 진심', author:'박웅현', field:'심리', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-grow', title:'함께 자라기', author:'김창준', field:'경영', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-sapiens', title:'사피엔스', author:'유발 하라리', field:'심리', status:'done', star:4, one:'허구를 함께 믿는 힘', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-loonshots', title:'룬샷', author:'사피 바칼', field:'경영', status:'done', star:4, one:'아이디어와 실행 조직을 분리하기', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-pragmatic', title:'실용주의 프로그래머', author:'앤드류 헌트', field:'기술', status:'done', star:5, one:'작은 어긋남을 놓치지 않기', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-sparks', title:'생각의 탄생', author:'루트번스타인', field:'창의', status:'done', star:4, one:'생각은 관찰에서 시작된다', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-rules', title:'규칙 없음', author:'리드 헤이스팅스', field:'경영', status:'done', star:3, one:'자유에는 맥락이 필요하다', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-wish-1', title:'물고기는 존재하지 않는다', author:'룰루 밀러', field:'인문', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-wish-2', title:'아티스트 웨이', author:'줄리아 캐머런', field:'창의', status:'wishlist', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' },
-        { id:'demo-drop', title:'어려운 대화', author:'더글러스 스톤', field:'심리', status:'dropped', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'지금 필요한 주제와 거리가 있었음' }
-      ];
-      const DEMO_QUOTES = [
-        { id:'demo-q7', bookId:'demo-pragmatic', text:'깨진 창문을 그대로 두지 말 것.', page:'31', note:'작은 어긋남이 기준을 무너뜨린다.', thought:'', created:isoAgo(1) },
-        { id:'demo-q6', bookId:'demo-thinking', text:'우리는 아는 것보다 이야기하기 쉬운 것을 믿는다.', page:'142', note:'', thought:'', created:isoAgo(2) },
-        { id:'demo-q5', bookId:'demo-grow', text:'실력은 피드백의 속도에 비례한다.', page:'82', note:'', thought:'', created:isoAgo(3) },
-        { id:'demo-q4', bookId:'demo-sapiens', text:'허구를 믿는 능력이 협력의 규모를 결정했다.', page:'49', note:'브랜드도 결국 허구를 함께 믿는 일.', thought:'**신뢰**가 규모를 만든다.', created:isoAgo(5) },
-        { id:'demo-q3', bookId:'demo-grow', text:'학습은 개인의 재능이 아니라 팀의 습관이다.', page:'119', note:'회고를 격주로', thought:'', created:isoAgo(7) },
-        { id:'demo-q2', bookId:'demo-simple', text:'말을 줄이면 뜻이 남는다.', page:'66', note:'', thought:'', created:isoAgo(9) },
-        { id:'demo-q1', bookId:'demo-thinking', text:'직관은 빠르지만 게으르다.', page:'176', note:'판단이 급할 때일수록 절차를 믿자.', thought:'한 번 더 **확인**하기.', created:isoAgo(12) },
-        { id:'demo-q0', bookId:'demo-thinking', text:'기억은 저장이 아니라 재구성이다.', page:'138', note:'', thought:'', created:isoAgo(24) }
-      ];
+      const isDemoItem = item => String(item?.id || '').startsWith('demo-') || String(item?.bookId || '').startsWith('demo-');
       const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
       const els = {
         banner:document.getElementById('waitingBanner'), search:document.getElementById('searchInput'), filters:document.getElementById('fieldFilters'),
@@ -162,14 +138,17 @@
       let deleteArmed = false;
 
       function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
-      function readLibrary() {
-        let raw = null; try { raw = localStorage.getItem(LIBRARY_KEY); } catch (_) {}
-        const value = safeParse(raw, null); return value && Array.isArray(value.books) ? value : { books:clone(DEMO_BOOKS) };
+      function readCollection(key, field) {
+        let raw = null; try { raw = localStorage.getItem(key); } catch (_) {}
+        const value = safeParse(raw, null);
+        if (!value || !Array.isArray(value[field])) return { [field]:[] };
+        const items = value[field].filter(item => !isDemoItem(item));
+        const cleaned = { ...value, [field]:items };
+        if (items.length !== value[field].length) try { localStorage.setItem(key, JSON.stringify(cleaned)); } catch (_) {}
+        return cleaned;
       }
-      function readQuotes() {
-        let raw = null; try { raw = localStorage.getItem(QUOTES_KEY); } catch (_) {}
-        const value = safeParse(raw, null); return value && Array.isArray(value.quotes) ? value : { quotes:clone(DEMO_QUOTES) };
-      }
+      function readLibrary() { return readCollection(LIBRARY_KEY, 'books'); }
+      function readQuotes() { return readCollection(QUOTES_KEY, 'quotes'); }
       function writeQuotes(next) {
         try { localStorage.setItem(QUOTES_KEY, JSON.stringify(next)); } catch (_) { return false; }
         if (channel) channel.postMessage({ type:'changed', key:QUOTES_KEY }); return true;

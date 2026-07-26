@@ -323,7 +323,7 @@
         { glyph: '▤', label: '독서 노트', placeholder: '독서 노트 페이지 주소' },
         { glyph: '◇', label: '업무', placeholder: '업무 페이지 주소' }
       ];
-      let memorySettings = { start: '2024-02-29', urls: ['', '', ''] };
+      let memorySettings = { start: localKey(new Date()), urls: ['', '', ''] };
       let settings = readSettings();
       let settingsOpen = false;
       let statusExpanded = false;
@@ -345,7 +345,7 @@
         const urls = Array.isArray(value?.urls) ? value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
         while (urls.length < 3) urls.push('');
         return {
-          start: /^\d{4}-\d{2}-\d{2}$/.test(value?.start || '') ? value.start : '2024-02-29',
+          start: /^\d{4}-\d{2}-\d{2}$/.test(value?.start || '') && value.start !== '2024-02-29' ? value.start : localKey(new Date()),
           urls
         };
       }
@@ -366,29 +366,19 @@
           return raw === null ? { found: false, value: null } : { found: true, value: JSON.parse(raw) };
         } catch (_) { return { found: false, value: null }; }
       }
-      function demoDiary() {
-        const entries = {};
-        [1, 2, 3, 5, 6, 9, 12, 14, 17, 21, 24].forEach(days => { entries[keyDaysAgo(days)] = { demo: true }; });
-        return entries;
-      }
-      function demoReading() {
-        const byDate = {};
-        [[2, 2], [4, 1], [9, 3], [15, 1], [23, 1]].forEach(([days, count]) => { byDate[keyDaysAgo(days)] = count; });
-        return byDate;
-      }
       function readActivity() {
         const diarySource = safeRead(DIARY_KEY);
         const readingSource = safeRead(READING_KEY);
         const diary = diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object'
           ? diarySource.value.entries
-          : demoDiary();
+          : {};
         const reading = readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object'
           ? readingSource.value.byDate
-          : demoReading();
+          : {};
         return { diary, reading };
       }
       function tenure() {
-        const start = parseKey(settings.start) || new Date(2024, 1, 29);
+        const start = parseKey(settings.start) || localDay();
         const days = Math.max(0, dayDiff(start));
         return { days, level: Math.floor(days / 30) + 1 };
       }
@@ -396,7 +386,7 @@
         const recorded = new Set(keys);
         let days = 0;
         for (let offset = 0; offset < 14; offset += 1) if (recorded.has(keyDaysAgo(offset))) days += 1;
-        return Math.max(20, Math.round((days / 14) * 100));
+        return Math.round((days / 14) * 100);
       }
       function gapFromLast(keys) {
         const today = localDay();
@@ -529,7 +519,7 @@
 
       card.addEventListener('input', event => {
         if (event.target.matches('[data-start-date]')) {
-          settings.start = event.target.value || '2024-02-29';
+          settings.start = event.target.value || localKey(new Date());
           saveSettings();
           document.getElementById('tenureHelp').textContent = `근속 30일마다 Lv +1 · 현재 D+${tenure().days}`;
           return;

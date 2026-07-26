@@ -310,22 +310,12 @@
         while (urls.length < 3) urls.push('');
         return { urls };
       }
-      function demoDiary() {
-        const entries = {};
-        [1, 2, 3, 5, 6, 9, 12, 14, 17, 21, 24].forEach(days => { entries[keyDaysAgo(days)] = { demo: true }; });
-        return entries;
-      }
-      function demoReading() {
-        const byDate = {};
-        [[2, 2], [4, 1], [9, 3], [15, 1], [23, 1]].forEach(([days, count]) => { byDate[keyDaysAgo(days)] = count; });
-        return byDate;
-      }
       function readActivity() {
         const diarySource = safeRead(DIARY_KEY);
         const readingSource = safeRead(READING_KEY);
         return {
-          diary: diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object' ? diarySource.value.entries : demoDiary(),
-          reading: readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object' ? readingSource.value.byDate : demoReading()
+          diary: diarySource.found && diarySource.value?.entries && typeof diarySource.value.entries === 'object' ? diarySource.value.entries : {},
+          reading: readingSource.found && readingSource.value?.byDate && typeof readingSource.value.byDate === 'object' ? readingSource.value.byDate : {}
         };
       }
       function countsFor(key) {
