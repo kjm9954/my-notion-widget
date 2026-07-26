@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 노트 · 책 현황</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --text:#12303C; --title:#33505C; --secondary:#6B8794;
+      --deep:#55707C; --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --border:#E6EDF0; --border-soft:#F1F5F7; --surface:#FFFFFF; --surface-soft:#FAFCFD;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button { font:inherit; color:inherit; }
+    .card {
+      width:100%; max-width:340px; height:640px; margin:0 auto; padding:22px; overflow:hidden;
+      display:flex; flex-direction:column; gap:18px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .card.is-empty { height:auto; min-height:230px; }
+    .card-title { margin:0; color:var(--title); font-size:12px; font-weight:800; line-height:1.4; }
+    .total-block { display:flex; flex-direction:column; gap:8px; }
+    .eyebrow, .recent-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .total { display:flex; align-items:baseline; gap:7px; }
+    .total-number { color:var(--text); font-size:46px; font-weight:800; line-height:1; letter-spacing:-.02em; }
+    .total-unit { color:var(--secondary); font-size:12px; font-weight:800; }
+    .years { padding:15px 16px; display:flex; flex-direction:column; gap:11px; background:var(--surface-soft); border:1px solid var(--border-soft); border-radius:12px; }
+    .year-row { display:flex; align-items:baseline; justify-content:space-between; }
+    .year-label { color:var(--secondary); font-size:11px; font-weight:600; }
+    .year-count { color:var(--deep); font-size:13px; font-weight:800; }
+    .year-row.is-current .year-label { color:var(--action); font-weight:700; }
+    .year-row.is-current .year-count { color:var(--action); font-size:16px; }
+    .year-row.is-old .year-label, .year-row.is-old .year-count { color:var(--muted); }
+    .recent-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:11px; }
+    .recent-list { min-height:0; flex:1; display:flex; flex-direction:column; gap:9px; }
+    .book-item { min-height:66px; display:flex; align-items:center; gap:11px; }
+    .cover {
+      width:44px; aspect-ratio:2 / 3; flex:0 0 auto; overflow:hidden; display:flex; align-items:flex-end;
+      padding:7px; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:9px;
+    }
+    .cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border); }
+    .cover img { width:100%; height:100%; display:block; object-fit:cover; }
+    .cover-title { color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; word-break:keep-all; }
+    .book-copy { min-width:0; display:flex; flex-direction:column; gap:5px; }
+    .book-title {
+      overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      color:var(--text); font-size:11px; font-weight:700; line-height:1.4;
+    }
+    .book-meta { color:var(--faint); font-size:9px; font-weight:700; line-height:1.4; }
+    .empty-state {
+      min-height:160px; flex:1; padding:20px; display:grid; place-content:center; gap:6px; text-align:center;
+      background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+    }
+    .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    @media (max-width:639px) {
+      .total-number { font-size:40px; }
+      .cover { width:40px; }
+      .book-item { min-height:60px; }
+      .book-item:nth-child(n+4) { display:none; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-count.html" data-widget-max-width="340" data-widget-height="640" data-widget-max-scale="4" style="--widget-max-width:340px;--widget-base-width:340px;--widget-base-height:640px;--widget-visual-height:640px">
+    <main class="card" data-widget-card aria-label="책 현황 위젯">
+      <h1 class="card-title">책 현황</h1>
+      <div id="content"></div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+    </main>
+  </div>
+
+  <script>
+    const DATA = {
+      total:128,
+      years:[{ y:2026, n:31 }, { y:2025, n:47 }, { y:2024, n:50 }],
+      recent:[
+        { title:'밝은 밤', author:'최은영', date:'7월 21일', cover:null },
+        { title:'코스모스', author:'칼 세이건', date:'7월 14일', cover:null },
+        { title:'물고기는 존재하지 않는다', author:'룰루 밀러', date:'7월 5일', cover:null },
+        { title:'함께 자라기', author:'김창준', date:'6월 28일', cover:null }
+      ]
+    };
+
+    (() => {
+      const card = document.querySelector('.card');
+      const content = document.getElementById('content');
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+      const cover = book => book.cover
+        ? `<div class="cover has-image"><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"><span class="cover-title" hidden>${escapeHtml(book.title)}</span></div>`
+        : `<div class="cover"><span class="cover-title">${escapeHtml(book.title)}</span></div>`;
+
+      function bindCoverFallbacks() {
+        content.querySelectorAll('.cover.has-image img').forEach(image => image.addEventListener('error', () => {
+          const shell = image.parentElement;
+          shell.classList.remove('has-image');
+          image.remove();
+          const title = shell.querySelector('.cover-title');
+          if (title) title.hidden = false;
+        }, { once:true }));
+      }
+
+      function render() {
+        if (!DATA.total) {
+          card.classList.add('is-empty');
+          content.innerHTML = `<section class="empty-state"><strong>아직 완독한 책이 없어요</strong><span>DB에서 상태를 완독으로 바꾸면 여기 쌓입니다</span></section>`;
+          return;
+        }
+        const years = DATA.years.filter(item => Number.isFinite(item.n) && item.n > 0).slice(0, 3);
+        const recent = DATA.recent.slice(0, 4);
+        content.style.display = 'contents';
+        content.innerHTML = `
+          <section class="total-block"><span class="eyebrow">지금까지</span><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권</span></div></section>
+          ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${index === 0 ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${index === 0 ? ' · 올해' : ''}</span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
+          ${recent.length ? `<section class="recent-section"><span class="recent-label">최근에 덮은 책</span><div class="recent-list">${recent.map(book => `<article class="book-item">${cover(book)}<div class="book-copy"><strong class="book-title">${escapeHtml(book.title)}</strong><span class="book-meta">${escapeHtml(book.author)} · ${escapeHtml(book.date)}</span></div></article>`).join('')}</div></section>` : ''}`;
+        bindCoverFallbacks();
+      }
+
+      render();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>

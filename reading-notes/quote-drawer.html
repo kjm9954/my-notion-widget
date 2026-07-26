@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 노트 · 문장 서랍</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --text:#12303C; --title:#33505C; --secondary:#6B8794;
+      --deep:#55707C; --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --border:#DCE7ED; --border-soft:#E6EDF0; --border-faint:#F1F5F7; --quote:#CFE2EA;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD; --pill:#F5F9FB;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, textarea { font:inherit; color:inherit; }
+    button { cursor:pointer; }
+    .card {
+      width:100%; max-width:640px; height:640px; margin:0 auto; padding:20px; overflow:hidden;
+      display:flex; flex-direction:column; gap:13px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .card.is-empty { height:300px; }
+    .fixed { flex:0 0 auto; display:flex; flex-direction:column; gap:13px; }
+    .header { min-height:40px; display:flex; align-items:center; }
+    .title { color:var(--title); font-size:12px; font-weight:800; }
+    .refresh { width:40px; height:40px; margin-left:auto; padding:0; border:0; background:transparent; color:var(--muted); font-size:12px; font-weight:700; }
+    .today-quote { padding:3px 0 3px 14px; border-left:2px solid var(--quote); }
+    .today-text { color:var(--text); font-size:15px; font-weight:600; line-height:1.7; }
+    .today-source { margin-top:6px; color:var(--faint); font-size:9px; font-weight:700; }
+    .search {
+      width:100%; min-height:40px; padding:10px 12px; border:1px solid var(--border-soft); border-radius:9px;
+      background:var(--surface-soft); font-size:11px; font-weight:600; outline:none;
+    }
+    .search:focus, .thought-input:focus { border-color:var(--action); outline:2px solid #E2F0F6; }
+    .filters { min-height:28px; display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+    .chip {
+      min-height:28px; padding:5px 11px; border:0; border-radius:999px; background:var(--pill);
+      color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
+    }
+    .chip.is-selected { color:#FFFFFF; background:var(--action); }
+    .chip.more { border:1px dashed var(--inactive); background:#FFFFFF; color:var(--muted); }
+    .list-shell {
+      min-height:160px; flex:1; padding:10px; overflow-y:auto; background:var(--surface-soft);
+      border:1px solid var(--border-faint); border-radius:12px; scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
+    .quote-item { overflow:hidden; background:#FFFFFF; border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    .quote-item + .quote-item { margin-top:6px; }
+    .quote-summary { width:100%; padding:12px 13px; text-align:left; border:0; background:#FFFFFF; }
+    .quote-text { color:var(--text); font-size:12px; font-weight:600; line-height:1.7; white-space:normal; }
+    .quote-meta { margin-top:7px; display:flex; align-items:center; gap:10px; }
+    .quote-book { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
+    .quote-age { flex:0 0 auto; color:var(--inactive); font-size:9px; font-weight:700; }
+    .detail { margin:0 13px; padding:12px 0 13px; border-top:1px solid var(--border-faint); }
+    .detail-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .thought { margin-top:8px; color:var(--deep); font-size:12px; font-weight:600; line-height:1.7; white-space:pre-wrap; }
+    .thought.is-empty { color:var(--muted); }
+    .thought-input {
+      width:100%; height:84px; margin-top:8px; padding:10px; resize:none; border:1px solid var(--border);
+      border-radius:9px; background:var(--surface-soft); font-size:12px; font-weight:600; line-height:1.7; outline:none;
+    }
+    .detail-foot { min-height:40px; margin-top:8px; display:flex; align-items:center; gap:10px; }
+    .edit-button {
+      min-height:34px; padding:6px 12px; border:1px solid var(--border); border-radius:8px;
+      background:#FFFFFF; color:var(--action); font-size:11px; font-weight:700;
+    }
+    .page { margin-left:auto; color:var(--inactive); font-size:9px; font-weight:700; }
+    .empty-state {
+      height:100%; min-height:180px; padding:20px; display:grid; place-content:center; gap:6px; text-align:center;
+      background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+    }
+    .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    .hidden { display:none !important; }
+    @media (max-width:639px) {
+      .today-text { font-size:14px; }
+      .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
+      .chip { min-height:40px; flex:0 0 auto; }
+      .quote-summary { min-height:40px; padding:11px 12px; }
+      .edit-button { min-height:40px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-quote-drawer.html" data-widget-max-width="640" data-widget-height="640" data-widget-max-scale="4" style="--widget-max-width:640px;--widget-base-width:640px;--widget-base-height:640px;--widget-visual-height:640px">
+    <main class="card" data-widget-card aria-label="문장 서랍 위젯">
+      <div class="fixed" data-widget-fixed id="fixedArea">
+        <header class="header"><span class="title">문장 서랍</span><button class="refresh" id="refresh" type="button" aria-label="오늘의 문장 다시 뽑기">↻</button></header>
+        <section class="today-quote" id="todayQuote"></section>
+        <input class="search" id="search" type="search" placeholder="⌕ 문장 · 책 이름으로 찾기" aria-label="문장 또는 책 이름 검색">
+        <nav class="filters" id="filters" aria-label="책 필터"></nav>
+      </div>
+      <section class="list-shell" data-widget-list id="quoteList" aria-label="필사 문장 목록"></section>
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="문장 목록 세로 크기 조절"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+    </main>
+  </div>
+
+  <script>
+    const DATA = [
+      { id:1, text:'별을 본다는 건 아주 오래전에 출발한 빛이 지금의 나에게 도착하는 순간을 바라보는 일이다.', book:'코스모스', cat:'과학', page:'312p', ago:'2주 전', note:'멀리 있는 것을 바라보는 일이 지금의 나를 더 선명하게 만든다.' },
+      { id:2, text:'한 사람을 이해한다는 것은 그가 지나온 시간을 함께 상상해 보는 일인지도 모른다.', book:'밝은 밤', cat:'소설', page:'178p', ago:'3주 전', note:'다정함은 서둘러 판단하지 않는 태도에서 시작된다.' },
+      { id:3, text:'우리는 사실을 기억하는 것이 아니라 마지막으로 떠올렸던 기억을 다시 저장한다.', book:'생각에 관한 생각', cat:'심리', page:'142p', ago:'1개월 전', note:'' },
+      { id:4, text:'실력은 반복한 시간보다 얼마나 자주 정확한 피드백을 받았는지에 더 크게 좌우된다.', book:'함께 자라기', cat:'경영', page:'82p', ago:'1개월 전', note:'작게 시도하고 빠르게 확인하는 환경을 먼저 만들자.' },
+      { id:5, text:'혼돈은 질서의 반대가 아니라 우리가 아직 이해하지 못한 형태일 수 있다.', book:'물고기는 존재하지 않는다', cat:'인문', page:'204p', ago:'2개월 전', note:'' },
+      { id:6, text:'말을 줄이면 사라지는 것은 장식이고 끝까지 남는 것이 뜻이다.', book:'보통의 언어들', cat:'인문', page:'66p', ago:'2개월 전', note:'설명하기 전에 가장 남기고 싶은 한 문장을 먼저 찾기.' },
+      { id:7, text:'허구를 함께 믿는 능력이 인간의 협력 규모를 낯선 이들 사이까지 넓혔다.', book:'사피엔스', cat:'인문', page:'49p', ago:'3개월 전', note:'' },
+      { id:8, text:'좋은 도구는 생각을 대신하지 않고 생각이 더 멀리 갈 수 있도록 자리를 만든다.', book:'실용주의 프로그래머', cat:'기술', page:'31p', ago:'3개월 전', note:'도구를 늘리기 전에 반복되는 판단부터 분리하자.' }
+    ];
+
+    (() => {
+      const card = document.querySelector('.card');
+      const fixedArea = document.getElementById('fixedArea');
+      const todayQuote = document.getElementById('todayQuote');
+      const refresh = document.getElementById('refresh');
+      const search = document.getElementById('search');
+      const filters = document.getElementById('filters');
+      const quoteList = document.getElementById('quoteList');
+      const listHandle = document.querySelector('[data-widget-list-handle]');
+      const items = DATA.map(item => ({ ...item }));
+      const books = [...new Set(items.map(item => item.book))];
+      let todayIndex = items.length ? Math.floor(Math.random() * items.length) : 0;
+      let selectedBook = '전체';
+      let chipsExpanded = false;
+      let activeId = null;
+      let editingId = null;
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+
+      function filteredItems() {
+        const query = search.value.trim().toLocaleLowerCase('ko');
+        return items.filter(item => (selectedBook === '전체' || item.book === selectedBook) && (!query || item.text.toLocaleLowerCase('ko').includes(query) || item.book.toLocaleLowerCase('ko').includes(query)));
+      }
+
+      function renderToday() {
+        if (!items.length) return;
+        const item = items[todayIndex % items.length];
+        todayQuote.innerHTML = `<div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
+      }
+
+      function renderFilters() {
+        const visibleBooks = chipsExpanded ? books : books.slice(0, 3);
+        const moreCount = Math.max(0, books.length - visibleBooks.length);
+        filters.classList.toggle('is-expanded', chipsExpanded);
+        filters.innerHTML = ['전체', ...visibleBooks].map(book => `<button class="chip ${book === selectedBook ? 'is-selected' : ''}" type="button" data-book="${escapeHtml(book)}">${escapeHtml(book)}</button>`).join('')
+          + (books.length > 3 ? `<button class="chip more" id="moreBooks" type="button">${chipsExpanded ? '접기' : `＋${moreCount}`}</button>` : '');
+        filters.querySelectorAll('[data-book]').forEach(button => button.addEventListener('click', () => {
+          selectedBook = button.dataset.book;
+          activeId = null;
+          editingId = null;
+          renderFilters();
+          renderList();
+        }));
+        document.getElementById('moreBooks')?.addEventListener('click', () => {
+          chipsExpanded = !chipsExpanded;
+          if (!chipsExpanded && !books.slice(0, 3).includes(selectedBook)) selectedBook = '전체';
+          renderFilters();
+          renderList();
+        });
+      }
+
+      function renderDetail(item) {
+        const editing = editingId === item.id;
+        return `<div class="detail"><div class="detail-label">이 문장에 대한 생각</div>${editing
+          ? `<textarea class="thought-input" id="thoughtInput" aria-label="이 문장에 대한 생각">${escapeHtml(item.note)}</textarea>`
+          : `<div class="thought ${item.note ? '' : 'is-empty'}">${escapeHtml(item.note || '적어둔 생각이 없어요')}</div>`}
+          <div class="detail-foot"><button class="edit-button" type="button" data-edit="${item.id}">${editing ? '저장' : item.note ? '수정' : '생각 적기'}</button><span class="page">${escapeHtml(item.page)}</span></div></div>`;
+      }
+
+      function bindList() {
+        quoteList.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => {
+          const id = Number(button.dataset.open);
+          activeId = activeId === id ? null : id;
+          editingId = null;
+          renderList();
+        }));
+        quoteList.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => {
+          const id = Number(button.dataset.edit);
+          if (editingId === id) {
+            const item = items.find(entry => entry.id === id);
+            if (item) item.note = document.getElementById('thoughtInput')?.value.trim() || '';
+            editingId = null;
+          } else editingId = id;
+          renderList();
+          if (editingId === id) document.getElementById('thoughtInput')?.focus();
+        }));
+      }
+
+      function renderList() {
+        const result = filteredItems();
+        if (!result.length) {
+          quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
+          return;
+        }
+        quoteList.innerHTML = result.map(item => `<article class="quote-item"><button class="quote-summary" type="button" data-open="${item.id}"><div class="quote-text">${escapeHtml(item.text)}</div><div class="quote-meta"><span class="quote-book">${escapeHtml(item.book)}</span><span class="quote-age">${escapeHtml(item.ago)}</span></div></button>${activeId === item.id ? renderDetail(item) : ''}</article>`).join('');
+        bindList();
+      }
+
+      function renderEmpty() {
+        card.classList.add('is-empty');
+        fixedArea.classList.add('hidden');
+        listHandle.classList.add('hidden');
+        quoteList.innerHTML = `<section class="empty-state"><strong>아직 옮겨둔 문장이 없어요</strong><span>책 페이지에서 문장을 적어두면 이 서랍에 모입니다</span></section>`;
+      }
+
+      refresh.addEventListener('click', () => { if (items.length > 1) todayIndex = (todayIndex + 1) % items.length; renderToday(); });
+      search.addEventListener('input', () => { activeId = null; editingId = null; renderList(); });
+      if (!items.length) renderEmpty();
+      else { renderToday(); renderFilters(); renderList(); }
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>

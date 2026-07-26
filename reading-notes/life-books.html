@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 노트 · 인생책</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --text:#12303C; --title:#33505C; --muted:#93A5AD;
+      --faint:#A2B4BC; --inactive:#C6D6DD; --border:#E6EDF0; --quote:#CFE2EA;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button { font:inherit; color:inherit; }
+    .card {
+      width:100%; max-width:1040px; min-height:130px; margin:0 auto; padding:16px 18px 15px; overflow:hidden;
+      display:flex; align-items:center; gap:14px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .cover-row { min-width:0; flex:0 0 auto; display:flex; align-items:center; gap:11px; }
+    .cover-button {
+      width:66px; aspect-ratio:2 / 3; flex:0 0 auto; padding:0; overflow:hidden; display:flex; align-items:flex-end;
+      text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:9px;
+      opacity:.55; outline:0; transition:opacity .12s, outline-color .12s;
+    }
+    .cover-button.is-selected { opacity:1; outline:2px solid var(--action); outline-offset:-2px; }
+    .cover-button.has-image { background:#F1F5F7; border:1px solid var(--border); }
+    .cover-button img { width:100%; height:100%; display:block; object-fit:cover; }
+    .cover-title { padding:7px; color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; word-break:keep-all; }
+    .quote-panel { min-width:0; flex:1; padding-left:13px; display:flex; flex-direction:column; justify-content:center; gap:7px; border-left:2px solid var(--quote); }
+    .quote-line {
+      overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      color:var(--text); font-size:12px; font-weight:600; line-height:1.65;
+    }
+    .quote-foot { display:flex; align-items:center; gap:12px; }
+    .quote-meta { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
+    .open-book { margin-left:auto; flex:0 0 auto; padding:6px 0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:700; }
+    .empty-state {
+      width:100%; min-height:96px; padding:18px; display:grid; place-content:center; gap:6px; text-align:center;
+      background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+    }
+    .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-state span { color:var(--muted); font-size:10px; font-weight:600; }
+    @media (max-width:999px) {
+      .cover-button { width:58px; }
+    }
+    @media (max-width:639px) {
+      .card { min-height:0; align-items:stretch; flex-direction:column; }
+      .cover-row { width:100%; overflow-x:auto; scrollbar-width:none; }
+      .cover-row::-webkit-scrollbar { display:none; }
+      .cover-button { width:52px; min-height:78px; }
+      .quote-panel { width:100%; margin-top:12px; flex:none; }
+      .open-book { min-height:40px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-life-books.html" data-widget-max-width="1040" data-widget-height="130" data-widget-max-scale="4" style="--widget-max-width:1040px;--widget-base-width:1040px;--widget-base-height:130px;--widget-visual-height:130px">
+    <main class="card" data-widget-card aria-label="인생책 위젯">
+      <div id="content" style="display:contents"></div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+    </main>
+  </div>
+
+  <script>
+    const DATA = [
+      { title:'코스모스', author:'칼 세이건', cover:null, line:'우리는 우주가 자신을 알아가는 하나의 방법이다.', url:'' },
+      { title:'밝은 밤', author:'최은영', cover:null, line:'서로의 삶을 오래 바라보는 일은 그 자체로 다정함이었다.', url:'' },
+      { title:'사피엔스', author:'유발 하라리', cover:null, line:'인간은 함께 상상할 수 있었기에 낯선 이들과 협력할 수 있었다.', url:'' },
+      { title:'함께 자라기', author:'김창준', cover:null, line:'학습은 혼자 쌓는 능력이 아니라 함께 만드는 환경이다.', url:'' },
+      { title:'물고기는 존재하지 않는다', author:'룰루 밀러', cover:null, line:'혼돈 속에서도 우리는 다시 이름을 붙이고 살아간다.', url:'' }
+    ];
+
+    (() => {
+      const content = document.getElementById('content');
+      let selectedIndex = 0;
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+      const coverMarkup = (book, index) => book.cover
+        ? `<button class="cover-button has-image ${index === selectedIndex ? 'is-selected' : ''}" type="button" data-book-index="${index}" aria-label="${escapeHtml(book.title)} 선택"><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"><span class="cover-title" hidden>${escapeHtml(book.title)}</span></button>`
+        : `<button class="cover-button ${index === selectedIndex ? 'is-selected' : ''}" type="button" data-book-index="${index}" aria-label="${escapeHtml(book.title)} 선택"><span class="cover-title">${escapeHtml(book.title)}</span></button>`;
+
+      function openBook(book) {
+        if (book?.url) window.open(book.url, '_blank', 'noopener');
+      }
+
+      function bind() {
+        content.querySelectorAll('[data-book-index]').forEach(button => button.addEventListener('click', () => {
+          const next = Number(button.dataset.bookIndex);
+          if (next === selectedIndex) openBook(DATA[next]);
+          else { selectedIndex = next; render(); }
+        }));
+        document.getElementById('openBook')?.addEventListener('click', () => openBook(DATA[selectedIndex]));
+        content.querySelectorAll('.cover-button.has-image img').forEach(image => image.addEventListener('error', () => {
+          const shell = image.parentElement;
+          shell.classList.remove('has-image');
+          image.remove();
+          const title = shell.querySelector('.cover-title');
+          if (title) title.hidden = false;
+        }, { once:true }));
+      }
+
+      function render() {
+        if (!DATA.length) {
+          content.innerHTML = `<section class="empty-state"><strong>아직 고른 책이 없어요</strong><span>DB에서 인생책으로 표시하면 여기 걸립니다</span></section>`;
+          return;
+        }
+        const selected = DATA[selectedIndex] || DATA[0];
+        content.innerHTML = `
+          <div class="cover-row" aria-label="인생책 표지 목록">${DATA.slice(0, 5).map(coverMarkup).join('')}</div>
+          ${selected.line ? `<section class="quote-panel"><div class="quote-line">${escapeHtml(selected.line)}</div><div class="quote-foot"><span class="quote-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.title)}</span><button class="open-book" id="openBook" type="button">책 페이지 열기 ›</button></div></section>` : ''}`;
+        bind();
+      }
+
+      render();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
