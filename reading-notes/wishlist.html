@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 노트 · 구매 예정</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --text:#12303C; --title:#33505C; --secondary:#6B8794;
+      --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD; --border:#DCE7ED;
+      --border-soft:#E6EDF0; --border-faint:#F1F5F7; --surface:#FFFFFF;
+      --surface-soft:#FAFCFD; --pill:#F5F9FB;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button { font:inherit; color:inherit; cursor:pointer; }
+    .card {
+      width:100%; max-width:1040px; min-height:390px; margin:0 auto; padding:20px; overflow:hidden;
+      display:flex; flex-direction:column; gap:14px; background:var(--surface); border-radius:18px;
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .header { min-height:28px; display:flex; align-items:center; gap:8px; }
+    .title { color:var(--title); font-size:12px; font-weight:800; }
+    .count { color:var(--faint); font-size:9px; font-weight:700; }
+    .chips { margin-left:auto; display:flex; align-items:center; gap:5px; }
+    .chip {
+      min-height:28px; padding:5px 11px; border:0; border-radius:999px; background:var(--pill);
+      color:var(--secondary); font-size:10px; font-weight:700; transition:color .12s, background-color .12s;
+    }
+    .chip.is-selected { color:#FFFFFF; background:var(--action); }
+    .body { min-height:0; flex:1; display:flex; align-items:flex-start; gap:16px; }
+    .featured { width:112px; flex:0 0 112px; display:flex; flex-direction:column; gap:7px; }
+    .featured-cover, .grid-cover {
+      width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:flex-end; padding:9px;
+      text-align:left; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+    }
+    .featured-cover.has-image, .grid-cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border-soft); }
+    .grid-cover { padding:7px; border-radius:9px; }
+    .featured-cover img, .grid-cover img { width:100%; height:100%; display:block; object-fit:cover; }
+    .cover-title { color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; word-break:keep-all; }
+    .featured-title {
+      overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      color:var(--text); font-size:11px; font-weight:800; line-height:1.4;
+    }
+    .featured-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
+    .bought {
+      min-height:34px; width:100%; padding:7px 0; border:1px solid var(--border); border-radius:8px;
+      background:#FFFFFF; color:var(--action); font-size:10px; font-weight:700; text-align:center;
+      transition:color .12s, border-color .12s;
+    }
+    .grid-shell {
+      min-width:0; flex:1; padding:13px; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr));
+      align-content:start; gap:11px; background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:12px;
+    }
+    .grid-cover { border-radius:9px; cursor:pointer; }
+    .more {
+      width:100%; aspect-ratio:2 / 3; padding:0; display:grid; place-items:center; border:1px dashed var(--inactive);
+      border-radius:9px; background:var(--surface-soft); color:var(--muted); font-size:10px; font-weight:800;
+    }
+    .filter-empty, .all-empty {
+      min-height:160px; padding:20px; display:grid; place-content:center; gap:6px; text-align:center;
+      background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px;
+    }
+    .filter-empty { width:100%; min-height:100%; }
+    .all-empty { width:100%; flex:1; }
+    .filter-empty strong, .all-empty strong { color:var(--title); font-size:12px; font-weight:800; }
+    .filter-empty span, .all-empty span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    @media (max-width:999px) {
+      .featured { width:96px; flex-basis:96px; }
+      .grid-shell { grid-template-columns:repeat(5, minmax(0, 1fr)); }
+    }
+    @media (max-width:639px) {
+      .card { min-height:0; }
+      .header { align-items:flex-start; flex-wrap:wrap; }
+      .chips { width:100%; margin-left:0; overflow-x:auto; scrollbar-width:none; }
+      .chips::-webkit-scrollbar { display:none; }
+      .chip { min-height:40px; flex:0 0 auto; }
+      .body { flex-direction:column; }
+      .featured { width:84px; flex-basis:auto; }
+      .bought { min-height:40px; }
+      .grid-shell { width:100%; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-wishlist.html" data-widget-max-width="1040" data-widget-height="390" data-widget-max-scale="4" style="--widget-max-width:1040px;--widget-base-width:1040px;--widget-base-height:390px;--widget-visual-height:390px">
+    <main class="card" data-widget-card aria-label="구매 예정 책 위젯">
+      <header class="header"><span class="title">구매 예정</span><span class="count" id="count"></span><nav class="chips" id="chips" aria-label="분야 필터"></nav></header>
+      <div class="body" id="content"></div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+    </main>
+  </div>
+
+  <script>
+    const DATA = [
+      { id:1, title:'밝은 밤', author:'최은영', cat:'소설', addedAgo:'3일 전', cover:null },
+      { id:2, title:'물고기는 존재하지 않는다', author:'룰루 밀러', cat:'인문', addedAgo:'5일 전', cover:null },
+      { id:3, title:'아티스트 웨이', author:'줄리아 캐머런', cat:'예술', addedAgo:'1주 전', cover:null },
+      { id:4, title:'다정한 것이 살아남는다', author:'브라이언 헤어', cat:'과학', addedAgo:'1주 전', cover:null },
+      { id:5, title:'작별하지 않는다', author:'한강', cat:'소설', addedAgo:'2주 전', cover:null },
+      { id:6, title:'이기적 유전자', author:'리처드 도킨스', cat:'과학', addedAgo:'2주 전', cover:null },
+      { id:7, title:'보통의 언어들', author:'김이나', cat:'인문', addedAgo:'3주 전', cover:null },
+      { id:8, title:'예술의 쓸모', author:'강은진', cat:'예술', addedAgo:'3주 전', cover:null },
+      { id:9, title:'파친코', author:'이민진', cat:'소설', addedAgo:'1개월 전', cover:null },
+      { id:10, title:'숨결이 바람 될 때', author:'폴 칼라니티', cat:'인문', addedAgo:'1개월 전', cover:null },
+      { id:11, title:'랩 걸', author:'호프 자런', cat:'과학', addedAgo:'1개월 전', cover:null },
+      { id:12, title:'방구석 미술관', author:'조원재', cat:'예술', addedAgo:'2개월 전', cover:null }
+    ];
+
+    (() => {
+      const count = document.getElementById('count');
+      const chips = document.getElementById('chips');
+      const content = document.getElementById('content');
+      const categories = [...new Set(DATA.map(book => book.cat).filter(Boolean))].slice(0, 3);
+      let books = DATA.map(book => ({ ...book }));
+      let category = '전체';
+      let selectedId = books[0]?.id ?? null;
+      let expanded = false;
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+
+      function filteredBooks() { return category === '전체' ? books : books.filter(book => book.cat === category); }
+      function coverMarkup(book, type, interactive = false) {
+        const tag = interactive ? 'button' : 'div';
+        const attributes = interactive ? ` type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)} 대표로 보기"` : '';
+        return book.cover
+          ? `<${tag} class="${type} has-image"${attributes}><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"><span class="cover-title" hidden>${escapeHtml(book.title)}</span></${tag}>`
+          : `<${tag} class="${type}"${attributes}><span class="cover-title">${escapeHtml(book.title)}</span></${tag}>`;
+      }
+
+      function bindCoverFallbacks() {
+        content.querySelectorAll('.has-image img').forEach(image => image.addEventListener('error', () => {
+          const shell = image.parentElement;
+          shell.classList.remove('has-image');
+          image.remove();
+          const title = shell.querySelector('.cover-title');
+          if (title) title.hidden = false;
+        }, { once:true }));
+      }
+
+      function renderChips() {
+        if (!books.length) { chips.hidden = true; chips.innerHTML = ''; return; }
+        chips.hidden = false;
+        chips.innerHTML = ['전체', ...categories].map(item => `<button class="chip ${item === category ? 'is-selected' : ''}" type="button" data-category="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('');
+        chips.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => {
+          category = button.dataset.category;
+          selectedId = filteredBooks()[0]?.id ?? null;
+          expanded = false;
+          render();
+        }));
+      }
+
+      function buySelected() {
+        books = books.filter(book => book.id !== selectedId);
+        selectedId = filteredBooks()[0]?.id ?? null;
+        expanded = false;
+        render();
+      }
+
+      function renderContent() {
+        if (!books.length) {
+          content.innerHTML = `<section class="all-empty"><strong>담아둔 책이 없어요</strong><span>사고 싶은 책을 DB에 추가하면 여기 표지가 놓입니다</span></section>`;
+          return;
+        }
+        const filtered = filteredBooks();
+        if (!filtered.length) {
+          content.innerHTML = `<section class="filter-empty"><strong>이 분야엔 담은 책이 없어요</strong></section>`;
+          return;
+        }
+        if (!filtered.some(book => book.id === selectedId)) selectedId = filtered[0].id;
+        const selected = filtered.find(book => book.id === selectedId);
+        const remaining = filtered.filter(book => book.id !== selectedId);
+        const shown = expanded ? remaining : remaining.slice(0, 7);
+        const hiddenCount = remaining.length - shown.length;
+        content.innerHTML = `
+          <section class="featured">${coverMarkup(selected, 'featured-cover')}<strong class="featured-title">${escapeHtml(selected.title)}</strong><span class="featured-meta">${escapeHtml(selected.author)} · ${escapeHtml(selected.addedAgo)} 담음</span><button class="bought" id="bought" type="button">✓ 샀다</button></section>
+          ${remaining.length ? `<section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>` : ''}`;
+        document.getElementById('bought')?.addEventListener('click', buySelected);
+        document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
+        content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); renderContent(); }));
+        bindCoverFallbacks();
+      }
+
+      function render() {
+        count.textContent = `${books.length}권`;
+        renderChips();
+        renderContent();
+      }
+
+      render();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
