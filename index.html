@@ -1061,7 +1061,7 @@
         const items = currentItems();
         const groups = Object.fromEntries(ORDER.map(q => [q, items.filter(item => item.q === q)]));
         const cells = ORDER.map(q => `
-          <section class="quadrant q-${q}" data-drop-q="${q}">
+          <section class="quadrant q-${q}${ui.mobileQ === q ? ' is-selected' : ''}" data-drop-q="${q}">
             <div class="quadrant-head">
               <span class="q-badge">${q}</span>
               <span class="quadrant-name">${QUADRANTS[q].full}</span>

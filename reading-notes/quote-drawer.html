@@ -30,7 +30,7 @@
     .header { min-height:40px; display:flex; align-items:center; }
     .title { color:var(--title); font-size:12px; font-weight:800; }
     .refresh { width:40px; height:40px; margin-left:auto; padding:0; border:0; background:transparent; color:var(--muted); font-size:12px; font-weight:700; }
-    .refresh.is-turning { animation:refresh-turn 400ms var(--ease); }
+    .refresh.is-turning { animation:refresh-turn var(--t-swap) var(--ease); }
     .today-quote { position:relative; padding:3px 0 3px 14px; }
     .today-quote .quote-rule { position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--quote); }
     .today-text { max-width:760px; color:var(--text); font-size:15px; font-weight:600; line-height:1.7; }

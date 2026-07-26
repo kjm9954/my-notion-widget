@@ -1,3 +1,131 @@
+/* Idle breath: keep exactly one target alive in each widget, prefer the whole
+   empty block when the current view is empty, and pause whenever attention is
+   elsewhere. A shared helper also lets removed rows close their own place. */
+(() => {
+  'use strict';
+
+  const card = document.querySelector('[data-widget-card]');
+  const file = decodeURIComponent(location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  const targets = {
+    'index.html': { selector:'.quadrant.is-selected', kind:'outline' },
+    'thoughts.html': { selector:'.banner-age, .entry-hint', empty:'.empty-list' },
+    'find.html': { selector:'.banner-label, .filter-caption:not([hidden]), .manage-button', empty:'.empty-list' },
+    'add.html': { selector:'.detail-toggle' },
+    'quote-drawer.html': { selector:'.today-quote .quote-rule', empty:'.empty-state' },
+    'life-books.html': { selector:'.quote-panel .quote-rule', empty:'.empty-state' },
+    'reading-count.html': { selector:'.eyebrow', empty:'.empty-state' },
+    'wishlist.html': { selector:'.bought', kind:'border', empty:'.all-empty, .filter-empty' },
+    'drawer.html': { selector:'.banner-title', empty:'.quote-list > .empty' },
+    'library.html': { selector:'.title', empty:'#libraryView > .no-books' },
+    'session.html': { selector:'.capture-hint', empty:'.draft-list:has(.draft-empty)' },
+    'today.html': { selector:'.date-title', empty:'.empty-block' },
+    'calendar.html': { selector:'.today-ring' },
+    'mood.html': { selector:'.control-label', empty:'.history > .empty' },
+    'achieve.html': { selector:'.title', empty:'#content.empty' },
+    'empty.html': { selector:'.title' },
+    'material.html': { selector:'.label-block .title', empty:'.chip-area > .empty' },
+    'stats.html': { selector:'.meter-label' },
+    'goals.html': { selector:'.goal-column.accent .column-label, .column-label', empty:'.goal-column .empty' },
+    'record.html': { selector:'.legend-item' }
+  };
+  const fallbackSelector = '.title, .card-title, .date-title, .month-title, .column-label, .meter-label, .label, .section-head';
+  let idleSyncQueued = false;
+
+  function isVisible(element) {
+    if (!element || element.hidden) return false;
+    const style = getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+  }
+
+  function firstVisible(selector) {
+    if (!selector) return null;
+    for (const part of selector.split(',').map(value => value.trim()).filter(Boolean)) {
+      const match = Array.from(document.querySelectorAll(part)).find(isVisible);
+      if (match) return match;
+    }
+    return null;
+  }
+
+  function idleNode(owner, kind) {
+    if (!owner || !kind) return owner;
+    owner.classList.add('idle-owner');
+    let overlay = Array.from(owner.children).find(child => child.hasAttribute('data-idle-outline'));
+    if (!overlay) {
+      overlay = document.createElement('span');
+      overlay.setAttribute('data-idle-outline', '');
+      overlay.setAttribute('aria-hidden', 'true');
+      owner.appendChild(overlay);
+    }
+    const className = `idle-outline idle-outline-${kind}`;
+    if (overlay.className !== className) overlay.className = className;
+    return overlay;
+  }
+
+  function hasExpandedState() {
+    const selector = '[aria-expanded="true"], .expanded, .detail:not(.hidden), .overlay:not(.hidden):not([hidden]), .settings-view';
+    return Array.from(document.querySelectorAll(selector)).some(isVisible);
+  }
+
+  function syncIdle() {
+    idleSyncQueued = false;
+    if (!card) return;
+    const config = targets[file] || {};
+    const emptyTarget = firstVisible(config.empty);
+    const owner = emptyTarget || firstVisible(config.selector) || firstVisible(fallbackSelector) || card;
+    const target = idleNode(owner, emptyTarget ? '' : config.kind);
+    const current = Array.from(document.querySelectorAll('.idle'));
+
+    current.forEach(element => {
+      if (element !== target) element.classList.remove('idle', 'is-empty', 'is-paused');
+    });
+    document.querySelectorAll('.idle-owner').forEach(element => {
+      if (element !== owner) element.classList.remove('idle-owner');
+    });
+    target.classList.add('idle');
+    target.classList.toggle('is-empty', Boolean(emptyTarget));
+    target.classList.toggle('is-paused', document.visibilityState !== 'visible');
+    document.body.classList.toggle('has-widget-expanded', hasExpandedState());
+  }
+
+  function queueIdleSync() {
+    if (idleSyncQueued) return;
+    idleSyncQueued = true;
+    queueMicrotask(syncIdle);
+  }
+
+  function syncBreath() {
+    const hidden = document.visibilityState !== 'visible';
+    document.body.classList.toggle('is-widget-hidden', hidden);
+    document.querySelectorAll('.idle').forEach(element => element.classList.toggle('is-paused', hidden));
+    queueIdleSync();
+  }
+
+  document.addEventListener('visibilitychange', syncBreath);
+  if (card) {
+    new MutationObserver(queueIdleSync).observe(card, { childList:true, subtree:true });
+    ['click', 'input', 'change'].forEach(type => card.addEventListener(type, () => setTimeout(queueIdleSync, 0)));
+  }
+  syncBreath();
+  queueIdleSync();
+
+  window.widgetMotion = {
+    close(element, done) {
+      if (!element) return;
+      const finish = () => { try { done?.(); } catch (_) {} };
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        finish();
+        return;
+      }
+      element.style.setProperty('--close-height', `${element.offsetHeight}px`);
+      element.classList.add('motion-close');
+      let settled = false;
+      const once = () => { if (settled) return; settled = true; finish(); };
+      element.addEventListener('animationend', once, { once: true });
+      setTimeout(once, 260);
+    }
+  };
+})();
+
 (() => {
   'use strict';
 
@@ -42,30 +170,29 @@
   const sizeHandles = [scaleHandle, topLeftHandle, leftWidthHandle, rightWidthHandle, topHeightHandle, bottomHeightHandle];
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
-  const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth;
-  const defaultWidth = Math.min(designWidth, Math.max(1, window.innerWidth));
-  host.style.setProperty('--widget-content-width', `${defaultWidth}px`);
-  card.style.setProperty('--widget-content-width', `${defaultWidth}px`);
-  const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight;
-  const initialNaturalHeight = card.offsetHeight || declaredHeight;
+  const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
+  const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
   const fixed = card.querySelector('[data-widget-fixed]');
-  const minimumWidth = Math.max(20, Math.min(80, defaultWidth));
-  const minimumHeight = Math.max(20, Math.min(60, initialNaturalHeight));
-  let requestedWidth = defaultWidth;
-  let requestedHeight = initialNaturalHeight;
-  let renderedWidth = defaultWidth;
-  let renderedHeight = initialNaturalHeight;
-  let naturalHeight = initialNaturalHeight;
-  let widthLocked = false;
-  let heightLocked = false;
+  const ABSOLUTE_MINIMUM_SCALE = .08;
+
+  let contentWidth = designWidth;
+  host.style.setProperty('--widget-content-width', `${contentWidth}px`);
+  card.style.setProperty('--widget-content-width', `${contentWidth}px`);
+
+  let naturalHeight = Math.max(1, card.offsetHeight || declaredHeight);
+  let requestedScale = 1;
+  let renderedScale = 1;
+  let scaleLocked = false;
   let requestedListHeight = null;
   let renderedListHeight = null;
+  let listLocked = false;
   let sizeDrag = null;
   let listDrag = null;
   let frameRequest = 0;
+  let frameTimer = 0;
 
   function number(value, fallback) {
     const parsed = Number(value);
@@ -82,97 +209,128 @@
   }
 
   function saveSize() {
-    const value = { width: requestedWidth, height: requestedHeight, widthLocked, heightLocked };
-    if (list) value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
+    const value = { scale: requestedScale, scaleLocked };
+    if (list) {
+      value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
+      value.listLocked = listLocked;
+    }
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
-  function maximumWidth() {
-    if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) {
-      return Math.max(minimumWidth, designWidth * configuredMaximumScale);
-    }
-    return Math.max(minimumWidth, window.innerWidth);
+  /* The widget never letterboxes: the white frame is always exactly the scaled
+     card, so a wide or short embed can never leave an empty band around it. */
+  function maximumScale() {
+    if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) return configuredMaximumScale;
+    const byWidth = Math.max(1, window.innerWidth) / contentWidth;
+    const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
+    return Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(byWidth, byHeight));
   }
 
-  function maximumHeight() {
-    if (Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0) {
-      return Math.max(minimumHeight, declaredHeight * configuredMaximumScale);
-    }
-    return Math.max(minimumHeight, window.innerHeight);
+  function minimumScale() {
+    return Math.min(ABSOLUTE_MINIMUM_SCALE, maximumScale());
   }
 
-  function visibleDimension(value, minimum, maximum) {
-    return Math.max(Math.min(minimum, maximum), Math.min(maximum, number(value, minimum)));
+  function measureContentWidth() {
+    return designWidth;
   }
 
-  function updateFrame() {
+  function scaleFromSaved(saved, fallback) {
+    if (Number.isFinite(Number(saved.scale))) return Number(saved.scale);
+    const axisScales = ['scaleX', 'scaleY'].map(name => Number(saved[name])).filter(Number.isFinite);
+    if (axisScales.length) return Math.min(...axisScales);
+    const legacy = [];
+    if (Number.isFinite(Number(saved.width))) legacy.push(Number(saved.width) / contentWidth);
+    if (Number.isFinite(Number(saved.height))) legacy.push(Number(saved.height) / naturalHeight);
+    if (legacy.length) return Math.min(...legacy);
+    return fallback;
+  }
+
+  function commitFrame() {
     cancelAnimationFrame(frameRequest);
-    frameRequest = requestAnimationFrame(() => {
-      renderedWidth = visibleDimension(requestedWidth, minimumWidth, maximumWidth());
-      renderedHeight = visibleDimension(requestedHeight, minimumHeight, maximumHeight());
-      const contentScale = Math.max(.01, Math.min(
-        renderedWidth / Math.max(1, defaultWidth),
-        renderedHeight / Math.max(1, naturalHeight)
-      ));
-      host.style.setProperty('--widget-base-width', `${defaultWidth}px`);
-      host.style.setProperty('--widget-base-height', `${naturalHeight}px`);
-      host.style.setProperty('--widget-visual-width', `${renderedWidth}px`);
-      host.style.setProperty('--widget-visual-height', `${renderedHeight}px`);
-      host.style.setProperty('--widget-content-scale', String(contentScale));
-      card.style.setProperty('--widget-content-scale', String(contentScale));
-      host.dataset.widgetSizeReady = 'true';
-      sizeLabel.textContent = `${Math.round(renderedWidth)}×${Math.round(renderedHeight)}`;
+    clearTimeout(frameTimer);
+    frameRequest = 0;
+    frameTimer = 0;
 
-      sizeHandles.forEach(handle => {
-        const axis = handle.dataset.widgetScaleAxis || 'both';
-        if (axis === 'horizontal') {
-          handle.setAttribute('aria-valuemin', String(Math.round(minimumWidth)));
-          handle.setAttribute('aria-valuemax', String(Math.round(maximumWidth())));
-          handle.setAttribute('aria-valuenow', String(Math.round(requestedWidth)));
-          handle.setAttribute('aria-valuetext', `가로 ${Math.round(renderedWidth)}픽셀`);
-        } else if (axis === 'vertical') {
-          handle.setAttribute('aria-valuemin', String(Math.round(minimumHeight)));
-          handle.setAttribute('aria-valuemax', String(Math.round(maximumHeight())));
-          handle.setAttribute('aria-valuenow', String(Math.round(requestedHeight)));
-          handle.setAttribute('aria-valuetext', `세로 ${Math.round(renderedHeight)}픽셀`);
-        } else {
-          handle.setAttribute('aria-valuemin', '5');
-          handle.setAttribute('aria-valuemax', '400');
-          handle.setAttribute('aria-valuenow', '100');
-          handle.setAttribute('aria-valuetext', `${Math.round(renderedWidth)} × ${Math.round(renderedHeight)}픽셀`);
-        }
-      });
+    const nextContentWidth = measureContentWidth();
+    if (nextContentWidth !== contentWidth) {
+      contentWidth = nextContentWidth;
+      host.style.setProperty('--widget-content-width', `${contentWidth}px`);
+      card.style.setProperty('--widget-content-width', `${contentWidth}px`);
+    }
 
-      document.body.classList.toggle('is-widget-overflowing', renderedHeight > window.innerHeight + .5);
-      const rect = host.getBoundingClientRect();
-      topLeftHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.left + 6))}px`;
-      topLeftHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.top + 6))}px`;
-      scaleHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.right - 20))}px`;
-      scaleHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.bottom - 20))}px`;
+    renderedScale = Math.max(minimumScale(), Math.min(maximumScale(), requestedScale));
+    const visualWidth = contentWidth * renderedScale;
+    const visualHeight = naturalHeight * renderedScale;
 
-      const visibleTop = Math.max(6, rect.top);
-      const visibleBottom = Math.min(window.innerHeight - 6, rect.bottom);
-      const visibleMiddle = visibleBottom > visibleTop ? (visibleTop + visibleBottom) / 2 : window.innerHeight / 2;
-      const widthHandleTop = Math.max(6, Math.min(window.innerHeight - 52, visibleMiddle - 23));
-      leftWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.left + 6))}px`;
-      rightWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.right - 10))}px`;
-      leftWidthHandle.style.top = `${widthHandleTop}px`;
-      rightWidthHandle.style.top = `${widthHandleTop}px`;
+    host.style.setProperty('--widget-base-width', `${contentWidth}px`);
+    host.style.setProperty('--widget-base-height', `${naturalHeight}px`);
+    host.style.setProperty('--widget-visual-width', `${visualWidth}px`);
+    host.style.setProperty('--widget-visual-height', `${visualHeight}px`);
+    host.style.setProperty('--widget-content-scale', String(renderedScale));
+    card.style.setProperty('--widget-content-scale', String(renderedScale));
+    host.dataset.widgetSizeReady = 'true';
+    sizeLabel.textContent = `${Math.round(visualWidth)}×${Math.round(visualHeight)}`;
 
-      const visibleLeft = Math.max(6, rect.left);
-      const visibleRight = Math.min(window.innerWidth - 6, rect.right);
-      const visibleHorizontalMiddle = visibleRight > visibleLeft ? (visibleLeft + visibleRight) / 2 : window.innerWidth / 2;
-      const heightHandleLeft = Math.max(6, Math.min(window.innerWidth - 52, visibleHorizontalMiddle - 23));
-      topHeightHandle.style.left = `${heightHandleLeft}px`;
-      bottomHeightHandle.style.left = `${heightHandleLeft}px`;
-      topHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.top + 6))}px`;
-      bottomHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.bottom - 10))}px`;
+    sizeHandles.forEach(handle => {
+      const axis = handle.dataset.widgetScaleAxis || 'both';
+      if (axis === 'horizontal') {
+        handle.setAttribute('aria-valuemin', String(Math.round(contentWidth * minimumScale())));
+        handle.setAttribute('aria-valuemax', String(Math.round(contentWidth * maximumScale())));
+        handle.setAttribute('aria-valuenow', String(Math.round(visualWidth)));
+        handle.setAttribute('aria-valuetext', `가로 ${Math.round(visualWidth)}픽셀`);
+      } else if (axis === 'vertical') {
+        handle.setAttribute('aria-valuemin', String(Math.round(naturalHeight * minimumScale())));
+        handle.setAttribute('aria-valuemax', String(Math.round(naturalHeight * maximumScale())));
+        handle.setAttribute('aria-valuenow', String(Math.round(visualHeight)));
+        handle.setAttribute('aria-valuetext', `세로 ${Math.round(visualHeight)}픽셀`);
+      } else {
+        handle.setAttribute('aria-valuemin', String(Math.round(minimumScale() * 100)));
+        handle.setAttribute('aria-valuemax', String(Math.round(maximumScale() * 100)));
+        handle.setAttribute('aria-valuenow', String(Math.round(renderedScale * 100)));
+        handle.setAttribute('aria-valuetext', `${Math.round(visualWidth)} × ${Math.round(visualHeight)}픽셀`);
+      }
     });
+
+    document.body.classList.toggle('is-widget-overflowing', visualHeight > window.innerHeight + .5);
+    const rect = host.getBoundingClientRect();
+    topLeftHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.left + 6))}px`;
+    topLeftHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.top + 6))}px`;
+    scaleHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.right - 20))}px`;
+    scaleHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.bottom - 20))}px`;
+
+    const visibleTop = Math.max(6, rect.top);
+    const visibleBottom = Math.min(window.innerHeight - 6, rect.bottom);
+    const visibleMiddle = visibleBottom > visibleTop ? (visibleTop + visibleBottom) / 2 : window.innerHeight / 2;
+    const widthHandleTop = Math.max(6, Math.min(window.innerHeight - 52, visibleMiddle - 23));
+    leftWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.left + 6))}px`;
+    rightWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.right - 10))}px`;
+    leftWidthHandle.style.top = `${widthHandleTop}px`;
+    rightWidthHandle.style.top = `${widthHandleTop}px`;
+
+    const visibleLeft = Math.max(6, rect.left);
+    const visibleRight = Math.min(window.innerWidth - 6, rect.right);
+    const visibleHorizontalMiddle = visibleRight > visibleLeft ? (visibleLeft + visibleRight) / 2 : window.innerWidth / 2;
+    const heightHandleLeft = Math.max(6, Math.min(window.innerWidth - 52, visibleHorizontalMiddle - 23));
+    topHeightHandle.style.left = `${heightHandleLeft}px`;
+    bottomHeightHandle.style.left = `${heightHandleLeft}px`;
+    topHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.top + 6))}px`;
+    bottomHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.bottom - 10))}px`;
   }
 
-  function applySize(width, height, fromUser = false) {
-    if (Number.isFinite(width)) requestedWidth = fromUser ? visibleDimension(width, minimumWidth, maximumWidth()) : Math.max(minimumWidth, width);
-    if (Number.isFinite(height)) requestedHeight = fromUser ? visibleDimension(height, minimumHeight, maximumHeight()) : Math.max(minimumHeight, height);
+  /* A hidden or off-screen embed never gets an animation frame, so the timer
+     guarantees the frame is committed even when rAF stays parked. */
+  function updateFrame() {
+    if (frameRequest || frameTimer) return;
+    frameRequest = requestAnimationFrame(commitFrame);
+    frameTimer = setTimeout(commitFrame, 48);
+  }
+
+  function applyScale(value, fromUser = false) {
+    if (!Number.isFinite(value)) return;
+    requestedScale = fromUser
+      ? Math.max(minimumScale(), Math.min(maximumScale(), value))
+      : Math.max(ABSOLUTE_MINIMUM_SCALE, value);
+    if (fromUser) scaleLocked = true;
     updateFrame();
   }
 
@@ -186,24 +344,19 @@
     return Math.max(0, card.offsetHeight - list.offsetHeight);
   }
 
-  function listMaximum(offset) {
-    return Math.max(40, maximumHeight() - offset);
-  }
-
   function applyListHeight(value, fromUser = false) {
     if (!list) return;
+    if (fromUser) listLocked = true;
     const offset = listOffset();
-    const maximum = listMaximum(offset);
+    const maximum = Math.max(40, (window.innerHeight / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
     const desired = number(value, requestedListHeight ?? list.offsetHeight);
     requestedListHeight = fromUser ? Math.max(Math.min(160, maximum), Math.min(maximum, desired)) : Math.max(40, desired);
     renderedListHeight = Math.max(40, Math.min(maximum, requestedListHeight));
     list.style.flex = `0 0 ${renderedListHeight}px`;
     list.style.height = `${renderedListHeight}px`;
-    const nextCardHeight = offset + renderedListHeight;
+    const nextCardHeight = Math.max(listLocked ? 1 : declaredHeight, offset + renderedListHeight);
     card.style.height = `${nextCardHeight}px`;
-    naturalHeight = Math.max(minimumHeight, nextCardHeight);
-    if (fromUser) heightLocked = true;
-    if (fromUser || !heightLocked) requestedHeight = naturalHeight;
+    naturalHeight = nextCardHeight;
     listHandle?.setAttribute('aria-valuenow', String(Math.round(requestedListHeight)));
     updateFrame();
   }
@@ -213,18 +366,16 @@
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-      const axis = handle.dataset.widgetScaleAxis || 'both';
-      widthLocked = axis === 'horizontal' || axis === 'both' ? true : widthLocked;
-      heightLocked = true;
       sizeDrag = {
         handle,
         pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         direction: ['top-left', 'left', 'top'].includes(handle.dataset.widgetScalePosition) ? -1 : 1,
-        axis,
-        width: renderedWidth,
-        height: renderedHeight
+        axis: handle.dataset.widgetScaleAxis || 'both',
+        scale: renderedScale,
+        width: contentWidth * renderedScale,
+        height: naturalHeight * renderedScale
       };
       handle.setPointerCapture?.(event.pointerId);
       document.body.classList.add('is-widget-scaling');
@@ -237,15 +388,14 @@
       const widthDelta = (event.clientX - sizeDrag.x) * 2 * sizeDrag.direction;
       const heightDelta = (event.clientY - sizeDrag.y) * 2 * sizeDrag.direction;
       if (sizeDrag.axis === 'horizontal') {
-        applySize(sizeDrag.width + widthDelta, null, true);
+        applyScale((sizeDrag.width + widthDelta) / contentWidth, true);
       } else if (sizeDrag.axis === 'vertical') {
-        applySize(null, sizeDrag.height + heightDelta, true);
+        applyScale((sizeDrag.height + heightDelta) / naturalHeight, true);
       } else {
         const widthRatio = widthDelta / Math.max(1, sizeDrag.width);
         const heightRatio = heightDelta / Math.max(1, sizeDrag.height);
         const ratio = Math.abs(widthRatio) >= Math.abs(heightRatio) ? widthRatio : heightRatio;
-        const factor = Math.max(.05, 1 + ratio);
-        applySize(sizeDrag.width * factor, sizeDrag.height * factor, true);
+        applyScale(sizeDrag.scale * Math.max(.05, 1 + ratio), true);
       }
     });
 
@@ -276,17 +426,11 @@
       event.preventDefault();
       const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
       if (axis === 'horizontal') {
-        widthLocked = true;
-        heightLocked = true;
-        applySize(requestedWidth + direction * 20, null, true);
+        applyScale((contentWidth * renderedScale + direction * 20) / contentWidth, true);
       } else if (axis === 'vertical') {
-        heightLocked = true;
-        applySize(null, requestedHeight + direction * 20, true);
+        applyScale((naturalHeight * renderedScale + direction * 20) / naturalHeight, true);
       } else {
-        widthLocked = true;
-        heightLocked = true;
-        const factor = 1 + direction * .05;
-        applySize(requestedWidth * factor, requestedHeight * factor, true);
+        applyScale(renderedScale * (1 + direction * .05), true);
       }
       saveSize();
     });
@@ -305,7 +449,7 @@
     listHandle.addEventListener('pointermove', event => {
       if (!listDrag || event.pointerId !== listDrag.pointerId) return;
       event.preventDefault();
-      applyListHeight(listDrag.height + event.clientY - listDrag.y, true);
+      applyListHeight(listDrag.height + (event.clientY - listDrag.y) / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale), true);
     });
 
     const finishList = event => {
@@ -327,25 +471,17 @@
   }
 
   const saved = readSize();
-  const legacyScale = number(saved.scale, 1);
-  const legacyScaleX = number(saved.scaleX, legacyScale);
-  const legacyScaleY = number(saved.scaleY, legacyScale);
-  const hasLegacySize = ['scale', 'scaleX', 'scaleY'].some(property => Object.prototype.hasOwnProperty.call(saved, property));
-  requestedWidth = Math.max(minimumWidth, number(saved.width, defaultWidth * legacyScaleX));
-  requestedHeight = Math.max(minimumHeight, number(saved.height, initialNaturalHeight * legacyScaleY));
-  widthLocked = saved.widthLocked === true || Object.prototype.hasOwnProperty.call(saved, 'width') || (hasLegacySize && Math.abs(legacyScaleX - 1) > .001);
-  heightLocked = saved.heightLocked === true || Object.prototype.hasOwnProperty.call(saved, 'height') || hasLegacySize;
+  scaleLocked = saved.scaleLocked === true || ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(property => Object.prototype.hasOwnProperty.call(saved, property));
+  requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(saved, 1));
+  listLocked = saved.listLocked === true || (Object.prototype.hasOwnProperty.call(saved, 'listH') && !Object.prototype.hasOwnProperty.call(saved, 'listLocked'));
   if (list) applyListHeight(number(saved.listH, list.offsetHeight));
-  applySize(requestedWidth, requestedHeight);
+  commitFrame();
 
   new ResizeObserver(() => {
-    naturalHeight = Math.max(minimumHeight, card.offsetHeight || naturalHeight);
-    if (!heightLocked && !listDrag) {
-      requestedHeight = naturalHeight;
-      updateFrame();
-    } else {
-      updateFrame();
-    }
+    const measured = Math.max(1, card.offsetHeight || naturalHeight);
+    if (Math.abs(measured - naturalHeight) < .5) return;
+    naturalHeight = measured;
+    updateFrame();
   }).observe(card);
 
   if (fixed) {
@@ -355,21 +491,22 @@
   }
 
   window.addEventListener('resize', () => {
-    if (!widthLocked) requestedWidth = Math.min(designWidth, Math.max(minimumWidth, window.innerWidth));
-    if (!heightLocked) requestedHeight = Math.max(minimumHeight, card.offsetHeight || naturalHeight);
+    if (!scaleLocked) requestedScale = 1;
     if (list && requestedListHeight !== null) applyListHeight(requestedListHeight);
     else updateFrame();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') updateFrame();
   });
 
   window.addEventListener('storage', event => {
     if (event.key !== key) return;
     const next = readSize();
-    const nextLegacyScale = number(next.scale, 1);
-    requestedWidth = Math.max(minimumWidth, number(next.width, defaultWidth * number(next.scaleX, nextLegacyScale)));
-    requestedHeight = Math.max(minimumHeight, number(next.height, initialNaturalHeight * number(next.scaleY, nextLegacyScale)));
-    widthLocked = next.widthLocked === true || Object.prototype.hasOwnProperty.call(next, 'width');
-    heightLocked = next.heightLocked === true || Object.prototype.hasOwnProperty.call(next, 'height');
+    scaleLocked = next.scaleLocked === true || ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(property => Object.prototype.hasOwnProperty.call(next, property));
+    requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(next, 1));
+    listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
     if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
-    applySize(requestedWidth, requestedHeight);
+    updateFrame();
   });
 })();

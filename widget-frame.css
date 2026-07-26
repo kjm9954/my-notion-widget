@@ -8,6 +8,8 @@
   --t-gauge: 400ms;
   --t-mark: 800ms;
   --ease: cubic-bezier(.2,.6,.2,1);
+  --breath-lo: .55;
+  --breath-dur: 8s;
 }
 
 html,
@@ -33,11 +35,14 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   align-items: flex-start !important;
 }
 
+/* The frame is always exactly the scaled card: width/height come from one
+   shared scale, so a wide or short embed can never leave an empty white band
+   around the content. The fallbacks keep that true before the script runs. */
 .widget-host {
   position: relative;
-  width: var(--widget-visual-width, 100%);
+  width: var(--widget-visual-width, var(--widget-base-width, 100%));
   max-width: none;
-  height: var(--widget-visual-height, var(--widget-base-height));
+  height: var(--widget-visual-height, var(--widget-base-height, auto));
   min-height: 0 !important;
   display: flex !important;
   align-items: center;
@@ -47,7 +52,7 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   padding: 0 !important;
   overflow: hidden;
   background: #FFFFFF;
-  border-radius: 18px;
+  border-radius: calc(18px * var(--widget-content-scale, 1));
   box-shadow: 0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
 }
 
@@ -251,18 +256,70 @@ a:active,
 
 .chip.selected,
 .chip.is-selected,
-.segment.active {
+.segment.active,
+.book-chip.is-selected,
+.filter.is-selected,
+.status-button.is-selected,
+.temperature-part.active,
+.word-button.active,
+.photo-thumb.active,
+.day.selected,
+.item-card.selected,
+.mobile-item.selected,
+.mobile-q-button.selected,
+.q-choice.active,
+.status-button.active {
   outline: 2px solid #0E5C7A;
   outline-offset: -2px;
 }
 
-@keyframes quote-breath {
-  0%, 100% { opacity: .55; }
+/* Idle breath — the only always-on animation, and only ever on one element
+   per widget. It changes opacity and nothing else. */
+@keyframes idle-breath {
+  0%, 100% { opacity: var(--breath-lo); }
   50% { opacity: 1; }
 }
 
-.quote-rule {
-  animation: quote-breath 8s var(--ease) infinite;
+.idle {
+  animation: idle-breath var(--breath-dur) var(--ease) infinite;
+}
+
+.idle.is-empty {
+  --breath-lo: .8;
+  --breath-dur: 12s;
+}
+
+.idle-owner {
+  position: relative;
+}
+
+.idle-outline {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.idle-outline-outline {
+  outline: 2px solid #0E5C7A;
+  outline-offset: -2px;
+}
+
+.idle-outline-border {
+  border: 1px solid #0E5C7A;
+}
+
+body.is-widget-hidden .idle,
+.card:hover .idle,
+.card:focus-within .idle,
+[data-widget-card]:hover .idle,
+[data-widget-card]:focus-within .idle,
+.idle:hover,
+.idle.is-paused,
+body.has-widget-expanded .idle {
+  animation-play-state: paused;
 }
 
 @keyframes content-swap {
@@ -280,9 +337,31 @@ a:active,
   to { background-color: transparent; }
 }
 
+/* Removal: the row fades, then its place closes and the rows below pull up. */
+@keyframes item-close {
+  0% { opacity: 1; height: var(--close-height); }
+  40% { opacity: 0; height: var(--close-height); }
+  100% {
+    opacity: 0;
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+  }
+}
+
 .motion-swap { animation: content-swap var(--t-swap) var(--ease); }
-.motion-calendar-swap { animation: calendar-swap 140ms var(--ease); }
+.motion-calendar-swap { animation: calendar-swap var(--t-swap) var(--ease); }
 .motion-new { animation: item-mark var(--t-mark) var(--ease); }
+
+.motion-close {
+  overflow: hidden;
+  pointer-events: none;
+  animation: item-close var(--t-close) var(--ease) forwards;
+}
 
 body.is-widget-scaling,
 body.is-widget-list-resizing {
@@ -298,9 +377,16 @@ body.is-widget-list-resizing {
   }
 }
 
+/* Motion off. The reduced-motion contract intentionally resolves every
+   animated or transitioned element to its fully visible end state. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
+    opacity: 1 !important;
+  }
+
+  .motion-close {
+    display: none !important;
   }
 }

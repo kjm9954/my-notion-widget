@@ -33,11 +33,11 @@
     .detail-input.is-opening,.detail-input.is-closing { height:0; padding-top:0; padding-bottom:0; border-color:transparent; opacity:0; pointer-events:none; }
     .section-divider { height:1px; flex:0 0 1px; margin:2px -18px; background:var(--border-soft); }
     .banner { position:relative; height:64px; display:flex; flex:0 0 64px; flex-direction:column; justify-content:center; gap:6px; padding:12px 13px; overflow:hidden; background:var(--action-soft); border-radius:12px; outline:2px solid transparent; outline-offset:-2px; cursor:pointer; }
-    .banner .quote-rule { position:absolute; left:0; top:12px; bottom:12px; }
     .banner.empty { cursor:default; }
     .banner-top { min-width:0; display:flex; align-items:center; gap:7px; }
     .banner-refresh { margin-left:auto; color:var(--action); }
     .banner-one { min-width:0; flex:1 1 auto; overflow:hidden; font-size:13px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+    .banner-age { flex:0 0 auto; color:var(--muted); font-size:9px; font-weight:700; white-space:nowrap; }
     .banner-empty { color:var(--secondary); font-size:12px; font-weight:650; }
     .search { width:100%; height:36px; flex:0 0 36px; padding:0 11px; }
     .filter-row { height:26px; }
@@ -116,7 +116,7 @@
       function targetCat(){return store.cats.includes(filterCat)?filterCat:store.cats[0];}
       function catParticle(cat){const code=cat.charCodeAt(cat.length-1)-44032;return code>=0&&code<=11171&&code%28!==0&&code%28!==8?'으로':'로';}
       function renderEntryHint(){const cat=targetCat();entryHint.innerHTML=`<b>${escapeHtml(cat)}</b>${catParticle(cat)} 저장됩니다`;}
-      function renderBanner(animate=false){const item=itemById(bannerId);if(!item){banner.className='banner empty';banner.innerHTML='<div class="banner-empty">생각을 적으면 오래된 기록을 다시 꺼내드려요</div>';return;}banner.className=`banner${animate?' motion-swap':''}`;banner.innerHTML=`<span class="quote-rule" aria-hidden="true"></span><div class="banner-top"><div class="banner-one">${escapeHtml(item.one)}</div><button class="banner-refresh" type="button" data-refresh>다른 생각</button></div>`;}
+      function renderBanner(animate=false){const item=itemById(bannerId);if(!item){banner.className='banner empty';banner.innerHTML='<div class="banner-empty">생각을 적으면 오래된 기록을 다시 꺼내드려요</div>';return;}const elapsed=days(item.opened);banner.className=`banner${animate?' motion-swap':''}`;banner.innerHTML=`<div class="banner-top"><div class="banner-one">${escapeHtml(item.one)}</div><span class="banner-age">${elapsed===0?'오늘':`${elapsed}일`}</span><button class="banner-refresh" type="button" data-refresh>다른 생각</button></div>`;}
       function renderFilters(){filterChips.innerHTML=`<button class="chip${!filterCat?' selected':''}" type="button" data-filter="">전체</button>${store.cats.map(cat=>`<button class="chip${filterCat===cat?' selected':''}" type="button" data-filter="${escapeAttr(cat)}">${escapeHtml(cat)}</button>`).join('')}`;const count=filtered().length;filterCaption.hidden=!filterCat&&!query;filterCaption.textContent=`${count}개의 생각`;}
       function filtered(){const q=query.toLocaleLowerCase('ko');return store.items.filter(item=>(!filterCat||item.cat===filterCat)&&(!q||`${item.one} ${item.detail}`.toLocaleLowerCase('ko').includes(q))).sort((a,b)=>b.created-a.created);}
       function renderList(){const items=filtered();list.innerHTML=items.length?items.map(item=>`<button class="item${item.id===newId?' motion-new':''}" type="button" data-open="${escapeAttr(item.id)}"><span class="item-top"><span class="item-one">${escapeHtml(item.one)}</span>${item.id===newId?'<span class="new-mark">✓</span>':''}</span><span class="item-meta">${escapeHtml(item.cat)} · ${days(item.created)===0?'오늘':`${days(item.created)}일 전`}</span></button>`).join(''):'<div class="empty-list">조건에 맞는 생각이 없습니다</div>';}
