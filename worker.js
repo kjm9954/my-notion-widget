@@ -1,0 +1,186 @@
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+    if (request.method === "OPTIONS") return new Response(null, { headers: cors });
+
+    const json = (obj, status = 200) =>
+      new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+    try {
+      // ───────── 일기 ─────────
+      if (path === "/api/diary/save" && request.method === "POST") {
+        const d = await request.json();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO diary (date, mode, mood, achievements, images, quest, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(date) DO UPDATE SET
+             mode=excluded.mode, mood=excluded.mood, achievements=excluded.achievements,
+             images=excluded.images, quest=excluded.quest, updatedAt=excluded.updatedAt`
+        ).bind(d.date, d.mode || null, d.mood || null,
+               JSON.stringify(d.achievements || []), JSON.stringify(d.images || []),
+               JSON.stringify(d.quest || null), d.createdAt || now, now).run();
+        return json({ ok: true });
+      }
+
+      if (path === "/api/diary/get") {
+        const date = url.searchParams.get("date");
+        const row = await env.DB.prepare(`SELECT * FROM diary WHERE date = ?`).bind(date).first();
+        return json({ ok: true, data: row ? parseDiary(row) : null });
+      }
+
+      if (path === "/api/diary/range") {
+        const start = url.searchParams.get("start");
+        const end = url.searchParams.get("end");
+        const { results } = await env.DB.prepare(
+          `SELECT * FROM diary WHERE date >= ? AND date <= ? ORDER BY date ASC`
+        ).bind(start, end).all();
+        return json({ ok: true, data: (results || []).map(parseDiary) });
+      }
+
+      if (path === "/api/diary/dates") {
+        const { results } = await env.DB.prepare(`SELECT date FROM diary ORDER BY date ASC`).all();
+        return json({ ok: true, data: (results || []).map(r => r.date) });
+      }
+
+      if (path === "/api/diary/delete" && request.method === "POST") {
+        const { date } = await request.json();
+        await env.DB.prepare(`DELETE FROM diary WHERE date = ?`).bind(date).run();
+        return json({ ok: true });
+      }
+
+      // ───────── 감정 단어 ─────────
+      if (path === "/api/settings/mood-words" && request.method === "GET") {
+        const row = await env.DB.prepare(`SELECT value FROM widget_settings WHERE key = ?`)
+          .bind("moodWords").first();
+        return json({ ok: true, data: normalizeMoodWords(safeParse(row?.value, [])) });
+      }
+
+      if (path === "/api/settings/mood-words" && request.method === "POST") {
+        const body = await request.json();
+        if (!Array.isArray(body?.words)) return json({ ok: false, error: "words must be an array" }, 400);
+        const words = normalizeMoodWords(body?.words);
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO widget_settings (key, value, updatedAt) VALUES (?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value=excluded.value, updatedAt=excluded.updatedAt`
+        ).bind("moodWords", JSON.stringify(words), now).run();
+        return json({ ok: true, data: words });
+      }
+
+      // ───────── 생각 ─────────
+      if (path === "/api/thoughts/add" && request.method === "POST") {
+        const t = await request.json();
+        const now = new Date().toISOString();
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO thoughts (id, content, category, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)`
+        ).bind(id, t.content, t.category || null, now, now).run();
+        return json({ ok: true, id });
+      }
+
+      if (path === "/api/thoughts/list") {
+        const category = url.searchParams.get("category");
+        const keyword = url.searchParams.get("keyword");
+        let q = `SELECT * FROM thoughts WHERE 1=1`;
+        const binds = [];
+        if (category) { q += ` AND category = ?`; binds.push(category); }
+        if (keyword)  { q += ` AND content LIKE ?`; binds.push(`%${keyword}%`); }
+        q += ` ORDER BY createdAt DESC`;
+        const { results } = await env.DB.prepare(q).bind(...binds).all();
+        return json({ ok: true, data: results || [] });
+      }
+
+      if (path === "/api/thoughts/update" && request.method === "POST") {
+        const t = await request.json();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `UPDATE thoughts SET content=?, category=?, updatedAt=? WHERE id=?`
+        ).bind(t.content, t.category || null, now, t.id).run();
+        return json({ ok: true });
+      }
+
+      if (path === "/api/thoughts/delete" && request.method === "POST") {
+        const { id } = await request.json();
+        await env.DB.prepare(`DELETE FROM thoughts WHERE id = ?`).bind(id).run();
+        return json({ ok: true });
+      }
+
+      // ───────── 목표 ─────────
+      if (path === "/api/goals/add" && request.method === "POST") {
+        const g = await request.json();
+        const now = new Date().toISOString();
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO goals (id, title, scope, parentId, done, completedAt, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, 0, NULL, ?, ?)`
+        ).bind(id, g.title, g.scope || null, g.parentId || null, now, now).run();
+        return json({ ok: true, id });
+      }
+
+      if (path === "/api/goals/list") {
+        const scope = url.searchParams.get("scope");
+        let q = `SELECT * FROM goals`;
+        const binds = [];
+        if (scope) { q += ` WHERE scope = ?`; binds.push(scope); }
+        q += ` ORDER BY createdAt ASC`;
+        const { results } = await env.DB.prepare(q).bind(...binds).all();
+        return json({ ok: true, data: (results || []).map(g => ({ ...g, done: !!g.done })) });
+      }
+
+      if (path === "/api/goals/toggle" && request.method === "POST") {
+        const { id } = await request.json();
+        const row = await env.DB.prepare(`SELECT done FROM goals WHERE id = ?`).bind(id).first();
+        if (!row) return json({ ok: false, error: "not found" }, 404);
+        const newDone = row.done ? 0 : 1;
+        const completedAt = newDone ? new Date().toISOString() : null;
+        await env.DB.prepare(`UPDATE goals SET done=?, completedAt=? WHERE id=?`)
+          .bind(newDone, completedAt, id).run();
+        return json({ ok: true, done: !!newDone });
+      }
+
+      if (path === "/api/goals/delete" && request.method === "POST") {
+        const { id } = await request.json();
+        await env.DB.prepare(`DELETE FROM goals WHERE id = ?`).bind(id).run();
+        return json({ ok: true });
+      }
+
+      // 기본 화면
+      return new Response(
+        `<html><body style="font-family:sans-serif;padding:40px;text-align:center">
+          <h2>notion-widget API 서버 작동 중 ✅</h2>
+        </body></html>`,
+        { headers: { "Content-Type": "text/html; charset=utf-8" } }
+      );
+    } catch (e) {
+      return json({ ok: false, error: String(e) }, 500);
+    }
+  },
+};
+
+function parseDiary(row) {
+  return {
+    date: row.date,
+    mode: row.mode,
+    mood: row.mood,
+    achievements: safeParse(row.achievements, []),
+    images: safeParse(row.images, []),
+    quest: safeParse(row.quest, null),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+function safeParse(s, fallback) {
+  try { return JSON.parse(s); } catch { return fallback; }
+}
+function normalizeMoodWords(value) {
+  return [...new Set((Array.isArray(value) ? value : [])
+    .map(word => String(word).trim().slice(0, 20))
+    .filter(Boolean))].slice(0, 16);
+}

@@ -1,0 +1,14 @@
+name = "notion-widget"
+main = "worker.js"
+compatibility_date = "2026-07-26"
+workers_dev = true
+keep_vars = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "notion_widget_db"
+database_id = "319c978c-10dd-425f-b344-233fbbf2fd8d"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "3c209fa8f0514df9b18667f042bb3f5f"

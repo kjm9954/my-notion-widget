@@ -1,0 +1,35 @@
+CREATE TABLE diary (
+  date TEXT PRIMARY KEY,
+  mode TEXT,
+  mood TEXT,
+  achievements TEXT,
+  images TEXT,
+  quest TEXT,
+  createdAt TEXT,
+  updatedAt TEXT
+);
+
+CREATE TABLE thoughts (
+  id TEXT PRIMARY KEY,
+  content TEXT,
+  category TEXT,
+  createdAt TEXT,
+  updatedAt TEXT
+);
+
+CREATE TABLE goals (
+  id TEXT PRIMARY KEY,
+  title TEXT,
+  scope TEXT,
+  parentId TEXT,
+  done INTEGER DEFAULT 0,
+  completedAt TEXT,
+  createdAt TEXT,
+  updatedAt TEXT
+);
+
+CREATE TABLE widget_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updatedAt TEXT
+);
