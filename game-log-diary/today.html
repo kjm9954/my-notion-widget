@@ -18,7 +18,7 @@
     button, input, textarea { font:inherit; }
     button { color:inherit; }
     .shell { min-height:0; }
-    .widget { width:100%; height:546px; display:flex; flex-direction:column; padding:18px; overflow:hidden; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
+    .widget { width:100%; height:720px; display:flex; flex-direction:column; padding:18px; overflow:hidden; background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
     #app { min-height:0; display:flex; flex:1; flex-direction:column; gap:10px; }
     .header, .date-line, .section-head, .stat-row, .button-row, .editor-head, .mood-label, .custom-row { display:flex; align-items:center; }
     .header { min-height:26px; gap:8px; }
@@ -28,6 +28,11 @@
     .edit-button, .text-button { padding:0; color:var(--muted); background:transparent; border:0; font-size:10px; font-weight:700; cursor:pointer; }
     .header-actions { display:flex; align-items:center; gap:9px; margin-left:auto; }
     .write-today { color:var(--action); }
+    .delete-action, .delete-confirm-copy { color:#A56B6B; }
+    .delete-confirm-copy { font-size:10px; font-weight:700; }
+    .confirm-delete, .cancel-delete { min-height:28px; padding:0 8px; border-radius:8px; font-size:10px; font-weight:700; cursor:pointer; }
+    .confirm-delete { color:#FFFFFF; background:#A56B6B; border:1px solid #A56B6B; }
+    .cancel-delete { color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; }
     .entry-block { min-height:0; display:flex; flex:1; flex-direction:column; gap:8px; padding:11px; overflow-x:hidden; overflow-y:auto; background:#FAFCFD; border:1px solid #E6EDF0; border-radius:12px; }
     .empty-block { min-height:0; display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:34px 16px; text-align:center; background:#FAFCFD; border:1px dashed #C6D6DD; border-radius:12px; }
     .empty-title { color:var(--title); font-size:13px; font-weight:800; }
@@ -54,8 +59,8 @@
     .quote { padding-left:9px; border-left:2px solid #CFE2EA; }
     .body-text { margin:0; color:var(--text); font-size:12px; font-weight:600; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
     .choice { margin-top:4px; color:var(--action); font-size:11px; font-weight:700; }
-    .thumb-row { display:flex; gap:7px; overflow-x:auto; }
-    .view-thumb { width:72px; height:72px; flex:0 0 auto; object-fit:cover; border:1px solid #E6EDF0; border-radius:9px; }
+    .thumb-row { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; overflow:visible; }
+    .view-thumb { width:100%; height:auto; display:block; object-fit:contain; border:1px solid #E6EDF0; border-radius:9px; }
     .stats { flex:0 0 auto; padding:9px 10px; background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px; }
     .stat-row { gap:8px; }
     .hp-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
@@ -67,6 +72,7 @@
     .editor { width:100%; max-width:800px; min-height:0; display:flex; flex:1; flex-direction:column; gap:10px; margin:0 auto; }
     .editor-head { min-height:26px; gap:7px; }
     .editor-date { font-size:13px; font-weight:800; }
+    .editor-date-input { width:142px; min-height:30px; padding:0 8px; color:var(--text); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; font-size:11px; font-weight:700; }
     .editor-head .text-button { margin-left:auto; }
     .mode-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; color:var(--title); border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.06em; }
     .mode-pill.q { background:var(--q-tint); }
@@ -113,16 +119,13 @@
     .button-row { flex:0 0 auto; gap:7px; }
     .button-spacer { flex:1; }
     .photo-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
-    .photo-slots { display:flex; align-items:flex-start; gap:7px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
-    .photo-slots::-webkit-scrollbar { display:none; }
-    .photo-slot-wrap { display:flex; flex:0 0 auto; flex-direction:column; align-items:center; gap:4px; }
-    .photo-slot, .add-photo { width:82px; height:82px; flex:0 0 auto; border-radius:9px; }
+    .photo-slots { display:flex; flex-wrap:wrap; align-items:flex-start; gap:7px; overflow:visible; }
+    .photo-slot-wrap { width:300px; display:block; flex:0 0 auto; }
+    .photo-slot, .add-photo { width:300px; flex:0 0 auto; border-radius:9px; }
     .photo-slot { position:relative; overflow:hidden; border:1px solid #E6EDF0; }
-    .photo-slot img { width:100%; height:100%; object-fit:cover; }
+    .photo-slot img { width:100%; height:auto; display:block; object-fit:contain; }
     .remove-photo { position:absolute; top:4px; right:4px; width:22px; height:22px; padding:0; color:#FFFFFF; background:rgba(18,48,60,.62); border:0; border-radius:999px; cursor:pointer; }
-    .photo-order { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:9px; font-weight:700; }
-    .order-button { width:24px; height:24px; padding:0; color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; cursor:pointer; }
-    .add-photo { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--secondary); background:#FAFCFD; border:1px dashed #C6D6DD; font-size:10px; font-weight:700; cursor:pointer; }
+    .add-photo { position:relative; height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--secondary); background:#FAFCFD; border:1px dashed #C6D6DD; font-size:10px; font-weight:700; cursor:pointer; }
     .photo-slots .add-photo:only-child { width:100%; height:96px; }
     .add-photo span:first-child { color:var(--muted); font-size:18px; line-height:1; }
     .add-photo input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
@@ -132,13 +135,15 @@
       .button-row { flex-wrap:wrap; }
       .button-spacer { display:none; }
       .primary, .secondary-button { min-height:40px; }
+      .header-actions { flex-wrap:wrap; justify-content:flex-end; }
+      .photo-slot-wrap, .photo-slot, .add-photo { width:100%; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
   <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
-  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-today.html" data-widget-max-width="940" data-widget-height="546" style="--widget-max-width:940px;--widget-base-width:940px;--widget-base-height:546px;--widget-visual-height:546px">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-today.html" data-widget-max-width="940" data-widget-height="720" style="--widget-max-width:940px;--widget-base-width:940px;--widget-base-height:720px;--widget-visual-height:720px">
     <section class="widget" data-widget-card aria-label="게임 로그 일기 오늘 위젯">
       <div class="widget-dynamic-content" id="app"></div>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
@@ -174,7 +179,7 @@
       let busy=false;
       function initialDate(){try{const key=new URLSearchParams(location.search).get('date');if(key&&/^\d{4}-\d{2}-\d{2}$/.test(key)&&localKey(fromKey(key))===key)return key;}catch(_){}return localKey(new Date());}
       const TODAY=localKey(new Date());
-      const ui={screen:'home',selectedDate:initialDate(),questStep:1,questDraft:null,photoDraft:null,pending:{2:'',3:'',5:''},wordInputOpen:false,showTodayComposer:false,sharedMood:{mood:null,moodTags:[]}};
+      const ui={screen:'home',selectedDate:initialDate(),originalDate:null,questStep:1,questDraft:null,photoDraft:null,pending:{2:'',3:'',5:''},wordInputOpen:false,showTodayComposer:false,confirmingDelete:false,sharedMood:{mood:null,moodTags:[]}};
       let lastRenderedHp=null;
       let initialSwap=new URLSearchParams(location.search).get('motion')==='swap';
       function entryMood(entry){return entry?.mode==='quest'?{mood:moodValue(entry.quest?.mood),moodTags:cleanWords(entry.quest?.moodTags)}:{mood:moodValue(entry?.mood),moodTags:cleanWords(entry?.moodTags)};}
@@ -201,7 +206,7 @@
       function renderStats(value,startHp=value.hp){return `<section class="stats"><div class="stat-row"><span class="hp-label">HP</span><span class="hp-value">${value.hp}</span><span class="hp-track"><span class="hp-fill" style="width:${startHp}%"></span></span><span class="streak">연속 ${value.streak}일</span></div></section>`;}
       function renderEmpty(){return `<section class="empty-block"><div class="empty-title">오늘의 로그가 비어 있습니다</div><div class="empty-copy">한 섹션만 쓰고 저장해도 됩니다</div><div class="empty-actions"><button class="primary" type="button" data-start="quest">퀘스트로 쓰기</button><button class="secondary-button" type="button" data-start="photo">사진으로 쓰기</button></div></section>`;}
       function homeSelection(){const direct=store.entries[ui.selectedDate];if(direct)return{entry:direct,date:ui.selectedDate,fallback:false};if(ui.selectedDate===TODAY&&!ui.showTodayComposer){const date=latestPastDate();if(date)return{entry:store.entries[date],date,fallback:true};}return{entry:null,date:ui.selectedDate,fallback:false};}
-      function renderHome(){const selected=homeSelection(),mood=moodValue(moodByDate[selected.date]??entryMood(selected.entry).mood),actions=selected.entry?`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`:'',value=stats(),startHp=lastRenderedHp===null?value.hp:lastRenderedHp;lastRenderedHp=value.hp;app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood)}</div>${requestStatus()}${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats(value,startHp)}`;if(startHp!==value.hp)requestAnimationFrame(()=>{const fill=app.querySelector('.hp-fill');if(fill)fill.style.width=`${value.hp}%`;});if(initialSwap){app.classList.add('motion-swap');initialSwap=false;}}
+      function renderHome(){const selected=homeSelection(),mood=moodValue(moodByDate[selected.date]??entryMood(selected.entry).mood),actions=selected.entry?(ui.confirmingDelete?`<div class="header-actions"><span class="delete-confirm-copy">삭제할까요?</span><button class="confirm-delete" type="button" data-confirm-delete="${selected.date}">삭제</button><button class="cancel-delete" type="button" data-cancel-delete>취소</button></div>`:`<div class="header-actions"><button class="edit-button" type="button" data-edit-date="${selected.date}">수정</button><button class="edit-button delete-action" type="button" data-delete-request>삭제</button>${selected.fallback?'<button class="edit-button write-today" type="button" data-write-today>오늘 쓰기</button>':''}</div>`):'',value=stats(),startHp=lastRenderedHp===null?value.hp:lastRenderedHp;lastRenderedHp=value.hp;app.innerHTML=`<header class="header"><div class="date-line"><span class="date-title">${formatDate(selected.date)}</span>${temperaturePill(mood)}</div>${requestStatus()}${actions}</header>${selected.entry?renderEntry(selected.entry,selected.date):renderEmpty()}${renderStats(value,startHp)}`;if(startHp!==value.hp)requestAnimationFrame(()=>{const fill=app.querySelector('.hp-fill');if(fill)fill.style.width=`${value.hp}%`;});if(initialSwap){app.classList.add('motion-swap');initialSwap=false;}}
 
       const STEPS=[['오늘을 단어로 고르면?','여러 개 골라도 되고, 안 골라도 됩니다'],['오늘의 퀘스트는?','꼭 해야 했던 일들'],['서브 퀘스트가 있었나요?','곁다리로 처리한 일들'],['오늘 발생한 이벤트는?','돌발 상황과 그때 고른 선택지'],['오늘의 업적은?','잘한 일, 작아도 괜찮습니다'],['하루 엔딩로그','마무리 한두 줄']];
       function allWords(){return cleanWords([...PRESET_WORDS,...customWords,...cleanWords(currentDraft()?.moodTags)]);}
@@ -210,19 +215,21 @@
       function moodEditor(photo=false){const draft=currentDraft(),tags=cleanWords(draft?.moodTags);return `<div class="mood-box">${photo?'<div class="mood-caption">오늘의 감정</div>':''}${wordGrid(tags,photo)}${photo?'':`<div class="custom-row"><button class="custom-toggle" type="button" data-add-word>＋ 직접 쓰기</button><span class="selected-count">${tags.length}개 골랐어요</span></div>${ui.wordInputOpen?'<input class="custom-input" data-custom-word maxlength="20" placeholder="감정 단어를 쓰고 Enter">':''}`}${temperatureTrack(moodValue(draft?.mood))}</div>`;}
       function renderDraftList(kind,items){return `<div class="draft-list">${items.map((item,index)=>`<div class="draft-item"><span class="state-dot"></span><span class="draft-title">${escapeHtml(typeof item==='string'?item:item.t)}</span><button class="remove-item" type="button" data-remove-list="${kind}" data-index="${index}">×</button></div>`).join('')}</div><input class="list-input" data-list-input="${kind}" value="${escapeHtml(ui.pending[ui.questStep]||'')}" placeholder="항목을 입력하고 Enter"><div class="list-help">Enter로 추가 · 비워두고 넘어가도 됩니다</div>`;}
       function renderStepBody(){const q=ui.questDraft,step=ui.questStep;if(step===1)return moodEditor(false);if(step===2)return renderDraftList('main',q.main);if(step===3)return renderDraftList('sub',q.sub);if(step===4)return `<textarea class="textarea" data-event-field="t" placeholder="오늘 발생한 이벤트">${escapeHtml(q.event.t)}</textarea><input class="field" data-event-field="c" value="${escapeHtml(q.event.c)}" placeholder="그때 고른 선택지">`;if(step===5)return renderDraftList('achieve',q.achieve);return `<textarea class="textarea" data-quest-field="ending" placeholder="하루를 마무리하는 한두 줄">${escapeHtml(q.ending)}</textarea>`;}
-      function renderQuestEditor(){const [question,hint]=STEPS[ui.questStep-1];app.innerHTML=`<section class="editor"><header class="editor-head"><span class="editor-date">${formatDate(ui.selectedDate)}</span>${modePill('quest')}<button class="text-button" type="button" data-cancel${busy?' disabled':''}>취소</button></header><div class="progress">${Array.from({length:6},(_,i)=>`<span class="progress-part${i<ui.questStep?' active':''}"></span>`).join('')}</div><div class="question"><div class="question-title">${question}</div><div class="hint">${hint}</div></div><div class="step-body">${renderStepBody()}</div><div class="button-row">${requestStatus()}<button class="primary" type="button" data-next${busy?' disabled':''}>${ui.questStep===6?'저장하고 끝내기':'다음'}</button><button class="text-button" type="button" data-skip${busy?' disabled':''}>건너뛰기</button>${ui.questStep>1?`<button class="secondary-button" type="button" data-prev${busy?' disabled':''}>이전</button>`:''}<span class="button-spacer"></span><button class="secondary-button" type="button" data-switch-photo${busy?' disabled':''}>사진 모드로 바꾸기</button><button class="secondary-button" type="button" data-save-quest${busy?' disabled':''}>바로 저장</button></div></section>`;if(ui.wordInputOpen&&!busy)requestAnimationFrame(()=>app.querySelector('[data-custom-word]')?.focus());}
-      function renderPhotoEditor(){const d=ui.photoDraft;app.innerHTML=`<section class="editor"><header class="editor-head"><span class="editor-date">${formatDate(ui.selectedDate)}</span>${modePill('photo')}<button class="text-button" type="button" data-cancel${busy?' disabled':''}>취소</button></header><div class="step-body"><div class="photo-label">사진 · ${d.photos.length}장</div><div class="photo-slots">${d.photos.map((src,index)=>`<div class="photo-slot-wrap"><div class="photo-slot"><img src="${escapeHtml(src)}" alt=""><button class="remove-photo" type="button" data-remove-photo="${index}">×</button></div><div class="photo-order"><button class="order-button" type="button" data-move-photo="${index}" data-dir="-1">‹</button><span>${index+1}</span><button class="order-button" type="button" data-move-photo="${index}" data-dir="1">›</button></div></div>`).join('')}<label class="add-photo" for="todayPhotoInput"><span>＋</span><span>사진 업로드</span><input id="todayPhotoInput" type="file" accept="image/*" multiple data-photo-input aria-label="사진 업로드"></label></div><div class="photo-help">저장하면 캘린더에 바로 반영됩니다 · 긴 변 720px로 자동 축소</div><textarea class="textarea" data-photo-text placeholder="사진에 대해 짧게 적어보세요">${escapeHtml(d.text)}</textarea>${moodEditor(true)}</div><div class="button-row">${requestStatus()}<button class="primary" type="button" data-save-photo${busy?' disabled':''}>저장</button><button class="secondary-button" type="button" data-switch-quest${busy?' disabled':''}>퀘스트 모드로 바꾸기</button></div></section>`;}
+      function editorDateInput(){return `<input class="editor-date-input" type="date" value="${ui.selectedDate}" data-editor-date aria-label="일기 날짜"${busy?' disabled':''}>`;}
+      function renderQuestEditor(){const [question,hint]=STEPS[ui.questStep-1];app.innerHTML=`<section class="editor"><header class="editor-head">${editorDateInput()}${modePill('quest')}<button class="text-button" type="button" data-cancel${busy?' disabled':''}>취소</button></header><div class="progress">${Array.from({length:6},(_,i)=>`<span class="progress-part${i<ui.questStep?' active':''}"></span>`).join('')}</div><div class="question"><div class="question-title">${question}</div><div class="hint">${hint}</div></div><div class="step-body">${renderStepBody()}</div><div class="button-row">${requestStatus()}<button class="primary" type="button" data-next${busy?' disabled':''}>${ui.questStep===6?'저장하고 끝내기':'다음'}</button><button class="text-button" type="button" data-skip${busy?' disabled':''}>건너뛰기</button>${ui.questStep>1?`<button class="secondary-button" type="button" data-prev${busy?' disabled':''}>이전</button>`:''}<span class="button-spacer"></span><button class="secondary-button" type="button" data-switch-photo${busy?' disabled':''}>사진 모드로 바꾸기</button><button class="secondary-button" type="button" data-save-quest${busy?' disabled':''}>바로 저장</button></div></section>`;if(ui.wordInputOpen&&!busy)requestAnimationFrame(()=>app.querySelector('[data-custom-word]')?.focus());}
+      function renderPhotoEditor(){const d=ui.photoDraft;app.innerHTML=`<section class="editor"><header class="editor-head">${editorDateInput()}${modePill('photo')}<button class="text-button" type="button" data-cancel${busy?' disabled':''}>취소</button></header><div class="step-body"><div class="photo-label">사진 · ${d.photos.length}장</div><div class="photo-slots">${d.photos.map((src,index)=>`<div class="photo-slot-wrap"><div class="photo-slot"><img src="${escapeHtml(src)}" alt=""><button class="remove-photo" type="button" data-remove-photo="${index}">×</button></div></div>`).join('')}<label class="add-photo" for="todayPhotoInput"><span>＋</span><span>사진 업로드</span><input id="todayPhotoInput" type="file" accept="image/*" multiple data-photo-input aria-label="사진 업로드"></label></div><div class="photo-help">원본 파일과 비율 그대로 저장되며 캘린더에 바로 반영됩니다</div><textarea class="textarea" data-photo-text placeholder="사진에 대해 짧게 적어보세요">${escapeHtml(d.text)}</textarea>${moodEditor(true)}</div><div class="button-row">${requestStatus()}<button class="primary" type="button" data-save-photo${busy?' disabled':''}>저장</button><button class="secondary-button" type="button" data-switch-quest${busy?' disabled':''}>퀘스트 모드로 바꾸기</button></div></section>`;}
       function render(){if(ui.screen==='quest')renderQuestEditor();else if(ui.screen==='photo')renderPhotoEditor();else renderHome();}
-      function beginQuest(edit=false,preserve=false){const existing=store.entries[ui.selectedDate];if(!preserve)syncShared(entryMood(existing));if(!preserve||!ui.questDraft)ui.questDraft=edit&&existing?.mode==='quest'?normalizeQuest(clone(existing.quest)):emptyQuest();applyShared(ui.questDraft);ui.pending={2:'',3:'',5:''};ui.questStep=1;ui.wordInputOpen=false;ui.screen='quest';render();}
-      function beginPhoto(edit=false,preserve=false){const existing=store.entries[ui.selectedDate];if(!preserve)syncShared(entryMood(existing));if(!preserve||!ui.photoDraft)ui.photoDraft=edit&&existing?.mode==='photo'?{photos:[...(existing.photos||[])],text:String(existing.text??''),mood:moodValue(existing.mood),moodTags:cleanWords(existing.moodTags)}:{photos:[],text:'',mood:null,moodTags:[]};applyShared(ui.photoDraft);ui.wordInputOpen=false;ui.screen='photo';render();}
+      function beginQuest(edit=false,preserve=false){const existing=store.entries[ui.selectedDate];if(!preserve){ui.originalDate=edit?ui.selectedDate:null;syncShared(entryMood(existing));}if(!preserve||!ui.questDraft)ui.questDraft=edit&&existing?.mode==='quest'?normalizeQuest(clone(existing.quest)):emptyQuest();applyShared(ui.questDraft);ui.pending={2:'',3:'',5:''};ui.questStep=1;ui.wordInputOpen=false;ui.screen='quest';render();}
+      function beginPhoto(edit=false,preserve=false){const existing=store.entries[ui.selectedDate];if(!preserve){ui.originalDate=edit?ui.selectedDate:null;syncShared(entryMood(existing));}if(!preserve||!ui.photoDraft)ui.photoDraft=edit&&existing?.mode==='photo'?{photos:[...(existing.photos||[])],text:String(existing.text??''),mood:moodValue(existing.mood),moodTags:cleanWords(existing.moodTags)}:{photos:[],text:'',mood:null,moodTags:[]};applyShared(ui.photoDraft);ui.wordInputOpen=false;ui.screen='photo';render();}
       function updateMood(){const draft=currentDraft();if(!draft)return;syncShared(draft);}
       function commitPending(){const value=(ui.pending[ui.questStep]||'').trim();if(!value)return;if(ui.questStep===2)ui.questDraft.main.push({t:value,done:false});if(ui.questStep===3)ui.questDraft.sub.push({t:value,done:false});if(ui.questStep===5)ui.questDraft.achieve.push(value);ui.pending[ui.questStep]='';}
-      async function persistEntry(date,entry){if(busy)return false;busy=true;requestMessage='저장 중…';render();try{await Store.saveDiary(diaryPayload(date,entry));ui.screen='home';ui.showTodayComposer=false;requestMessage='';busy=false;await loadHomeData(false);return true;}catch(_){busy=false;requestMessage='저장 실패, 다시 시도';render();return false;}}
+      async function persistEntry(date,entry){if(busy)return false;busy=true;requestMessage='저장 중…';render();const originalDate=ui.originalDate;try{await Store.saveDiary(diaryPayload(date,entry));if(originalDate&&originalDate!==date)await Store.deleteDiary(originalDate);ui.originalDate=null;ui.screen='home';ui.showTodayComposer=false;ui.confirmingDelete=false;requestMessage='';busy=false;await loadHomeData(false);return true;}catch(_){busy=false;requestMessage='저장 실패, 다시 시도';render();return false;}}
+      async function deleteEntry(date){if(busy)return;busy=true;requestMessage='삭제 중…';renderHome();try{await Store.deleteDiary(date);ui.confirmingDelete=false;ui.showTodayComposer=false;requestMessage='';busy=false;await loadHomeData(false);}catch(_){busy=false;requestMessage='삭제 실패, 다시 시도';renderHome();}}
       async function saveQuest(){commitPending();applyShared(ui.questDraft);return persistEntry(ui.selectedDate,{mode:'quest',quest:clone(ui.questDraft)});}
       async function savePhoto(){applyShared(ui.photoDraft);return persistEntry(ui.selectedDate,{mode:'photo',photos:[...ui.photoDraft.photos],text:ui.photoDraft.text,mood:ui.photoDraft.mood,moodTags:[...ui.photoDraft.moodTags]});}
       async function toggleTask(date,type,index){const entry=clone(store.entries[date]);if(entry?.mode!=='quest'||!entry.quest?.[type]?.[index])return;entry.quest[type][index].done=!entry.quest[type][index].done;await persistEntry(date,entry);}
       async function addCustomWord(value){const next=cleanWords([...customWords,value]).filter(word=>!PRESET_WORDS.includes(word)).slice(0,16);busy=true;requestMessage='저장 중…';renderQuestEditor();try{await Store.saveMoodWords(next);customWords=next;if(!ui.questDraft.moodTags.includes(value))ui.questDraft.moodTags.push(value);updateMood();ui.wordInputOpen=false;requestMessage='';busy=false;renderQuestEditor();}catch(_){busy=false;requestMessage='저장 실패, 다시 시도';ui.wordInputOpen=true;renderQuestEditor();}}
-      function resizePhoto(file){return new Promise(resolve=>{try{const reader=new FileReader();reader.onerror=()=>resolve(null);reader.onload=()=>{const image=new Image();image.onerror=()=>resolve(null);image.onload=()=>{try{const scale=Math.min(1,720/Math.max(image.width,image.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',.8));}catch(_){resolve(null);}};image.src=reader.result;};reader.readAsDataURL(file);}catch(_){resolve(null);}});}
+      function readPhoto(file){return new Promise(resolve=>{try{const reader=new FileReader();reader.onerror=()=>resolve(null);reader.onload=()=>resolve(typeof reader.result==='string'?reader.result:null);reader.readAsDataURL(file);}catch(_){resolve(null);}});}
 
       app.addEventListener('click',async event=>{
         const target=event.target;
@@ -232,10 +239,14 @@
         if(start){start.dataset.start==='quest'?beginQuest():beginPhoto();return;}
         const edit=target.closest('[data-edit-date]');
         if(edit){ui.selectedDate=edit.dataset.editDate;const entry=store.entries[ui.selectedDate];entry?.mode==='photo'?beginPhoto(true):beginQuest(true);return;}
-        if(target.closest('[data-write-today]')){ui.selectedDate=TODAY;ui.showTodayComposer=true;renderHome();return;}
+        if(target.closest('[data-delete-request]')){ui.confirmingDelete=true;renderHome();return;}
+        if(target.closest('[data-cancel-delete]')){ui.confirmingDelete=false;renderHome();return;}
+        const confirmDelete=target.closest('[data-confirm-delete]');
+        if(confirmDelete){await deleteEntry(confirmDelete.dataset.confirmDelete);return;}
+        if(target.closest('[data-write-today]')){ui.selectedDate=TODAY;ui.showTodayComposer=true;ui.confirmingDelete=false;renderHome();return;}
         const toggle=target.closest('[data-toggle-task]');
         if(toggle){await toggleTask(toggle.dataset.date,toggle.dataset.toggleTask,Number(toggle.dataset.index));return;}
-        if(target.closest('[data-cancel]')){ui.screen='home';ui.showTodayComposer=false;requestMessage='';render();return;}
+        if(target.closest('[data-cancel]')){ui.originalDate=null;ui.screen='home';ui.showTodayComposer=false;requestMessage='';render();return;}
         const word=target.closest('[data-mood-word]');
         if(word){const draft=currentDraft(),value=word.dataset.moodWord,index=draft.moodTags.indexOf(value);index>=0?draft.moodTags.splice(index,1):draft.moodTags.push(value);updateMood();ui.screen==='quest'?renderQuestEditor():renderPhotoEditor();return;}
         const mood=target.closest('[data-mood-value]');
@@ -250,14 +261,12 @@
         if(target.closest('[data-switch-photo]')){commitPending();beginPhoto(false,true);return;}
         const removePhoto=target.closest('[data-remove-photo]');
         if(removePhoto){ui.photoDraft.photos.splice(Number(removePhoto.dataset.removePhoto),1);renderPhotoEditor();return;}
-        const move=target.closest('[data-move-photo]');
-        if(move){const from=Number(move.dataset.movePhoto),to=from+Number(move.dataset.dir);if(to>=0&&to<ui.photoDraft.photos.length){const [photo]=ui.photoDraft.photos.splice(from,1);ui.photoDraft.photos.splice(to,0,photo);renderPhotoEditor();}return;}
         if(target.closest('[data-save-photo]')){await savePhoto();return;}
         if(target.closest('[data-switch-quest]'))beginQuest(false,true);
       });
       app.addEventListener('input',event=>{const el=event.target;if(el.matches('[data-quest-field]'))ui.questDraft[el.dataset.questField]=el.value;if(el.matches('[data-event-field]'))ui.questDraft.event[el.dataset.eventField]=el.value;if(el.matches('[data-list-input]'))ui.pending[ui.questStep]=el.value;if(el.matches('[data-photo-text]'))ui.photoDraft.text=el.value;});
       app.addEventListener('keydown',async event=>{if(busy)return;const listInput=event.target.closest('[data-list-input]');if(listInput&&event.key==='Enter'){event.preventDefault();commitPending();renderQuestEditor();requestAnimationFrame(()=>app.querySelector('[data-list-input]')?.focus());return;}const custom=event.target.closest('[data-custom-word]');if(custom&&event.key==='Enter'){event.preventDefault();const value=custom.value.trim();if(!value)return;await addCustomWord(value);}});
-      app.addEventListener('change',async event=>{const input=event.target.closest('[data-photo-input]');if(!input)return;const files=[...input.files].filter(file=>file.type.startsWith('image/')),resized=await Promise.all(files.map(resizePhoto));ui.photoDraft.photos.push(...resized.filter(Boolean));renderPhotoEditor();});
+      app.addEventListener('change',async event=>{const dateInput=event.target.closest('[data-editor-date]');if(dateInput){const value=dateInput.value;if(/^\d{4}-\d{2}-\d{2}$/.test(value)&&localKey(fromKey(value))===value){if(ui.screen==='quest')commitPending();ui.selectedDate=value;ui.screen==='quest'?renderQuestEditor():renderPhotoEditor();}return;}const input=event.target.closest('[data-photo-input]');if(!input)return;const files=[...input.files].filter(file=>file.type.startsWith('image/')),photos=await Promise.all(files.map(readPhoto));ui.photoDraft.photos.push(...photos.filter(Boolean));renderPhotoEditor();});
       loadHomeData();
     })();
   </script>

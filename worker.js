@@ -150,7 +150,16 @@ export default {
 
       if (path === "/api/goals/state" && request.method === "POST") {
         const state = normalizeGoalState(await request.json());
-        await saveSetting(env, "goalBox", state);
+        const index = await loadIndexSettings(env);
+        const activeGoalIds = new Set(state.goals.map(goal => `goal:${goal.id}`));
+        Object.keys(index.items).forEach(id => {
+          if (id.startsWith("goal:") && !activeGoalIds.has(id)) delete index.items[id];
+        });
+        state.goals.forEach(goal => {
+          const id = `goal:${goal.id}`;
+          if (!index.items[id]) index.items[id] = { scope: index.scope, q: null, st: goal.done ? "done" : "todo", p: null };
+        });
+        await Promise.all([saveSetting(env, "goalBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true, data: state });
       }
 
@@ -169,7 +178,9 @@ export default {
           completedAt: null,
         };
         state.goals.push(goal);
-        await saveSetting(env, "goalBox", state);
+        const index = await loadIndexSettings(env);
+        index.items[`goal:${goal.id}`] = { scope: index.scope, q: null, st: "todo", p: null };
+        await Promise.all([saveSetting(env, "goalBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true, id: goal.id, data: goal });
       }
 
@@ -488,7 +499,7 @@ async function buildIndexState(env) {
     const id = `goal:${goal.id}`;
     const meta = index.items[id] || {};
     const parent = goal.parent ? `goal:${goal.parent}` : null;
-    return { id, source: "goal", sourceId: goal.id, scope: meta.scope || "month", q: meta.q || null, st: goal.done ? "done" : (meta.st === "doing" ? "doing" : "todo"), t: goal.t, p: meta.p || parent };
+    return { id, source: "goal", sourceId: goal.id, scope: meta.scope || index.scope, q: meta.q || null, st: goal.done ? "done" : (meta.st === "doing" ? "doing" : "todo"), t: goal.t, p: meta.p || parent };
   });
   return { items: [...thoughtItems, ...goalItems], scope: index.scope };
 }

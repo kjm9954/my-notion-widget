@@ -106,6 +106,7 @@
       let saveTimer=0;
       let revision=0;
       let saving=false;
+      let knownGoalIds=new Set();
       const ui={editing:'',composer:'',deleting:'',undo:null,showPast:false};
 
       function id(){return `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;}
@@ -121,8 +122,8 @@
         }))};
       }
       function save(){state=normalize(state);revision+=1;clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}
-      async function persist(){saveTimer=0;if(saving)return;saving=true;const current=revision,snapshot=normalize(state);try{await Store.saveGoalState(snapshot);}catch(_){}saving=false;if(revision!==current)persist();}
-      async function sync(){if(saving||saveTimer)return;try{state=normalize(await Store.loadGoalState());render();}catch(_){} }
+      async function persist(){saveTimer=0;if(saving)return;saving=true;const current=revision,snapshot=normalize(state),nextIds=new Set(snapshot.goals.map(goal=>goal.id)),added=snapshot.goals.filter(goal=>!knownGoalIds.has(goal.id));try{let indexScope='week';if(added.length){try{const index=await Store.loadIndexState();indexScope=index?.scope==='month'?'month':'week';}catch(_){}}await Store.saveGoalState(snapshot);if(added.length)await Promise.all(added.map(goal=>Store.updateIndexItem(`goal:${goal.id}`,{scope:indexScope})));knownGoalIds=nextIds;}catch(_){}saving=false;if(revision!==current)persist();}
+      async function sync(){if(saving||saveTimer)return;try{state=normalize(await Store.loadGoalState());knownGoalIds=new Set(state.goals.map(goal=>goal.id));render();}catch(_){} }
       function byId(goalId){return state.goals.find(goal=>goal.id===goalId)||null;}
       function goalsFor(scope){return state.goals.filter(goal=>goal.scope===scope).sort((a,b)=>Number(a.done)-Number(b.done)||a.createdAt-b.createdAt);}
       function descendants(rootId){

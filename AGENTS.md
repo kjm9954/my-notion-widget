@@ -198,7 +198,7 @@ growth-goals-v1        목표        { goals:[{id,scope,t,done,parent}] }
 growth-stats-v1        스탯        { start, urls }
 reading-notes-v1       독서 노트    { byDate: { "YYYY-MM-DD": n } }
 ```
-- 날짜 키는 로컬 시간 `YYYY-MM-DD`. 사진은 **긴 변 720px · JPEG 0.8 dataURL**로 저장(원본 금지).
+- 날짜 키는 로컬 시간 `YYYY-MM-DD`. 일기 사진은 **원본 dataURL과 원본 비율을 그대로** 저장하며 캔버스 축소·재인코딩·강제 crop을 하지 않는다.
 - 쓰기 직전에 저장소를 다시 읽어 병합한다(다른 위젯의 쓰기를 덮지 않도록).
 - 실시간 반영이 필요하면 `BroadcastChannel` + `storage` 이벤트 + `visibilitychange`/`focus` 세 가지를 모두 건다.
 - 읽기/쓰기는 전부 try-catch. **위 키 외의 localStorage를 읽거나 지우지 마라.**

@@ -173,8 +173,7 @@ async function getHP() {
     d.setDate(d.getDate() - i);
     if (set.has(todayStr(d))) count++;
   }
-  const hp = Math.round((count / 7) * 100);
-  return Math.max(hp, 20); // 하한 20
+  return Math.min(100, 20 + Math.round((count / 7) * 80));
 }
 async function getTodayAchievements() {
   const today = todayStr();
