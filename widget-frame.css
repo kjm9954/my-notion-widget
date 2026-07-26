@@ -363,7 +363,14 @@ body.widget-page select:focus {
 }
 
 .idle-outline-empty {
+  inset: -1px;
   border: 1px dashed #0E5C7A;
+}
+
+/* The animated empty-state border replaces the static border instead of
+   drawing a second dashed line on top of it. */
+.idle-owner:has(> .idle-outline-empty) {
+  border-color: transparent !important;
 }
 
 .idle-relay-dot {

@@ -92,9 +92,9 @@
       min-height: 26px;
       padding: 4px 10px;
       border: 0;
-      border-radius: 7px;
+      border-radius: 8px;
       background: transparent;
-      color: #8AA0AA;
+      color: #93A5AD;
       font-size: 12px;
       font-weight: 800;
       line-height: 1;
@@ -159,7 +159,7 @@
       align-items: center;
       justify-content: center;
       gap: 3px;
-      color: #B3C3CA;
+      color: #A9BAC2;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: .1em;
@@ -179,7 +179,7 @@
 
     .axis-x {
       grid-column: 2;
-      color: #B3C3CA;
+      color: #A9BAC2;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: .1em;
@@ -247,7 +247,7 @@
       justify-content: center;
       color: #FFFFFF;
       background: var(--q-color);
-      border-radius: 5px;
+      border-radius: 8px;
       font-size: 10px;
       font-weight: 800;
       line-height: 1;
@@ -335,7 +335,7 @@
 
     .state-todo {
       background: #FFFFFF;
-      border: 1.5px solid #C6D6DD;
+      border: 1px solid #C6D6DD;
     }
 
     .state-doing {
@@ -466,13 +466,13 @@
 
     .collapsed-hint {
       color: #A2B4BC;
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .collapsed-plus {
       color: #93A5AD;
       font-size: 18px;
-      font-weight: 500;
+      font-weight: 600;
       line-height: 1;
     }
 
@@ -619,7 +619,7 @@
       width: 30px;
       height: 30px;
       padding: 0;
-      color: #7E96A1;
+      color: #6B8794;
       background: #FFFFFF;
       border: 1px solid #E1EAEE;
       border-radius: 8px;
@@ -638,7 +638,7 @@
     .unclassify-button {
       min-height: 30px;
       padding: 0 9px;
-      color: #7E96A1;
+      color: #6B8794;
       background: #FFFFFF;
       border: 1px dashed #C6D6DD;
       border-radius: 8px;
@@ -708,7 +708,7 @@
         width: min(380px, calc(100vw - 16px));
         gap: 14px;
         padding: 18px 14px 14px;
-        border-radius: 16px;
+        border-radius: 18px;
       }
 
       .header {
@@ -776,7 +776,7 @@
       .mobile-q-button .q-badge {
         width: 22px;
         height: 22px;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 11px;
       }
 
@@ -827,9 +827,9 @@
         padding: 8px 11px;
         background: #FFFFFF;
         border: 1px solid #E6EDF0;
-        border-radius: 11px;
-        outline: 1.5px solid transparent;
-        outline-offset: -1.5px;
+        border-radius: 9px;
+        outline: 2px solid transparent;
+        outline-offset: -2px;
         cursor: grab;
         transition: outline-color var(--t-color) var(--ease), opacity var(--t-close) var(--ease);
       }
@@ -850,7 +850,7 @@
         padding: 12px;
         color: #A2B4BC;
         border: 1px dashed #C6D6DD;
-        border-radius: 11px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
       }
@@ -886,7 +886,7 @@
       .q-choice {
         width: 44px;
         height: 44px;
-        border-radius: 10px;
+        border-radius: 9px;
         font-size: 12px;
       }
 
@@ -925,11 +925,6 @@
         S: { full: '체계를 찾는 업무', short: '체계' },
         M: { full: '현재를 유지하는 업무', short: '유지' }
       };
-      const PERIODS = {
-        week: '7월 20일 – 26일',
-        month: '2026년 7월'
-      };
-
       const state = { items: [], scope: 'week' };
       const ui = {
         bottomState: 'collapsed',
@@ -941,6 +936,8 @@
       };
       let pointerDrag = null;
       const titleTimers = new Map();
+      let scopeRevision = 0;
+      let scopeSaving = false;
 
       const widget = document.getElementById('widget');
       const header = document.getElementById('header');
@@ -964,13 +961,19 @@
       async function sync() {
         try {
           const loaded = await Store.loadIndexState();
-          state.items = (Array.isArray(loaded?.items) ? loaded.items : []).map(normalizeItem).filter(Boolean);
-          state.scope = loaded?.scope === 'month' ? 'month' : 'week';
+          const nextItems = (Array.isArray(loaded?.items) ? loaded.items : []).map(normalizeItem).filter(Boolean);
+          const nextScope = loaded?.scope === 'month' ? 'month' : 'week';
+          const itemsChanged = JSON.stringify(nextItems) !== JSON.stringify(state.items);
+          const scopeChanged = !scopeSaving && nextScope !== state.scope;
+          if (itemsChanged) state.items = nextItems;
+          if (scopeChanged) state.scope = nextScope;
+          let selectionChanged = false;
           if (ui.selectedId && !state.items.some(item => item.id === ui.selectedId)) {
             ui.selectedId = null;
             ui.bottomState = 'collapsed';
+            selectionChanged = true;
           }
-          render();
+          if (itemsChanged || scopeChanged || selectionChanged) render();
         } catch (_) {}
       }
 
@@ -1010,6 +1013,21 @@
         return state.items.filter(item => item.scope === state.scope);
       }
 
+      function periodLabel(scope) {
+        const now = new Date();
+        if (scope === 'month') return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const mondayOffset = (start.getDay() + 6) % 7;
+        start.setDate(start.getDate() - mondayOffset);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        const startText = `${start.getMonth() + 1}월 ${start.getDate()}일`;
+        const endText = start.getMonth() === end.getMonth()
+          ? `${end.getDate()}일`
+          : `${end.getMonth() + 1}월 ${end.getDate()}일`;
+        return `${startText} – ${endText}`;
+      }
+
       function findItem(id) {
         return state.items.find(item => item.id === id) || null;
       }
@@ -1028,7 +1046,7 @@
               <button class="segment ${state.scope === 'week' ? 'active' : ''}" type="button" data-scope="week">이번 주</button>
               <button class="segment ${state.scope === 'month' ? 'active' : ''}" type="button" data-scope="month">이번 달</button>
             </div>
-            <div class="period">${PERIODS[state.scope]}</div>
+            <div class="period">${periodLabel(state.scope)}</div>
           </div>
           <div class="progress-side">
             <span class="progress-copy">${done} / ${items.length} 완료</span>
@@ -1198,7 +1216,30 @@
         ui.selectedId = null;
         ui.bottomState = 'collapsed';
         render();
-        Store.saveIndexScope(scope).catch(() => sync());
+        queueScopeSave();
+      }
+
+      function queueScopeSave() {
+        scopeRevision += 1;
+        persistScope();
+      }
+
+      async function persistScope() {
+        if (scopeSaving) return;
+        scopeSaving = true;
+        const current = scopeRevision;
+        const scope = state.scope;
+        try {
+          await Store.saveIndexScope(scope);
+        } catch (_) {
+          scopeSaving = false;
+          if (scopeRevision !== current) persistScope();
+          else sync();
+          return;
+        }
+        scopeSaving = false;
+        if (scopeRevision !== current) persistScope();
+        else sync();
       }
 
       function updateItem(mutator) {
@@ -1236,7 +1277,7 @@
         if (item.q) ui.mobileQ = item.q;
         render();
         persistItem(item);
-        Store.saveIndexScope('week').catch(() => sync());
+        queueScopeSave();
       }
 
       function setDropHighlight(target) {
