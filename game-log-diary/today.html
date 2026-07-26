@@ -113,7 +113,8 @@
     .button-row { flex:0 0 auto; gap:7px; }
     .button-spacer { flex:1; }
     .photo-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
-    .photo-slots { display:flex; align-items:flex-start; gap:7px; overflow-x:auto; }
+    .photo-slots { display:flex; align-items:flex-start; gap:7px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+    .photo-slots::-webkit-scrollbar { display:none; }
     .photo-slot-wrap { display:flex; flex:0 0 auto; flex-direction:column; align-items:center; gap:4px; }
     .photo-slot, .add-photo { width:82px; height:82px; flex:0 0 auto; border-radius:9px; }
     .photo-slot { position:relative; overflow:hidden; border:1px solid #E6EDF0; }
@@ -122,7 +123,7 @@
     .photo-order { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:9px; font-weight:700; }
     .order-button { width:24px; height:24px; padding:0; color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; cursor:pointer; }
     .add-photo { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--secondary); background:#FAFCFD; border:1px dashed #C6D6DD; font-size:10px; font-weight:700; cursor:pointer; }
-    .photo-slots .add-photo:only-child { width:100%; height:104px; }
+    .photo-slots .add-photo:only-child { width:100%; height:96px; }
     .add-photo span:first-child { color:var(--muted); font-size:18px; line-height:1; }
     .add-photo input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
     @media (max-width:639px) {
