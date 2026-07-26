@@ -193,7 +193,7 @@
       }
 
       function renderList() {
-        const result = filteredItems();
+        const result = filteredItems().slice(0, 5);
         if (!result.length) {
           quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
           return;
