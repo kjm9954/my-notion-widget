@@ -217,6 +217,7 @@
   const sizeHandles = [scaleHandle, topLeftHandle, leftWidthHandle, rightWidthHandle, topHeightHandle, bottomHeightHandle];
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+  const widthKey = host.dataset.widgetWidthKey || '';
   const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
   const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
@@ -235,6 +236,7 @@
   let requestedScale = 1;
   let renderedScale = 1;
   let scaleLocked = false;
+  let sharedVisualWidth = null;
   let widthLocked = false;
   let heightLocked = false;
   let requestedListHeight = null;
@@ -250,16 +252,26 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  function readSize() {
+  function readStoredSize(storageKey) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(key));
+      const parsed = JSON.parse(localStorage.getItem(storageKey));
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (_) {
       return {};
     }
   }
 
+  function readSize() {
+    return readStoredSize(key);
+  }
+
+  function readWidthSize() {
+    return widthKey ? readStoredSize(widthKey) : {};
+  }
+
   function saveSize() {
+    const nextScale = Math.max(minimumScale(), Math.min(maximumScale(), requestedScale));
+    if (widthKey) sharedVisualWidth = Math.round(contentWidth * nextScale);
     const value = {
       scale: requestedScale,
       scaleLocked,
@@ -272,7 +284,17 @@
       value.listH = Math.round(requestedListHeight ?? list.offsetHeight);
       value.listLocked = listLocked;
     }
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      if (widthKey) {
+        localStorage.setItem(widthKey, JSON.stringify({
+          scale: requestedScale,
+          scaleLocked,
+          visualW: sharedVisualWidth,
+          widthLocked
+        }));
+      }
+    } catch (_) {}
   }
 
   /* The widget never letterboxes: the white frame is always exactly the scaled
@@ -291,7 +313,20 @@
   }
 
   function measureContentWidth() {
-    if (widthLocked || sizeDrag) return contentWidth;
+    if (sizeDrag) return contentWidth;
+    if (widthKey) {
+      /* Members can have different natural heights, so their height-limited
+         scales may differ. Compensate with logical width so the outer widths
+         still land on the same shared visual target. */
+      const target = clampAxisSize(sharedVisualWidth ?? designWidth, MINIMUM_CONTENT_WIDTH, window.innerWidth);
+      const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
+      const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
+        ? configuredMaximumScale
+        : Number.POSITIVE_INFINITY;
+      const scaleWithoutWidth = Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, byHeight, requestedScale));
+      return target / scaleWithoutWidth;
+    }
+    if (widthLocked) return contentWidth;
     return clampAxisSize(designWidth, MINIMUM_CONTENT_WIDTH, maximumContentWidth(requestedScale));
   }
 
@@ -584,11 +619,18 @@
   }
 
   const saved = readSize();
+  const horizontalSaved = widthKey ? readWidthSize() : saved;
+  const hasHorizontal = property => Object.prototype.hasOwnProperty.call(horizontalSaved, property);
+  scaleLocked = horizontalSaved.scaleLocked === true || (!hasHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(hasHorizontal));
+  requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(horizontalSaved, 1));
+  widthLocked = horizontalSaved.widthLocked === true || (!hasHorizontal('widthLocked') && hasHorizontal('contentW'));
+  if (widthKey) {
+    const storedVisualWidth = Number(horizontalSaved.visualW);
+    sharedVisualWidth = Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null;
+  } else {
+    applyContentWidth(number(horizontalSaved.contentW, designWidth), false, requestedScale);
+  }
   const hasOwn = property => Object.prototype.hasOwnProperty.call(saved, property);
-  scaleLocked = saved.scaleLocked === true || (!hasOwn('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(hasOwn));
-  requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(saved, 1));
-  widthLocked = saved.widthLocked === true || (!hasOwn('widthLocked') && hasOwn('contentW'));
-  applyContentWidth(number(saved.contentW, designWidth), false, requestedScale);
   heightLocked = saved.heightLocked === true || (!hasOwn('heightLocked') && hasOwn('frameH'));
   listLocked = saved.listLocked === true || (Object.prototype.hasOwnProperty.call(saved, 'listH') && !Object.prototype.hasOwnProperty.call(saved, 'listLocked'));
   if (list && heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
@@ -623,18 +665,31 @@
   });
 
   window.addEventListener('storage', event => {
-    if (event.key !== key) return;
-    const next = readSize();
-    const owns = property => Object.prototype.hasOwnProperty.call(next, property);
-    scaleLocked = next.scaleLocked === true || (!owns('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(owns));
-    requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(next, 1));
-    widthLocked = next.widthLocked === true || (!owns('widthLocked') && owns('contentW'));
-    applyContentWidth(number(next.contentW, designWidth), false, requestedScale);
-    heightLocked = next.heightLocked === true || (!owns('heightLocked') && owns('frameH'));
-    listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
-    if (list && heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
-    else if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
-    else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+    const localChanged = event.key === key;
+    const sharedWidthChanged = Boolean(widthKey) && event.key === widthKey;
+    if (!localChanged && !sharedWidthChanged) return;
+    if (sharedWidthChanged || (!widthKey && localChanged)) {
+      const nextHorizontal = widthKey ? readWidthSize() : readSize();
+      const ownsHorizontal = property => Object.prototype.hasOwnProperty.call(nextHorizontal, property);
+      scaleLocked = nextHorizontal.scaleLocked === true || (!ownsHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(ownsHorizontal));
+      requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(nextHorizontal, 1));
+      widthLocked = nextHorizontal.widthLocked === true || (!ownsHorizontal('widthLocked') && ownsHorizontal('contentW'));
+      if (widthKey) {
+        const storedVisualWidth = Number(nextHorizontal.visualW);
+        sharedVisualWidth = Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null;
+      } else {
+        applyContentWidth(number(nextHorizontal.contentW, designWidth), false, requestedScale);
+      }
+    }
+    if (localChanged) {
+      const next = readSize();
+      const owns = property => Object.prototype.hasOwnProperty.call(next, property);
+      heightLocked = next.heightLocked === true || (!owns('heightLocked') && owns('frameH'));
+      listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
+      if (list && heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+      else if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
+      else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+    }
     updateFrame();
   });
 })();
