@@ -124,7 +124,10 @@
       min-width:0; padding:3px 5px; overflow:hidden; border-radius:999px; background:var(--pill); color:var(--secondary);
       font-size:10px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
     }
+    .cell-button { min-width:0; padding:0; border:0; background:transparent; }
+    .project-button { width:100%; }
     .q-slot { width:20px; display:flex; justify-content:center; }
+    .q-button { width:20px; height:22px; display:grid; place-items:center; color:var(--inactive); font-size:10px; font-weight:700; }
     .q-badge {
       width:17px; height:17px; border-radius:5px; display:grid; place-items:center;
       color:#FFFFFF; font-size:9px; font-weight:800; line-height:1;
@@ -138,12 +141,19 @@
       width:100%; min-width:0; padding:0; overflow:hidden; border:0; background:transparent; color:var(--text);
       display:block; font-size:12px; font-weight:600; line-height:1.2; text-align:left; text-overflow:ellipsis; white-space:nowrap;
     }
+    .quick-title-input {
+      width:100%; min-width:0; height:26px; padding:4px 6px; border:1px solid var(--action); border-radius:8px;
+      background:var(--surface); color:var(--text); font-size:12px; font-weight:600; outline:none;
+    }
     .roll-caption { display:block; margin-top:1px; color:var(--faint); font-size:9px; font-weight:700; line-height:1; }
     .cell, .number-cell {
       min-width:0; overflow:hidden; color:var(--deep); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
     }
     .task-title-button, .cell, .number-cell, .memo { transition:color .12s var(--ease); }
     .number-cell { text-align:right; font-variant-numeric:tabular-nums; }
+    .number-button { width:100%; text-align:right; }
+    .date-cell { position:relative; display:block; cursor:pointer; }
+    .date-cell input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
     .duration { color:var(--text); }
     .is-missing { color:var(--inactive); }
     .memo { color:var(--deep); font-size:11px; font-weight:600; }
@@ -152,6 +162,7 @@
       min-width:0; padding:3px 4px; border-radius:999px; overflow:hidden;
       font-size:9px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
     }
+    .status-button { width:100%; }
     .status-doing { background:var(--action); color:#FFFFFF; }
     .status-done { background:var(--pill); color:var(--secondary); }
     .status-wait { border:1px dashed var(--inactive); background:var(--surface); color:var(--muted); }
@@ -194,6 +205,27 @@
     }
     .add-plus { font-size:13px; font-weight:700; }
     .add-editor { flex:0 0 auto; }
+    .cell-popover {
+      position:absolute; z-index:30; width:164px; padding:10px; border:1px solid var(--border); border-radius:9px;
+      background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05);
+    }
+    .cell-popover[hidden] { display:none; }
+    .popover-label { display:block; margin-bottom:6px; color:var(--muted); font-size:9px; font-weight:800; }
+    .popover-current { margin-bottom:7px; color:var(--title); font-size:11px; font-weight:700; text-align:center; }
+    .popover-controls { display:grid; grid-template-columns:30px minmax(0,1fr) 30px; align-items:center; gap:6px; }
+    .popover-step, .popover-value {
+      height:30px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--secondary);
+      display:grid; place-items:center; font-size:11px; font-weight:700;
+    }
+    .popover-value { background:var(--surface-soft); color:var(--text); }
+    .popover-caption { display:block; margin-top:6px; color:var(--muted); font-size:9px; font-weight:600; line-height:1.4; text-align:center; }
+    .popover-form { display:flex; flex-direction:column; gap:7px; }
+    .popover-form input {
+      width:100%; height:32px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:600; outline:none;
+    }
+    .popover-form input:focus { border-color:var(--action); }
+    .popover-actions { display:flex; justify-content:flex-end; gap:6px; }
     .sr-only {
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
@@ -253,6 +285,9 @@
       .task-row.work .mobile-work-meta.times {
         grid-column:1; grid-row:3; color:var(--deep); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums;
       }
+      .task-row.work .mobile-work-meta .cell-button { width:auto; color:inherit; font-size:inherit; font-weight:inherit; }
+      .task-row.work .mobile-work-meta .date-cell { width:auto; }
+      .task-row.work .mobile-work-meta .project-button { max-width:110px; }
       .column-head.life, .task-row.life { grid-template-columns:44px 20px 168px 38px 18px minmax(0,1fr); gap:8px; }
       .column-head { padding-left:7px; padding-right:7px; }
       .task-row { padding-left:7px; padding-right:7px; }
@@ -301,6 +336,7 @@
       </div>
       <section class="list-shell" id="taskList" data-widget-list data-widget-list-height="368" data-worklog-list aria-label="기록 목록"></section>
       <div class="worklog-bottom" data-widget-fixed><div id="addArea"></div></div>
+      <div class="cell-popover" id="cellPopover" hidden></div>
       <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="목록 세로 크기 조절" aria-valuemin="160"></button>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
@@ -325,6 +361,7 @@
       const cardHeader = document.getElementById('cardHeader');
       const taskList = document.getElementById('taskList');
       const addArea = document.getElementById('addArea');
+      const cellPopover = document.getElementById('cellPopover');
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
       const narrowQuery = window.matchMedia('(max-width: 320px)');
@@ -334,7 +371,10 @@
       } catch (error) {
         console.warn('업무일지 실시간 동기화를 시작하지 못했습니다.', error);
       }
-      const ui = { selectedDate:'', adding:false, editingId:null, confirmDeleteId:null, newId:null, dirtyFields:new Set() };
+      const ui = {
+        selectedDate:'', adding:false, draftTask:null, editingId:null, confirmDeleteId:null,
+        newId:null, popover:null, dirtyFields:new Set()
+      };
       let state;
       let pendingExternalSync = false;
 
@@ -419,6 +459,8 @@
         const qNumber = Number(raw.q);
         const hasEstimate = raw.est !== null && raw.est !== undefined && raw.est !== '';
         const estNumber = Number(raw.est);
+        const hasProgress = raw.progress !== null && raw.progress !== undefined && raw.progress !== '';
+        const progressNumber = Number(raw.progress);
         return {
           id:raw.id.trim(),
           mode,
@@ -429,6 +471,7 @@
           due:parseDate(raw.due) ? raw.due : null,
           start:normalizeTime(raw.start),
           end:normalizeTime(raw.end),
+          progress:hasProgress && Number.isFinite(progressNumber) && progressNumber >= 0 ? progressNumber : null,
           est:hasEstimate && Number.isFinite(estNumber) && estNumber >= 0 ? estNumber : null,
           status:done ? 'done' : status,
           done,
@@ -574,8 +617,21 @@
         return Math.round((minutes / 60) * 10) / 10;
       }
 
+      function progressOf(task) {
+        return task.progress === null ? durationOf(task) : task.progress;
+      }
+
+      function currentTimeKey() {
+        const now = new Date();
+        return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      }
+
       function numberHours(value) {
         return `${Number(value || 0).toFixed(1)}h`;
+      }
+
+      function displayHours(value) {
+        return Number.isInteger(Number(value) * 10) ? Number(value).toFixed(1) : Number(value).toFixed(2);
       }
 
       function formatDue(value) {
@@ -610,6 +666,26 @@
 
       function qBadge(q) {
         return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '';
+      }
+
+      function qButton(task) {
+        const label = task.q ? `Q${task.q}` : '–';
+        return `<button class="cell-button q-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label}" title="눌러서 Q 변경">${task.q ? qBadge(task.q) : '–'}</button>`;
+      }
+
+      function latestWorkDefaults() {
+        const previous = [...state.tasks].reverse().find(task => task.mode === 'work' && task.title);
+        return { proj:previous?.proj || '미분류', q:previous?.q || null };
+      }
+
+      function createQuickDraft() {
+        const defaults = latestWorkDefaults();
+        return normalizeTask({
+          id:crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          mode:'work', date:ui.selectedDate, proj:defaults.proj, q:defaults.q, title:'',
+          due:localDateKey(todayDate()), start:null, end:null, progress:0, est:null,
+          status:'wait', done:false, memo:'', rolledFrom:null
+        });
       }
 
       function statusMeta(task) {
@@ -680,7 +756,7 @@
         const count = `<span><strong>${items.length}</strong>개 중 <strong>${done}</strong> 완료</span>`;
         let modeSummary = '';
         if (state.mode === 'work') {
-          const durations = items.map(durationOf).filter(value => value !== null);
+          const durations = items.map(progressOf).filter(value => value !== null);
           const estimates = items.map(task => task.est).filter(value => value !== null);
           const duration = durations.reduce((sum, value) => sum + value, 0);
           const estimate = estimates.reduce((sum, value) => sum + value, 0);
@@ -696,27 +772,72 @@
         cardHeader.innerHTML = `<div class="date-side">${datePieces}</div><div class="summary-side">${count}${modeSummary}</div>`;
       }
 
+      function projectButton(task) {
+        const project = task.proj || '미분류';
+        return `<button class="cell-button project-pill project-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="project" aria-label="구분 변경, 현재 ${escapeHtml(project)}" title="눌러서 구분 변경">${escapeHtml(project)}</button>`;
+      }
+
+      function dueCell(task) {
+        return `<label class="number-cell date-cell ${task.due ? '' : 'is-missing'}" title="눌러서 목표일 변경"><span>${formatDue(task.due)}</span><input type="date" value="${escapeHtml(task.due || '')}" data-due-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title || '새 업무')} 목표일"></label>`;
+      }
+
+      function timeButton(task, field) {
+        const value = task[field] || '–';
+        const label = field === 'start' ? '시작' : '종료';
+        return `<button class="cell-button number-cell number-button ${task[field] ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간을 현재 시간으로 기록" title="누른 시간을 ${label}으로 기록">${value}</button>`;
+      }
+
+      function hourButton(task, field, value) {
+        const label = field === 'progress' ? '진행 시간' : '예상 시간';
+        return `<button class="cell-button number-cell number-button ${field === 'progress' ? 'duration' : ''} ${value === null ? 'is-missing' : ''}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 변경, 현재 ${value === null ? '없음' : `${displayHours(value)}시간`}" title="눌러서 0.5시간 단위로 변경">${value === null ? '–' : displayHours(value)}</button>`;
+      }
+
+      function statusButton(task, status) {
+        return `<button class="cell-button status-pill status-button ${status.className}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="status" aria-label="상태 변경, 현재 ${status.label}" title="눌러서 상태 변경">${status.label}</button>`;
+      }
+
+      function mobileWorkMeta(task, status, progress, estimate) {
+        return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span>
+          <span class="mobile-work-meta times"><span>목표</span>${dueCell(task)}<span>·</span>${timeButton(task, 'start')}<span>–</span>${timeButton(task, 'end')}<span>· 진행</span>${hourButton(task, 'progress', progress)}<span>/ 예상</span>${hourButton(task, 'est', estimate)}</span>`;
+      }
+
       function workRow(task) {
-        const duration = durationOf(task);
+        const progress = progressOf(task);
         const status = statusMeta(task);
         const rolled = rolledCaption(task);
-        const start = task.start || '–';
-        const end = task.end || '–';
-        const estimate = task.est === null ? '–' : task.est.toFixed(1);
+        const estimate = task.est;
         return `<article class="task-row work ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
-          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
-          <span class="q-slot">${qBadge(task.q)}</span>
+          ${projectButton(task)}
+          <span class="q-slot">${qButton(task)}</span>
           <span class="task-main"><button class="task-title-button" type="button" data-edit-task="${escapeHtml(task.id)}" title="수정">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>
-          <span class="number-cell ${task.due ? '' : 'is-missing'}">${formatDue(task.due)}</span>
-          <span class="number-cell ${task.start ? '' : 'is-missing'}">${start}</span>
-          <span class="number-cell ${task.end ? '' : 'is-missing'}">${end}</span>
-          <span class="number-cell duration ${duration === null ? 'is-missing' : ''}">${duration === null ? '–' : duration.toFixed(1)}</span>
-          <span class="number-cell ${task.est === null ? 'is-missing' : ''}">${estimate}</span>
-          <span class="status-pill ${status.className}">${status.label}</span>
+          ${dueCell(task)}
+          ${timeButton(task, 'start')}
+          ${timeButton(task, 'end')}
+          ${hourButton(task, 'progress', progress)}
+          ${hourButton(task, 'est', estimate)}
+          ${statusButton(task, status)}
           <span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-work" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>
-          <span class="mobile-work-meta pills"><span class="project-pill">${escapeHtml(task.proj || '미분류')}</span><span class="q-slot">${qBadge(task.q)}</span><span class="status-pill ${status.className}">${status.label}</span></span>
-          <span class="mobile-work-meta times">${start}–${end} · 진행 ${duration === null ? '–' : duration.toFixed(1)} / 예상 ${estimate}</span>
+          ${mobileWorkMeta(task, status, progress, estimate)}
         </article>`;
+      }
+
+      function quickWorkRow(task) {
+        const status = statusMeta(task);
+        const q = task.q ? qBadge(task.q) : '–';
+        return `<form class="task-row work quick-add-row" data-quick-add-form data-task-id="${escapeHtml(task.id)}">
+          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
+          <span class="q-slot">${q}</span>
+          <span class="task-main"><input class="quick-title-input" name="title" autocomplete="off" aria-label="새 업무명" placeholder="업무명 입력 후 Enter"></span>
+          <span class="number-cell">${formatDue(task.due)}</span>
+          <span class="number-cell is-missing">–</span>
+          <span class="number-cell is-missing">–</span>
+          <span class="number-cell duration">0.0</span>
+          <span class="number-cell is-missing">–</span>
+          <span class="status-pill ${status.className}">${status.label}</span>
+          <span class="check-wrap"><span class="done-check mode-work" aria-hidden="true"></span></span>
+          <span class="mobile-work-meta pills"><span class="project-pill">${escapeHtml(task.proj || '미분류')}</span><span class="q-slot">${q}</span><span class="status-pill ${status.className}">${status.label}</span></span>
+          <span class="mobile-work-meta times">목표 ${formatDue(task.due)} · –– · 진행 0.0 / 예상 –</span>
+        </form>`;
       }
 
       function lifeRow(task) {
@@ -776,23 +897,64 @@
       }
 
       function renderList(items) {
-        taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId);
-        if (!items.length && !ui.editingId) {
+        const hasQuickRow = state.mode === 'work' && ui.adding && ui.draftTask;
+        taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId && !hasQuickRow);
+        if (!items.length && !ui.editingId && !hasQuickRow) {
           taskList.innerHTML = `<span class="empty-title" data-empty-state>오늘 적은 ${state.mode === 'work' ? '업무' : '할 일'} 없음</span><span class="empty-copy">＋ ${state.mode === 'work' ? '업무' : '할 일'} 추가로 한 줄 남겨두세요</span>`;
           return;
         }
         const rows = items.map(task => ui.editingId === task.id ? editorHtml(task, 'edit') : (state.mode === 'work' ? workRow(task) : lifeRow(task)));
+        if (hasQuickRow) rows.push(quickWorkRow(ui.draftTask));
         const head = state.mode === 'work' && mobileQuery.matches ? '' : columnHead(state.mode);
         taskList.innerHTML = `${head}<div class="rows-scroll">${rows.join('')}</div>`;
       }
 
       function renderAdd(items) {
         card.classList.toggle('is-adding', ui.adding);
-        if (ui.adding) {
+        if (ui.adding && state.mode === 'life') {
           addArea.innerHTML = editorHtml(null, 'add');
           return;
         }
         addArea.innerHTML = `<button class="add-row" type="button" data-add-task data-add-row><span class="add-plus" ${items.length === 0 ? 'data-empty-add' : ''}>＋</span><span>${state.mode === 'work' ? '업무' : '할 일'} 추가</span></button>`;
+      }
+
+      function closeCellPopover() {
+        ui.popover = null;
+        cellPopover.hidden = true;
+        cellPopover.innerHTML = '';
+      }
+
+      function renderCellPopover() {
+        if (!ui.popover || ui.adding || ui.editingId) {
+          cellPopover.hidden = true;
+          cellPopover.innerHTML = '';
+          return;
+        }
+        const task = state.tasks.find(item => item.id === ui.popover.taskId && item.mode === 'work');
+        const anchors = [...card.querySelectorAll(`[data-cell-task="${CSS.escape(ui.popover.taskId)}"][data-cell-field="${CSS.escape(ui.popover.field)}"]`)];
+        const anchor = anchors.find(element => element.offsetParent !== null);
+        if (!task || !anchor) {
+          closeCellPopover();
+          return;
+        }
+        if (ui.popover.field === 'project') {
+          cellPopover.innerHTML = `<form class="popover-form" data-project-form data-task-id="${escapeHtml(task.id)}"><label><span class="popover-label">구분</span><input name="project" value="${escapeHtml(task.proj || '미분류')}" maxlength="30" autocomplete="off"></label><div class="popover-actions"><button class="editor-button" type="button" data-popover-close>취소</button><button class="editor-button primary" type="submit">저장</button></div></form>`;
+        } else {
+          const value = ui.popover.field === 'progress' ? progressOf(task) : task.est;
+          const label = ui.popover.field === 'progress' ? '진행 시간' : '예상 시간';
+          cellPopover.innerHTML = `<div class="popover-current">${label} ${value === null ? '–' : `${displayHours(value)}h`}</div><div class="popover-controls"><button class="popover-step" type="button" data-adjust-hours="-0.5" aria-label="${label} 0.5시간 줄이기">−</button><span class="popover-value">0.5</span><button class="popover-step" type="button" data-adjust-hours="0.5" aria-label="${label} 0.5시간 늘리기">＋</button></div><span class="popover-caption">0.5시간 단위로 조정됩니다</span>`;
+        }
+        cellPopover.hidden = false;
+        const cardRect = card.getBoundingClientRect();
+        const anchorRect = anchor.getBoundingClientRect();
+        const scale = card.offsetWidth ? cardRect.width / card.offsetWidth : 1;
+        const width = cellPopover.offsetWidth;
+        const height = cellPopover.offsetHeight;
+        const anchorCenter = ((anchorRect.left + anchorRect.right) / 2 - cardRect.left) / scale;
+        const below = (anchorRect.bottom - cardRect.top) / scale + 6;
+        const above = (anchorRect.top - cardRect.top) / scale - height - 6;
+        cellPopover.style.left = `${Math.max(10, Math.min(card.offsetWidth - width - 10, anchorCenter - width / 2))}px`;
+        cellPopover.style.top = `${below + height <= card.offsetHeight - 10 ? below : Math.max(10, above)}px`;
       }
 
       function renderAll() {
@@ -807,6 +969,7 @@
         renderHeader(items);
         renderList(items);
         renderAdd(items);
+        renderCellPopover();
       }
 
       function announce(message) {
@@ -829,8 +992,10 @@
         const current = parseDate(ui.selectedDate) || todayDate();
         ui.selectedDate = localDateKey(nextActiveDate(current, state.mode, direction));
         ui.adding = false;
+        ui.draftTask = null;
         ui.editingId = null;
         ui.confirmDeleteId = null;
+        ui.popover = null;
         ui.dirtyFields = new Set();
         renderAll();
         if (keepDayFocus) dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
@@ -855,6 +1020,7 @@
           due:values.get('due') || null,
           start:mode === 'work' ? normalizeTime(values.get('start')) : null,
           end:mode === 'work' ? normalizeTime(values.get('end')) : null,
+          progress:mode === 'work' ? (existing?.progress ?? null) : null,
           est:Number.isFinite(estimate) ? estimate : null,
           status:done ? 'done' : status,
           done,
@@ -863,16 +1029,62 @@
         });
       }
 
+      function saveQuickTask(form) {
+        const title = String(new FormData(form).get('title') || '').trim();
+        if (!title || !ui.draftTask) {
+          form.querySelector('input[name="title"]')?.focus();
+          return false;
+        }
+        if (!drainPendingSync()) return false;
+        const task = normalizeTask({ ...ui.draftTask, title });
+        if (!task) return false;
+        const previous = { adding:ui.adding, draftTask:ui.draftTask, newId:ui.newId };
+        ui.adding = false;
+        ui.draftTask = null;
+        ui.newId = task.id;
+        const saved = mutate(fresh => {
+          if (!fresh.tasks.some(item => item.id === task.id)) fresh.tasks.push(task);
+          return fresh;
+        });
+        if (!saved) {
+          Object.assign(ui, previous);
+          renderAll();
+          return false;
+        }
+        announce('추가했습니다.');
+        window.setTimeout(() => { ui.newId = null; }, 1200);
+        return true;
+      }
+
+      function updateWorkTask(id, updater, announcement) {
+        if (!drainPendingSync()) return false;
+        let found = false;
+        const saved = mutate(fresh => {
+          const index = fresh.tasks.findIndex(task => task.id === id && task.mode === 'work');
+          if (index < 0) return fresh;
+          const next = { ...fresh.tasks[index] };
+          updater(next);
+          fresh.tasks[index] = normalizeTask(next);
+          found = true;
+          return fresh;
+        });
+        if (saved && found && announcement) announce(announcement);
+        if (saved && !found) announce('다른 창에서 삭제된 항목입니다.');
+        return saved && found;
+      }
+
       modeRow.addEventListener('click', event => {
         const button = event.target.closest('[data-mode]');
         if (!button || button.dataset.mode === state.mode) return;
         const nextMode = button.dataset.mode;
         const previousDate = ui.selectedDate;
-        const previousUi = { adding:ui.adding, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, dirtyFields:ui.dirtyFields };
+        const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, popover:ui.popover, dirtyFields:ui.dirtyFields };
         if (!drainPendingSync()) return;
         ui.adding = false;
+        ui.draftTask = null;
         ui.editingId = null;
         ui.confirmDeleteId = null;
+        ui.popover = null;
         ui.dirtyFields = new Set();
         const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), nextMode);
         ui.selectedDate = localDateKey(selected);
@@ -891,8 +1103,10 @@
         if (!drainPendingSync()) return;
         ui.selectedDate = button.dataset.date;
         ui.adding = false;
+        ui.draftTask = null;
         ui.editingId = null;
         ui.confirmDeleteId = null;
+        ui.popover = null;
         ui.dirtyFields = new Set();
         renderAll();
         dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
@@ -906,26 +1120,92 @@
       card.addEventListener('input', trackEditorChange);
       card.addEventListener('change', trackEditorChange);
 
+      card.addEventListener('change', event => {
+        const input = event.target.closest('[data-due-task]');
+        if (!input) return;
+        const due = parseDate(input.value) ? input.value : null;
+        ui.popover = null;
+        updateWorkTask(input.dataset.dueTask, task => { task.due = due; }, '목표일을 바꿨습니다.');
+      });
+
       card.addEventListener('click', event => {
         if (event.target.closest('[data-dismiss-banner]')) {
           const saved = mutate(fresh => { fresh.bannerDismissedWeek = isoWeekKey(todayDate()); return fresh; }, false);
           if (saved) renderBanner();
           return;
         }
+        if (event.target.closest('[data-popover-close]')) {
+          closeCellPopover();
+          return;
+        }
+        const adjustmentButton = event.target.closest('[data-adjust-hours]');
+        if (adjustmentButton && ui.popover && ['progress','est'].includes(ui.popover.field)) {
+          const { taskId, field } = ui.popover;
+          const delta = Number(adjustmentButton.dataset.adjustHours);
+          updateWorkTask(taskId, task => {
+            const current = field === 'progress' ? progressOf(task) : task.est;
+            task[field] = Math.max(0, Math.round(((current ?? 0) + delta) * 100) / 100);
+          }, `${field === 'progress' ? '진행' : '예상'} 시간을 바꿨습니다.`);
+          return;
+        }
         if (event.target.closest('[data-add-task]')) {
+          if (ui.adding) {
+            (taskList.querySelector('[data-quick-add-form] input[name="title"]') || addArea.querySelector('input[name="title"]'))?.focus();
+            return;
+          }
+          if (!drainPendingSync()) return;
           ui.adding = true;
+          ui.draftTask = state.mode === 'work' ? createQuickDraft() : null;
           ui.editingId = null;
           ui.confirmDeleteId = null;
+          ui.popover = null;
           ui.dirtyFields = new Set();
           renderAll();
-          addArea.querySelector('input[name="title"]')?.focus();
+          (taskList.querySelector('[data-quick-add-form] input[name="title"]') || addArea.querySelector('input[name="title"]'))?.focus();
+          return;
+        }
+        const cellButton = event.target.closest('[data-cell-task][data-cell-field]');
+        if (cellButton) {
+          if (ui.adding || ui.editingId) return;
+          const id = cellButton.dataset.cellTask;
+          const field = cellButton.dataset.cellField;
+          if (field === 'project' || field === 'progress' || field === 'est') {
+            const alreadyOpen = ui.popover?.taskId === id && ui.popover?.field === field;
+            ui.popover = alreadyOpen ? null : { taskId:id, field };
+            renderCellPopover();
+            if (!alreadyOpen && field === 'project') {
+              const input = cellPopover.querySelector('input[name="project"]');
+              input?.focus();
+              input?.select();
+            }
+            return;
+          }
+          ui.popover = null;
+          if (field === 'q') {
+            updateWorkTask(id, task => { task.q = task.q === 4 ? null : (task.q || 0) + 1; }, 'Q를 바꿨습니다.');
+            return;
+          }
+          if (field === 'start' || field === 'end') {
+            updateWorkTask(id, task => { task[field] = currentTimeKey(); }, `${field === 'start' ? '시작' : '종료'} 시간을 기록했습니다.`);
+            return;
+          }
+          if (field === 'status') {
+            updateWorkTask(id, task => {
+              const next = task.status === 'wait' ? 'doing' : task.status === 'doing' ? 'done' : 'wait';
+              task.status = next;
+              task.done = next === 'done';
+            }, '상태를 바꿨습니다.');
+            return;
+          }
           return;
         }
         const editButton = event.target.closest('[data-edit-task]');
         if (editButton) {
           ui.editingId = editButton.dataset.editTask;
           ui.adding = false;
+          ui.draftTask = null;
           ui.confirmDeleteId = null;
+          ui.popover = null;
           ui.dirtyFields = new Set();
           renderAll();
           taskList.querySelector('input[name="title"]')?.focus();
@@ -947,8 +1227,10 @@
         }
         if (event.target.closest('[data-cancel-editor]')) {
           ui.adding = false;
+          ui.draftTask = null;
           ui.editingId = null;
           ui.confirmDeleteId = null;
+          ui.popover = null;
           ui.dirtyFields = new Set();
           syncFromStorage();
           return;
@@ -986,6 +1268,21 @@
       });
 
       card.addEventListener('submit', event => {
+        const quickForm = event.target.closest('[data-quick-add-form]');
+        if (quickForm) {
+          event.preventDefault();
+          saveQuickTask(quickForm);
+          return;
+        }
+        const projectForm = event.target.closest('[data-project-form]');
+        if (projectForm) {
+          event.preventDefault();
+          const id = projectForm.dataset.taskId;
+          const project = String(new FormData(projectForm).get('project') || '').trim() || '미분류';
+          closeCellPopover();
+          updateWorkTask(id, task => { task.proj = project; }, '구분을 바꿨습니다.');
+          return;
+        }
         const form = event.target.closest('[data-task-form]');
         if (!form) return;
         event.preventDefault();
@@ -1012,11 +1309,13 @@
         }
         const isNew = form.dataset.kind === 'add';
         const dirtyFields = new Set(ui.dirtyFields);
-        const previousUi = { adding:ui.adding, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, newId:ui.newId, dirtyFields:ui.dirtyFields };
+        const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, newId:ui.newId, popover:ui.popover, dirtyFields:ui.dirtyFields };
         ui.newId = isNew ? task.id : null;
         ui.adding = false;
+        ui.draftTask = null;
         ui.editingId = null;
         ui.confirmDeleteId = null;
+        ui.popover = null;
         ui.dirtyFields = new Set();
         let updatedExisting = isNew;
         const saved = mutate(fresh => {
@@ -1050,12 +1349,33 @@
         if (isNew) window.setTimeout(() => { ui.newId = null; }, 1200);
       });
 
+      card.addEventListener('focusout', event => {
+        const form = event.target.closest('[data-quick-add-form]');
+        if (!form || !event.target.matches('input[name="title"]')) return;
+        window.setTimeout(() => {
+          if (!ui.adding || !form.isConnected || form.contains(document.activeElement)) return;
+          if (String(event.target.value || '').trim()) saveQuickTask(form);
+        }, 0);
+      });
+
+      document.addEventListener('pointerdown', event => {
+        if (!ui.popover) return;
+        if (event.target.closest('#cellPopover, [data-cell-task][data-cell-field]')) return;
+        closeCellPopover();
+      });
+
       document.addEventListener('keydown', event => {
         if (event.isComposing) return;
+        if (event.key === 'Escape' && ui.popover) {
+          closeCellPopover();
+          return;
+        }
         if (event.key === 'Escape' && (ui.adding || ui.editingId)) {
           ui.adding = false;
+          ui.draftTask = null;
           ui.editingId = null;
           ui.confirmDeleteId = null;
+          ui.popover = null;
           ui.dirtyFields = new Set();
           syncFromStorage();
           return;
