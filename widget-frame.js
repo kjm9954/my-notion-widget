@@ -20,6 +20,7 @@
     'achieve.html': { selector:'#content.list .row', kind:'dot', max:3, empty:'#content.empty' },
     'index.html': { selector:'.quadrant-list .item-card:first-child .state-dot', max:4 },
     'stats.html': { disabled:true },
+    'worklog.html': { selector:'.roll-banner:not([hidden]), [data-empty-add]', max:2 },
     'goals.html': { selector:'.goal-row:not(.done) .check', max:3, empty:'.goals-grid .empty' },
     'find.html': { empty:'.empty-list' },
     'drawer.html': { empty:'.quote-list > .empty' },
@@ -32,7 +33,7 @@
   const fileOrder = [
     'quote-drawer.html', 'thoughts.html', 'life-books.html', 'reading-count.html', 'wishlist.html',
     'today.html', 'calendar.html', 'material.html', 'empty.html', 'mood.html', 'achieve.html',
-    'index.html', 'stats.html', 'goals.html', 'record.html', 'find.html', 'add.html',
+    'index.html', 'stats.html', 'worklog.html', 'goals.html', 'record.html', 'find.html', 'add.html',
     'drawer.html', 'library.html', 'session.html'
   ];
   const fileOffset = Math.max(0, fileOrder.indexOf(file) % 5) * .7;
@@ -223,7 +224,8 @@
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
   const list = card.querySelector('[data-widget-list]');
   const listHandle = card.querySelector('[data-widget-list-handle]');
-  const fixed = card.querySelector('[data-widget-fixed]');
+  const fixedParts = Array.from(card.querySelectorAll('[data-widget-fixed]'));
+  const defaultListHeight = Number(list?.dataset.widgetListHeight) || list?.offsetHeight || 0;
   const ABSOLUTE_MINIMUM_SCALE = .08;
   const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
   const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
@@ -457,11 +459,13 @@
   }
 
   function listOffset() {
-    if (fixed) {
+    if (fixedParts.length) {
       const style = getComputedStyle(card);
       const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
       const gap = parseFloat(style.rowGap || style.gap);
-      return fixed.offsetHeight + padding + gap;
+      const visibleParts = fixedParts.filter(part => part.offsetParent !== null);
+      const fixedHeight = visibleParts.reduce((sum, part) => sum + part.offsetHeight, 0);
+      return fixedHeight + padding + gap * visibleParts.length;
     }
     return Math.max(0, card.offsetHeight - list.offsetHeight);
   }
@@ -634,7 +638,7 @@
   heightLocked = saved.heightLocked === true || (!hasOwn('heightLocked') && hasOwn('frameH'));
   listLocked = saved.listLocked === true || (Object.prototype.hasOwnProperty.call(saved, 'listH') && !Object.prototype.hasOwnProperty.call(saved, 'listLocked'));
   if (list && heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
-  else if (list) applyListHeight(number(saved.listH, list.offsetHeight));
+  else if (list) applyListHeight(number(saved.listH, defaultListHeight));
   else if (heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
   commitFrame();
 
@@ -646,12 +650,13 @@
     updateFrame();
   }).observe(card);
 
-  if (fixed) {
-    new ResizeObserver(() => {
+  if (fixedParts.length) {
+    const fixedObserver = new ResizeObserver(() => {
       if (listDrag) return;
       if (heightLocked) applyFrameHeight(naturalHeight);
       else applyListHeight(requestedListHeight ?? list.offsetHeight);
-    }).observe(fixed);
+    });
+    fixedParts.forEach(part => fixedObserver.observe(part));
   }
 
   window.addEventListener('resize', () => {

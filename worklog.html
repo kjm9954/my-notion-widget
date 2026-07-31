@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>업무일지</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --mid:#CFE2EA;
+      --text:#12303C; --title:#33505C; --secondary:#6B8794; --deep:#55707C;
+      --muted:#93A5AD; --faint:#A2B4BC; --complete:#A9BAC2; --inactive:#C6D6DD;
+      --border:#DCE7ED; --border-soft:#E6EDF0; --border-faint:#EDF2F4; --border-pale:#F1F5F7;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD; --pill:#F5F9FB;
+      --danger-border:#E4D5D5; --danger:#A56B6B;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, select { color:inherit; font:inherit; }
+    button { cursor:pointer; }
+    .card {
+      position:relative; width:100%; max-width:720px; height:595px; margin:0 auto; padding:18px;
+      display:flex; flex-direction:column; gap:10px; overflow:hidden; background:var(--surface);
+      border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .worklog-top { flex:0 0 auto; display:flex; flex-direction:column; gap:10px; }
+    .worklog-bottom { flex:0 0 auto; }
+    .mode-row { min-height:30px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+    .mode-pill {
+      min-height:30px; padding:6px 13px; border:1px solid var(--border); border-radius:999px;
+      background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
+    }
+    .mode-pill.is-selected[data-mode="work"] { border-color:var(--action); background:var(--action); color:#FFFFFF; }
+    .mode-pill.is-selected[data-mode="life"] { border-color:var(--mid); background:var(--mid); color:var(--action); }
+    .day-nav { min-height:34px; display:grid; grid-template-columns:26px minmax(0,1fr) 26px; align-items:center; gap:8px; }
+    .nav-arrow {
+      position:relative; width:26px; height:34px; padding:0; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface); color:var(--muted); font-size:17px; font-weight:700; line-height:1;
+    }
+    .day-track { min-width:0; padding:3px; display:flex; background:var(--border-pale); border-radius:9px; }
+    .day-button {
+      min-width:40px; min-height:36px; flex:1; padding:3px 2px; border:0; border-radius:7px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+      background:transparent; color:#8AA0AA;
+    }
+    .day-button.is-future { opacity:.5; }
+    .day-button.is-selected {
+      background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(18,48,60,.10);
+    }
+    .day-name { font-size:12px; font-weight:800; line-height:1.1; }
+    .day-count-line { min-height:12px; display:flex; align-items:center; justify-content:center; gap:2px; }
+    .day-count { color:var(--faint); font-size:9px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+    .day-button.is-selected .day-count { font-weight:800; }
+    .day-button.is-selected.mode-work .day-count { color:var(--action); }
+    .day-button.is-selected.mode-life .day-count { color:var(--action); }
+    .roll-count {
+      padding:1px 4px; border-radius:999px; background:var(--action-soft); color:var(--action);
+      font-size:8px; font-weight:800; line-height:1.2; font-variant-numeric:tabular-nums;
+    }
+    .roll-banner {
+      flex:0 0 auto; padding:11px 12px; display:flex; flex-direction:column; gap:4px;
+      background:var(--action-soft); border-radius:12px;
+    }
+    .roll-banner[hidden] { display:none; }
+    .banner-kicker { color:var(--action); font-size:9px; font-weight:800; letter-spacing:.06em; }
+    .banner-copy { color:var(--text); font-size:11px; font-weight:700; }
+    .banner-dismiss {
+      align-self:flex-end; padding:0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:800;
+    }
+    .card-header {
+      min-height:39px; padding-top:12px; border-top:1px solid var(--border-faint);
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+    }
+    .date-side, .summary-side { min-width:0; display:flex; align-items:center; gap:7px; }
+    .date-title { color:var(--text); font-size:13px; font-weight:800; white-space:nowrap; }
+    .weekday-label { color:var(--secondary); font-size:11px; font-weight:700; white-space:nowrap; }
+    .today-pill {
+      padding:3px 7px; border-radius:999px; background:var(--action-soft); color:var(--action); font-size:10px; font-weight:700;
+    }
+    .week-caption { color:var(--faint); font-size:9px; font-weight:700; white-space:nowrap; }
+    .summary-side { justify-content:flex-end; color:var(--secondary); font-size:11px; font-weight:700; white-space:nowrap; }
+    .summary-side strong { color:var(--text); font-weight:800; }
+    .summary-divider { color:var(--inactive); }
+    .time-summary { color:var(--text); font-variant-numeric:tabular-nums; }
+    .time-summary span { color:var(--faint); font-size:10px; }
+    .list-shell {
+      min-height:160px; flex:1; padding:12px; overflow:hidden;
+      display:flex; flex-direction:column; gap:6px; background:var(--surface-soft);
+      border:1px solid var(--border-pale); border-radius:12px;
+    }
+    .rows-scroll {
+      min-height:0; flex:1; overflow-x:hidden; overflow-y:auto; display:flex; flex-direction:column; gap:6px;
+      scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
+    .list-shell.is-empty {
+      padding:26px 12px; align-items:center; justify-content:center; gap:4px;
+      border:1px dashed var(--inactive); text-align:center;
+    }
+    .empty-title { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
+    .column-head, .task-row { display:grid; align-items:center; gap:8px; }
+    .column-head.work, .task-row.work {
+      grid-template-columns:44px 20px minmax(110px,1fr) 38px 38px 38px 28px 28px 42px 18px;
+    }
+    .column-head.life, .task-row.life {
+      grid-template-columns:44px 20px 168px 38px 18px minmax(120px,1fr);
+    }
+    .column-head {
+      flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
+      color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.04em;
+    }
+    .column-head span.numeric { text-align:right; }
+    .task-row {
+      height:40px; min-height:40px; flex:0 0 auto; padding:7px 10px; background:var(--surface); border-radius:9px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid transparent; outline-offset:-1px;
+      transition:outline-color .12s var(--ease);
+    }
+    @media (hover:hover) { .task-row:hover { outline-color:var(--border-soft); } }
+    .project-pill {
+      min-width:0; padding:3px 5px; overflow:hidden; border-radius:999px; background:var(--pill); color:var(--secondary);
+      font-size:10px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .q-slot { width:20px; display:flex; justify-content:center; }
+    .q-badge {
+      width:17px; height:17px; border-radius:5px; display:grid; place-items:center;
+      color:#FFFFFF; font-size:9px; font-weight:800; line-height:1;
+    }
+    .q-1 { background:var(--title); }
+    .q-2 { background:var(--secondary); }
+    .q-3 { background:var(--complete); }
+    .q-4 { background:var(--border-faint); color:var(--muted); }
+    .task-main { min-width:0; display:flex; flex-direction:column; justify-content:center; }
+    .task-title-button {
+      width:100%; min-width:0; padding:0; overflow:hidden; border:0; background:transparent; color:var(--text);
+      display:block; font-size:12px; font-weight:600; line-height:1.2; text-align:left; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .roll-caption { display:block; margin-top:1px; color:var(--faint); font-size:9px; font-weight:700; line-height:1; }
+    .cell, .number-cell {
+      min-width:0; overflow:hidden; color:var(--deep); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .task-title-button, .cell, .number-cell, .memo { transition:color .12s var(--ease); }
+    .number-cell { text-align:right; font-variant-numeric:tabular-nums; }
+    .duration { color:var(--text); }
+    .is-missing { color:var(--inactive); }
+    .memo { color:var(--deep); font-size:11px; font-weight:600; }
+    .memo.is-missing { color:var(--complete); }
+    .status-pill {
+      min-width:0; padding:3px 4px; border-radius:999px; overflow:hidden;
+      font-size:9px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .status-doing { background:var(--action); color:#FFFFFF; }
+    .status-done { background:var(--pill); color:var(--secondary); }
+    .status-wait { border:1px dashed var(--inactive); background:var(--surface); color:var(--muted); }
+    .check-wrap { width:18px; height:18px; display:grid; place-items:center; }
+    .done-check {
+      width:15px; height:15px; padding:0; border:1.5px solid var(--inactive); border-radius:4px;
+      display:grid; place-items:center; background:var(--surface); color:#FFFFFF; font-size:9px; font-weight:800; line-height:1;
+      transition:background-color .12s var(--ease), border-color .12s var(--ease), color .12s var(--ease);
+    }
+    .done-check.is-done.mode-work { border-color:var(--action); background:var(--action); }
+    .done-check.is-done.mode-life { border-color:var(--mid); background:var(--mid); color:var(--action); }
+    .task-row.is-done .task-title-button, .task-row.is-done .cell, .task-row.is-done .number-cell, .task-row.is-done .memo { color:var(--complete); }
+    .task-row.is-done .task-title-button { text-decoration:line-through; }
+    .mobile-work-meta { display:none; }
+    .inline-editor {
+      flex:0 0 auto; padding:10px; background:var(--surface); border-radius:9px;
+      box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid var(--border-soft); outline-offset:-1px;
+    }
+    .editor-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .editor-field { min-width:0; display:flex; flex-direction:column; gap:4px; color:var(--muted); font-size:9px; font-weight:800; }
+    .editor-field.is-wide { grid-column:span 2; }
+    .editor-field input, .editor-field select {
+      width:100%; min-width:0; height:32px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:600; outline:none;
+      transition:border-color .12s var(--ease);
+    }
+    .editor-field input:focus, .editor-field select:focus { border-color:var(--action); }
+    .editor-actions { min-height:34px; margin-top:8px; display:flex; align-items:center; justify-content:flex-end; gap:7px; }
+    .editor-button {
+      min-height:30px; padding:5px 10px; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface); color:var(--secondary); font-size:10px; font-weight:700;
+    }
+    .editor-button.primary { border-color:var(--action); background:var(--action); color:#FFFFFF; }
+    .editor-button.danger { margin-right:auto; border-color:var(--danger-border); color:var(--danger); }
+    .editor-button.confirm-danger { margin-right:auto; border-color:var(--danger); background:var(--danger); color:#FFFFFF; }
+    .add-row {
+      width:100%; min-height:40px; flex:0 0 auto; padding:7px 10px; border:1px dashed var(--inactive); border-radius:9px;
+      display:flex; align-items:center; justify-content:center; gap:6px; background:var(--surface); color:var(--muted);
+      font-size:11px; font-weight:700;
+    }
+    .add-plus { font-size:13px; font-weight:700; }
+    .add-editor { flex:0 0 auto; }
+    .sr-only {
+      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+      clip:rect(0,0,0,0); white-space:nowrap; border:0;
+    }
+    @media (max-width:999px) and (min-width:640px) {
+      .column-head.work, .task-row.work {
+        grid-template-columns:44px 20px minmax(90px,1fr) 38px 34px 34px 28px 28px 42px 18px;
+      }
+    }
+    @media (max-width:639px) {
+      .card { padding:14px; }
+      .mode-pill {
+        position:relative; min-width:44px; min-height:44px; padding:0 13px;
+        border-color:transparent; background:transparent; isolation:isolate;
+      }
+      .mode-pill::before {
+        content:""; position:absolute; left:0; right:0; top:7px; height:30px;
+        z-index:-1; border:1px solid var(--border); border-radius:999px; background:var(--surface);
+      }
+      .mode-pill.is-selected[data-mode="work"] { border-color:transparent; background:transparent; }
+      .mode-pill.is-selected[data-mode="work"]::before { border-color:var(--action); background:var(--action); }
+      .mode-pill.is-selected[data-mode="life"] { border-color:transparent; background:transparent; }
+      .mode-pill.is-selected[data-mode="life"]::before { border-color:var(--mid); background:var(--mid); }
+      .day-nav { grid-template-columns:44px minmax(0,1fr) 44px; gap:2px; }
+      .nav-arrow { width:44px; height:44px; border:0; background:transparent; }
+      .nav-arrow::before {
+        content:""; position:absolute; left:9px; top:5px; width:26px; height:34px;
+        border:1px solid var(--border); border-radius:8px; background:var(--surface); z-index:-1;
+      }
+      .day-button { min-height:40px; padding-left:0; padding-right:0; }
+      .card-header { align-items:flex-start; }
+      .summary-side { flex-wrap:wrap; row-gap:3px; }
+      .column-head.work { display:none; }
+      .task-row.work {
+        height:auto; min-height:0; padding:9px 10px; display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:6px;
+      }
+      .task-row.work > :not(.task-main):not(.check-wrap):not(.mobile-work-meta) { display:none; }
+      .task-row.work .task-main { grid-column:1; grid-row:1; }
+      .task-row.work .task-title-button { font-size:13px; }
+      .task-row.work .check-wrap { width:44px; height:44px; grid-column:2; grid-row:1 / span 3; }
+      .task-row.work .done-check {
+        position:relative; width:44px; height:44px; border:0; background:transparent; color:transparent;
+      }
+      .task-row.work .done-check::before {
+        content:""; position:absolute; left:50%; top:50%; width:15px; height:15px;
+        border:1.5px solid var(--inactive); border-radius:4px; background:var(--surface);
+        transform:translate(-50%,-50%);
+        transition:background-color .12s var(--ease), border-color .12s var(--ease);
+      }
+      .task-row.work .done-check.is-done.mode-work::before { border-color:var(--action); background:var(--action); }
+      .task-row.work .done-check.is-done::after {
+        content:"✓"; position:absolute; left:50%; top:50%; color:#FFFFFF; font-size:9px; font-weight:800;
+        line-height:1; transform:translate(-50%,-50%);
+      }
+      .task-row.work .mobile-work-meta { min-width:0; display:flex; align-items:center; gap:6px; }
+      .task-row.work .mobile-work-meta.pills { grid-column:1; grid-row:2; }
+      .task-row.work .mobile-work-meta.times {
+        grid-column:1; grid-row:3; color:var(--deep); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums;
+      }
+      .column-head.life, .task-row.life { grid-template-columns:44px 20px 168px 38px 18px minmax(0,1fr); gap:8px; }
+      .column-head { padding-left:7px; padding-right:7px; }
+      .task-row { padding-left:7px; padding-right:7px; }
+      .editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .editor-field.is-wide { grid-column:span 2; }
+      .editor-button { min-height:40px; }
+    }
+    @media (max-width:447px) {
+      .column-head.life, .task-row.life {
+        grid-template-columns:40px 18px minmax(84px,168px) 34px 18px minmax(0,1fr); gap:5px;
+      }
+    }
+    @media (max-width:320px) {
+      .card { padding-left:10px; padding-right:10px; }
+      .day-track { overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; }
+      .day-track::-webkit-scrollbar { display:none; }
+      .day-button { min-width:40px; flex:0 0 40px; min-height:40px; scroll-snap-align:center; }
+      .day-name { font-size:11px; }
+      .date-side { flex-wrap:wrap; row-gap:3px; }
+      .summary-divider { display:none; }
+      .column-head.life, .task-row.life {
+        grid-template-columns:36px 17px minmax(76px,1fr) 32px 18px; gap:4px;
+      }
+      .column-head.life span:last-child { display:none; }
+      .task-row.life .memo { grid-column:3 / -1; grid-row:2; }
+      .task-row.life { height:auto; min-height:58px; }
+    }
+  </style>
+  <link rel="stylesheet" href="widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog" data-widget-max-width="720" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:720px;--widget-base-width:720px;--widget-base-height:595px;--widget-visual-height:595px">
+    <main class="card" data-widget-card aria-label="업무일지 위젯">
+      <div class="worklog-top" data-widget-fixed>
+        <div class="mode-row" id="modeRow" aria-label="기록 모드">
+          <button class="mode-pill" type="button" data-mode="work" aria-pressed="false">업무</button>
+          <button class="mode-pill" type="button" data-mode="life" aria-pressed="false">일상</button>
+        </div>
+        <nav class="day-nav" aria-label="날짜 이동">
+          <button class="nav-arrow" id="previousDay" type="button" data-nav="prev" aria-label="이전 요일">‹</button>
+          <div class="day-track" id="dayTrack"></div>
+          <button class="nav-arrow" id="nextDay" type="button" data-nav="next" aria-label="다음 요일">›</button>
+        </nav>
+        <section class="roll-banner" id="rollBanner" data-roll-banner hidden aria-live="polite"></section>
+        <header class="card-header" id="cardHeader" data-worklog-header></header>
+      </div>
+      <section class="list-shell" id="taskList" data-widget-list data-widget-list-height="368" data-worklog-list aria-label="기록 목록"></section>
+      <div class="worklog-bottom" data-widget-fixed><div id="addArea"></div></div>
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="목록 세로 크기 조절" aria-valuemin="160"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+      <div class="sr-only" id="liveRegion" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'worklog-v1';
+      const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+      const SHORT_DAYS = ['일','월','화','수','목','금','토'];
+      const VALID_STATUS = new Set(['doing','done','wait']);
+      const card = document.querySelector('[data-widget-card]');
+      const modeRow = document.getElementById('modeRow');
+      const dayTrack = document.getElementById('dayTrack');
+      const previousDay = document.getElementById('previousDay');
+      const nextDayButton = document.getElementById('nextDay');
+      const rollBanner = document.getElementById('rollBanner');
+      const cardHeader = document.getElementById('cardHeader');
+      const taskList = document.getElementById('taskList');
+      const addArea = document.getElementById('addArea');
+      const liveRegion = document.getElementById('liveRegion');
+      const mobileQuery = window.matchMedia('(max-width: 639px)');
+      const narrowQuery = window.matchMedia('(max-width: 320px)');
+      let channel = null;
+      try {
+        if ('BroadcastChannel' in window) channel = new BroadcastChannel(STORAGE_KEY);
+      } catch (error) {
+        console.warn('업무일지 실시간 동기화를 시작하지 못했습니다.', error);
+      }
+      const ui = { selectedDate:'', adding:false, editingId:null, confirmDeleteId:null, newId:null, dirtyFields:new Set() };
+      let state;
+      let pendingExternalSync = false;
+
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      })[character]);
+
+      function localDateKey(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function parseDate(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+        if (!match) return null;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+        return localDateKey(date) === value ? date : null;
+      }
+
+      function addDays(date, amount) {
+        const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12);
+        return next;
+      }
+
+      function startOfWeek(date) {
+        const offset = date.getDay() === 0 ? -6 : 1 - date.getDay();
+        return addDays(date, offset);
+      }
+
+      function isoWeekKey(date) {
+        const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const day = utc.getUTCDay() || 7;
+        utc.setUTCDate(utc.getUTCDate() + 4 - day);
+        const year = utc.getUTCFullYear();
+        const first = new Date(Date.UTC(year, 0, 1));
+        const week = Math.ceil((((utc - first) / 86400000) + 1) / 7);
+        return `${year}-W${String(week).padStart(2, '0')}`;
+      }
+
+      function todayDate() {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+      }
+
+      function defaultState() {
+        return {
+          mode:'work', tasks:[], lastRollWeek:isoWeekKey(todayDate()),
+          bannerDismissedWeek:'', lastRollCount:0
+        };
+      }
+
+      function validWeekKey(value) {
+        const match = /^(\d{4})-W(\d{2})$/.exec(String(value || ''));
+        if (!match) return false;
+        const year = Number(match[1]);
+        const week = Number(match[2]);
+        if (week < 1 || week > 53) return false;
+        const lastWeek = Number(isoWeekKey(new Date(year, 11, 28, 12)).slice(-2));
+        return week <= lastWeek;
+      }
+
+      function normalizeTime(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const match = /^(\d{1,2}):(\d{1,2})$/.exec(String(value).trim());
+        if (!match) return null;
+        const hour = Number(match[1]);
+        const minute = Number(match[2]);
+        if (hour > 23 || minute > 59) return null;
+        return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      }
+
+      function normalizeTask(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const dateValue = parseDate(raw.date);
+        if (typeof raw.id !== 'string' || !raw.id.trim() || !dateValue) return null;
+        const date = raw.date;
+        const mode = raw.mode === 'life' ? 'life' : 'work';
+        const status = VALID_STATUS.has(raw.status) ? raw.status : 'wait';
+        const done = raw.done === true || status === 'done';
+        const qNumber = Number(raw.q);
+        const hasEstimate = raw.est !== null && raw.est !== undefined && raw.est !== '';
+        const estNumber = Number(raw.est);
+        return {
+          id:raw.id.trim(),
+          mode,
+          date,
+          proj:String(raw.proj || '').trim(),
+          q:Number.isInteger(qNumber) && qNumber >= 1 && qNumber <= 4 ? qNumber : null,
+          title:String(raw.title || '').trim(),
+          due:parseDate(raw.due) ? raw.due : null,
+          start:normalizeTime(raw.start),
+          end:normalizeTime(raw.end),
+          est:hasEstimate && Number.isFinite(estNumber) && estNumber >= 0 ? estNumber : null,
+          status:done ? 'done' : status,
+          done,
+          memo:String(raw.memo || '').trim(),
+          rolledFrom:parseDate(raw.rolledFrom) ? raw.rolledFrom : null
+        };
+      }
+
+      function normalizeState(raw) {
+        const fallback = defaultState();
+        if (!raw || typeof raw !== 'object') return fallback;
+        const seenIds = new Set();
+        const tasks = [];
+        if (Array.isArray(raw.tasks)) {
+          raw.tasks.forEach(item => {
+            const task = normalizeTask(item);
+            if (!task || seenIds.has(task.id)) return;
+            seenIds.add(task.id);
+            tasks.push(task);
+          });
+        }
+        return {
+          ...raw,
+          mode:raw.mode === 'life' ? 'life' : 'work',
+          tasks,
+          lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
+          bannerDismissedWeek:validWeekKey(raw.bannerDismissedWeek) ? raw.bannerDismissedWeek : '',
+          lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0
+        };
+      }
+
+      function readState() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          return saved ? normalizeState(JSON.parse(saved)) : defaultState();
+        } catch (error) {
+          console.warn('업무일지 데이터를 불러오지 못했습니다.', error);
+          return defaultState();
+        }
+      }
+
+      function persist(next, announce = true) {
+        const normalized = normalizeState(next);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          state = normalized;
+        } catch (error) {
+          console.warn('업무일지 데이터를 저장하지 못했습니다.', error);
+          liveRegion.textContent = '저장하지 못했습니다. 다시 시도해 주세요.';
+          return false;
+        }
+        if (announce) {
+          try { channel?.postMessage({ type:'changed' }); }
+          catch (error) { console.warn('업무일지 변경 알림을 보내지 못했습니다.', error); }
+        }
+        return true;
+      }
+
+      function mutate(mutator, shouldRender = true) {
+        const fresh = readState();
+        const result = mutator(fresh) || fresh;
+        if (!persist(result)) return false;
+        if (shouldRender) renderAll();
+        return true;
+      }
+
+      function activeDays(mode) {
+        return mode === 'work' ? [1,2,3,4,5] : [1,2,3,4,5,6,0];
+      }
+
+      function clampDateToMode(date, mode) {
+        if (mode !== 'work' || (date.getDay() !== 0 && date.getDay() !== 6)) return date;
+        return addDays(date, date.getDay() === 6 ? -1 : -2);
+      }
+
+      function nextActiveDate(date, mode, direction) {
+        let next = addDays(date, direction);
+        if (mode === 'work') {
+          while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, direction);
+        }
+        return next;
+      }
+
+      function mapRolledDateToCurrentWeek(date, mode, currentWeekStart) {
+        const candidate = nextActiveDate(date, mode, 1);
+        const offset = candidate.getDay() === 0 ? 6 : candidate.getDay() - 1;
+        return addDays(currentWeekStart, offset);
+      }
+
+      function rollWeekIfNeeded() {
+        const currentDate = todayDate();
+        const currentWeek = isoWeekKey(currentDate);
+        const currentStart = startOfWeek(currentDate);
+        const currentStartKey = localDateKey(currentStart);
+        const fresh = readState();
+        if (fresh.lastRollWeek === currentWeek) {
+          state = fresh;
+          return true;
+        }
+        if (fresh.lastRollWeek > currentWeek) {
+          fresh.lastRollWeek = currentWeek;
+          fresh.lastRollCount = 0;
+          fresh.bannerDismissedWeek = '';
+          return persist(fresh);
+        }
+        let moved = 0;
+        fresh.tasks = fresh.tasks.map(task => {
+          const cleared = { ...task, rolledFrom:null };
+          if (task.done || task.date >= currentStartKey) return cleared;
+          const source = parseDate(task.date);
+          if (!source) return cleared;
+          moved += 1;
+          return {
+            ...cleared,
+            date:localDateKey(mapRolledDateToCurrentWeek(source, task.mode, currentStart)),
+            rolledFrom:task.date
+          };
+        });
+        fresh.lastRollWeek = currentWeek;
+        fresh.lastRollCount = moved;
+        fresh.bannerDismissedWeek = '';
+        return persist(fresh);
+      }
+
+      function modeDateKeys(mode, date) {
+        const monday = startOfWeek(date);
+        return activeDays(mode).map(day => {
+          const offset = day === 0 ? 6 : day - 1;
+          return localDateKey(addDays(monday, offset));
+        });
+      }
+
+      function tasksFor(mode, dateKey) {
+        return state.tasks.filter(task => task.mode === mode && task.date === dateKey);
+      }
+
+      function durationOf(task) {
+        if (!task.start || !task.end) return null;
+        const [startHour, startMinute] = task.start.split(':').map(Number);
+        const [endHour, endMinute] = task.end.split(':').map(Number);
+        let minutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
+        if (minutes < 0) minutes += 24 * 60;
+        return Math.round((minutes / 60) * 10) / 10;
+      }
+
+      function numberHours(value) {
+        return `${Number(value || 0).toFixed(1)}h`;
+      }
+
+      function formatDue(value) {
+        const date = parseDate(value);
+        return date ? `${date.getMonth() + 1}/${date.getDate()}` : '–';
+      }
+
+      function dateHeader(value) {
+        const date = parseDate(value) || todayDate();
+        return {
+          title:`${date.getMonth() + 1}월 ${date.getDate()}일`,
+          weekday:WEEKDAYS[date.getDay()]
+        };
+      }
+
+      function weekCaption(value) {
+        const selected = startOfWeek(parseDate(value) || todayDate());
+        const current = startOfWeek(todayDate());
+        const selectedKey = localDateKey(selected);
+        const currentKey = localDateKey(current);
+        if (selectedKey === currentKey) return '';
+        return selectedKey < currentKey ? '지난주' : '다음주';
+      }
+
+      function rolledCaption(task) {
+        if (!task.rolledFrom) return '';
+        const from = parseDate(task.rolledFrom);
+        const to = parseDate(task.date);
+        if (!from || !to) return '';
+        return Math.round((to - from) / 86400000) === 1 ? '↷ 어제' : '↷ 지난주';
+      }
+
+      function qBadge(q) {
+        return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '';
+      }
+
+      function statusMeta(task) {
+        if (task.done || task.status === 'done') return { label:'완료', className:'status-done' };
+        if (task.status === 'doing') return { label:'진행중', className:'status-doing' };
+        return { label:'대기', className:'status-wait' };
+      }
+
+      function renderModes() {
+        modeRow.querySelectorAll('[data-mode]').forEach(button => {
+          const selected = button.dataset.mode === state.mode;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', String(selected));
+        });
+      }
+
+      function renderDays() {
+        const todayKey = localDateKey(todayDate());
+        const keys = modeDateKeys(state.mode, parseDate(ui.selectedDate) || todayDate());
+        dayTrack.innerHTML = keys.map(key => {
+          const date = parseDate(key);
+          const items = tasksFor(state.mode, key);
+          const rolled = items.filter(task => task.rolledFrom).length;
+          const selected = key === ui.selectedDate;
+          return `<button class="day-button ${selected ? `is-selected mode-${state.mode}` : ''} ${key > todayKey ? 'is-future' : ''}" type="button" data-date="${key}" data-day="${key}" aria-label="${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${SHORT_DAYS[date.getDay()]}요일, ${items.length}건" aria-pressed="${selected}">
+            <span class="day-name">${SHORT_DAYS[date.getDay()]}</span>
+            <span class="day-count-line"><span class="day-count">${items.length}</span>${rolled ? `<span class="roll-count">↷${rolled}</span>` : ''}</span>
+          </button>`;
+        }).join('');
+        alignSelectedDay();
+        if (narrowQuery.matches) window.setTimeout(alignSelectedDay, 0);
+      }
+
+      function alignSelectedDay() {
+        const selectedDay = dayTrack.querySelector('[aria-pressed="true"]');
+        if (!narrowQuery.matches || !selectedDay) {
+          dayTrack.scrollLeft = 0;
+          return;
+        }
+        const relativeLeft = selectedDay.offsetLeft - dayTrack.offsetLeft;
+        dayTrack.scrollLeft = Math.max(0, relativeLeft - (dayTrack.clientWidth - selectedDay.offsetWidth) / 2);
+      }
+
+      function renderBanner() {
+        const currentWeek = isoWeekKey(todayDate());
+        const visible = state.lastRollWeek === currentWeek && state.lastRollCount > 0 && state.bannerDismissedWeek !== currentWeek;
+        card.classList.toggle('has-roll-banner', visible);
+        rollBanner.hidden = !visible;
+        if (!visible) {
+          rollBanner.innerHTML = '';
+          return;
+        }
+        rollBanner.innerHTML = `<span class="banner-kicker">새 주가 시작됐습니다</span>
+          <span class="banner-copy">미완료 ${state.lastRollCount}건을 이번 주로 옮겼습니다</span>
+          <button class="banner-dismiss" type="button" data-dismiss-banner data-roll-dismiss>확인 ✕</button>`;
+      }
+
+      function renderHeader(items) {
+        const info = dateHeader(ui.selectedDate);
+        const today = ui.selectedDate === localDateKey(todayDate());
+        const caption = weekCaption(ui.selectedDate);
+        const datePieces = `<span class="date-title">${info.title}</span><span class="weekday-label">${info.weekday}</span>${today ? '<span class="today-pill">오늘</span>' : ''}${caption ? `<span class="week-caption">${caption}</span>` : ''}`;
+        if (!items.length) {
+          cardHeader.innerHTML = `<div class="date-side">${datePieces}</div>`;
+          return;
+        }
+        const done = items.filter(task => task.done).length;
+        const count = `<span><strong>${items.length}</strong>개 중 <strong>${done}</strong> 완료</span>`;
+        let modeSummary = '';
+        if (state.mode === 'work') {
+          const durations = items.map(durationOf).filter(value => value !== null);
+          const estimates = items.map(task => task.est).filter(value => value !== null);
+          const duration = durations.reduce((sum, value) => sum + value, 0);
+          const estimate = estimates.reduce((sum, value) => sum + value, 0);
+          if (durations.length || estimates.length) {
+            const durationText = durations.length ? numberHours(duration) : '';
+            const estimateText = estimates.length ? `<span>${durations.length ? '/ ' : ''}예상 ${numberHours(estimate)}</span>` : '';
+            modeSummary = `<span class="summary-divider">·</span><span class="time-summary">${durationText} ${estimateText}</span>`;
+          }
+        } else {
+          const rolled = items.filter(task => task.rolledFrom).length;
+          modeSummary = rolled ? `<span class="summary-divider">·</span><span>↷ 넘어온 <strong>${rolled}</strong>건</span>` : '';
+        }
+        cardHeader.innerHTML = `<div class="date-side">${datePieces}</div><div class="summary-side">${count}${modeSummary}</div>`;
+      }
+
+      function workRow(task) {
+        const duration = durationOf(task);
+        const status = statusMeta(task);
+        const rolled = rolledCaption(task);
+        const start = task.start || '–';
+        const end = task.end || '–';
+        const estimate = task.est === null ? '–' : task.est.toFixed(1);
+        return `<article class="task-row work ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
+          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
+          <span class="q-slot">${qBadge(task.q)}</span>
+          <span class="task-main"><button class="task-title-button" type="button" data-edit-task="${escapeHtml(task.id)}" title="수정">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>
+          <span class="number-cell ${task.due ? '' : 'is-missing'}">${formatDue(task.due)}</span>
+          <span class="number-cell ${task.start ? '' : 'is-missing'}">${start}</span>
+          <span class="number-cell ${task.end ? '' : 'is-missing'}">${end}</span>
+          <span class="number-cell duration ${duration === null ? 'is-missing' : ''}">${duration === null ? '–' : duration.toFixed(1)}</span>
+          <span class="number-cell ${task.est === null ? 'is-missing' : ''}">${estimate}</span>
+          <span class="status-pill ${status.className}">${status.label}</span>
+          <span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-work" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>
+          <span class="mobile-work-meta pills"><span class="project-pill">${escapeHtml(task.proj || '미분류')}</span><span class="q-slot">${qBadge(task.q)}</span><span class="status-pill ${status.className}">${status.label}</span></span>
+          <span class="mobile-work-meta times">${start}–${end} · 진행 ${duration === null ? '–' : duration.toFixed(1)} / 예상 ${estimate}</span>
+        </article>`;
+      }
+
+      function lifeRow(task) {
+        const rolled = rolledCaption(task);
+        return `<article class="task-row life ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
+          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
+          <span class="q-slot">${qBadge(task.q)}</span>
+          <span class="task-main"><button class="task-title-button" type="button" data-edit-task="${escapeHtml(task.id)}" title="수정">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>
+          <span class="number-cell ${task.due ? '' : 'is-missing'}">${formatDue(task.due)}</span>
+          <span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-life" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>
+          <span class="cell memo ${task.memo ? '' : 'is-missing'}" title="${escapeHtml(task.memo)}">${escapeHtml(task.memo || '—')}</span>
+        </article>`;
+      }
+
+      function columnHead(mode) {
+        if (mode === 'work') {
+          return `<div class="column-head work" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>업무명</span><span class="numeric">목표</span><span class="numeric">시작</span><span class="numeric">종료</span><span class="numeric">진행</span><span class="numeric">예상</span><span>상태</span><span>완료</span></div>`;
+        }
+        return `<div class="column-head life" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>할 일</span><span class="numeric">목표</span><span>완료</span><span>메모</span></div>`;
+      }
+
+      function field(label, name, value, options = {}) {
+        const wide = options.wide ? ' is-wide' : '';
+        if (options.choices) {
+          return `<label class="editor-field${wide}"><span>${label}</span><select name="${name}">${options.choices.map(choice => `<option value="${escapeHtml(choice.value)}" ${String(value ?? '') === String(choice.value) ? 'selected' : ''}>${escapeHtml(choice.label)}</option>`).join('')}</select></label>`;
+        }
+        return `<label class="editor-field${wide}"><span>${label}</span><input name="${name}" type="${options.type || 'text'}" value="${escapeHtml(value ?? '')}" ${options.required ? 'required' : ''} ${options.step ? `step="${options.step}"` : ''} ${options.min !== undefined ? `min="${options.min}"` : ''} ${options.placeholder ? `placeholder="${escapeHtml(options.placeholder)}"` : ''}></label>`;
+      }
+
+      function editorHtml(task, kind) {
+        const editing = kind === 'edit';
+        const mode = task?.mode || state.mode;
+        const qChoices = [{value:'',label:'—'},1,2,3,4].map(choice => typeof choice === 'object' ? choice : ({ value:String(choice), label:`Q${choice}` }));
+        const statusChoices = [{value:'doing',label:'진행중'},{value:'wait',label:'대기'},{value:'done',label:'완료'}];
+        const fields = [
+          field('구분','proj',task?.proj || '',{placeholder:'미분류'}),
+          field('Q','q',task?.q || '',{choices:qChoices}),
+          field(mode === 'work' ? '업무명' : '할 일','title',task?.title || '',{wide:true,required:true}),
+          field('목표일','due',task?.due || '',{type:'date'})
+        ];
+        if (mode === 'work') {
+          fields.push(
+            field('시작','start',task?.start || '',{placeholder:'17:20'}),
+            field('종료','end',task?.end || '',{placeholder:'19:00'}),
+            field('예상 시간','est',task?.est ?? '',{type:'number',step:'0.1',min:0}),
+            field('상태','status',task?.done ? 'done' : (task?.status || 'wait'),{choices:statusChoices})
+          );
+        } else {
+          fields.push(field('메모','memo',task?.memo || '',{wide:true,placeholder:'메모'}));
+        }
+        const deleteClass = ui.confirmDeleteId === task?.id ? 'confirm-danger' : 'danger';
+        const deleteLabel = ui.confirmDeleteId === task?.id ? '정말 삭제' : '삭제';
+        return `<form class="inline-editor ${kind === 'add' ? 'add-editor' : ''}" data-task-form data-kind="${kind}" data-task-id="${editing ? escapeHtml(task.id) : ''}" data-mode="${mode}">
+          <div class="editor-fields">${fields.join('')}</div>
+          <div class="editor-actions">${editing ? `<button class="editor-button ${deleteClass}" type="button" data-delete-task="${escapeHtml(task.id)}">${deleteLabel}</button>` : ''}<button class="editor-button" type="button" data-cancel-editor>취소</button><button class="editor-button primary" type="submit">저장</button></div>
+        </form>`;
+      }
+
+      function renderList(items) {
+        taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId);
+        if (!items.length && !ui.editingId) {
+          taskList.innerHTML = `<span class="empty-title" data-empty-state>오늘 적은 ${state.mode === 'work' ? '업무' : '할 일'} 없음</span><span class="empty-copy">＋ ${state.mode === 'work' ? '업무' : '할 일'} 추가로 한 줄 남겨두세요</span>`;
+          return;
+        }
+        const rows = items.map(task => ui.editingId === task.id ? editorHtml(task, 'edit') : (state.mode === 'work' ? workRow(task) : lifeRow(task)));
+        const head = state.mode === 'work' && mobileQuery.matches ? '' : columnHead(state.mode);
+        taskList.innerHTML = `${head}<div class="rows-scroll">${rows.join('')}</div>`;
+      }
+
+      function renderAdd(items) {
+        card.classList.toggle('is-adding', ui.adding);
+        if (ui.adding) {
+          addArea.innerHTML = editorHtml(null, 'add');
+          return;
+        }
+        addArea.innerHTML = `<button class="add-row" type="button" data-add-task data-add-row><span class="add-plus" ${items.length === 0 ? 'data-empty-add' : ''}>＋</span><span>${state.mode === 'work' ? '업무' : '할 일'} 추가</span></button>`;
+      }
+
+      function renderAll() {
+        const items = tasksFor(state.mode, ui.selectedDate);
+        if (ui.editingId && !items.some(task => task.id === ui.editingId)) {
+          ui.editingId = null;
+          ui.confirmDeleteId = null;
+        }
+        renderModes();
+        renderDays();
+        renderBanner();
+        renderHeader(items);
+        renderList(items);
+        renderAdd(items);
+      }
+
+      function announce(message) {
+        liveRegion.textContent = '';
+        requestAnimationFrame(() => { liveRegion.textContent = message; });
+      }
+
+      function drainPendingSync() {
+        if (!pendingExternalSync) return true;
+        if (!rollWeekIfNeeded()) return false;
+        pendingExternalSync = false;
+        const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), state.mode);
+        ui.selectedDate = localDateKey(selected);
+        return true;
+      }
+
+      function changeDate(direction) {
+        const keepDayFocus = Boolean(document.activeElement?.closest?.('[data-day]'));
+        if (!drainPendingSync()) return;
+        const current = parseDate(ui.selectedDate) || todayDate();
+        ui.selectedDate = localDateKey(nextActiveDate(current, state.mode, direction));
+        ui.adding = false;
+        ui.editingId = null;
+        ui.confirmDeleteId = null;
+        ui.dirtyFields = new Set();
+        renderAll();
+        if (keepDayFocus) dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
+      }
+
+      function taskFromForm(form, existing) {
+        const values = new FormData(form);
+        const mode = form.dataset.mode === 'life' ? 'life' : 'work';
+        const status = mode === 'work' && VALID_STATUS.has(values.get('status')) ? values.get('status') : 'wait';
+        const estValue = values.get('est');
+        const estimate = estValue === null || String(estValue).trim() === '' ? null : Math.max(0, Number(estValue));
+        const title = String(values.get('title') || '').trim();
+        const done = mode === 'work' ? status === 'done' : Boolean(existing?.done);
+        return normalizeTask({
+          ...(existing || {}),
+          id:existing?.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+          mode,
+          date:existing?.date || ui.selectedDate,
+          proj:String(values.get('proj') || '').trim(),
+          q:values.get('q') || null,
+          title,
+          due:values.get('due') || null,
+          start:mode === 'work' ? normalizeTime(values.get('start')) : null,
+          end:mode === 'work' ? normalizeTime(values.get('end')) : null,
+          est:Number.isFinite(estimate) ? estimate : null,
+          status:done ? 'done' : status,
+          done,
+          memo:mode === 'life' ? String(values.get('memo') || '').trim() : '',
+          rolledFrom:existing?.rolledFrom || null
+        });
+      }
+
+      modeRow.addEventListener('click', event => {
+        const button = event.target.closest('[data-mode]');
+        if (!button || button.dataset.mode === state.mode) return;
+        const nextMode = button.dataset.mode;
+        const previousDate = ui.selectedDate;
+        const previousUi = { adding:ui.adding, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, dirtyFields:ui.dirtyFields };
+        if (!drainPendingSync()) return;
+        ui.adding = false;
+        ui.editingId = null;
+        ui.confirmDeleteId = null;
+        ui.dirtyFields = new Set();
+        const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), nextMode);
+        ui.selectedDate = localDateKey(selected);
+        if (!mutate(fresh => { fresh.mode = nextMode; return fresh; })) {
+          ui.selectedDate = previousDate;
+          Object.assign(ui, previousUi);
+        }
+      });
+
+      previousDay.addEventListener('click', () => changeDate(-1));
+      nextDayButton.addEventListener('click', () => changeDate(1));
+
+      dayTrack.addEventListener('click', event => {
+        const button = event.target.closest('[data-date]');
+        if (!button) return;
+        if (!drainPendingSync()) return;
+        ui.selectedDate = button.dataset.date;
+        ui.adding = false;
+        ui.editingId = null;
+        ui.confirmDeleteId = null;
+        ui.dirtyFields = new Set();
+        renderAll();
+        dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
+      });
+
+      function trackEditorChange(event) {
+        if (typeof event.target.setCustomValidity === 'function') event.target.setCustomValidity('');
+        const form = event.target.closest?.('[data-task-form][data-kind="edit"]');
+        if (form && event.target.name) ui.dirtyFields.add(event.target.name);
+      }
+      card.addEventListener('input', trackEditorChange);
+      card.addEventListener('change', trackEditorChange);
+
+      card.addEventListener('click', event => {
+        if (event.target.closest('[data-dismiss-banner]')) {
+          const saved = mutate(fresh => { fresh.bannerDismissedWeek = isoWeekKey(todayDate()); return fresh; }, false);
+          if (saved) renderBanner();
+          return;
+        }
+        if (event.target.closest('[data-add-task]')) {
+          ui.adding = true;
+          ui.editingId = null;
+          ui.confirmDeleteId = null;
+          ui.dirtyFields = new Set();
+          renderAll();
+          addArea.querySelector('input[name="title"]')?.focus();
+          return;
+        }
+        const editButton = event.target.closest('[data-edit-task]');
+        if (editButton) {
+          ui.editingId = editButton.dataset.editTask;
+          ui.adding = false;
+          ui.confirmDeleteId = null;
+          ui.dirtyFields = new Set();
+          renderAll();
+          taskList.querySelector('input[name="title"]')?.focus();
+          return;
+        }
+        const toggleButton = event.target.closest('[data-toggle-task]');
+        if (toggleButton) {
+          if (ui.adding || ui.editingId) return;
+          const id = toggleButton.dataset.toggleTask;
+          const saved = mutate(fresh => {
+            const task = fresh.tasks.find(item => item.id === id);
+            if (!task) return fresh;
+            task.done = !task.done;
+            task.status = task.done ? 'done' : 'wait';
+            return fresh;
+          });
+          if (saved) taskList.querySelector(`[data-toggle-task="${CSS.escape(id)}"]`)?.focus();
+          return;
+        }
+        if (event.target.closest('[data-cancel-editor]')) {
+          ui.adding = false;
+          ui.editingId = null;
+          ui.confirmDeleteId = null;
+          ui.dirtyFields = new Set();
+          syncFromStorage();
+          return;
+        }
+        const deleteButton = event.target.closest('[data-delete-task]');
+        if (deleteButton) {
+          const id = deleteButton.dataset.deleteTask;
+          if (ui.confirmDeleteId !== id) {
+            ui.confirmDeleteId = id;
+            deleteButton.classList.remove('danger');
+            deleteButton.classList.add('confirm-danger');
+            deleteButton.textContent = '정말 삭제';
+            return;
+          }
+          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`) || taskList.querySelector('[data-task-form]');
+          const remove = () => {
+            if (!drainPendingSync()) {
+              row?.classList.remove('motion-close');
+              return;
+            }
+            ui.editingId = null;
+            ui.confirmDeleteId = null;
+            ui.dirtyFields = new Set();
+            const saved = mutate(fresh => { fresh.tasks = fresh.tasks.filter(task => task.id !== id); return fresh; });
+            if (saved) announce('삭제했습니다.');
+            else {
+              ui.editingId = id;
+              row?.classList.remove('motion-close');
+              renderAll();
+            }
+          };
+          if (window.widgetMotion?.close && row) window.widgetMotion.close(row, remove);
+          else remove();
+        }
+      });
+
+      card.addEventListener('submit', event => {
+        const form = event.target.closest('[data-task-form]');
+        if (!form) return;
+        event.preventDefault();
+        if (form.dataset.mode === 'work') {
+          for (const name of ['start','end']) {
+            const input = form.elements.namedItem(name);
+            const raw = String(input?.value || '').trim();
+            if (raw && !normalizeTime(raw)) {
+              input.setCustomValidity('00:00 형식으로 입력해 주세요.');
+              input.reportValidity();
+              input.focus();
+              return;
+            }
+            input?.setCustomValidity('');
+          }
+        }
+        if (!drainPendingSync()) return;
+        const id = form.dataset.taskId;
+        const existing = id ? state.tasks.find(task => task.id === id) : null;
+        const task = taskFromForm(form, existing);
+        if (!task || !task.title) {
+          form.querySelector('input[name="title"]')?.focus();
+          return;
+        }
+        const isNew = form.dataset.kind === 'add';
+        const dirtyFields = new Set(ui.dirtyFields);
+        const previousUi = { adding:ui.adding, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, newId:ui.newId, dirtyFields:ui.dirtyFields };
+        ui.newId = isNew ? task.id : null;
+        ui.adding = false;
+        ui.editingId = null;
+        ui.confirmDeleteId = null;
+        ui.dirtyFields = new Set();
+        let updatedExisting = isNew;
+        const saved = mutate(fresh => {
+          const index = fresh.tasks.findIndex(item => item.id === task.id);
+          if (index >= 0) {
+            const current = fresh.tasks[index];
+            const merged = { ...current };
+            ['proj','q','title','due','start','end','est','status','memo'].forEach(fieldName => {
+              if (dirtyFields.has(fieldName)) merged[fieldName] = task[fieldName];
+            });
+            if (current.mode === 'work' && dirtyFields.has('status')) {
+              merged.done = task.done;
+              merged.status = task.status;
+            }
+            fresh.tasks[index] = normalizeTask(merged);
+            updatedExisting = true;
+          } else if (isNew) {
+            fresh.tasks.push(task);
+          }
+          return fresh;
+        });
+        if (!saved) {
+          Object.assign(ui, previousUi);
+          return;
+        }
+        if (!updatedExisting) {
+          announce('다른 창에서 삭제된 항목입니다.');
+          return;
+        }
+        announce(isNew ? '추가했습니다.' : '수정했습니다.');
+        if (isNew) window.setTimeout(() => { ui.newId = null; }, 1200);
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.isComposing) return;
+        if (event.key === 'Escape' && (ui.adding || ui.editingId)) {
+          ui.adding = false;
+          ui.editingId = null;
+          ui.confirmDeleteId = null;
+          ui.dirtyFields = new Set();
+          syncFromStorage();
+          return;
+        }
+        if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
+        if (event.target.closest('input, select, textarea, [contenteditable="true"], [data-widget-scale-handle], [data-widget-list-handle]')) return;
+        event.preventDefault();
+        changeDate(event.key === 'ArrowRight' ? 1 : -1);
+      });
+
+      function syncFromStorage() {
+        if (ui.adding || ui.editingId) {
+          pendingExternalSync = true;
+          return;
+        }
+        pendingExternalSync = !rollWeekIfNeeded();
+        const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), state.mode);
+        ui.selectedDate = localDateKey(selected);
+        renderAll();
+      }
+
+      window.addEventListener('storage', event => {
+        if (event.key === STORAGE_KEY) syncFromStorage();
+      });
+      window.addEventListener('focus', syncFromStorage);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(); });
+      channel?.addEventListener('message', syncFromStorage);
+      mobileQuery.addEventListener?.('change', () => {
+        if (!ui.adding && !ui.editingId) renderAll();
+      });
+      narrowQuery.addEventListener?.('change', () => {
+        if (!ui.adding && !ui.editingId) renderDays();
+      });
+
+      state = readState();
+      pendingExternalSync = !rollWeekIfNeeded();
+      const initial = clampDateToMode(todayDate(), state.mode);
+      ui.selectedDate = localDateKey(initial);
+      renderAll();
+      window.addEventListener('load', alignSelectedDay, { once:true });
+    })();
+  </script>
+  <script src="widget-frame.js"></script>
+</body>
+</html>

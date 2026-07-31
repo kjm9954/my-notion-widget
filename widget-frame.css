@@ -145,20 +145,22 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   transition: opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
 }
 
-body.widget-page:hover .widget-size-handle,
-body.widget-page:hover .widget-size-handle-top-left,
+.widget-host:hover ~ .widget-size-handle,
+.widget-size-handle:hover,
 .widget-size-handle:focus-visible,
 body.is-widget-scaling .widget-size-handle {
   opacity: 1;
 }
 
-body.widget-page:hover .widget-width-handle,
+.widget-host:hover ~ .widget-width-handle,
+.widget-width-handle:hover,
 .widget-width-handle:focus-visible,
 body.is-widget-scaling .widget-width-handle {
   opacity: 1;
 }
 
-body.widget-page:hover .widget-height-handle,
+.widget-host:hover ~ .widget-height-handle,
+.widget-height-handle:hover,
 .widget-height-handle:focus-visible,
 body.is-widget-scaling .widget-height-handle {
   opacity: 1;
