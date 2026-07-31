@@ -673,17 +673,17 @@
         return `<button class="cell-button q-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label}" title="눌러서 Q 변경">${task.q ? qBadge(task.q) : '–'}</button>`;
       }
 
-      function latestWorkDefaults() {
-        const previous = [...state.tasks].reverse().find(task => task.mode === 'work' && task.title);
+      function latestDefaults(mode) {
+        const previous = [...state.tasks].reverse().find(task => task.mode === mode && task.title);
         return { proj:previous?.proj || '미분류', q:previous?.q || null };
       }
 
-      function createQuickDraft() {
-        const defaults = latestWorkDefaults();
+      function createQuickDraft(mode) {
+        const defaults = latestDefaults(mode);
         return normalizeTask({
           id:crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          mode:'work', date:ui.selectedDate, proj:defaults.proj, q:defaults.q, title:'',
-          due:localDateKey(todayDate()), start:null, end:null, progress:0, est:null,
+          mode, date:ui.selectedDate, proj:defaults.proj, q:defaults.q, title:'',
+          due:localDateKey(todayDate()), start:null, end:null, progress:mode === 'work' ? 0 : null, est:null,
           status:'wait', done:false, memo:'', rolledFrom:null
         });
       }
@@ -840,6 +840,18 @@
         </form>`;
       }
 
+      function quickLifeRow(task) {
+        const q = task.q ? qBadge(task.q) : '–';
+        return `<form class="task-row life quick-add-row" data-quick-add-form data-task-id="${escapeHtml(task.id)}">
+          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
+          <span class="q-slot">${q}</span>
+          <span class="task-main"><input class="quick-title-input" name="title" autocomplete="off" aria-label="새 할 일" placeholder="할 일 입력 후 Enter"></span>
+          <span class="number-cell">${formatDue(task.due)}</span>
+          <span class="check-wrap"><span class="done-check mode-life" aria-hidden="true"></span></span>
+          <span class="cell memo is-missing">—</span>
+        </form>`;
+      }
+
       function lifeRow(task) {
         const rolled = rolledCaption(task);
         return `<article class="task-row life ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
@@ -897,24 +909,20 @@
       }
 
       function renderList(items) {
-        const hasQuickRow = state.mode === 'work' && ui.adding && ui.draftTask;
+        const hasQuickRow = ui.adding && ui.draftTask;
         taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId && !hasQuickRow);
         if (!items.length && !ui.editingId && !hasQuickRow) {
           taskList.innerHTML = `<span class="empty-title" data-empty-state>오늘 적은 ${state.mode === 'work' ? '업무' : '할 일'} 없음</span><span class="empty-copy">＋ ${state.mode === 'work' ? '업무' : '할 일'} 추가로 한 줄 남겨두세요</span>`;
           return;
         }
         const rows = items.map(task => ui.editingId === task.id ? editorHtml(task, 'edit') : (state.mode === 'work' ? workRow(task) : lifeRow(task)));
-        if (hasQuickRow) rows.push(quickWorkRow(ui.draftTask));
+        if (hasQuickRow) rows.push(state.mode === 'work' ? quickWorkRow(ui.draftTask) : quickLifeRow(ui.draftTask));
         const head = state.mode === 'work' && mobileQuery.matches ? '' : columnHead(state.mode);
         taskList.innerHTML = `${head}<div class="rows-scroll">${rows.join('')}</div>`;
       }
 
       function renderAdd(items) {
         card.classList.toggle('is-adding', ui.adding);
-        if (ui.adding && state.mode === 'life') {
-          addArea.innerHTML = editorHtml(null, 'add');
-          return;
-        }
         addArea.innerHTML = `<button class="add-row" type="button" data-add-task data-add-row><span class="add-plus" ${items.length === 0 ? 'data-empty-add' : ''}>＋</span><span>${state.mode === 'work' ? '업무' : '할 일'} 추가</span></button>`;
       }
 
@@ -1073,6 +1081,12 @@
         return saved && found;
       }
 
+      function focusAddTitle() {
+        const input = taskList.querySelector('[data-quick-add-form] input[name="title"]');
+        if (!input) return;
+        input.focus({ preventScroll:true });
+      }
+
       modeRow.addEventListener('click', event => {
         const button = event.target.closest('[data-mode]');
         if (!button || button.dataset.mode === state.mode) return;
@@ -1150,18 +1164,20 @@
         }
         if (event.target.closest('[data-add-task]')) {
           if (ui.adding) {
-            (taskList.querySelector('[data-quick-add-form] input[name="title"]') || addArea.querySelector('input[name="title"]'))?.focus();
+            focusAddTitle();
+            window.setTimeout(focusAddTitle, 0);
             return;
           }
           if (!drainPendingSync()) return;
           ui.adding = true;
-          ui.draftTask = state.mode === 'work' ? createQuickDraft() : null;
+          ui.draftTask = createQuickDraft(state.mode);
           ui.editingId = null;
           ui.confirmDeleteId = null;
           ui.popover = null;
           ui.dirtyFields = new Set();
           renderAll();
-          (taskList.querySelector('[data-quick-add-form] input[name="title"]') || addArea.querySelector('input[name="title"]'))?.focus();
+          focusAddTitle();
+          window.setTimeout(focusAddTitle, 0);
           return;
         }
         const cellButton = event.target.closest('[data-cell-task][data-cell-field]');
