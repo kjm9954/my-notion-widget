@@ -547,6 +547,17 @@
         return addDays(date, date.getDay() === 6 ? -1 : -2);
       }
 
+      function applyOpenDefaults() {
+        const today = todayDate();
+        if ((today.getDay() === 0 || today.getDay() === 6) && state.mode !== 'life') {
+          const fresh = readState();
+          fresh.mode = 'life';
+          if (!persist(fresh)) return false;
+        }
+        ui.selectedDate = localDateKey(clampDateToMode(today,state.mode));
+        return true;
+      }
+
       function nextActiveDate(date, mode, direction) {
         let next = addDays(date, direction);
         if (mode === 'work') {
@@ -1411,8 +1422,11 @@
           return;
         }
         pendingExternalSync = !rollWeekIfNeeded();
-        const selected = clampDateToMode(resetToToday ? todayDate() : (parseDate(ui.selectedDate) || todayDate()), state.mode);
-        ui.selectedDate = localDateKey(selected);
+        if (resetToToday) applyOpenDefaults();
+        else {
+          const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
+          ui.selectedDate = localDateKey(selected);
+        }
         renderAll();
       }
 
@@ -1432,8 +1446,7 @@
 
       state = readState();
       pendingExternalSync = !rollWeekIfNeeded();
-      const initial = clampDateToMode(todayDate(), state.mode);
-      ui.selectedDate = localDateKey(initial);
+      applyOpenDefaults();
       renderAll();
       window.addEventListener('load', alignSelectedDay, { once:true });
     })();
