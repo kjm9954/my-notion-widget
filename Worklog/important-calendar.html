@@ -101,14 +101,15 @@
     .day-add-zone { position:absolute; z-index:2; top:0; right:0; bottom:0; width:28px; }
     .day-add {
       position:absolute; top:4px; right:4px; width:24px; height:24px; display:grid; place-items:center;
-      padding:0; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--secondary);
+      padding:0; border:0; border-radius:8px; background:var(--bg); color:var(--secondary);
       font-size:10px; font-weight:700; opacity:0; visibility:hidden; pointer-events:none;
-      transition:color .12s, border-color .12s, outline-color .12s;
+      transition:color .12s, outline-color .12s;
     }
     .day-add-zone:hover .day-add, .day-add:focus-visible, .day.add-open .day-add {
       opacity:1; visibility:visible; pointer-events:auto;
     }
-    .day-add:hover, .day-add:focus-visible { color:var(--action); outline:2px solid var(--action); outline-offset:-2px; }
+    .day-add:hover { color:var(--action); }
+    .day-add:focus-visible { color:var(--action); outline:2px solid var(--action); outline-offset:-2px; }
     .popover {
       position:absolute; z-index:20; width:min(300px,calc(100% - 32px)); max-height:calc(100% - 32px);
       display:grid; gap:8px; padding:12px; overflow:visible; border:0; border-radius:14px;
