@@ -116,7 +116,7 @@
     }
     .day-overlay[hidden] { display:none; }
     .modal-panel {
-      width:min(560px,calc(100% - 48px)); max-height:calc(100% - 24px); padding:20px;
+      width:min(640px,calc(100% - 48px)); max-height:calc(100% - 24px); padding:20px;
       display:flex; flex-direction:column; gap:12px; overflow:hidden; background:var(--surface);
       border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
@@ -295,7 +295,7 @@
 
       const DATA_KEY = 'worklog-v1';
       const SHORT_DAYS = ['일','월','화','수','목','금','토'];
-      const LEVEL_LIMITS = [3,6,Infinity];
+      const LEVEL_LIMITS = [4,8,Infinity];
       const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
       const card = document.querySelector('[data-widget-card]');
       const weekRange = document.getElementById('weekRange');
@@ -505,7 +505,7 @@
       }
 
       function renderExpand(items) {
-        const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 3);
+        const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 4);
         if (!hasExpandable || mobileQuery.matches) {
           expandArea.hidden = true;
           expandArea.innerHTML = '';
@@ -515,7 +515,7 @@
         const hidden = activeKeys().reduce((sum,key) => sum + Math.max(0, tasksForDate(key).length - limit), 0);
         const controls = [];
         if (state.level < 2 && hidden > 0) {
-          const nextIsAll = state.level === 1 || activeKeys().every(key => tasksForDate(key).length <= 6);
+          const nextIsAll = state.level === 1 || activeKeys().every(key => tasksForDate(key).length <= 8);
           controls.push(`<button class="expand-button" type="button" data-expand>${nextIsAll ? '전체 펼치기' : '더 펼치기'} <span class="expand-count">· ${hidden}건 더</span></button>`);
         }
         if (state.level > 0) controls.push('<button class="collapse-button" type="button" data-collapse>− 접기</button>');
