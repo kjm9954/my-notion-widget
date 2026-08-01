@@ -120,7 +120,9 @@
 
     .progress-side {
       flex: 0 0 auto;
-      gap: 10px;
+      justify-content: flex-end;
+      margin-left: auto;
+      text-align: right;
     }
 
     .progress-copy {
@@ -128,21 +130,6 @@
       font-size: 12px;
       font-weight: 700;
       white-space: nowrap;
-    }
-
-    .progress-track {
-      width: 86px;
-      height: 5px;
-      overflow: hidden;
-      background: #EDF2F4;
-      border-radius: 999px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: #0E5C7A;
-      border-radius: inherit;
-      transition: width var(--t-open) var(--ease);
     }
 
     .matrix-stage {
@@ -729,14 +716,6 @@
         max-width: 96px;
       }
 
-      .progress-side {
-        gap: 7px;
-      }
-
-      .progress-track {
-        width: 60px;
-      }
-
       .matrix-stage {
         display: none;
       }
@@ -1039,7 +1018,6 @@
       function renderHeader() {
         const items = currentItems();
         const done = items.filter(item => item.st === 'done').length;
-        const ratio = items.length ? (done / items.length) * 100 : 0;
         header.innerHTML = `
           <div class="scope-side">
             <div class="segments" aria-label="기간 선택">
@@ -1050,7 +1028,6 @@
           </div>
           <div class="progress-side">
             <span class="progress-copy">${done} / ${items.length} 완료</span>
-            <div class="progress-track" aria-hidden="true"><div class="progress-fill" style="width:${ratio}%"></div></div>
           </div>
         `;
       }
