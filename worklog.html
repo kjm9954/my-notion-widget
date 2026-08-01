@@ -1100,7 +1100,10 @@
         ui.confirmDeleteId = null;
         ui.popover = null;
         ui.dirtyFields = new Set();
-        const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), nextMode);
+        const today = todayDate();
+        const followsClampedWorkToday = state.mode === 'work' && nextMode === 'life'
+          && ui.selectedDate === localDateKey(clampDateToMode(today,'work'));
+        const selected = followsClampedWorkToday ? today : clampDateToMode(parseDate(ui.selectedDate) || today,nextMode);
         ui.selectedDate = localDateKey(selected);
         if (!mutate(fresh => { fresh.mode = nextMode; return fresh; })) {
           ui.selectedDate = previousDate;
