@@ -18,9 +18,7 @@
     .card { width:100%; min-height:420px; display:flex; flex-direction:column; gap:12px; padding:18px; overflow:hidden; background:var(--surface); border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
     .header { min-height:30px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .year-title { font-size:15px; font-weight:850; }
-    .summary { display:flex; align-items:center; gap:9px; color:var(--secondary); font-size:11px; font-weight:750; white-space:nowrap; }
-    .track { width:88px; height:5px; overflow:hidden; background:var(--border-soft); border-radius:999px; }
-    .fill { height:100%; background:var(--action); border-radius:inherit; transition:width var(--t-open) var(--ease); }
+    .summary { display:flex; align-items:center; justify-content:flex-end; margin-left:auto; color:var(--secondary); font-size:11px; font-weight:750; text-align:right; white-space:nowrap; }
     .goals-grid { min-height:0; display:grid; flex:1 1 auto; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
     .goal-column { min-width:0; min-height:338px; display:flex; flex-direction:column; padding:11px; background:var(--surface-soft); border:1px solid var(--border-soft); border-radius:14px; }
     .goal-column.accent { background:var(--surface); border-color:#CFE2EA; }
@@ -70,7 +68,6 @@
       .goal-column.mobile-secondary { display:none; }
       .goals-grid.show-past .goal-column.mobile-secondary { display:flex; }
       .past-toggle { display:block; }
-      .summary .track { width:60px; }
       .goal-column { min-height:230px; }
     }
   </style>
@@ -143,8 +140,8 @@
         return parent?.t||'구간 연결 없음';
       }
       function renderHeader(){
-        const total=state.goals.length,done=state.goals.filter(goal=>goal.done).length,pct=total?Math.round(done/total*100):0;
-        header.innerHTML=`<div class="year-title">${now.getFullYear()}</div><div class="summary"><span>${total}개 중 ${done}개 완료</span><span class="track"><span class="fill" style="width:${pct}%"></span></span></div>`;
+        const total=state.goals.length,done=state.goals.filter(goal=>goal.done).length;
+        header.innerHTML=`<div class="year-title">${now.getFullYear()}</div><div class="summary"><span>${total}개 중 ${done}개 완료</span></div>`;
       }
       function row(goal){
         if(ui.editing===goal.id)return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><input class="edit-input" data-edit-input="${esc(goal.id)}" value="${esc(goal.t)}"><button class="text-action danger" type="button" data-delete-request="${esc(goal.id)}">삭제</button><button class="text-action" type="button" data-edit-done>완료</button></div>`;
