@@ -316,7 +316,7 @@
       .task-row.life { height:auto; min-height:58px; }
     }
   </style>
-  <link rel="stylesheet" href="widget-frame.css">
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog" data-widget-max-width="850" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:850px;--widget-base-width:850px;--widget-base-height:595px;--widget-visual-height:595px">
@@ -545,6 +545,17 @@
       function clampDateToMode(date, mode) {
         if (mode !== 'work' || (date.getDay() !== 0 && date.getDay() !== 6)) return date;
         return addDays(date, date.getDay() === 6 ? -1 : -2);
+      }
+
+      function applyOpenDefaults() {
+        const today = todayDate();
+        if ((today.getDay() === 0 || today.getDay() === 6) && state.mode !== 'life') {
+          const fresh = readState();
+          fresh.mode = 'life';
+          if (!persist(fresh)) return false;
+        }
+        ui.selectedDate = localDateKey(clampDateToMode(today,state.mode));
+        return true;
       }
 
       function nextActiveDate(date, mode, direction) {
@@ -1411,8 +1422,11 @@
           return;
         }
         pendingExternalSync = !rollWeekIfNeeded();
-        const selected = clampDateToMode(resetToToday ? todayDate() : (parseDate(ui.selectedDate) || todayDate()), state.mode);
-        ui.selectedDate = localDateKey(selected);
+        if (resetToToday) applyOpenDefaults();
+        else {
+          const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
+          ui.selectedDate = localDateKey(selected);
+        }
         renderAll();
       }
 
@@ -1432,12 +1446,11 @@
 
       state = readState();
       pendingExternalSync = !rollWeekIfNeeded();
-      const initial = clampDateToMode(todayDate(), state.mode);
-      ui.selectedDate = localDateKey(initial);
+      applyOpenDefaults();
       renderAll();
       window.addEventListener('load', alignSelectedDay, { once:true });
     })();
   </script>
-  <script src="widget-frame.js"></script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>
