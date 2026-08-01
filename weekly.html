@@ -39,14 +39,13 @@
     }
     .current-week[hidden] { display:none; }
     .header-rule { height:1px; min-width:18px; flex:1; background:var(--border-faint); }
-    .mode-segment { padding:3px; display:grid; grid-template-columns:1fr 1fr; gap:3px; border-radius:9px; background:var(--border-pale); }
+    .mode-segment { min-height:30px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
     .mode-button {
-      min-width:58px; height:30px; padding:0 12px; border:0; border-radius:7px; background:transparent;
-      color:#8AA0AA; font-size:12px; font-weight:800;
-      transition:background-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
+      min-height:30px; padding:6px 13px; border:1px solid var(--border); border-radius:999px;
+      background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
     }
-    .mode-button.is-selected[data-mode="work"] { background:var(--action); color:#FFFFFF; }
-    .mode-button.is-selected[data-mode="life"] { background:var(--mid); color:var(--action); }
+    .mode-button.is-selected[data-mode="work"] { border-color:var(--action); background:var(--action); color:#FFFFFF; }
+    .mode-button.is-selected[data-mode="life"] { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .summary-row {
       min-height:35px; padding-bottom:14px; border-bottom:1px solid var(--border-faint);
       display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
@@ -192,7 +191,18 @@
       .week-arrow { width:40px; height:40px; }
       .header-rule { min-width:8px; }
       .mode-segment { width:100%; order:10; }
-      .mode-button { height:40px; }
+      .mode-button {
+        position:relative; min-width:44px; min-height:44px; padding:0 13px;
+        border-color:transparent; background:transparent; isolation:isolate;
+      }
+      .mode-button::before {
+        content:""; position:absolute; left:0; right:0; top:7px; height:30px;
+        z-index:-1; border:1px solid var(--border); border-radius:999px; background:var(--surface);
+      }
+      .mode-button.is-selected[data-mode="work"] { border-color:transparent; background:transparent; }
+      .mode-button.is-selected[data-mode="work"]::before { border-color:var(--action); background:var(--action); }
+      .mode-button.is-selected[data-mode="life"] { border-color:transparent; background:transparent; }
+      .mode-button.is-selected[data-mode="life"]::before { border-color:var(--mid); background:var(--mid); }
       .summary-row { min-height:32px; padding-bottom:10px; }
       .desktop-view { display:none; }
       .mobile-view { height:100%; display:flex; flex-direction:column; gap:10px; }
