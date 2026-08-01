@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>D-7 마감 현황</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6;
+      --text:#12303C; --title:#33505C; --secondary:#6B8794; --secondary-strong:#55707C;
+      --muted:#93A5AD; --done:#A9BAC2; --inactive:#C6D6DD;
+      --border:#DCE7ED; --border-soft:#E6EDF0; --track:#F1F5F7; --edge:#F7F9FA;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD;
+      --project-1:#5679BB; --project-2:#4A9266; --project-3:#BD7138; --project-4:#33505C;
+      --item-shadow:0 1px 2px rgba(18,48,60,.05);
+    }
+
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text);
+      font-family:"Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+      font-weight:600; -webkit-font-smoothing:antialiased;
+    }
+    button { color:inherit; font:inherit; }
+
+    .deadline-card {
+      position:relative; width:100%; max-width:571px; height:510px; min-height:0; margin:0 auto;
+      display:flex; flex-direction:column; gap:10px; padding:16px; overflow:hidden;
+      border-radius:18px; background:var(--surface);
+      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+
+    .day-rail {
+      min-width:0; flex:0 0 48px; display:grid;
+      grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px;
+    }
+    .day-chip {
+      min-width:0; min-height:48px; padding:4px 2px; border:1px solid var(--border-soft);
+      border-radius:9px; display:grid; place-items:center; align-content:center; gap:4px;
+      background:var(--surface); color:var(--secondary); text-align:center; cursor:pointer;
+      outline-color:transparent; outline-offset:-2px;
+      transition:color var(--t-color) var(--ease), background-color var(--t-color) var(--ease),
+        border-color var(--t-color) var(--ease), outline-color var(--t-color) var(--ease);
+    }
+    .day-chip.is-empty { color:var(--muted); }
+    .day-chip.is-today { outline:2px solid var(--action); outline-offset:-2px; }
+    .day-chip.is-selected { border-color:var(--action); background:var(--action); color:var(--surface); }
+    .day-chip.is-selected.is-today { outline-color:transparent; }
+    .day-chip:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
+    .day-label {
+      max-width:100%; overflow:hidden; font-size:9px; font-weight:800; line-height:1;
+      letter-spacing:.02em; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .day-count {
+      font-size:12px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums;
+    }
+
+    .focus-panel {
+      min-width:0; min-height:0; flex:1; padding:12px; overflow:hidden;
+      display:grid; grid-template-rows:auto minmax(0,1fr); gap:8px;
+      border:1px solid var(--track); border-radius:12px; background:var(--surface-soft);
+    }
+    .focus-panel.is-global-empty { grid-template-rows:minmax(0,1fr); }
+    .focus-panel.is-global-empty .focus-head { display:none; }
+    .focus-head {
+      min-width:0; min-height:40px; padding-bottom:8px; display:grid; align-content:center; gap:2px;
+      border-bottom:1px solid var(--track);
+    }
+    .focus-title { margin:0; color:var(--title); font-size:12px; font-weight:800; line-height:1.2; }
+    .focus-date { margin:0; color:var(--muted); font-size:9px; font-weight:700; line-height:1.2; }
+    .task-list {
+      min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px;
+      overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+      scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
+    .task-row {
+      width:100%; min-width:0; min-height:40px; flex:0 0 40px; padding:6px 8px;
+      display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:6px;
+      border:0; border-radius:9px; background:var(--surface); box-shadow:var(--item-shadow);
+    }
+    .task-row.is-wait { border:1px dashed var(--inactive); box-shadow:none; }
+    .project-dot { width:8px; height:8px; border-radius:999px; background:var(--inactive); }
+    .project-dot.project-1 { background:var(--project-1); }
+    .project-dot.project-2 { background:var(--project-2); }
+    .project-dot.project-3 { background:var(--project-3); }
+    .project-dot.project-4 { background:var(--project-4); }
+    .task-name {
+      min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:700;
+      line-height:1.3; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .task-status { color:var(--secondary); font-size:9px; font-weight:800; line-height:1; white-space:nowrap; }
+    .task-row.is-done .task-status { color:var(--done); }
+
+    .empty-state {
+      min-width:0; min-height:88px; flex:1; padding:16px;
+      display:grid; place-content:center; gap:4px;
+      border:1px dashed var(--inactive); border-radius:12px; background:var(--surface-soft); text-align:center;
+    }
+    .empty-state.is-compact { min-height:88px; flex:0 0 auto; }
+    .empty-title { color:var(--title); font-size:12px; font-weight:800; line-height:1.3; }
+    .empty-copy { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    .sr-only {
+      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+      clip:rect(0,0,0,0); white-space:nowrap; border:0;
+    }
+
+    @media (hover:hover) {
+      .day-chip:hover { border-color:#CFE2EA; }
+    }
+    @media (max-width:390px) {
+      .day-chip { padding-left:1px; padding-right:1px; }
+      .day-label { font-size:8px; letter-spacing:0; }
+      .focus-panel { padding-left:10px; padding-right:10px; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-deadline-horizon.html"
+    data-widget-max-width="571" data-widget-height="510" data-widget-max-scale="4"
+    style="--widget-max-width:571px;--widget-base-width:571px;--widget-base-height:510px;--widget-visual-height:510px">
+    <main class="deadline-card" data-widget-card aria-label="D-7 마감 현황 위젯">
+      <nav class="day-rail" id="dayRail" data-widget-fixed aria-label="D-DAY부터 D-7까지 마감 현황">
+        <button class="day-chip" type="button" data-offset="0" aria-pressed="true"><span class="day-label">D-DAY</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="1" aria-pressed="false"><span class="day-label">D-1</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="2" aria-pressed="false"><span class="day-label">D-2</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="3" aria-pressed="false"><span class="day-label">D-3</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="4" aria-pressed="false"><span class="day-label">D-4</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="5" aria-pressed="false"><span class="day-label">D-5</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="6" aria-pressed="false"><span class="day-label">D-6</span><span class="day-count">0</span></button>
+        <button class="day-chip" type="button" data-offset="7" aria-pressed="false"><span class="day-label">D-7</span><span class="day-count">0</span></button>
+      </nav>
+
+      <section class="focus-panel" id="focusPanel" data-widget-list data-widget-list-height="420"
+        aria-live="polite" aria-atomic="true">
+        <header class="focus-head">
+          <h1 class="focus-title" id="focusTitle">D-DAY 업무</h1>
+          <p class="focus-date" id="focusDate"></p>
+        </header>
+        <div class="task-list" id="taskList" role="list" aria-label="선택한 날짜의 중요 업무"></div>
+      </section>
+
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button"
+        aria-label="업무 목록 세로 크기 조절" aria-valuemin="160"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button"
+        aria-label="위젯 비율 고정 크기 조절"></button>
+      <span class="sr-only" id="liveRegion" aria-live="polite"></span>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'important-calendar-v1';
+      const WORKLOG_KEY = 'worklog-v1';
+      const STATUS_LABELS = { wait:'대기', doing:'진행', done:'완료' };
+      const STATUS_ORDER = { doing:0, wait:1, done:2 };
+      const STATUS_VALUES = new Set(Object.keys(STATUS_LABELS));
+      const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+      const PROJECT_CLASSES = ['project-1','project-2','project-3','project-4'];
+
+      const dayRail = document.getElementById('dayRail');
+      const dayButtons = Array.from(dayRail.querySelectorAll('[data-offset]'));
+      const focusPanel = document.getElementById('focusPanel');
+      const focusTitle = document.getElementById('focusTitle');
+      const focusDate = document.getElementById('focusDate');
+      const taskList = document.getElementById('taskList');
+      const liveRegion = document.getElementById('liveRegion');
+
+      let selectedOffset = 0;
+      let today = localNoon(new Date());
+      let renderedDateKey = '';
+      let state = readCalendar();
+      let projects = readProjects();
+      let calendarChannel = null;
+      let worklogChannel = null;
+      let midnightTimer = 0;
+      let animationTimer = 0;
+
+      function pad(value) { return String(value).padStart(2,'0'); }
+
+      function localNoon(value) {
+        const date = value instanceof Date ? value : new Date(value);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+      }
+
+      function dateKey(date) {
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      }
+
+      function parseDate(value) {
+        const key = String(value || '');
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+        if (!match) return null;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+        return dateKey(date) === key ? date : null;
+      }
+
+      function addDays(date, amount) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12);
+      }
+
+      function dayDifference(date, base) {
+        return Math.round((localNoon(date) - localNoon(base)) / 86400000);
+      }
+
+      function koreanDate(date) {
+        return `${date.getMonth() + 1}월 ${date.getDate()}일 ${WEEKDAYS[date.getDay()]}`;
+      }
+
+      function normalizeTask(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const id = String(raw.id || '').trim();
+        const title = String(raw.title || '').trim();
+        const dueDate = parseDate(raw.due);
+        if (!id || !title || !dueDate) return null;
+        const createdAt = Number(raw.createdAt);
+        const updatedAt = Number(raw.updatedAt);
+        return {
+          id,
+          title,
+          proj:String(raw.proj || '').trim(),
+          status:STATUS_VALUES.has(raw.status) ? raw.status : 'wait',
+          due:dateKey(dueDate),
+          memo:String(raw.memo || '').trim(),
+          createdAt:Number.isFinite(createdAt) ? createdAt : 0,
+          updatedAt:Number.isFinite(updatedAt) ? updatedAt : 0
+        };
+      }
+
+      function normalizeCalendar(raw) {
+        const tasks = [];
+        const ids = new Set();
+        if (Array.isArray(raw?.tasks)) {
+          raw.tasks.forEach(value => {
+            const task = normalizeTask(value);
+            if (!task || ids.has(task.id)) return;
+            ids.add(task.id);
+            tasks.push(task);
+          });
+        }
+        return { tasks };
+      }
+
+      function readCalendar() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return normalizeCalendar(raw ? JSON.parse(raw) : {});
+        } catch (error) {
+          console.warn('중요 업무를 불러오지 못했습니다.', error);
+          return { tasks:[] };
+        }
+      }
+
+      function readProjects() {
+        try {
+          const raw = localStorage.getItem(WORKLOG_KEY);
+          const worklog = raw ? JSON.parse(raw) : {};
+          const values = [
+            worklog?.lastUsed?.work?.proj,
+            worklog?.lastUsed?.life?.proj,
+            ...(Array.isArray(worklog?.tasks) ? worklog.tasks.map(task => task?.proj) : [])
+          ];
+          const unique = [];
+          values.forEach(value => {
+            const project = String(value || '').trim();
+            if (!project || project === '미분류' || unique.includes(project)) return;
+            unique.push(project);
+          });
+          return unique.slice(0,4);
+        } catch (error) {
+          console.warn('업무일지 프로젝트를 불러오지 못했습니다.', error);
+          return [];
+        }
+      }
+
+      function compareTasks(a, b) {
+        return STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+          || a.due.localeCompare(b.due)
+          || a.createdAt - b.createdAt
+          || a.title.localeCompare(b.title, 'ko')
+          || a.id.localeCompare(b.id);
+      }
+
+      function buildBuckets() {
+        const buckets = Array.from({ length:8 }, () => []);
+        state.tasks.forEach(task => {
+          const due = parseDate(task.due);
+          if (!due) return;
+          const offset = dayDifference(due, today);
+          if (offset < 0) {
+            if (task.status !== 'done') buckets[0].push(task);
+            return;
+          }
+          if (offset <= 7) buckets[offset].push(task);
+        });
+        buckets.forEach(bucket => bucket.sort(compareTasks));
+        return buckets;
+      }
+
+      function projectClass(project) {
+        const index = projects.indexOf(project);
+        return index >= 0 ? PROJECT_CLASSES[index] : '';
+      }
+
+      function createTaskRow(task) {
+        const row = document.createElement('div');
+        row.className = `task-row is-${task.status}`;
+        row.setAttribute('role','listitem');
+        row.setAttribute('aria-label', `${task.title}, ${STATUS_LABELS[task.status]}`);
+
+        const dot = document.createElement('span');
+        dot.className = `project-dot ${projectClass(task.proj)}`.trim();
+        dot.setAttribute('aria-hidden','true');
+        const title = document.createElement('span');
+        title.className = 'task-name';
+        title.textContent = task.title;
+        const status = document.createElement('span');
+        status.className = 'task-status';
+        status.textContent = STATUS_LABELS[task.status];
+        row.append(dot, title, status);
+        return row;
+      }
+
+      function createEmptyState(globalEmpty) {
+        const empty = document.createElement('div');
+        empty.className = `empty-state${globalEmpty ? '' : ' is-compact'}`;
+        const title = document.createElement('strong');
+        title.className = 'empty-title';
+        title.textContent = globalEmpty ? '가까운 마감이 없어요' : '이날 마감 업무가 없어요';
+        empty.appendChild(title);
+        if (globalEmpty) {
+          const copy = document.createElement('span');
+          copy.className = 'empty-copy';
+          copy.textContent = '지난 미완료 업무와 오늘부터 7일 안의 중요 업무가 없습니다.';
+          empty.appendChild(copy);
+        }
+        return empty;
+      }
+
+      function runPanelMotion(className) {
+        clearTimeout(animationTimer);
+        focusPanel.classList.remove('motion-swap','motion-new');
+        void focusPanel.offsetWidth;
+        focusPanel.classList.add(className);
+        animationTimer = window.setTimeout(() => focusPanel.classList.remove(className), 900);
+      }
+
+      function render({ motion='', announce=false } = {}) {
+        const buckets = buildBuckets();
+        const selectedDate = addDays(today, selectedOffset);
+        const selectedKey = dateKey(selectedDate);
+        const previousScroll = renderedDateKey === selectedKey ? taskList.scrollTop : 0;
+        const total = buckets.reduce((sum, bucket) => sum + bucket.length, 0);
+        const selectedTasks = buckets[selectedOffset];
+
+        dayButtons.forEach((button, offset) => {
+          const count = buckets[offset].length;
+          button.classList.toggle('is-selected', offset === selectedOffset);
+          button.classList.toggle('is-today', offset === 0);
+          button.classList.toggle('is-empty', count === 0);
+          button.setAttribute('aria-pressed', String(offset === selectedOffset));
+          button.setAttribute('aria-label', `${offset === 0 ? 'D-DAY' : `D-${offset}`}, 업무 ${count}개`);
+          button.querySelector('.day-count').textContent = String(count);
+        });
+
+        focusPanel.classList.toggle('is-global-empty', total === 0);
+        focusTitle.textContent = `${selectedOffset === 0 ? 'D-DAY' : `D-${selectedOffset}`} 업무`;
+        focusDate.textContent = koreanDate(selectedDate);
+        if (total === 0) taskList.replaceChildren(createEmptyState(true));
+        else if (selectedTasks.length === 0) taskList.replaceChildren(createEmptyState(false));
+        else taskList.replaceChildren(...selectedTasks.map(createTaskRow));
+        taskList.scrollTop = previousScroll;
+        renderedDateKey = selectedKey;
+
+        if (motion) runPanelMotion(motion);
+        if (announce) {
+          liveRegion.textContent = total === 0
+            ? '가까운 마감이 없습니다.'
+            : `${focusTitle.textContent}, ${koreanDate(selectedDate)}, 업무 ${selectedTasks.length}개`;
+        }
+      }
+
+      function refresh({ calendar=true, worklog=true, mark=false } = {}) {
+        const nextToday = localNoon(new Date());
+        if (dateKey(nextToday) !== dateKey(today)) today = nextToday;
+        if (calendar) state = readCalendar();
+        if (worklog) projects = readProjects();
+        render({ motion:mark ? 'motion-new' : '', announce:false });
+      }
+
+      function scheduleMidnightRefresh() {
+        clearTimeout(midnightTimer);
+        const now = new Date();
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+        midnightTimer = window.setTimeout(() => {
+          refresh();
+          scheduleMidnightRefresh();
+        }, Math.max(1000, midnight - now));
+      }
+
+      dayRail.addEventListener('click', event => {
+        const button = event.target.closest('[data-offset]');
+        if (!button) return;
+        const offset = Number(button.dataset.offset);
+        if (!Number.isInteger(offset) || offset < 0 || offset > 7 || offset === selectedOffset) return;
+        selectedOffset = offset;
+        renderedDateKey = '';
+        render({ motion:'motion-swap', announce:true });
+      });
+
+      try {
+        if ('BroadcastChannel' in window) {
+          calendarChannel = new BroadcastChannel(STORAGE_KEY);
+          worklogChannel = new BroadcastChannel(WORKLOG_KEY);
+          calendarChannel.addEventListener('message', () => refresh({ calendar:true, worklog:false, mark:true }));
+          worklogChannel.addEventListener('message', () => refresh({ calendar:false, worklog:true, mark:true }));
+        }
+      } catch (error) {
+        console.warn('동기화 채널을 열지 못했습니다.', error);
+      }
+
+      window.addEventListener('storage', event => {
+        if (event.key === STORAGE_KEY) refresh({ calendar:true, worklog:false, mark:true });
+        else if (event.key === WORKLOG_KEY) refresh({ calendar:false, worklog:true, mark:true });
+        else if (event.key === null) refresh({ mark:true });
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          refresh();
+          scheduleMidnightRefresh();
+        }
+      });
+      window.addEventListener('focus', () => {
+        refresh();
+        scheduleMidnightRefresh();
+      });
+      window.addEventListener('pagehide', () => {
+        clearTimeout(midnightTimer);
+        try { calendarChannel?.close(); } catch (_) {}
+        try { worklogChannel?.close(); } catch (_) {}
+      });
+
+      render();
+      scheduleMidnightRefresh();
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
