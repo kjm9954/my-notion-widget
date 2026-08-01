@@ -515,7 +515,7 @@
 
       function renderContent(items) {
         if (!items.length) {
-          weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">이 주에 적은 기록 없음</span><span class="empty-copy">업무일지 위젯에 하루를 적으면 여기에 모입니다</span></div>';
+          weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">기록이 비어있어요</span><span class="empty-copy">업무일지에 내용을 작성해주세요.</span></div>';
           renderExpand(items);
           return;
         }
@@ -593,7 +593,12 @@
         modalClose.focus({ preventScroll:true });
       }
 
-      function syncData(external = false) {
+      function syncData(external = false, resetToCurrentWeek = false) {
+        if (resetToCurrentWeek) {
+          closeModal();
+          state.weekStart = startOfWeek(todayDate());
+          state.selectedDay = '';
+        }
         const loaded = readWorklog();
         if (!initialized) {
           state.mode = loaded.mode;
@@ -683,8 +688,9 @@
       });
 
       window.addEventListener('storage', event => { if (event.key === DATA_KEY) syncData(true); });
-      window.addEventListener('focus', () => syncData(true));
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true); });
+      window.addEventListener('focus', () => syncData(true,true));
+      window.addEventListener('pageshow', () => syncData(true,true));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true,true); });
       mobileQuery.addEventListener?.('change', render);
       try {
         if ('BroadcastChannel' in window) {

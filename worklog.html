@@ -1405,13 +1405,13 @@
         changeDate(event.key === 'ArrowRight' ? 1 : -1);
       });
 
-      function syncFromStorage() {
+      function syncFromStorage(resetToToday = false) {
         if (ui.adding || ui.editingId) {
           pendingExternalSync = true;
           return;
         }
         pendingExternalSync = !rollWeekIfNeeded();
-        const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), state.mode);
+        const selected = clampDateToMode(resetToToday ? todayDate() : (parseDate(ui.selectedDate) || todayDate()), state.mode);
         ui.selectedDate = localDateKey(selected);
         renderAll();
       }
@@ -1419,9 +1419,10 @@
       window.addEventListener('storage', event => {
         if (event.key === STORAGE_KEY) syncFromStorage();
       });
-      window.addEventListener('focus', syncFromStorage);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(); });
-      channel?.addEventListener('message', syncFromStorage);
+      window.addEventListener('focus', () => syncFromStorage(true));
+      window.addEventListener('pageshow', () => syncFromStorage(true));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(true); });
+      channel?.addEventListener('message', () => syncFromStorage());
       mobileQuery.addEventListener?.('change', () => {
         if (!ui.adding && !ui.editingId) renderAll();
       });
