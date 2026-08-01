@@ -21,7 +21,7 @@
     }
     button { color:inherit; font:inherit; cursor:pointer; }
     .card {
-      position:relative; width:100%; max-width:1180px; height:560px; margin:0 auto; padding:22px;
+      position:relative; width:100%; max-width:1500px; height:560px; margin:0 auto; padding:22px;
       display:flex; flex-direction:column; gap:16px; overflow:hidden; background:var(--surface);
       border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
@@ -39,14 +39,13 @@
     }
     .current-week[hidden] { display:none; }
     .header-rule { height:1px; min-width:18px; flex:1; background:var(--border-faint); }
-    .mode-segment { padding:3px; display:grid; grid-template-columns:1fr 1fr; gap:3px; border-radius:9px; background:var(--border-pale); }
+    .mode-segment { min-height:30px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
     .mode-button {
-      min-width:58px; height:30px; padding:0 12px; border:0; border-radius:7px; background:transparent;
-      color:#8AA0AA; font-size:12px; font-weight:800;
-      transition:background-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
+      min-height:30px; padding:6px 13px; border:1px solid var(--border); border-radius:999px;
+      background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
     }
-    .mode-button.is-selected[data-mode="work"] { background:var(--action); color:#FFFFFF; }
-    .mode-button.is-selected[data-mode="life"] { background:var(--mid); color:var(--action); }
+    .mode-button.is-selected[data-mode="work"] { border-color:var(--action); background:var(--action); color:#FFFFFF; }
+    .mode-button.is-selected[data-mode="life"] { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .summary-row {
       min-height:35px; padding-bottom:14px; border-bottom:1px solid var(--border-faint);
       display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
@@ -192,7 +191,18 @@
       .week-arrow { width:40px; height:40px; }
       .header-rule { min-width:8px; }
       .mode-segment { width:100%; order:10; }
-      .mode-button { height:40px; }
+      .mode-button {
+        position:relative; min-width:44px; min-height:44px; padding:0 13px;
+        border-color:transparent; background:transparent; isolation:isolate;
+      }
+      .mode-button::before {
+        content:""; position:absolute; left:0; right:0; top:7px; height:30px;
+        z-index:-1; border:1px solid var(--border); border-radius:999px; background:var(--surface);
+      }
+      .mode-button.is-selected[data-mode="work"] { border-color:transparent; background:transparent; }
+      .mode-button.is-selected[data-mode="work"]::before { border-color:var(--action); background:var(--action); }
+      .mode-button.is-selected[data-mode="life"] { border-color:transparent; background:transparent; }
+      .mode-button.is-selected[data-mode="life"]::before { border-color:var(--mid); background:var(--mid); }
       .summary-row { min-height:32px; padding-bottom:10px; }
       .desktop-view { display:none; }
       .mobile-view { height:100%; display:flex; flex-direction:column; gap:10px; }
@@ -239,7 +249,7 @@
   <link rel="stylesheet" href="widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-weekly.html" data-widget-max-width="1180" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:1180px;--widget-base-width:1180px;--widget-base-height:560px;--widget-visual-height:560px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-weekly.html" data-widget-max-width="1500" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:1500px;--widget-base-width:1500px;--widget-base-height:560px;--widget-visual-height:560px">
     <main class="card" data-widget-card aria-label="주간 업무 요약 위젯">
       <div class="weekly-top" data-widget-fixed>
         <header class="week-header">
@@ -515,7 +525,7 @@
 
       function renderContent(items) {
         if (!items.length) {
-          weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">이 주에 적은 기록 없음</span><span class="empty-copy">업무일지 위젯에 하루를 적으면 여기에 모입니다</span></div>';
+          weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">기록이 비어있어요</span><span class="empty-copy">업무일지에 내용을 작성해주세요.</span></div>';
           renderExpand(items);
           return;
         }
@@ -593,7 +603,12 @@
         modalClose.focus({ preventScroll:true });
       }
 
-      function syncData(external = false) {
+      function syncData(external = false, resetToCurrentWeek = false) {
+        if (resetToCurrentWeek) {
+          closeModal();
+          state.weekStart = startOfWeek(todayDate());
+          state.selectedDay = '';
+        }
         const loaded = readWorklog();
         if (!initialized) {
           state.mode = loaded.mode;
@@ -683,8 +698,9 @@
       });
 
       window.addEventListener('storage', event => { if (event.key === DATA_KEY) syncData(true); });
-      window.addEventListener('focus', () => syncData(true));
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true); });
+      window.addEventListener('focus', () => syncData(true,true));
+      window.addEventListener('pageshow', () => syncData(true,true));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true,true); });
       mobileQuery.addEventListener?.('change', render);
       try {
         if ('BroadcastChannel' in window) {
