@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모장</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --text:#12303C; --title:#33505C; --muted:#93A5AD;
+      --done:#A9BAC2; --inactive:#C6D6DD; --surface:#FFFFFF; --surface-soft:#FAFCFD;
+      --border-pale:#F1F5F7; --danger:#A56B6B;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; padding:12px; display:flex; align-items:center; justify-content:center;
+      color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input { color:inherit; font:inherit; }
+    button { cursor:pointer; }
+    .card {
+      position:relative; width:100%; max-width:340px; margin:0 auto; padding:16px;
+      display:flex; flex-direction:column; gap:12px; overflow:hidden; background:var(--surface);
+      border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .notes-area {
+      height:var(--notes-list-height,262px); min-height:0; padding:10px;
+      display:flex; flex-direction:column; background:var(--surface-soft);
+      border:1px solid var(--border-pale); border-radius:12px;
+    }
+    .notes-scroll {
+      min-height:0; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px;
+    }
+    .memo-row {
+      width:100%; height:34px; min-height:34px; padding:0 8px; border-radius:9px;
+      display:flex; align-items:center; gap:9px; background:transparent; border:0;
+      transition:background-color var(--t-color) var(--ease), box-shadow var(--t-color) var(--ease), outline-color var(--t-color) var(--ease);
+    }
+    .memo-row.is-editing {
+      background:var(--surface); outline:2px solid var(--action); outline-offset:-2px;
+    }
+    .check-action {
+      width:28px; height:28px; margin-left:-5px; padding:0; flex:0 0 28px;
+      display:grid; place-items:center; border:0; background:transparent;
+    }
+    .check-mark {
+      width:17px; height:17px; border:1.5px solid var(--inactive); border-radius:5px;
+      display:grid; place-items:center; background:transparent; color:var(--surface);
+      font-size:10px; font-weight:800; line-height:1;
+    }
+    .check-action[aria-checked="true"] .check-mark { border:0; background:var(--action); }
+    .memo-text {
+      min-width:0; flex:1; overflow:hidden; color:var(--text); font-size:11px; font-weight:600;
+      text-overflow:ellipsis; white-space:nowrap;
+    }
+    .memo-row.is-done .memo-text { color:var(--done); text-decoration:line-through; }
+    .memo-input {
+      min-width:0; height:28px; padding:0; flex:1; border:0; outline:0; background:transparent;
+      color:var(--text); font-size:11px; font-weight:600; white-space:nowrap;
+    }
+    .delete-action {
+      width:22px; height:22px; padding:0; flex:0 0 auto; opacity:0; pointer-events:none;
+      border:0; border-radius:8px; background:transparent; color:var(--inactive);
+      font-size:12px; font-weight:700; line-height:1;
+      transition:color var(--t-color) var(--ease), opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
+    }
+    .delete-confirm {
+      min-width:auto; width:auto; padding:3px 7px; opacity:1; pointer-events:auto;
+      background:var(--danger); color:var(--surface); font-size:9px; font-weight:700;
+    }
+    .memo-row.is-confirming .delete-action { opacity:1; pointer-events:auto; }
+    .memo-row.is-editing .delete-action { display:none; }
+    .add-row {
+      width:100%; height:34px; min-height:34px; margin-top:3px; padding:0 8px;
+      display:flex; align-items:center; justify-content:center; gap:5px;
+      border:1px dashed var(--inactive); border-radius:9px; background:transparent;
+      color:var(--muted); font-size:11px; font-weight:700;
+      transition:border-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
+    }
+    .add-symbol { font-size:12px; }
+    .empty-state {
+      position:relative; width:100%; min-height:110px; padding:24px 12px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+      border:1px dashed var(--inactive); border-radius:12px; background:var(--surface-soft); text-align:center;
+    }
+    .empty-title { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
+    .widget-list-resize-handle {
+      position:static; width:46px; height:4px; min-height:4px; margin:0 auto; padding:0;
+      opacity:0; border:0; border-radius:2px; outline:0; background:var(--inactive);
+      cursor:ns-resize; touch-action:none; transform:none;
+      transition:opacity var(--t-color) var(--ease), background-color var(--t-color) var(--ease);
+    }
+    .card:hover .widget-list-resize-handle, .widget-list-resize-handle:focus-visible, body.is-notes-resizing .widget-list-resize-handle { opacity:1; }
+    body.is-notes-resizing .widget-list-resize-handle { background:var(--action); }
+    @media (hover:hover) {
+      .memo-row:hover:not(.is-editing) { background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); }
+      .memo-row:hover .delete-action { opacity:1; pointer-events:auto; }
+      .delete-action:hover { color:var(--muted); }
+      .add-row:hover { border-color:#CFE2EA; }
+    }
+    @media (min-width:720px) {
+      .card { padding:18px; }
+    }
+    @media (max-width:639px) {
+      body { align-items:flex-start; padding:8px; }
+      .card { max-width:100%; }
+      .notes-area { height:auto; }
+      .notes-scroll { overflow:visible; }
+      .memo-row { height:44px; min-height:44px; padding:0 6px; }
+      .check-action { width:40px; height:40px; margin-left:-6px; flex-basis:40px; }
+      .check-mark { width:20px; height:20px; }
+      .memo-text, .memo-input { font-size:12px; }
+      .delete-action { width:28px; height:44px; opacity:1; pointer-events:auto; }
+      .delete-confirm { width:auto; height:28px; }
+      .add-row { height:44px; min-height:44px; }
+      .widget-list-resize-handle { display:none; }
+    }
+    @media (hover:none) {
+      .delete-action { opacity:1; pointer-events:auto; }
+      .widget-list-resize-handle { display:none; }
+    }
+  </style>
+  <link rel="stylesheet" href="widget-frame.css">
+</head>
+<body class="widget-page">
+  <main class="card" id="notesCard" aria-label="메모장 위젯"></main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const DATA_KEY = 'notes-v1';
+      const SIZE_KEY = 'widget-size-notes.html';
+      const DEFAULT_LIST_HEIGHT = 262;
+      const MIN_LIST_HEIGHT = 110;
+      const MAX_LIST_HEIGHT = 756;
+      const DELETE_CONFIRM_MS = 3000;
+      const card = document.getElementById('notesCard');
+      let items = [];
+      let editingId = null;
+      let editingOriginal = '';
+      let draftNew = false;
+      let confirmingId = null;
+      let confirmTimer = 0;
+      let pendingSync = false;
+      let channel = null;
+      let listHeight = DEFAULT_LIST_HEIGHT;
+
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      })[character]);
+
+      function makeId() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+
+      function normalizeItems(value) {
+        if (!value || typeof value !== 'object' || !Array.isArray(value.items)) return [];
+        return value.items.map((item,index) => {
+          if (!item || typeof item !== 'object') return null;
+          const text = String(item.text || '').trim();
+          if (!text) return null;
+          return { id:String(item.id || `note-${index}`), text, done:item.done === true };
+        }).filter(Boolean);
+      }
+
+      function readItems() {
+        try {
+          const raw = localStorage.getItem(DATA_KEY);
+          return raw ? normalizeItems(JSON.parse(raw)) : [];
+        } catch (error) {
+          console.warn('메모를 불러오지 못했습니다.', error);
+          return [];
+        }
+      }
+
+      function writeMerged(change) {
+        try {
+          const latest = readItems();
+          const next = change(latest).filter(item => item.text.trim());
+          localStorage.setItem(DATA_KEY, JSON.stringify({ items:next }));
+          items = next;
+          channel?.postMessage({ type:'changed' });
+          return true;
+        } catch (error) {
+          console.warn('메모를 저장하지 못했습니다.', error);
+          return false;
+        }
+      }
+
+      function readSize() {
+        try {
+          const raw = localStorage.getItem(SIZE_KEY);
+          if (!raw) return DEFAULT_LIST_HEIGHT;
+          const value = Number(JSON.parse(raw)?.listH);
+          return Number.isFinite(value) ? Math.min(MAX_LIST_HEIGHT,Math.max(MIN_LIST_HEIGHT,value)) : DEFAULT_LIST_HEIGHT;
+        } catch (error) {
+          console.warn('메모장 높이를 불러오지 못했습니다.', error);
+          return DEFAULT_LIST_HEIGHT;
+        }
+      }
+
+      function writeSize() {
+        try {
+          localStorage.setItem(SIZE_KEY, JSON.stringify({ listH:Math.round(listHeight) }));
+        } catch (error) {
+          console.warn('메모장 높이를 저장하지 못했습니다.', error);
+        }
+      }
+
+      function isEditing() {
+        return editingId !== null || draftNew;
+      }
+
+      function rowMarkup(item) {
+        const editing = item.id === editingId;
+        const confirming = item.id === confirmingId;
+        const checked = item.done ? 'true' : 'false';
+        return `<div class="memo-row ${item.done ? 'is-done' : ''} ${editing ? 'is-editing' : ''} ${confirming ? 'is-confirming' : ''}" data-note-id="${escapeHtml(item.id)}">
+          <button class="check-action" type="button" role="checkbox" aria-checked="${checked}" aria-label="${item.done ? '완료 취소' : '완료 표시'}" data-check="${escapeHtml(item.id)}"><span class="check-mark" aria-hidden="true">${item.done ? '✓' : ''}</span></button>
+          ${editing ? `<input class="memo-input" id="activeNoteInput" type="text" value="${escapeHtml(item.text)}" aria-label="메모 편집" autocomplete="off">` : `<span class="memo-text">${escapeHtml(item.text)}</span>`}
+          ${editing ? '' : confirming ? `<button class="delete-action delete-confirm" type="button" data-confirm-delete="${escapeHtml(item.id)}">지울까요</button>` : `<button class="delete-action" type="button" aria-label="메모 삭제" data-delete="${escapeHtml(item.id)}">✕</button>`}
+        </div>`;
+      }
+
+      function draftMarkup() {
+        return `<div class="memo-row is-editing" data-new-note><span class="check-action" aria-hidden="true"><span class="check-mark"></span></span><input class="memo-input" id="activeNoteInput" type="text" value="" aria-label="새 메모" autocomplete="off"></div>`;
+      }
+
+      function emptyMarkup() {
+        return `<button class="empty-state idle-owner" type="button" data-start-first><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">적어둔 메모 없음</span><span class="empty-copy">＋ 눌러서 한 줄 남겨두세요</span></button>`;
+      }
+
+      function render({ focus = false } = {}) {
+        if (!items.length && !draftNew) {
+          card.innerHTML = emptyMarkup();
+          return;
+        }
+        card.style.setProperty('--notes-list-height', `${listHeight}px`);
+        card.innerHTML = `<section class="notes-area" aria-label="메모 목록"><div class="notes-scroll" id="notesScroll">${items.map(rowMarkup).join('')}${draftNew ? draftMarkup() : ''}</div><button class="add-row" type="button" data-add-note><span class="add-symbol">＋</span><span>메모 추가</span></button></section><button class="widget-list-resize-handle" id="notesResizeHandle" type="button" aria-label="메모 목록 높이 조절"></button>`;
+        bindResizeHandle();
+        if (focus) {
+          requestAnimationFrame(() => {
+            const input = document.getElementById('activeNoteInput');
+            if (!input) return;
+            input.focus({ preventScroll:true });
+            input.setSelectionRange(input.value.length,input.value.length);
+            input.closest('.memo-row')?.scrollIntoView({ block:'nearest' });
+          });
+        }
+      }
+
+      function clearConfirmation(shouldRender = true) {
+        if (confirmTimer) window.clearTimeout(confirmTimer);
+        confirmTimer = 0;
+        if (!confirmingId) return;
+        confirmingId = null;
+        if (shouldRender) render();
+      }
+
+      function confirmDelete(id) {
+        clearConfirmation(false);
+        confirmingId = id;
+        confirmTimer = window.setTimeout(() => clearConfirmation(true),DELETE_CONFIRM_MS);
+        render();
+      }
+
+      function performDelete(id, row) {
+        clearConfirmation(false);
+        const remove = () => {
+          writeMerged(latest => latest.filter(item => item.id !== id));
+          render();
+        };
+        if (window.widgetMotion?.close && row) window.widgetMotion.close(row,remove);
+        else remove();
+      }
+
+      function beginEdit(id) {
+        if (editingId === id) return;
+        clearConfirmation(false);
+        const item = items.find(note => note.id === id);
+        if (!item) return;
+        editingId = id;
+        editingOriginal = item.text;
+        draftNew = false;
+        render({ focus:true });
+      }
+
+      function beginDraft() {
+        if (draftNew) {
+          document.getElementById('activeNoteInput')?.focus();
+          return;
+        }
+        if (editingId) commitEdit(false);
+        clearConfirmation(false);
+        editingId = null;
+        editingOriginal = '';
+        draftNew = true;
+        render({ focus:true });
+      }
+
+      function commitEdit(continueDraft) {
+        const input = document.getElementById('activeNoteInput');
+        const text = String(input?.value || '').trim();
+        if (draftNew) {
+          draftNew = false;
+          if (text) {
+            const newItem = { id:makeId(), text, done:false };
+            writeMerged(latest => latest.some(item => item.id === newItem.id) ? latest : [...latest,newItem]);
+          }
+          if (continueDraft && text) draftNew = true;
+          render({ focus:draftNew });
+          flushPendingSync();
+          return;
+        }
+        if (!editingId) return;
+        const id = editingId;
+        editingId = null;
+        editingOriginal = '';
+        if (text) writeMerged(latest => latest.map(item => item.id === id ? { ...item,text } : item));
+        else writeMerged(latest => latest.filter(item => item.id !== id));
+        render();
+        flushPendingSync();
+      }
+
+      function cancelEdit() {
+        if (draftNew) {
+          draftNew = false;
+          render();
+          flushPendingSync();
+          return;
+        }
+        if (!editingId) return;
+        const id = editingId;
+        editingId = null;
+        const original = editingOriginal;
+        editingOriginal = '';
+        const local = items.find(item => item.id === id);
+        if (local) local.text = original;
+        render();
+        flushPendingSync();
+      }
+
+      function syncFromStorage() {
+        if (isEditing()) {
+          pendingSync = true;
+          return;
+        }
+        const next = readItems();
+        if (JSON.stringify(next) === JSON.stringify(items)) return;
+        items = next;
+        clearConfirmation(false);
+        render();
+      }
+
+      function flushPendingSync() {
+        if (!pendingSync || isEditing()) return;
+        pendingSync = false;
+        syncFromStorage();
+      }
+
+      function bindResizeHandle() {
+        const handle = document.getElementById('notesResizeHandle');
+        if (!handle || handle.dataset.bound) return;
+        handle.dataset.bound = 'true';
+        handle.addEventListener('pointerdown', event => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          const startY = event.clientY;
+          const startHeight = listHeight;
+          document.body.classList.add('is-notes-resizing');
+          handle.setPointerCapture?.(event.pointerId);
+          const move = moveEvent => {
+            listHeight = Math.min(MAX_LIST_HEIGHT,Math.max(MIN_LIST_HEIGHT,startHeight + moveEvent.clientY - startY));
+            card.style.setProperty('--notes-list-height', `${Math.round(listHeight)}px`);
+          };
+          const finish = () => {
+            document.body.classList.remove('is-notes-resizing');
+            writeSize();
+            window.removeEventListener('pointermove',move);
+            window.removeEventListener('pointerup',finish);
+            window.removeEventListener('pointercancel',finish);
+          };
+          window.addEventListener('pointermove',move);
+          window.addEventListener('pointerup',finish,{ once:true });
+          window.addEventListener('pointercancel',finish,{ once:true });
+        });
+      }
+
+      card.addEventListener('click', event => {
+        const activeEditingRow = event.target.closest('.memo-row.is-editing');
+        if (isEditing() && !activeEditingRow) commitEdit(false);
+        const first = event.target.closest('[data-start-first]');
+        if (first) return beginDraft();
+        const add = event.target.closest('[data-add-note]');
+        if (add) return beginDraft();
+        const check = event.target.closest('[data-check]');
+        if (check) {
+          const id = check.dataset.check;
+          const activeText = editingId === id ? String(document.getElementById('activeNoteInput')?.value || '') : null;
+          writeMerged(latest => latest.map(item => item.id === id ? { ...item,done:!item.done } : item));
+          if (activeText !== null) {
+            const local = items.find(item => item.id === id);
+            if (local) local.text = activeText;
+          }
+          render({ focus:editingId === id });
+          return;
+        }
+        const remove = event.target.closest('[data-delete]');
+        if (remove) return confirmDelete(remove.dataset.delete);
+        const confirm = event.target.closest('[data-confirm-delete]');
+        if (confirm) return performDelete(confirm.dataset.confirmDelete,confirm.closest('.memo-row'));
+        const row = event.target.closest('[data-note-id]');
+        if (row && !row.classList.contains('is-editing')) beginEdit(row.dataset.noteId);
+      });
+
+      card.addEventListener('keydown', event => {
+        if (!event.target.matches('.memo-input')) return;
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commitEdit(draftNew);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelEdit();
+        }
+      });
+
+      card.addEventListener('focusout', event => {
+        if (!event.target.matches('.memo-input')) return;
+        window.setTimeout(() => {
+          if (!isEditing() || card.contains(document.activeElement)) return;
+          commitEdit(false);
+        },0);
+      });
+
+      document.addEventListener('pointerdown', event => {
+        if (confirmingId && !event.target.closest(`[data-note-id="${CSS.escape(confirmingId)}"]`)) clearConfirmation(true);
+      },true);
+
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || isEditing() || !confirmingId) return;
+        event.preventDefault();
+        clearConfirmation(true);
+      });
+
+      window.addEventListener('storage', event => { if (event.key === DATA_KEY) syncFromStorage(); });
+      window.addEventListener('focus',syncFromStorage);
+      document.addEventListener('visibilitychange',() => { if (!document.hidden) syncFromStorage(); });
+      try {
+        if ('BroadcastChannel' in window) {
+          channel = new BroadcastChannel(DATA_KEY);
+          channel.addEventListener('message',syncFromStorage);
+        }
+      } catch (error) {
+        console.warn('메모 실시간 동기화를 시작하지 못했습니다.', error);
+      }
+
+      items = readItems();
+      listHeight = readSize();
+      render();
+    })();
+  </script>
+  <script src="widget-frame.js"></script>
+</body>
+</html>
