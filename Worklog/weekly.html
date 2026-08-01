@@ -48,12 +48,12 @@
     .mode-button.is-selected[data-mode="life"] { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .summary-row {
       min-height:35px; padding-bottom:14px; border-bottom:1px solid var(--border-faint);
-      display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+      display:flex; align-items:flex-start; justify-content:flex-end; gap:14px;
       color:var(--secondary); font-size:11px; font-weight:700;
     }
     .summary-row[hidden] { display:none; }
     .summary-row b { color:var(--text); font-weight:800; }
-    .summary-time { margin-left:auto; color:var(--deep); font-variant-numeric:tabular-nums; }
+    .summary-time { color:var(--deep); font-variant-numeric:tabular-nums; }
     .weekly-content { min-height:180px; flex:1; overflow:hidden; }
     .week-surface {
       width:100%; height:100%; padding:14px; overflow:hidden; background:var(--surface-soft);
@@ -456,7 +456,7 @@
         }
         const done = items.filter(task => task.done).length;
         const hours = items.reduce((sum, task) => sum + (task.progress ?? 0), 0);
-        summaryRow.innerHTML = `<span>${items.length}개 중 <b>${done}</b> 완료</span>${state.mode === 'work' ? `<span class="summary-time">${displayHours(hours)}</span>` : ''}`;
+        summaryRow.innerHTML = `${state.mode === 'work' ? `<span class="summary-time">${displayHours(hours)}</span>` : ''}<span>${items.length}개 중 <b>${done}</b> 완료</span>`;
       }
 
       function taskDot(task) {
