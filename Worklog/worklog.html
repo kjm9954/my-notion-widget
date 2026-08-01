@@ -113,7 +113,9 @@
       flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
       background:transparent; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em;
     }
-    .column-head span.numeric { text-align:right; }
+    .column-head span { text-align:center; }
+    .column-head span:nth-child(3), .column-head.life span:nth-child(5) { text-align:left; }
+    .column-head span.numeric { text-align:center; }
     .task-row {
       height:40px; min-height:40px; flex:0 0 auto; padding:7px 10px; background:var(--surface); border-radius:9px;
       box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid transparent; outline-offset:-1px;
@@ -130,7 +132,7 @@
     }
     .cell-button.is-popover-open { outline-color:var(--action); }
     .project-button { width:100%; }
-    .q-slot { width:20px; display:flex; justify-content:center; }
+    .q-slot { width:100%; display:flex; justify-content:center; }
     .q-button { width:22px; height:24px; display:grid; place-items:center; color:var(--inactive); font-size:10px; font-weight:700; }
     .q-badge {
       width:17px; height:17px; border-radius:5px; display:grid; place-items:center;
@@ -163,14 +165,14 @@
       outline:2px solid var(--action); outline-offset:-2px;
     }
     .inline-cell-input.memo-input { font-size:11px; }
-    .inline-cell-input.time-input { height:24px; padding:3px 2px; font-size:11px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
+    .inline-cell-input.time-input { height:24px; padding:3px 2px; font-size:11px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; }
     .roll-caption { display:block; margin-top:1px; color:var(--faint); font-size:9px; font-weight:700; line-height:1; }
     .cell, .number-cell {
       min-width:0; overflow:hidden; color:var(--deep); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
     }
     .task-title-button, .cell, .number-cell, .memo { transition:color .12s var(--ease); }
-    .number-cell { text-align:right; font-variant-numeric:tabular-nums; }
-    .number-button { width:100%; text-align:right; }
+    .number-cell { text-align:center; font-variant-numeric:tabular-nums; }
+    .number-button { width:100%; text-align:center; }
     .date-cell { width:100%; cursor:pointer; }
     .duration { color:var(--text); }
     .is-missing { color:var(--inactive); }
@@ -184,7 +186,7 @@
     .status-doing { background:var(--action); color:#FFFFFF; }
     .status-done { background:var(--pill); color:var(--secondary); }
     .status-wait { border:1px dashed var(--inactive); background:var(--surface); color:var(--muted); }
-    .check-wrap { width:18px; height:18px; display:grid; place-items:center; }
+    .check-wrap { width:100%; height:18px; display:grid; place-items:center; }
     .done-check {
       width:15px; height:15px; padding:0; border:1.5px solid var(--inactive); border-radius:4px;
       display:grid; place-items:center; background:var(--surface); color:#FFFFFF; font-size:9px; font-weight:800; line-height:1;
@@ -194,9 +196,9 @@
     .done-check.is-done.mode-life { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .task-row.is-done .task-title-button, .task-row.is-done .cell, .task-row.is-done .number-cell, .task-row.is-done .memo { color:var(--complete); }
     .task-row.is-done .task-title-button { text-decoration:line-through; }
-    .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:flex-end; }
-    .time-value { width:100%; height:24px; text-align:right; font-variant-numeric:tabular-nums; }
-    .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:flex-end; gap:2px; background:var(--surface); }
+    .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:center; }
+    .time-value { width:100%; height:24px; text-align:center; font-variant-numeric:tabular-nums; }
+    .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:2px; background:var(--surface); }
     .time-action { width:20px; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:700; }
     @media (hover:hover) { .time-cell.has-value:hover .time-actions { display:flex; } }
     .delete-wrap { width:24px; height:24px; display:grid; place-items:center; }
@@ -276,6 +278,7 @@
     .mini-calendar-day.is-other { color:var(--inactive); }
     .mini-calendar-day.is-today { color:var(--action); }
     .mini-calendar-day.is-selected { outline:2px solid var(--action); outline-offset:-2px; }
+    .mini-calendar-day.is-selected.is-today { outline-color:transparent; }
     .mini-calendar-actions { margin-top:7px; display:flex; gap:5px; }
     .mini-calendar-actions button { min-height:24px; flex:1; padding:4px; border:0; border-radius:8px; background:var(--pill); color:var(--secondary); font-size:9px; font-weight:700; }
     .sr-only {
@@ -1621,6 +1624,8 @@
 
       document.addEventListener('keydown', event => {
         if (event.isComposing) return;
+        const newProjectInput = event.target.closest('[data-project-new-form] .project-new-input');
+        if (newProjectInput && ui.popover?.field === 'project' && event.key === 'Enter') return;
         if (ui.popover && ['progress','est'].includes(ui.popover.field) && ['ArrowUp','ArrowDown'].includes(event.key)) {
           event.preventDefault();
           adjustHours(event.key === 'ArrowUp' ? 0.5 : -0.5);
