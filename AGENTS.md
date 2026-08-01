@@ -24,6 +24,7 @@ stats.html      스탯               record.html    성장 기록
 --text: #12303C;  --title: #33505C;
 --secondary: #6B8794;  #55707C;  #3E5A66;
 --muted: #93A5AD;  --faint: #A2B4BC;  --done: #A9BAC2;  --inactive: #C6D6DD;
+--dim: rgba(18,48,60,.28);  /* weekly.html 오버레이 딤 전용. 다른 용도 금지 */
 
 /* 보더 */  #DCE7ED  #E1EAEE  #E6EDF0  #F1F5F7  #EDF2F4  #F7F9FA
 /* 면 */    #FFFFFF  #FAFCFD  #F5F9FB(알약 배경)
@@ -171,7 +172,7 @@ radius   카드 18 / 내부 카드 14 / 블록·영역 12 / 항목·입력·칸 
 3. **회색은 카드 안쪽에만** — 카드 안 "영역"에 `background:#FAFCFD; border:1px solid #F1F5F7; border-radius:12px`. 목록·게이지·격자·스크롤 영역이 대상.
 4. **캘린더 칸** — `aspect-ratio: 1/1`, **월요일 시작**, 6주차 불필요 시 렌더 안 함. 이전/다음 달 `opacity:.3`, 미래 `opacity:.35`, 오늘 `outline:2px solid #0E5C7A; outline-offset:-2px`.
 5. **내부 스크롤은 목록 영역만.** 고정 영역(헤더·검색·칩·배너)은 스크롤되지 않는다. 카드 높이는 고정해 항목이 늘어도 레이아웃이 밀리지 않게 한다.
-6. **모달·토스트·툴팁·탭·토글을 신설하지 마라.** 화면 전환은 카드 안에서 내용을 교체하는 방식.
+6. **모달·토스트·툴팁·탭·토글을 신설하지 마라.** 화면 전환은 카드 안에서 내용을 교체하는 방식. 단 예외 — `weekly.html`의 일별 상세 오버레이 1개만 모달을 허용한다.
 
 ## 5. 크기 조절 핸들 (전 파일 공통)
 

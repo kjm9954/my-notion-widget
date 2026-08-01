@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>주간 업무 요약</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --mid:#CFE2EA;
+      --text:#12303C; --title:#33505C; --secondary:#6B8794; --deep:#55707C;
+      --muted:#93A5AD; --faint:#A2B4BC; --done:#A9BAC2; --inactive:#C6D6DD;
+      --border:#DCE7ED; --border-soft:#E6EDF0; --border-faint:#EDF2F4; --border-pale:#F1F5F7;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD; --pill:#F5F9FB; --dim:rgba(18,48,60,.28);
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    button { color:inherit; font:inherit; cursor:pointer; }
+    .card {
+      position:relative; width:100%; max-width:1180px; height:560px; margin:0 auto; padding:22px;
+      display:flex; flex-direction:column; gap:16px; overflow:hidden; background:var(--surface);
+      border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .weekly-top { flex:0 0 auto; display:flex; flex-direction:column; gap:12px; }
+    .week-header { min-height:30px; display:flex; align-items:center; gap:10px; }
+    .week-arrow {
+      width:28px; height:28px; padding:0; flex:0 0 auto; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface); color:var(--secondary); font-size:17px; font-weight:700; line-height:1;
+      transition:border-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
+    }
+    .week-range { color:var(--text); font-size:13px; font-weight:800; white-space:nowrap; }
+    .current-week {
+      padding:4px 8px; border:0; border-radius:999px; background:var(--pill); color:var(--secondary);
+      font-size:10px; font-weight:700; white-space:nowrap;
+    }
+    .current-week[hidden] { display:none; }
+    .header-rule { height:1px; min-width:18px; flex:1; background:var(--border-faint); }
+    .mode-segment { padding:3px; display:grid; grid-template-columns:1fr 1fr; gap:3px; border-radius:9px; background:var(--border-pale); }
+    .mode-button {
+      min-width:58px; height:30px; padding:0 12px; border:0; border-radius:7px; background:transparent;
+      color:#8AA0AA; font-size:12px; font-weight:800;
+      transition:background-color var(--t-color) var(--ease), color var(--t-color) var(--ease);
+    }
+    .mode-button.is-selected[data-mode="work"] { background:var(--action); color:#FFFFFF; }
+    .mode-button.is-selected[data-mode="life"] { background:var(--mid); color:var(--action); }
+    .summary-row {
+      min-height:35px; padding-bottom:14px; border-bottom:1px solid var(--border-faint);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+      color:var(--secondary); font-size:11px; font-weight:700;
+    }
+    .summary-row[hidden] { display:none; }
+    .summary-row b { color:var(--text); font-weight:800; }
+    .summary-time { margin-left:auto; color:var(--deep); font-variant-numeric:tabular-nums; }
+    .weekly-content { min-height:180px; flex:1; overflow:hidden; }
+    .week-surface {
+      width:100%; height:100%; padding:14px; overflow:hidden; background:var(--surface-soft);
+      border:1px solid var(--border-pale); border-radius:12px;
+    }
+    .week-grid { height:100%; display:grid; gap:10px; align-items:stretch; }
+    .week-grid.mode-work { grid-template-columns:repeat(5,minmax(0,1fr)); }
+    .week-grid.mode-life { grid-template-columns:repeat(7,minmax(0,1fr)); gap:9px; }
+    .day-column { min-width:0; display:flex; flex-direction:column; gap:8px; }
+    .day-column.is-future { opacity:.35; }
+    .day-heading {
+      width:100%; min-width:0; min-height:27px; padding:0 0 8px; border:0; border-bottom:1px solid var(--border-faint);
+      display:flex; align-items:baseline; gap:6px; background:transparent; text-align:left;
+      transition:border-color var(--t-color) var(--ease);
+    }
+    .day-column.is-today .day-heading { padding-bottom:7px; border-bottom:2px solid var(--action); }
+    .day-name { color:var(--title); font-size:12px; font-weight:800; }
+    .day-date { color:var(--faint); font-size:9px; font-weight:700; }
+    .day-column.is-today .day-name { color:var(--text); }
+    .day-column.is-today .day-date { color:var(--action); }
+    .day-count { margin-left:auto; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; white-space:nowrap; }
+    .day-items { min-height:0; flex:1; display:flex; flex-direction:column; gap:7px; }
+    .grid-task {
+      width:100%; min-width:0; min-height:22px; padding:2px 0; border:0; background:transparent;
+      display:grid; align-items:center; gap:7px; text-align:left;
+    }
+    .grid-task.mode-work { grid-template-columns:8px minmax(0,1fr) auto; }
+    .grid-task.mode-life { grid-template-columns:8px minmax(0,1fr); }
+    .task-dot { width:8px; height:8px; border:1.5px solid var(--inactive); border-radius:999px; background:transparent; }
+    .grid-task.is-done .task-dot { border:0; background:var(--action); }
+    .task-title {
+      min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:600;
+      text-overflow:ellipsis; white-space:nowrap;
+    }
+    .grid-task.is-done .task-title { color:var(--done); text-decoration:line-through; }
+    .task-progress { color:var(--muted); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .grid-task.is-done .task-progress { color:var(--inactive); }
+    .more-count { margin-top:auto; padding-top:6px; color:var(--faint); font-size:9px; font-weight:700; }
+    .expand-area { min-height:32px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .expand-area[hidden] { display:none; }
+    .expand-button {
+      padding:9px 18px; border:1px solid var(--border); border-radius:8px; background:var(--surface);
+      color:var(--deep); font-size:11px; font-weight:700;
+      transition:border-color var(--t-color) var(--ease), color var(--t-color) var(--ease), transform var(--t-press) var(--ease);
+    }
+    .expand-button:active { color:var(--text); transform:scale(.985); }
+    .expand-count { color:var(--faint); }
+    .collapse-button { min-height:32px; padding:6px 8px; border:0; background:transparent; color:var(--secondary); font-size:11px; font-weight:700; }
+    .empty-week {
+      position:relative; width:100%; height:100%; min-height:150px; padding:30px 20px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+      background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px; text-align:center;
+    }
+    .empty-title { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
+    .mobile-view { display:none; }
+    .day-overlay {
+      position:absolute; inset:0; z-index:50; padding:12px; display:flex; align-items:center; justify-content:center;
+      background:var(--dim);
+    }
+    .day-overlay[hidden] { display:none; }
+    .modal-panel {
+      width:min(560px,calc(100% - 48px)); max-height:calc(100% - 24px); padding:20px;
+      display:flex; flex-direction:column; gap:12px; overflow:hidden; background:var(--surface);
+      border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .modal-header { flex:0 0 auto; display:grid; grid-template-columns:24px minmax(0,1fr) 24px 28px; align-items:center; gap:8px; }
+    .modal-arrow, .modal-close {
+      width:24px; height:24px; padding:0; border:0; border-radius:8px; background:transparent;
+      color:var(--secondary); font-size:16px; font-weight:700; line-height:1;
+    }
+    .modal-arrow:disabled { opacity:.35; cursor:default; }
+    .modal-date { color:var(--text); font-size:13px; font-weight:800; text-align:center; }
+    .modal-date span { margin-left:5px; color:var(--secondary); font-size:11px; font-weight:700; }
+    .modal-close { width:28px; height:28px; color:var(--muted); }
+    .modal-summary {
+      min-height:31px; padding-bottom:12px; border-bottom:1px solid var(--border-faint);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      color:var(--secondary); font-size:11px; font-weight:700;
+    }
+    .modal-summary b { color:var(--text); font-weight:800; }
+    .modal-hours { color:var(--deep); font-variant-numeric:tabular-nums; }
+    .modal-body {
+      min-height:0; overflow-y:auto; padding:12px; background:var(--surface-soft);
+      border:1px solid var(--border-pale); border-radius:12px;
+      scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
+    .q-group + .q-group { margin-top:12px; }
+    .q-heading { min-height:20px; margin-bottom:6px; display:flex; align-items:center; gap:7px; }
+    .q-badge { width:17px; height:17px; border-radius:5px; display:grid; place-items:center; color:#FFFFFF; font-size:9px; font-weight:800; }
+    .q-1 { background:var(--title); }
+    .q-2 { background:var(--secondary); }
+    .q-3 { background:var(--done); }
+    .q-4 { background:var(--border-faint); color:var(--muted); }
+    .q-label { color:var(--title); font-size:11px; font-weight:700; }
+    .q-count { margin-left:auto; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .modal-items { display:flex; flex-direction:column; gap:5px; }
+    .modal-task {
+      min-width:0; min-height:34px; padding:8px 10px; display:grid; align-items:center; gap:9px;
+      background:var(--surface); border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05);
+    }
+    .modal-task.mode-work { grid-template-columns:8px minmax(0,1fr) 78px 38px 30px; }
+    .modal-task.mode-life { grid-template-columns:8px minmax(0,1fr) 38px minmax(0,120px); }
+    .modal-title-wrap { min-width:0; display:flex; align-items:center; gap:5px; }
+    .late-label { flex:0 0 auto; color:var(--muted); font-size:9px; font-weight:700; }
+    .modal-task-title { min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+    .modal-task.is-done .modal-task-title { color:var(--done); text-decoration:line-through; }
+    .modal-time, .modal-project, .modal-progress, .modal-memo {
+      min-width:0; overflow:hidden; color:var(--muted); font-size:10px; font-weight:700;
+      text-overflow:ellipsis; white-space:nowrap;
+    }
+    .modal-time, .modal-progress { font-variant-numeric:tabular-nums; }
+    .modal-project, .modal-progress { color:var(--secondary); text-align:right; }
+    .modal-task.is-done .modal-time, .modal-task.is-done .modal-progress { color:var(--inactive); }
+    .modal-task.is-done .modal-project, .modal-task.is-done .modal-memo { color:var(--done); }
+    .modal-meta { display:none; }
+    .sr-only {
+      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+      clip:rect(0,0,0,0); white-space:nowrap; border:0;
+    }
+    @media (hover:hover) {
+      .week-arrow:hover, .expand-button:hover { border-color:var(--mid); }
+      .day-heading:hover { border-color:var(--mid); }
+    }
+    @media (max-width:999px) and (min-width:640px) {
+      .card { padding-left:18px; padding-right:18px; }
+      .day-date, .task-progress { display:none; }
+      .task-title { font-size:10px; }
+      .week-grid, .week-grid.mode-life { gap:8px; }
+    }
+    @media (max-width:639px) {
+      .card { padding:14px; gap:10px; }
+      .weekly-top { gap:9px; }
+      .week-header { min-height:84px; flex-wrap:wrap; gap:7px; }
+      .week-arrow { width:40px; height:40px; }
+      .header-rule { min-width:8px; }
+      .mode-segment { width:100%; order:10; }
+      .mode-button { height:40px; }
+      .summary-row { min-height:32px; padding-bottom:10px; }
+      .desktop-view { display:none; }
+      .mobile-view { height:100%; display:flex; flex-direction:column; gap:10px; }
+      .mobile-days { padding:3px; display:grid; gap:3px; background:var(--border-pale); border-radius:9px; }
+      .mobile-days.mode-work { grid-template-columns:repeat(5,minmax(0,1fr)); }
+      .mobile-days.mode-life { grid-template-columns:repeat(7,minmax(0,1fr)); }
+      .mobile-day {
+        min-width:40px; min-height:40px; padding:3px 1px; border:0; border-radius:7px;
+        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+        background:transparent; color:#8AA0AA;
+      }
+      .mobile-day.is-selected { background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(18,48,60,.10); }
+      .mobile-day.is-future { opacity:.5; }
+      .mobile-day-name { font-size:12px; font-weight:800; }
+      .mobile-day-count { min-height:10px; color:var(--muted); font-size:9px; font-weight:700; }
+      .mobile-day.is-selected .mobile-day-count { color:var(--action); font-weight:800; }
+      .mobile-list {
+        min-height:0; flex:1; padding:10px; overflow:hidden; display:flex; flex-direction:column; gap:7px;
+        background:var(--surface-soft); border:1px solid var(--border-pale); border-radius:12px;
+      }
+      .mobile-task {
+        width:100%; min-height:40px; padding:7px 8px; border:0; border-radius:9px;
+        display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:8px;
+        background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); text-align:left;
+      }
+      .mobile-task.mode-life { grid-template-columns:8px minmax(0,1fr); }
+      .mobile-task .task-title { font-size:12px; }
+      .mobile-more {
+        min-height:40px; padding:7px 10px; border:1px solid var(--border); border-radius:8px;
+        background:var(--surface); color:var(--deep); font-size:11px; font-weight:700;
+      }
+      .modal-panel { width:calc(100% - 24px); padding:14px; }
+      .modal-header { grid-template-columns:40px minmax(0,1fr) 40px 40px; }
+      .modal-arrow, .modal-close { width:40px; height:40px; }
+      .modal-task { min-height:48px; grid-template-columns:8px minmax(0,1fr); grid-template-rows:auto auto; column-gap:9px; row-gap:4px; }
+      .modal-task.mode-work, .modal-task.mode-life { grid-template-columns:8px minmax(0,1fr); }
+      .modal-task .task-dot { grid-column:1; grid-row:1; }
+      .modal-title-wrap { grid-column:2; grid-row:1; }
+      .modal-meta { grid-column:2; grid-row:2; min-width:0; display:flex; align-items:center; gap:6px; overflow:hidden; }
+      .modal-task > .modal-time, .modal-task > .modal-project, .modal-task > .modal-progress, .modal-task > .modal-memo { display:none; }
+      .modal-time, .modal-project, .modal-progress, .modal-memo { font-size:9px; color:var(--muted); text-align:left; }
+    }
+  </style>
+  <link rel="stylesheet" href="widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-weekly.html" data-widget-max-width="1180" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:1180px;--widget-base-width:1180px;--widget-base-height:560px;--widget-visual-height:560px">
+    <main class="card" data-widget-card aria-label="주간 업무 요약 위젯">
+      <div class="weekly-top" data-widget-fixed>
+        <header class="week-header">
+          <button class="week-arrow" id="previousWeek" type="button" aria-label="이전 주">‹</button>
+          <span class="week-range" id="weekRange"></span>
+          <button class="week-arrow" id="nextWeek" type="button" aria-label="다음 주">›</button>
+          <button class="current-week" id="currentWeek" type="button" hidden>이번 주</button>
+          <span class="header-rule" aria-hidden="true"></span>
+          <div class="mode-segment" id="modeSegment" aria-label="요약 모드">
+            <button class="mode-button" type="button" data-mode="work" aria-pressed="false">업무</button>
+            <button class="mode-button" type="button" data-mode="life" aria-pressed="false">일상</button>
+          </div>
+        </header>
+        <div class="summary-row" id="summaryRow" hidden></div>
+      </div>
+
+      <section class="weekly-content" id="weeklyContent" data-widget-list data-widget-list-height="398" aria-label="주간 기록"></section>
+      <div class="expand-area" id="expandArea" data-widget-fixed hidden></div>
+
+      <div class="day-overlay" id="dayOverlay" role="dialog" aria-modal="true" aria-labelledby="modalDate" hidden>
+        <section class="modal-panel" id="modalPanel">
+          <header class="modal-header">
+            <button class="modal-arrow" id="modalPrevious" type="button" aria-label="기록 있는 이전 날">‹</button>
+            <div class="modal-date" id="modalDate"></div>
+            <button class="modal-arrow" id="modalNext" type="button" aria-label="기록 있는 다음 날">›</button>
+            <button class="modal-close" id="modalClose" type="button" aria-label="일별 상세 닫기">✕</button>
+          </header>
+          <div class="modal-summary" id="modalSummary"></div>
+          <div class="modal-body" id="modalBody"></div>
+        </section>
+      </div>
+
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="요일 격자 세로 크기 조절" aria-valuemin="180"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+      <div class="sr-only" id="liveRegion" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const DATA_KEY = 'worklog-v1';
+      const SHORT_DAYS = ['일','월','화','수','목','금','토'];
+      const LEVEL_LIMITS = [3,6,Infinity];
+      const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
+      const card = document.querySelector('[data-widget-card]');
+      const weekRange = document.getElementById('weekRange');
+      const previousWeek = document.getElementById('previousWeek');
+      const nextWeek = document.getElementById('nextWeek');
+      const currentWeek = document.getElementById('currentWeek');
+      const modeSegment = document.getElementById('modeSegment');
+      const summaryRow = document.getElementById('summaryRow');
+      const weeklyContent = document.getElementById('weeklyContent');
+      const expandArea = document.getElementById('expandArea');
+      const dayOverlay = document.getElementById('dayOverlay');
+      const modalPanel = document.getElementById('modalPanel');
+      const modalPrevious = document.getElementById('modalPrevious');
+      const modalNext = document.getElementById('modalNext');
+      const modalClose = document.getElementById('modalClose');
+      const modalDate = document.getElementById('modalDate');
+      const modalSummary = document.getElementById('modalSummary');
+      const modalBody = document.getElementById('modalBody');
+      const liveRegion = document.getElementById('liveRegion');
+      const mobileQuery = window.matchMedia('(max-width: 639px)');
+      let channel = null;
+      let initialized = false;
+      let lastFocused = null;
+      const state = { mode:'work', weekStart:null, level:0, selectedDay:'', modalDate:null, tasks:[] };
+
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      })[character]);
+
+      function localDateKey(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2,'0');
+        const day = String(date.getDate()).padStart(2,'0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function parseDate(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+        if (!match) return null;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+        return localDateKey(date) === value ? date : null;
+      }
+
+      function todayDate() {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+      }
+
+      function addDays(date, amount) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12);
+      }
+
+      function startOfWeek(date) {
+        const offset = date.getDay() === 0 ? -6 : 1 - date.getDay();
+        return addDays(date, offset);
+      }
+
+      function normalizeTime(value) {
+        const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim());
+        if (!match) return null;
+        const hour = Number(match[1]);
+        const minute = Number(match[2]);
+        if (hour > 23 || minute > 59) return null;
+        return `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+      }
+
+      function normalizeTask(raw, index) {
+        if (!raw || typeof raw !== 'object' || !parseDate(raw.date)) return null;
+        const q = Number(raw.q);
+        const progress = Number(raw.progress);
+        const mode = raw.mode === 'life' ? 'life' : 'work';
+        return {
+          id:String(raw.id || `${raw.date}-${index}`), index, mode, date:raw.date,
+          proj:String(raw.proj || '').trim(), q:Number.isInteger(q) && q >= 1 && q <= 4 ? q : null,
+          title:String(raw.title || '').trim(), due:parseDate(raw.due) ? raw.due : null,
+          start:normalizeTime(raw.start), end:normalizeTime(raw.end),
+          progress:raw.progress !== null && raw.progress !== undefined && raw.progress !== '' && Number.isFinite(progress) && progress >= 0 ? progress : null,
+          status:['doing','done','wait'].includes(raw.status) ? raw.status : 'wait',
+          done:raw.done === true || raw.status === 'done', memo:String(raw.memo || '').trim()
+        };
+      }
+
+      function readWorklog() {
+        try {
+          const rawText = localStorage.getItem(DATA_KEY);
+          if (!rawText) return { mode:'work', tasks:[] };
+          const raw = JSON.parse(rawText);
+          if (!raw || typeof raw !== 'object') return { mode:'work', tasks:[] };
+          const tasks = Array.isArray(raw.tasks) ? raw.tasks.map(normalizeTask).filter(task => task && task.title) : [];
+          return { mode:raw.mode === 'life' ? 'life' : 'work', tasks };
+        } catch (error) {
+          console.warn('주간 요약 데이터를 불러오지 못했습니다.', error);
+          return { mode:'work', tasks:[] };
+        }
+      }
+
+      function activeKeys() {
+        const count = state.mode === 'work' ? 5 : 7;
+        return Array.from({ length:count }, (_, index) => localDateKey(addDays(state.weekStart, index)));
+      }
+
+      function tasksForDate(key) {
+        return state.tasks.filter(task => task.mode === state.mode && task.date === key);
+      }
+
+      function weekTasks() {
+        const keys = new Set(activeKeys());
+        return state.tasks.filter(task => task.mode === state.mode && keys.has(task.date));
+      }
+
+      function sortedTasks(items) {
+        return [...items].sort((a,b) => {
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          if (a.start && b.start && a.start !== b.start) return a.start.localeCompare(b.start);
+          if (a.start && !b.start) return -1;
+          if (!a.start && b.start) return 1;
+          return a.index - b.index;
+        });
+      }
+
+      function displayHours(value) {
+        return `${Number(value).toFixed(1)}h`;
+      }
+
+      function formatShortDate(key) {
+        const date = parseDate(key);
+        return date ? `${date.getMonth() + 1}/${date.getDate()}` : '';
+      }
+
+      function isCurrentWeek() {
+        return localDateKey(state.weekStart) === localDateKey(startOfWeek(todayDate()));
+      }
+
+      function ensureSelectedDay() {
+        const keys = activeKeys();
+        if (keys.includes(state.selectedDay)) return;
+        const todayKey = localDateKey(todayDate());
+        if (isCurrentWeek() && keys.includes(todayKey)) {
+          state.selectedDay = todayKey;
+          return;
+        }
+        state.selectedDay = keys.find(key => tasksForDate(key).length) || keys[0];
+      }
+
+      function renderHeader(items) {
+        const keys = activeKeys();
+        weekRange.textContent = `${formatShortDate(keys[0])} ~ ${formatShortDate(keys[keys.length - 1])}`;
+        currentWeek.hidden = isCurrentWeek();
+        modeSegment.querySelectorAll('[data-mode]').forEach(button => {
+          const selected = button.dataset.mode === state.mode;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', String(selected));
+        });
+        summaryRow.hidden = items.length === 0;
+        if (!items.length) {
+          summaryRow.innerHTML = '';
+          return;
+        }
+        const done = items.filter(task => task.done).length;
+        const hours = items.reduce((sum, task) => sum + (task.progress ?? 0), 0);
+        summaryRow.innerHTML = `<span>${items.length}개 중 <b>${done}</b> 완료</span>${state.mode === 'work' ? `<span class="summary-time">${displayHours(hours)}</span>` : ''}`;
+      }
+
+      function taskDot(task) {
+        return `<span class="task-dot" aria-hidden="true"></span>`;
+      }
+
+      function desktopTask(task) {
+        const progress = state.mode === 'work' && task.progress !== null ? `<span class="task-progress">${displayHours(task.progress)}</span>` : '';
+        return `<button class="grid-task mode-${state.mode} ${task.done ? 'is-done' : ''}" type="button" data-open-day="${task.date}" aria-label="${escapeHtml(task.title)} 일별 상세 열기">${taskDot(task)}<span class="task-title">${escapeHtml(task.title)}</span>${progress}</button>`;
+      }
+
+      function renderDesktop(keys) {
+        const limit = LEVEL_LIMITS[state.level];
+        const todayKey = localDateKey(todayDate());
+        const columns = keys.map(key => {
+          const date = parseDate(key);
+          const items = sortedTasks(tasksForDate(key));
+          const done = items.filter(task => task.done).length;
+          const visible = items.slice(0, limit);
+          const hidden = Math.max(0, items.length - visible.length);
+          return `<section class="day-column ${key === todayKey ? 'is-today' : ''} ${key > todayKey ? 'is-future' : ''}">
+            <button class="day-heading" type="button" data-open-day="${key}" aria-label="${date.getMonth() + 1}월 ${date.getDate()}일 ${SHORT_DAYS[date.getDay()]}요일 상세 열기"><span class="day-name">${SHORT_DAYS[date.getDay()]}</span><span class="day-date">${formatShortDate(key)}</span>${items.length ? `<span class="day-count">${done}/${items.length}</span>` : ''}</button>
+            <div class="day-items">${visible.map(desktopTask).join('')}${hidden ? `<span class="more-count">＋${hidden}</span>` : ''}</div>
+          </section>`;
+        }).join('');
+        return `<div class="desktop-view week-surface"><div class="week-grid mode-${state.mode}">${columns}</div></div>`;
+      }
+
+      function mobileTask(task) {
+        const progress = state.mode === 'work' && task.progress !== null ? `<span class="task-progress">${displayHours(task.progress)}</span>` : '';
+        return `<button class="mobile-task mode-${state.mode} ${task.done ? 'is-done' : ''}" type="button" data-open-day="${task.date}" aria-label="${escapeHtml(task.title)} 일별 상세 열기">${taskDot(task)}<span class="task-title">${escapeHtml(task.title)}</span>${progress}</button>`;
+      }
+
+      function renderMobile(keys) {
+        ensureSelectedDay();
+        const todayKey = localDateKey(todayDate());
+        const tabs = keys.map(key => {
+          const date = parseDate(key);
+          const count = tasksForDate(key).length;
+          return `<button class="mobile-day ${key === state.selectedDay ? 'is-selected' : ''} ${key > todayKey ? 'is-future' : ''}" type="button" data-mobile-day="${key}" aria-pressed="${key === state.selectedDay}"><span class="mobile-day-name">${SHORT_DAYS[date.getDay()]}</span><span class="mobile-day-count">${count || ''}</span></button>`;
+        }).join('');
+        const items = sortedTasks(tasksForDate(state.selectedDay));
+        const visible = items.slice(0,5);
+        const hidden = Math.max(0, items.length - visible.length);
+        return `<div class="mobile-view"><div class="mobile-days mode-${state.mode}">${tabs}</div><div class="mobile-list">${visible.map(mobileTask).join('')}${hidden ? `<button class="mobile-more" type="button" data-open-day="${state.selectedDay}">이 날 전체 보기 <span class="expand-count">· ${hidden}건 더</span></button>` : ''}</div></div>`;
+      }
+
+      function renderExpand(items) {
+        const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 3);
+        if (!hasExpandable || mobileQuery.matches) {
+          expandArea.hidden = true;
+          expandArea.innerHTML = '';
+          return;
+        }
+        const limit = LEVEL_LIMITS[state.level];
+        const hidden = activeKeys().reduce((sum,key) => sum + Math.max(0, tasksForDate(key).length - limit), 0);
+        const controls = [];
+        if (state.level < 2 && hidden > 0) {
+          const nextIsAll = state.level === 1 || activeKeys().every(key => tasksForDate(key).length <= 6);
+          controls.push(`<button class="expand-button" type="button" data-expand>${nextIsAll ? '전체 펼치기' : '더 펼치기'} <span class="expand-count">· ${hidden}건 더</span></button>`);
+        }
+        if (state.level > 0) controls.push('<button class="collapse-button" type="button" data-collapse>− 접기</button>');
+        expandArea.hidden = controls.length === 0;
+        expandArea.innerHTML = controls.join('');
+      }
+
+      function renderContent(items) {
+        if (!items.length) {
+          weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">이 주에 적은 기록 없음</span><span class="empty-copy">업무일지 위젯에 하루를 적으면 여기에 모입니다</span></div>';
+          renderExpand(items);
+          return;
+        }
+        const keys = activeKeys();
+        weeklyContent.innerHTML = `${renderDesktop(keys)}${renderMobile(keys)}`;
+        renderExpand(items);
+      }
+
+      function render() {
+        const items = weekTasks();
+        renderHeader(items);
+        renderContent(items);
+      }
+
+      function qHeading(q, count) {
+        if (q === null) return `<div class="q-heading"><span class="q-label">분류 없음</span><span class="q-count">${count}</span></div>`;
+        return `<div class="q-heading"><span class="q-badge q-${q}">Q${q}</span><span class="q-label">${Q_LABELS[q]}</span><span class="q-count">${count}</span></div>`;
+      }
+
+      function modalTask(task) {
+        const late = state.mode === 'work' && task.start && Number(task.start.slice(0,2)) >= 22 ? '<span class="late-label">야근</span>' : '';
+        const time = task.start && task.end ? `${task.start}–${task.end}` : '';
+        const project = task.proj;
+        const progress = task.progress !== null ? displayHours(task.progress) : '';
+        if (state.mode === 'work') {
+          return `<div class="modal-task mode-work ${task.done ? 'is-done' : ''}">${taskDot(task)}<span class="modal-title-wrap">${late}<span class="modal-task-title">${escapeHtml(task.title)}</span></span><span class="modal-time">${time}</span><span class="modal-project">${escapeHtml(project)}</span><span class="modal-progress">${progress}</span><span class="modal-meta"><span class="modal-time">${time}</span><span class="modal-project">${escapeHtml(project)}</span><span class="modal-progress">${progress}</span></span></div>`;
+        }
+        return `<div class="modal-task mode-life ${task.done ? 'is-done' : ''}">${taskDot(task)}<span class="modal-title-wrap">${late}<span class="modal-task-title">${escapeHtml(task.title)}</span></span><span class="modal-project">${escapeHtml(project)}</span><span class="modal-memo">${escapeHtml(task.memo)}</span><span class="modal-meta"><span class="modal-project">${escapeHtml(project)}</span><span class="modal-memo">${escapeHtml(task.memo)}</span></span></div>`;
+      }
+
+      function recordKeys() {
+        return activeKeys().filter(key => tasksForDate(key).length > 0);
+      }
+
+      function renderModal() {
+        if (!state.modalDate) return;
+        const date = parseDate(state.modalDate);
+        if (!date) return closeModal();
+        const items = sortedTasks(tasksForDate(state.modalDate));
+        const done = items.filter(task => task.done).length;
+        const hours = items.reduce((sum,task) => sum + (task.progress ?? 0), 0);
+        modalDate.innerHTML = `${date.getMonth() + 1}월 ${date.getDate()}일 <span>${SHORT_DAYS[date.getDay()]}</span>`;
+        modalSummary.innerHTML = `<span>${items.length}개 중 <b>${done}</b> 완료</span>${state.mode === 'work' ? `<span class="modal-hours">${displayHours(hours)}</span>` : ''}`;
+        const groups = [1,2,3,4,null].map(q => ({ q, items:items.filter(task => task.q === q) })).filter(group => group.items.length);
+        modalBody.innerHTML = groups.map(group => `<section class="q-group">${qHeading(group.q, group.items.length)}<div class="modal-items">${group.items.map(modalTask).join('')}</div></section>`).join('');
+        const keys = recordKeys();
+        modalPrevious.disabled = !keys.some(key => key < state.modalDate);
+        modalNext.disabled = !keys.some(key => key > state.modalDate);
+      }
+
+      function openModal(date, trigger) {
+        lastFocused = trigger || document.activeElement;
+        state.modalDate = date;
+        renderModal();
+        dayOverlay.hidden = false;
+        document.body.classList.add('has-widget-expanded');
+        modalClose.focus({ preventScroll:true });
+      }
+
+      function closeModal() {
+        if (!state.modalDate && dayOverlay.hidden) return;
+        state.modalDate = null;
+        dayOverlay.hidden = true;
+        document.body.classList.remove('has-widget-expanded');
+        lastFocused?.focus?.({ preventScroll:true });
+        lastFocused = null;
+      }
+
+      function moveModal(direction) {
+        const keys = recordKeys().filter(key => direction < 0 ? key < state.modalDate : key > state.modalDate);
+        const next = direction < 0 ? keys[keys.length - 1] : keys[0];
+        if (!next) return;
+        state.modalDate = next;
+        renderModal();
+        modalClose.focus({ preventScroll:true });
+      }
+
+      function syncData(external = false) {
+        const loaded = readWorklog();
+        if (!initialized) {
+          state.mode = loaded.mode;
+          initialized = true;
+        }
+        state.tasks = loaded.tasks;
+        ensureSelectedDay();
+        const modalScroll = modalBody.scrollTop;
+        render();
+        if (state.modalDate) {
+          renderModal();
+          modalBody.scrollTop = modalScroll;
+        }
+      }
+
+      previousWeek.addEventListener('click', () => {
+        closeModal();
+        state.weekStart = addDays(state.weekStart,-7);
+        state.selectedDay = '';
+        render();
+      });
+      nextWeek.addEventListener('click', () => {
+        closeModal();
+        state.weekStart = addDays(state.weekStart,7);
+        state.selectedDay = '';
+        render();
+      });
+      currentWeek.addEventListener('click', () => {
+        closeModal();
+        state.weekStart = startOfWeek(todayDate());
+        state.selectedDay = '';
+        render();
+      });
+      modeSegment.addEventListener('click', event => {
+        const button = event.target.closest('[data-mode]');
+        if (!button || button.dataset.mode === state.mode) return;
+        closeModal();
+        state.mode = button.dataset.mode;
+        state.level = 0;
+        state.selectedDay = '';
+        render();
+      });
+      weeklyContent.addEventListener('click', event => {
+        const mobileDay = event.target.closest('[data-mobile-day]');
+        if (mobileDay) {
+          state.selectedDay = mobileDay.dataset.mobileDay;
+          render();
+          return;
+        }
+        const opener = event.target.closest('[data-open-day]');
+        if (opener) openModal(opener.dataset.openDay, opener);
+      });
+      expandArea.addEventListener('click', event => {
+        if (event.target.closest('[data-expand]')) {
+          state.level = Math.min(2,state.level + 1);
+          render();
+          return;
+        }
+        if (event.target.closest('[data-collapse]')) {
+          state.level = 0;
+          render();
+        }
+      });
+      modalClose.addEventListener('click', closeModal);
+      modalPrevious.addEventListener('click', () => moveModal(-1));
+      modalNext.addEventListener('click', () => moveModal(1));
+      dayOverlay.addEventListener('click', event => { if (event.target === dayOverlay) closeModal(); });
+      document.addEventListener('keydown', event => {
+        if (dayOverlay.hidden) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeModal();
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = [...modalPanel.querySelectorAll('button:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+
+      window.addEventListener('storage', event => { if (event.key === DATA_KEY) syncData(true); });
+      window.addEventListener('focus', () => syncData(true));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true); });
+      mobileQuery.addEventListener?.('change', render);
+      try {
+        if ('BroadcastChannel' in window) {
+          channel = new BroadcastChannel(DATA_KEY);
+          channel.addEventListener('message', () => syncData(true));
+        }
+      } catch (error) {
+        console.warn('주간 요약 실시간 동기화를 시작하지 못했습니다.', error);
+      }
+
+      state.weekStart = startOfWeek(todayDate());
+      syncData(false);
+    })();
+  </script>
+  <script src="widget-frame.js"></script>
+</body>
+</html>
