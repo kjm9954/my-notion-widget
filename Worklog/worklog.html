@@ -23,7 +23,7 @@
     button, input, select { color:inherit; font:inherit; }
     button { cursor:pointer; }
     .card {
-      position:relative; width:100%; max-width:850px; height:595px; margin:0 auto; padding:18px;
+      position:relative; width:100%; max-width:1000px; height:595px; margin:0 auto; padding:22px;
       display:flex; flex-direction:column; gap:10px; overflow:hidden; background:var(--surface);
       border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
@@ -102,16 +102,16 @@
     }
     .empty-title { color:var(--title); font-size:12px; font-weight:800; }
     .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
-    .column-head, .task-row { display:grid; align-items:center; gap:8px; }
+    .column-head, .task-row { display:grid; align-items:center; gap:10px; }
     .column-head.work, .task-row.work {
-      grid-template-columns:44px 20px minmax(110px,1fr) 38px 38px 38px 28px 28px 42px 18px;
+      grid-template-columns:62px 22px minmax(0,1fr) 52px 46px 46px 42px 42px 52px 24px 24px;
     }
     .column-head.life, .task-row.life {
-      grid-template-columns:44px 20px 168px 38px 18px minmax(120px,1fr);
+      grid-template-columns:62px 22px minmax(0,1.2fr) 52px minmax(0,1fr) 24px 24px;
     }
     .column-head {
       flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
-      color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.04em;
+      background:transparent; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em;
     }
     .column-head span.numeric { text-align:right; }
     .task-row {
@@ -124,10 +124,14 @@
       min-width:0; padding:3px 5px; overflow:hidden; border-radius:999px; background:var(--pill); color:var(--secondary);
       font-size:10px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
     }
-    .cell-button { min-width:0; padding:0; border:0; background:transparent; }
+    .cell-button {
+      min-width:0; min-height:24px; padding:0; border:0; border-radius:8px; background:transparent;
+      outline:2px solid transparent; outline-offset:-2px; transition:color .12s var(--ease), outline-color .12s var(--ease), background-color .12s var(--ease);
+    }
+    .cell-button.is-popover-open { outline-color:var(--action); }
     .project-button { width:100%; }
     .q-slot { width:20px; display:flex; justify-content:center; }
-    .q-button { width:20px; height:22px; display:grid; place-items:center; color:var(--inactive); font-size:10px; font-weight:700; }
+    .q-button { width:22px; height:24px; display:grid; place-items:center; color:var(--inactive); font-size:10px; font-weight:700; }
     .q-badge {
       width:17px; height:17px; border-radius:5px; display:grid; place-items:center;
       color:#FFFFFF; font-size:9px; font-weight:800; line-height:1;
@@ -136,15 +140,30 @@
     .q-2 { background:var(--secondary); }
     .q-3 { background:var(--complete); }
     .q-4 { background:var(--border-faint); color:var(--muted); }
+    .q-none { background:var(--border-faint); color:var(--muted); }
     .task-main { min-width:0; display:flex; flex-direction:column; justify-content:center; }
-    .task-title-button {
-      width:100%; min-width:0; padding:0; overflow:hidden; border:0; background:transparent; color:var(--text);
+    .task-title-button, .memo-button {
+      width:100%; min-width:0; height:26px; padding:4px 6px; overflow:hidden; border:0; border-radius:8px; background:transparent; color:var(--text);
       display:block; font-size:12px; font-weight:600; line-height:1.2; text-align:left; text-overflow:ellipsis; white-space:nowrap;
     }
-    .quick-title-input {
-      width:100%; min-width:0; height:26px; padding:4px 6px; border:1px solid var(--action); border-radius:8px;
-      background:var(--surface); color:var(--text); font-size:12px; font-weight:600; outline:none;
+    .memo-button { color:var(--deep); font-size:11px; }
+    .memo-button.is-empty { color:transparent; }
+    @media (hover:hover) {
+      .task-title-button:hover, .memo-button:hover { background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); }
+      .memo-button.is-empty:hover { color:var(--border-soft); }
     }
+    .quick-title-input {
+      width:100%; min-width:0; height:26px; padding:4px 6px; border:0; border-radius:8px;
+      background:transparent; color:var(--text); font-size:12px; font-weight:600;
+      outline:2px solid var(--action); outline-offset:-2px;
+    }
+    .inline-cell-input {
+      width:100%; min-width:0; height:26px; padding:4px 6px; border:0; border-radius:8px;
+      background:var(--surface); color:var(--text); font-size:12px; font-weight:600;
+      outline:2px solid var(--action); outline-offset:-2px;
+    }
+    .inline-cell-input.memo-input { font-size:11px; }
+    .inline-cell-input.time-input { height:24px; padding:3px 2px; font-size:11px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
     .roll-caption { display:block; margin-top:1px; color:var(--faint); font-size:9px; font-weight:700; line-height:1; }
     .cell, .number-cell {
       min-width:0; overflow:hidden; color:var(--deep); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
@@ -152,8 +171,7 @@
     .task-title-button, .cell, .number-cell, .memo { transition:color .12s var(--ease); }
     .number-cell { text-align:right; font-variant-numeric:tabular-nums; }
     .number-button { width:100%; text-align:right; }
-    .date-cell { position:relative; display:block; cursor:pointer; }
-    .date-cell input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+    .date-cell { width:100%; cursor:pointer; }
     .duration { color:var(--text); }
     .is-missing { color:var(--inactive); }
     .memo { color:var(--deep); font-size:11px; font-weight:600; }
@@ -176,6 +194,20 @@
     .done-check.is-done.mode-life { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .task-row.is-done .task-title-button, .task-row.is-done .cell, .task-row.is-done .number-cell, .task-row.is-done .memo { color:var(--complete); }
     .task-row.is-done .task-title-button { text-decoration:line-through; }
+    .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:flex-end; }
+    .time-value { width:100%; height:24px; text-align:right; font-variant-numeric:tabular-nums; }
+    .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:flex-end; gap:2px; background:var(--surface); }
+    .time-action { width:20px; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:700; }
+    @media (hover:hover) { .time-cell.has-value:hover .time-actions { display:flex; } }
+    .delete-wrap { width:24px; height:24px; display:grid; place-items:center; }
+    .row-delete {
+      width:24px; height:24px; padding:0; border:0; border-radius:8px; background:transparent;
+      color:var(--border-soft); font-size:11px; font-weight:700; line-height:1;
+      transition:color .12s var(--ease);
+    }
+    @media (hover:hover) { .row-delete:hover { color:var(--muted); } }
+    .task-row.is-delete-confirm { outline-color:var(--danger-border); }
+    .task-row.is-delete-confirm .row-delete { color:var(--danger); font-size:12px; font-weight:800; }
     .mobile-work-meta { display:none; }
     .inline-editor {
       flex:0 0 auto; padding:10px; background:var(--surface); border-radius:9px;
@@ -206,33 +238,53 @@
     .add-plus { font-size:13px; font-weight:700; }
     .add-editor { flex:0 0 auto; }
     .cell-popover {
-      position:absolute; z-index:30; width:164px; padding:10px; border:1px solid var(--border); border-radius:9px;
-      background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05);
+      position:absolute; z-index:30; width:168px; max-width:calc(100% - 24px); padding:10px 12px; border:0; border-radius:14px;
+      background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
     .cell-popover[hidden] { display:none; }
-    .popover-label { display:block; margin-bottom:6px; color:var(--muted); font-size:9px; font-weight:800; }
-    .popover-current { margin-bottom:7px; color:var(--title); font-size:11px; font-weight:700; text-align:center; }
-    .popover-controls { display:grid; grid-template-columns:30px minmax(0,1fr) 30px; align-items:center; gap:6px; }
-    .popover-step, .popover-value {
-      height:30px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--secondary);
+    .cell-popover.kind-project { width:108px; max-height:220px; overflow-y:auto; }
+    .cell-popover.kind-q { width:60px; }
+    .cell-popover.kind-due { width:176px; }
+    .popover-label { display:block; margin-bottom:7px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
+    .project-options, .q-options { display:flex; flex-direction:column; gap:5px; }
+    .project-option {
+      min-height:24px; padding:4px 7px; overflow:hidden; border:0; border-radius:999px; background:var(--pill); color:var(--secondary);
+      font-size:9px; font-weight:700; text-align:left; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .project-option.is-selected { background:var(--action); color:#FFFFFF; }
+    .project-new {
+      min-height:24px; padding:4px 5px; border:1px dashed var(--inactive); border-radius:8px; background:var(--surface); color:var(--muted);
+      font-size:9px; font-weight:700;
+    }
+    .project-new-input { width:100%; height:24px; padding:4px 5px; border:1px solid var(--border); border-radius:8px; background:var(--surface); font-size:9px; font-weight:700; outline:none; }
+    .project-new-input:focus { border-color:var(--action); }
+    .q-option { width:36px; min-height:28px; padding:0; border:0; border-radius:8px; display:grid; place-items:center; background:transparent; }
+    .q-option.is-selected { outline:2px solid var(--action); outline-offset:-2px; }
+    .popover-controls { display:grid; grid-template-columns:28px minmax(40px,1fr) 28px; align-items:center; gap:8px; }
+    .popover-step {
+      width:28px; height:28px; padding:0; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--secondary);
       display:grid; place-items:center; font-size:11px; font-weight:700;
     }
-    .popover-value { background:var(--surface-soft); color:var(--text); }
-    .popover-caption { display:block; margin-top:6px; color:var(--muted); font-size:9px; font-weight:600; line-height:1.4; text-align:center; }
-    .popover-form { display:flex; flex-direction:column; gap:7px; }
-    .popover-form input {
-      width:100%; height:32px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;
-      background:var(--surface-soft); color:var(--text); font-size:11px; font-weight:600; outline:none;
-    }
-    .popover-form input:focus { border-color:var(--action); }
-    .popover-actions { display:flex; justify-content:flex-end; gap:6px; }
+    .popover-value { min-width:40px; color:var(--text); font-size:15px; font-weight:800; text-align:center; font-variant-numeric:tabular-nums; }
+    .popover-caption { display:block; margin-top:7px; color:var(--faint); font-size:9px; font-weight:700; line-height:1.4; text-align:center; }
+    .mini-calendar-head { margin-bottom:7px; display:grid; grid-template-columns:20px minmax(0,1fr) 20px; align-items:center; gap:4px; }
+    .mini-calendar-nav { width:20px; height:20px; padding:0; border:0; border-radius:8px; background:var(--surface); color:var(--secondary); font-size:12px; font-weight:700; }
+    .mini-calendar-title { color:var(--text); font-size:11px; font-weight:800; text-align:center; }
+    .mini-calendar-week, .mini-calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; }
+    .mini-calendar-week span { color:var(--muted); font-size:9px; font-weight:700; text-align:center; }
+    .mini-calendar-day { aspect-ratio:1/1; min-width:0; padding:0; border:0; border-radius:4px; background:transparent; color:var(--deep); font-size:9px; font-weight:700; }
+    .mini-calendar-day.is-other { color:var(--inactive); }
+    .mini-calendar-day.is-today { color:var(--action); }
+    .mini-calendar-day.is-selected { outline:2px solid var(--action); outline-offset:-2px; }
+    .mini-calendar-actions { margin-top:7px; display:flex; gap:5px; }
+    .mini-calendar-actions button { min-height:24px; flex:1; padding:4px; border:0; border-radius:8px; background:var(--pill); color:var(--secondary); font-size:9px; font-weight:700; }
     .sr-only {
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
     }
     @media (max-width:999px) and (min-width:640px) {
       .column-head.work, .task-row.work {
-        grid-template-columns:44px 20px minmax(90px,1fr) 38px 34px 34px 28px 28px 42px 18px;
+        grid-template-columns:62px 22px minmax(90px,1fr) 52px 46px 46px 42px 42px 52px 24px 24px;
       }
     }
     @media (max-width:639px) {
@@ -260,12 +312,13 @@
       .summary-side { flex-wrap:wrap; row-gap:3px; }
       .column-head.work { display:none; }
       .task-row.work {
-        height:auto; min-height:0; padding:9px 10px; display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:6px;
+        height:auto; min-height:0; padding:9px 10px; display:grid; grid-template-columns:minmax(0,1fr) 44px 40px; gap:6px;
       }
-      .task-row.work > :not(.task-main):not(.check-wrap):not(.mobile-work-meta) { display:none; }
+      .task-row.work > :not(.task-main):not(.check-wrap):not(.delete-wrap):not(.mobile-work-meta) { display:none; }
       .task-row.work .task-main { grid-column:1; grid-row:1; }
       .task-row.work .task-title-button { font-size:13px; }
       .task-row.work .check-wrap { width:44px; height:44px; grid-column:2; grid-row:1 / span 3; }
+      .task-row.work .delete-wrap { width:40px; height:44px; grid-column:3; grid-row:1 / span 3; }
       .task-row.work .done-check {
         position:relative; width:44px; height:44px; border:0; background:transparent; color:transparent;
       }
@@ -283,23 +336,31 @@
       .task-row.work .mobile-work-meta { min-width:0; display:flex; align-items:center; gap:6px; }
       .task-row.work .mobile-work-meta.pills { grid-column:1; grid-row:2; }
       .task-row.work .mobile-work-meta.times {
-        grid-column:1; grid-row:3; color:var(--deep); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums;
+        grid-column:1; grid-row:3; flex-wrap:wrap; color:var(--deep); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums;
       }
       .task-row.work .mobile-work-meta .cell-button { width:auto; color:inherit; font-size:inherit; font-weight:inherit; }
       .task-row.work .mobile-work-meta .date-cell { width:auto; }
       .task-row.work .mobile-work-meta .project-button { max-width:110px; }
-      .column-head.life, .task-row.life { grid-template-columns:44px 20px 168px 38px 18px minmax(0,1fr); gap:8px; }
+      .column-head.life { display:none; }
+      .task-row.life { height:auto; min-height:0; padding:9px 10px; grid-template-columns:62px 22px minmax(0,1fr) 44px 40px; grid-template-rows:40px 32px; gap:6px; }
+      .task-row.life .project-button { grid-column:1; grid-row:1; }
+      .task-row.life .q-slot { grid-column:2; grid-row:1; }
+      .task-row.life .task-main { grid-column:3; grid-row:1; }
+      .task-row.life .date-cell { grid-column:1 / span 2; grid-row:2; }
+      .task-row.life .memo { grid-column:3; grid-row:2; }
+      .task-row.life .check-wrap { width:44px; height:44px; grid-column:4; grid-row:1 / span 2; }
+      .task-row.life .delete-wrap { width:40px; height:44px; grid-column:5; grid-row:1 / span 2; }
+      .task-row .cell-button { min-height:40px; }
+      .task-row .q-button { width:40px; }
+      .task-row .time-cell, .task-row .time-value { height:40px; }
+      .row-delete { width:40px; height:40px; color:var(--inactive); }
       .column-head { padding-left:7px; padding-right:7px; }
       .task-row { padding-left:7px; padding-right:7px; }
       .editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .editor-field.is-wide { grid-column:span 2; }
       .editor-button { min-height:40px; }
     }
-    @media (max-width:447px) {
-      .column-head.life, .task-row.life {
-        grid-template-columns:40px 18px minmax(84px,168px) 34px 18px minmax(0,1fr); gap:5px;
-      }
-    }
+    @media (max-width:447px) { .task-row.life { grid-template-columns:52px 22px minmax(0,1fr) 40px 40px; gap:5px; } }
     @media (max-width:320px) {
       .card { padding-left:10px; padding-right:10px; }
       .day-track { overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; }
@@ -308,18 +369,13 @@
       .day-name { font-size:11px; }
       .date-side { flex-wrap:wrap; row-gap:3px; }
       .summary-divider { display:none; }
-      .column-head.life, .task-row.life {
-        grid-template-columns:36px 17px minmax(76px,1fr) 32px 18px; gap:4px;
-      }
-      .column-head.life span:last-child { display:none; }
-      .task-row.life .memo { grid-column:3 / -1; grid-row:2; }
-      .task-row.life { height:auto; min-height:58px; }
+      .task-row.life { grid-template-columns:44px 18px minmax(0,1fr) 40px 40px; gap:4px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog" data-widget-max-width="850" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:850px;--widget-base-width:850px;--widget-base-height:595px;--widget-visual-height:595px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog.html" data-widget-max-width="1000" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:1000px;--widget-base-width:1000px;--widget-base-height:595px;--widget-visual-height:595px">
     <main class="card" data-widget-card aria-label="업무일지 위젯">
       <div class="worklog-top" data-widget-fixed>
         <div class="mode-row" id="modeRow" aria-label="기록 모드">
@@ -372,8 +428,9 @@
         console.warn('업무일지 실시간 동기화를 시작하지 못했습니다.', error);
       }
       const ui = {
-        selectedDate:'', adding:false, draftTask:null, editingId:null, confirmDeleteId:null,
-        newId:null, popover:null, dirtyFields:new Set()
+        selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
+        confirmDeleteId:null, deleteTimer:null, newId:null, popover:null, projectAdding:false,
+        dirtyFields:new Set()
       };
       let state;
       let pendingExternalSync = false;
@@ -424,7 +481,8 @@
       function defaultState() {
         return {
           mode:'work', tasks:[], lastRollWeek:isoWeekKey(todayDate()),
-          bannerDismissedWeek:'', lastRollCount:0
+          bannerDismissedWeek:'', lastRollCount:0,
+          lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } }
         };
       }
 
@@ -476,7 +534,16 @@
           status:done ? 'done' : status,
           done,
           memo:String(raw.memo || '').trim(),
-          rolledFrom:parseDate(raw.rolledFrom) ? raw.rolledFrom : null
+          rolledFrom:parseDate(raw.rolledFrom) ? raw.rolledFrom : null,
+          progressTouched:raw.progressTouched === true
+        };
+      }
+
+      function normalizeLastUsed(raw) {
+        const q = Number(raw?.q);
+        return {
+          proj:String(raw?.proj || '').trim() || '미분류',
+          q:Number.isInteger(q) && q >= 1 && q <= 4 ? q : null
         };
       }
 
@@ -499,7 +566,11 @@
           tasks,
           lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
           bannerDismissedWeek:validWeekKey(raw.bannerDismissedWeek) ? raw.bannerDismissedWeek : '',
-          lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0
+          lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0,
+          lastUsed:{
+            work:normalizeLastUsed(raw.lastUsed?.work),
+            life:normalizeLastUsed(raw.lastUsed?.life)
+          }
         };
       }
 
@@ -625,7 +696,7 @@
         const [endHour, endMinute] = task.end.split(':').map(Number);
         let minutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
         if (minutes < 0) minutes += 24 * 60;
-        return Math.round((minutes / 60) * 10) / 10;
+        return Math.round((minutes / 60) * 2) / 2;
       }
 
       function progressOf(task) {
@@ -676,17 +747,16 @@
       }
 
       function qBadge(q) {
-        return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '';
+        return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '<span class="q-badge q-none">–</span>';
       }
 
       function qButton(task) {
         const label = task.q ? `Q${task.q}` : '–';
-        return `<button class="cell-button q-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label}" title="눌러서 Q 변경">${task.q ? qBadge(task.q) : '–'}</button>`;
+        return `<button class="cell-button q-button ${cellActive(task.id,'q')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label}" title="눌러서 Q 변경">${qBadge(task.q)}</button>`;
       }
 
       function latestDefaults(mode) {
-        const previous = [...state.tasks].reverse().find(task => task.mode === mode && task.title);
-        return { proj:previous?.proj || '미분류', q:previous?.q || null };
+        return normalizeLastUsed(state.lastUsed?.[mode]);
       }
 
       function createQuickDraft(mode) {
@@ -694,8 +764,8 @@
         return normalizeTask({
           id:crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           mode, date:ui.selectedDate, proj:defaults.proj, q:defaults.q, title:'',
-          due:localDateKey(todayDate()), start:null, end:null, progress:mode === 'work' ? 0 : null, est:null,
-          status:'wait', done:false, memo:'', rolledFrom:null
+          due:localDateKey(todayDate()), start:null, end:null, progress:null, est:null,
+          status:'wait', done:false, memo:'', rolledFrom:null, progressTouched:false
         });
       }
 
@@ -783,103 +853,114 @@
         cardHeader.innerHTML = `<div class="date-side">${datePieces}</div><div class="summary-side">${count}${modeSummary}</div>`;
       }
 
+      function cellActive(id, field) {
+        return ui.popover?.taskId === id && ui.popover?.field === field ? 'is-popover-open' : '';
+      }
+
       function projectButton(task) {
         const project = task.proj || '미분류';
-        return `<button class="cell-button project-pill project-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="project" aria-label="구분 변경, 현재 ${escapeHtml(project)}" title="눌러서 구분 변경">${escapeHtml(project)}</button>`;
+        return `<button class="cell-button project-pill project-button ${cellActive(task.id,'project')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="project" aria-label="구분 변경, 현재 ${escapeHtml(project)}">${escapeHtml(project)}</button>`;
       }
 
       function dueCell(task) {
-        return `<label class="number-cell date-cell ${task.due ? '' : 'is-missing'}" title="눌러서 목표일 변경"><span>${formatDue(task.due)}</span><input type="date" value="${escapeHtml(task.due || '')}" data-due-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title || '새 업무')} 목표일"></label>`;
+        return `<button class="cell-button number-cell number-button date-cell ${task.due ? '' : 'is-missing'} ${cellActive(task.id,'due')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="due" aria-label="${escapeHtml(task.title || '새 항목')} 목표일 변경">${formatDue(task.due)}</button>`;
       }
 
-      function timeButton(task, field) {
-        const value = task[field] || '–';
+      function timeCell(task, field) {
+        const value = task[field];
         const label = field === 'start' ? '시작' : '종료';
-        return `<button class="cell-button number-cell number-button ${task[field] ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간을 현재 시간으로 기록" title="누른 시간을 ${label}으로 기록">${value}</button>`;
+        if (ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === field) {
+          return `<span class="time-cell"><input class="inline-cell-input time-input" value="${escapeHtml(value || '')}" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="${field}" aria-label="${label} 시간 편집"></span>`;
+        }
+        return `<span class="time-cell ${value ? 'has-value' : ''}">
+          <button class="cell-button number-cell time-value ${value ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간 ${value ? value : '현재 시각으로 기록'}">${value || '–'}</button>
+          ${value ? `<span class="time-actions"><button class="time-action" type="button" data-time-retry="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 다시 찍기">↻</button><button class="time-action" type="button" data-time-clear="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 비우기">✕</button></span>` : ''}
+        </span>`;
       }
 
       function hourButton(task, field, value) {
         const label = field === 'progress' ? '진행 시간' : '예상 시간';
-        return `<button class="cell-button number-cell number-button ${field === 'progress' ? 'duration' : ''} ${value === null ? 'is-missing' : ''}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 변경, 현재 ${value === null ? '없음' : `${displayHours(value)}시간`}" title="눌러서 0.5시간 단위로 변경">${value === null ? '–' : displayHours(value)}</button>`;
+        return `<button class="cell-button number-cell number-button ${field === 'progress' ? 'duration' : ''} ${value === null ? 'is-missing' : ''} ${cellActive(task.id,field)}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 변경, 현재 ${value === null ? '없음' : `${displayHours(value)}시간`}">${value === null ? '–' : displayHours(value)}</button>`;
       }
 
       function statusButton(task, status) {
-        return `<button class="cell-button status-pill status-button ${status.className}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="status" aria-label="상태 변경, 현재 ${status.label}" title="눌러서 상태 변경">${status.label}</button>`;
+        return `<button class="cell-button status-pill status-button ${status.className}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="status" aria-label="상태 변경, 현재 ${status.label}">${status.label}</button>`;
+      }
+
+      function titleCell(task, draft) {
+        const rolled = rolledCaption(task);
+        if (draft) return `<span class="task-main"><input class="quick-title-input" name="title" value="${escapeHtml(task.title)}" autocomplete="off" aria-label="새 ${task.mode === 'work' ? '업무명' : '할 일'}"></span>`;
+        if (ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === 'title') {
+          return `<span class="task-main"><input class="inline-cell-input" value="${escapeHtml(task.title)}" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="title" aria-label="${task.mode === 'work' ? '업무명' : '할 일'} 편집"></span>`;
+        }
+        return `<span class="task-main"><button class="task-title-button" type="button" data-inline-start="title" data-task-id="${escapeHtml(task.id)}">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>`;
+      }
+
+      function memoCell(task) {
+        if (ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === 'memo') {
+          return `<span class="cell memo"><input class="inline-cell-input memo-input" value="${escapeHtml(task.memo)}" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="memo" aria-label="메모 편집"></span>`;
+        }
+        return `<span class="cell memo"><button class="memo-button ${task.memo ? '' : 'is-empty'}" type="button" data-inline-start="memo" data-task-id="${escapeHtml(task.id)}" aria-label="메모 ${task.memo ? '편집' : '추가'}">${task.memo ? escapeHtml(task.memo) : '＋'}</button></span>`;
+      }
+
+      function completionButton(task) {
+        return `<span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-${task.mode}" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title || '새 항목')} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>`;
+      }
+
+      function deleteButton(task) {
+        const confirming = ui.confirmDeleteId === task.id;
+        return `<span class="delete-wrap"><button class="row-delete" type="button" data-row-delete="${escapeHtml(task.id)}" aria-label="${confirming ? '한 번 더 누르면 삭제' : '삭제'}">✕</button></span>`;
       }
 
       function mobileWorkMeta(task, status, progress, estimate) {
         return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span>
-          <span class="mobile-work-meta times"><span>목표</span>${dueCell(task)}<span>·</span>${timeButton(task, 'start')}<span>–</span>${timeButton(task, 'end')}<span>· 진행</span>${hourButton(task, 'progress', progress)}<span>/ 예상</span>${hourButton(task, 'est', estimate)}</span>`;
+          <span class="mobile-work-meta times"><span>목표</span>${dueCell(task)}<span>·</span>${timeCell(task, 'start')}<span>–</span>${timeCell(task, 'end')}<span>· 진행</span>${hourButton(task, 'progress', progress)}<span>/ 예상</span>${hourButton(task, 'est', estimate)}</span>`;
       }
 
-      function workRow(task) {
+      function workRow(task, draft = false) {
         const progress = progressOf(task);
         const status = statusMeta(task);
-        const rolled = rolledCaption(task);
-        const estimate = task.est;
-        return `<article class="task-row work ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
+        const tag = draft ? 'form' : 'article';
+        const draftAttr = draft ? ' data-quick-add-form' : '';
+        return `<${tag} class="task-row work ${draft ? 'quick-add-row' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
-          <span class="task-main"><button class="task-title-button" type="button" data-edit-task="${escapeHtml(task.id)}" title="수정">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>
+          ${titleCell(task, draft)}
           ${dueCell(task)}
-          ${timeButton(task, 'start')}
-          ${timeButton(task, 'end')}
+          ${timeCell(task, 'start')}
+          ${timeCell(task, 'end')}
           ${hourButton(task, 'progress', progress)}
-          ${hourButton(task, 'est', estimate)}
+          ${hourButton(task, 'est', task.est)}
           ${statusButton(task, status)}
-          <span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-work" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>
-          ${mobileWorkMeta(task, status, progress, estimate)}
-        </article>`;
+          ${completionButton(task)}
+          ${deleteButton(task)}
+          ${mobileWorkMeta(task, status, progress, task.est)}
+        </${tag}>`;
       }
 
-      function quickWorkRow(task) {
-        const status = statusMeta(task);
-        const q = task.q ? qBadge(task.q) : '–';
-        return `<form class="task-row work quick-add-row" data-quick-add-form data-task-id="${escapeHtml(task.id)}">
-          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
-          <span class="q-slot">${q}</span>
-          <span class="task-main"><input class="quick-title-input" name="title" autocomplete="off" aria-label="새 업무명" placeholder="업무명 입력 후 Enter"></span>
-          <span class="number-cell">${formatDue(task.due)}</span>
-          <span class="number-cell is-missing">–</span>
-          <span class="number-cell is-missing">–</span>
-          <span class="number-cell duration">0.0</span>
-          <span class="number-cell is-missing">–</span>
-          <span class="status-pill ${status.className}">${status.label}</span>
-          <span class="check-wrap"><span class="done-check mode-work" aria-hidden="true"></span></span>
-          <span class="mobile-work-meta pills"><span class="project-pill">${escapeHtml(task.proj || '미분류')}</span><span class="q-slot">${q}</span><span class="status-pill ${status.className}">${status.label}</span></span>
-          <span class="mobile-work-meta times">목표 ${formatDue(task.due)} · –– · 진행 0.0 / 예상 –</span>
-        </form>`;
+      function quickWorkRow(task) { return workRow(task, true); }
+
+      function lifeRow(task, draft = false) {
+        const tag = draft ? 'form' : 'article';
+        const draftAttr = draft ? ' data-quick-add-form' : '';
+        return `<${tag} class="task-row life ${draft ? 'quick-add-row' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+          ${projectButton(task)}
+          <span class="q-slot">${qButton(task)}</span>
+          ${titleCell(task, draft)}
+          ${dueCell(task)}
+          ${memoCell(task)}
+          ${completionButton(task)}
+          ${deleteButton(task)}
+        </${tag}>`;
       }
 
-      function quickLifeRow(task) {
-        const q = task.q ? qBadge(task.q) : '–';
-        return `<form class="task-row life quick-add-row" data-quick-add-form data-task-id="${escapeHtml(task.id)}">
-          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
-          <span class="q-slot">${q}</span>
-          <span class="task-main"><input class="quick-title-input" name="title" autocomplete="off" aria-label="새 할 일" placeholder="할 일 입력 후 Enter"></span>
-          <span class="number-cell">${formatDue(task.due)}</span>
-          <span class="check-wrap"><span class="done-check mode-life" aria-hidden="true"></span></span>
-          <span class="cell memo is-missing">—</span>
-        </form>`;
-      }
-
-      function lifeRow(task) {
-        const rolled = rolledCaption(task);
-        return `<article class="task-row life ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}">
-          <span class="project-pill" title="${escapeHtml(task.proj || '미분류')}">${escapeHtml(task.proj || '미분류')}</span>
-          <span class="q-slot">${qBadge(task.q)}</span>
-          <span class="task-main"><button class="task-title-button" type="button" data-edit-task="${escapeHtml(task.id)}" title="수정">${escapeHtml(task.title || '제목 없음')}</button>${rolled ? `<span class="roll-caption">${rolled}</span>` : ''}</span>
-          <span class="number-cell ${task.due ? '' : 'is-missing'}">${formatDue(task.due)}</span>
-          <span class="check-wrap"><button class="done-check ${task.done ? 'is-done' : ''} mode-life" type="button" role="checkbox" aria-checked="${task.done}" data-toggle-task="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} ${task.done ? '완료 취소' : '완료'}">${task.done ? '✓' : ''}</button></span>
-          <span class="cell memo ${task.memo ? '' : 'is-missing'}" title="${escapeHtml(task.memo)}">${escapeHtml(task.memo || '—')}</span>
-        </article>`;
-      }
+      function quickLifeRow(task) { return lifeRow(task, true); }
 
       function columnHead(mode) {
         if (mode === 'work') {
-          return `<div class="column-head work" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>업무명</span><span class="numeric">목표</span><span class="numeric">시작</span><span class="numeric">종료</span><span class="numeric">진행</span><span class="numeric">예상</span><span>상태</span><span>완료</span></div>`;
+          return `<div class="column-head work" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>업무명</span><span class="numeric">목표</span><span class="numeric">시작</span><span class="numeric">종료</span><span class="numeric">진행</span><span class="numeric">예상</span><span>상태</span><span></span><span></span></div>`;
         }
-        return `<div class="column-head life" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>할 일</span><span class="numeric">목표</span><span>완료</span><span>메모</span></div>`;
+        return `<div class="column-head life" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>할 일</span><span class="numeric">목표</span><span>메모</span><span></span><span></span></div>`;
       }
 
       function field(label, name, value, options = {}) {
@@ -893,7 +974,7 @@
       function editorHtml(task, kind) {
         const editing = kind === 'edit';
         const mode = task?.mode || state.mode;
-        const qChoices = [{value:'',label:'—'},1,2,3,4].map(choice => typeof choice === 'object' ? choice : ({ value:String(choice), label:`Q${choice}` }));
+        const qChoices = [{value:'',label:'–'},1,2,3,4].map(choice => typeof choice === 'object' ? choice : ({ value:String(choice), label:`Q${choice}` }));
         const statusChoices = [{value:'doing',label:'진행중'},{value:'wait',label:'대기'},{value:'done',label:'완료'}];
         const fields = [
           field('구분','proj',task?.proj || '',{placeholder:'미분류'}),
@@ -939,29 +1020,82 @@
 
       function closeCellPopover() {
         ui.popover = null;
+        ui.projectAdding = false;
+        card.querySelectorAll('.is-popover-open').forEach(element => element.classList.remove('is-popover-open'));
         cellPopover.hidden = true;
         cellPopover.innerHTML = '';
       }
 
+      function taskById(id) {
+        if (ui.draftTask?.id === id) return ui.draftTask;
+        return state.tasks.find(item => item.id === id) || null;
+      }
+
+      function projectChoices(task) {
+        const values = [task?.proj, state.lastUsed?.work?.proj, state.lastUsed?.life?.proj, ...state.tasks.map(item => item.proj)]
+          .map(value => String(value || '').trim()).filter(Boolean);
+        return [...new Set(['미분류', ...values])];
+      }
+
+      function calendarMonth(value) {
+        const parsed = /^(\d{4})-(\d{2})$/.exec(String(value || ''));
+        if (parsed) return new Date(Number(parsed[1]), Number(parsed[2]) - 1, 1, 12);
+        const today = todayDate();
+        return new Date(today.getFullYear(), today.getMonth(), 1, 12);
+      }
+
+      function monthKey(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}`;
+      }
+
+      function miniCalendarHtml(task) {
+        const month = calendarMonth(ui.popover?.month || String(task.due || '').slice(0,7));
+        const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+        const mondayOffset = (first.getDay() + 6) % 7;
+        const gridStart = addDays(first, -mondayOffset);
+        const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+        const count = Math.ceil((mondayOffset + daysInMonth) / 7) * 7;
+        const todayKey = localDateKey(todayDate());
+        const cells = Array.from({ length:count }, (_, index) => {
+          const date = addDays(gridStart, index);
+          const key = localDateKey(date);
+          const other = date.getMonth() !== month.getMonth();
+          return `<button class="mini-calendar-day ${other ? 'is-other' : ''} ${key === todayKey ? 'is-today' : ''} ${key === task.due ? 'is-selected' : ''}" type="button" data-date-choice="${key}" aria-label="${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일">${date.getDate()}</button>`;
+        }).join('');
+        return `<div class="mini-calendar-head"><button class="mini-calendar-nav" type="button" data-calendar-nav="-1" aria-label="이전 달">‹</button><span class="mini-calendar-title">${month.getFullYear()}. ${month.getMonth() + 1}</span><button class="mini-calendar-nav" type="button" data-calendar-nav="1" aria-label="다음 달">›</button></div>
+          <div class="mini-calendar-week" aria-hidden="true">${['월','화','수','목','금','토','일'].map(day => `<span>${day}</span>`).join('')}</div>
+          <div class="mini-calendar-grid">${cells}</div>
+          <div class="mini-calendar-actions"><button type="button" data-date-choice="${todayKey}">오늘</button><button type="button" data-date-choice="">비우기</button></div>`;
+      }
+
       function renderCellPopover() {
-        if (!ui.popover || ui.adding || ui.editingId) {
+        if (!ui.popover || ui.editingId || ui.inlineEdit) {
           cellPopover.hidden = true;
           cellPopover.innerHTML = '';
           return;
         }
-        const task = state.tasks.find(item => item.id === ui.popover.taskId && item.mode === 'work');
+        const task = taskById(ui.popover.taskId);
         const anchors = [...card.querySelectorAll(`[data-cell-task="${CSS.escape(ui.popover.taskId)}"][data-cell-field="${CSS.escape(ui.popover.field)}"]`)];
         const anchor = anchors.find(element => element.offsetParent !== null);
         if (!task || !anchor) {
           closeCellPopover();
           return;
         }
+        cellPopover.className = `cell-popover kind-${ui.popover.field}`;
         if (ui.popover.field === 'project') {
-          cellPopover.innerHTML = `<form class="popover-form" data-project-form data-task-id="${escapeHtml(task.id)}"><label><span class="popover-label">구분</span><input name="project" value="${escapeHtml(task.proj || '미분류')}" maxlength="30" autocomplete="off"></label><div class="popover-actions"><button class="editor-button" type="button" data-popover-close>취소</button><button class="editor-button primary" type="submit">저장</button></div></form>`;
+          const options = projectChoices(task).map(project => `<button class="project-option ${project === (task.proj || '미분류') ? 'is-selected' : ''}" type="button" data-project-choice="${escapeHtml(project)}">${escapeHtml(project)}</button>`).join('');
+          const add = ui.projectAdding
+            ? `<form data-project-new-form><input class="project-new-input" name="project" maxlength="30" autocomplete="off" aria-label="새 구분 이름"></form>`
+            : '<button class="project-new" type="button" data-project-new>＋ 새 구분</button>';
+          cellPopover.innerHTML = `<div class="project-options">${options}${add}</div>`;
+        } else if (ui.popover.field === 'q') {
+          cellPopover.innerHTML = `<div class="q-options">${[1,2,3,4,null].map(q => `<button class="q-option ${task.q === q ? 'is-selected' : ''}" type="button" data-q-choice="${q ?? ''}" aria-label="${q ? `Q${q}` : 'Q 없음'}">${qBadge(q)}</button>`).join('')}</div>`;
+        } else if (ui.popover.field === 'due') {
+          cellPopover.innerHTML = miniCalendarHtml(task);
         } else {
           const value = ui.popover.field === 'progress' ? progressOf(task) : task.est;
           const label = ui.popover.field === 'progress' ? '진행 시간' : '예상 시간';
-          cellPopover.innerHTML = `<div class="popover-current">${label} ${value === null ? '–' : `${displayHours(value)}h`}</div><div class="popover-controls"><button class="popover-step" type="button" data-adjust-hours="-0.5" aria-label="${label} 0.5시간 줄이기">−</button><span class="popover-value">0.5</span><button class="popover-step" type="button" data-adjust-hours="0.5" aria-label="${label} 0.5시간 늘리기">＋</button></div><span class="popover-caption">0.5시간 단위로 조정됩니다</span>`;
+          cellPopover.innerHTML = `<span class="popover-label">${label}</span><div class="popover-controls"><button class="popover-step" type="button" data-adjust-hours="-0.5" aria-label="${label} 0.5시간 줄이기">−</button><span class="popover-value">${value === null ? '–' : displayHours(value)}</span><button class="popover-step" type="button" data-adjust-hours="0.5" aria-label="${label} 0.5시간 늘리기">＋</button></div><span class="popover-caption">0.5 단위 · 0.5 = 30분</span>`;
         }
         cellPopover.hidden = false;
         const cardRect = card.getBoundingClientRect();
@@ -969,24 +1103,28 @@
         const scale = card.offsetWidth ? cardRect.width / card.offsetWidth : 1;
         const width = cellPopover.offsetWidth;
         const height = cellPopover.offsetHeight;
-        const anchorCenter = ((anchorRect.left + anchorRect.right) / 2 - cardRect.left) / scale;
+        const anchorLeft = (anchorRect.left - cardRect.left) / scale;
         const below = (anchorRect.bottom - cardRect.top) / scale + 6;
         const above = (anchorRect.top - cardRect.top) / scale - height - 6;
-        cellPopover.style.left = `${Math.max(10, Math.min(card.offsetWidth - width - 10, anchorCenter - width / 2))}px`;
-        cellPopover.style.top = `${below + height <= card.offsetHeight - 10 ? below : Math.max(10, above)}px`;
+        cellPopover.style.left = `${Math.max(12, Math.min(card.offsetWidth - width - 12, anchorLeft))}px`;
+        cellPopover.style.top = `${below + height <= card.offsetHeight - 12 ? below : Math.max(12, above)}px`;
       }
 
       function renderAll() {
+        const listScroll = taskList.querySelector('.rows-scroll')?.scrollTop || 0;
         const items = tasksFor(state.mode, ui.selectedDate);
         if (ui.editingId && !items.some(task => task.id === ui.editingId)) {
           ui.editingId = null;
           ui.confirmDeleteId = null;
         }
+        if (ui.inlineEdit && !taskById(ui.inlineEdit.taskId)) ui.inlineEdit = null;
         renderModes();
         renderDays();
         renderBanner();
         renderHeader(items);
         renderList(items);
+        const nextScroll = taskList.querySelector('.rows-scroll');
+        if (nextScroll) nextScroll.scrollTop = listScroll;
         renderAdd(items);
         renderCellPopover();
       }
@@ -1005,17 +1143,25 @@
         return true;
       }
 
+      function resetTransient() {
+        if (ui.deleteTimer) window.clearTimeout(ui.deleteTimer);
+        ui.deleteTimer = null;
+        ui.adding = false;
+        ui.draftTask = null;
+        ui.editingId = null;
+        ui.inlineEdit = null;
+        ui.confirmDeleteId = null;
+        ui.popover = null;
+        ui.projectAdding = false;
+        ui.dirtyFields = new Set();
+      }
+
       function changeDate(direction) {
         const keepDayFocus = Boolean(document.activeElement?.closest?.('[data-day]'));
         if (!drainPendingSync()) return;
         const current = parseDate(ui.selectedDate) || todayDate();
         ui.selectedDate = localDateKey(nextActiveDate(current, state.mode, direction));
-        ui.adding = false;
-        ui.draftTask = null;
-        ui.editingId = null;
-        ui.confirmDeleteId = null;
-        ui.popover = null;
-        ui.dirtyFields = new Set();
+        resetTransient();
         renderAll();
         if (keepDayFocus) dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       }
@@ -1048,10 +1194,18 @@
         });
       }
 
-      function saveQuickTask(form) {
+      function cancelQuickAdd() {
+        ui.adding = false;
+        ui.draftTask = null;
+        ui.popover = null;
+        ui.projectAdding = false;
+        renderAll();
+      }
+
+      function saveQuickTask(form, continueAdding = false) {
         const title = String(new FormData(form).get('title') || '').trim();
         if (!title || !ui.draftTask) {
-          form.querySelector('input[name="title"]')?.focus();
+          cancelQuickAdd();
           return false;
         }
         if (!drainPendingSync()) return false;
@@ -1063,23 +1217,38 @@
         ui.newId = task.id;
         const saved = mutate(fresh => {
           if (!fresh.tasks.some(item => item.id === task.id)) fresh.tasks.push(task);
+          fresh.lastUsed ||= { work:{ proj:'미분류',q:null }, life:{ proj:'미분류',q:null } };
+          fresh.lastUsed[task.mode] = { proj:task.proj || '미분류', q:task.q };
           return fresh;
-        });
+        }, false);
         if (!saved) {
           Object.assign(ui, previous);
           renderAll();
           return false;
         }
+        if (continueAdding) {
+          ui.adding = true;
+          ui.draftTask = createQuickDraft(task.mode);
+        }
+        renderAll();
+        if (continueAdding) window.setTimeout(focusAddTitle, 0);
         announce('추가했습니다.');
         window.setTimeout(() => { ui.newId = null; }, 1200);
         return true;
       }
 
-      function updateWorkTask(id, updater, announcement) {
+      function updateTask(id, updater, announcement) {
+        if (ui.draftTask?.id === id) {
+          const next = { ...ui.draftTask };
+          updater(next);
+          ui.draftTask = normalizeTask(next);
+          renderAll();
+          return true;
+        }
         if (!drainPendingSync()) return false;
         let found = false;
         const saved = mutate(fresh => {
-          const index = fresh.tasks.findIndex(task => task.id === id && task.mode === 'work');
+          const index = fresh.tasks.findIndex(task => task.id === id);
           if (index < 0) return fresh;
           const next = { ...fresh.tasks[index] };
           updater(next);
@@ -1105,12 +1274,7 @@
         const previousDate = ui.selectedDate;
         const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, popover:ui.popover, dirtyFields:ui.dirtyFields };
         if (!drainPendingSync()) return;
-        ui.adding = false;
-        ui.draftTask = null;
-        ui.editingId = null;
-        ui.confirmDeleteId = null;
-        ui.popover = null;
-        ui.dirtyFields = new Set();
+        resetTransient();
         const today = todayDate();
         const followsClampedWorkToday = state.mode === 'work' && nextMode === 'life'
           && ui.selectedDate === localDateKey(clampDateToMode(today,'work'));
@@ -1130,30 +1294,117 @@
         if (!button) return;
         if (!drainPendingSync()) return;
         ui.selectedDate = button.dataset.date;
-        ui.adding = false;
-        ui.draftTask = null;
-        ui.editingId = null;
-        ui.confirmDeleteId = null;
-        ui.popover = null;
-        ui.dirtyFields = new Set();
+        resetTransient();
         renderAll();
         dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       });
 
+      function clearDeleteConfirm(shouldRender = true) {
+        if (!ui.confirmDeleteId) return;
+        const id = ui.confirmDeleteId;
+        if (ui.deleteTimer) window.clearTimeout(ui.deleteTimer);
+        ui.deleteTimer = null;
+        ui.confirmDeleteId = null;
+        if (shouldRender) renderAll();
+        else {
+          taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.classList.remove('is-delete-confirm');
+          const button = taskList.querySelector(`[data-row-delete="${CSS.escape(id)}"]`);
+          button?.setAttribute('aria-label','삭제');
+        }
+      }
+
+      function armDelete(id) {
+        if (ui.confirmDeleteId === id) {
+          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
+          const remove = () => {
+            if (ui.draftTask?.id === id) {
+              cancelQuickAdd();
+              return;
+            }
+            if (!drainPendingSync()) return;
+            clearDeleteConfirm(false);
+            ui.editingId = null;
+            const saved = mutate(fresh => { fresh.tasks = fresh.tasks.filter(task => task.id !== id); return fresh; });
+            if (saved) announce('삭제했습니다.');
+          };
+          if (window.widgetMotion?.close && row) window.widgetMotion.close(row, remove);
+          else remove();
+          return;
+        }
+        clearDeleteConfirm(false);
+        ui.confirmDeleteId = id;
+        ui.deleteTimer = window.setTimeout(() => clearDeleteConfirm(), 3000);
+        renderAll();
+        taskList.querySelector(`[data-row-delete="${CSS.escape(id)}"]`)?.focus({ preventScroll:true });
+      }
+
+      function beginInlineEdit(id, field) {
+        const task = taskById(id);
+        if (!task) return;
+        closeCellPopover();
+        ui.inlineEdit = { taskId:id, field, original:String(task[field] || '') };
+        renderAll();
+        const input = taskList.querySelector(`[data-inline-task="${CSS.escape(id)}"][data-inline-field="${field}"]`);
+        input?.focus({ preventScroll:true });
+        input?.select();
+      }
+
+      function finishInlineEdit(input, save) {
+        if (!input || !ui.inlineEdit) return;
+        const { taskId, field } = ui.inlineEdit;
+        if (input.dataset.inlineTask !== taskId || input.dataset.inlineField !== field) return;
+        const raw = String(input.value || '');
+        let value = raw.trim();
+        if ((field === 'start' || field === 'end') && value) {
+          value = normalizeTime(value);
+          if (!value) save = false;
+        }
+        if (field === 'title' && !value) save = false;
+        ui.inlineEdit = null;
+        if (!save) {
+          renderAll();
+          return;
+        }
+        updateTask(taskId, task => {
+          task[field] = value || (field === 'memo' ? '' : null);
+          if (field === 'end' && !task.progressTouched && task.start && task.end) task.progress = durationOf(task);
+        }, '수정했습니다.');
+      }
+
+      function openPopover(id, field) {
+        const alreadyOpen = ui.popover?.taskId === id && ui.popover?.field === field;
+        ui.inlineEdit = null;
+        ui.projectAdding = false;
+        ui.popover = alreadyOpen ? null : { taskId:id, field, month:field === 'due' ? String(taskById(id)?.due || localDateKey(todayDate())).slice(0,7) : '' };
+        renderAll();
+      }
+
+      function adjustHours(delta) {
+        if (!ui.popover || !['progress','est'].includes(ui.popover.field)) return;
+        const { taskId, field } = ui.popover;
+        updateTask(taskId, task => {
+          const current = field === 'progress' ? progressOf(task) : task.est;
+          const base = current ?? 0;
+          const next = Math.min(24, Math.max(0, Math.round((base + delta) * 2) / 2));
+          task[field] = delta < 0 && next <= 0 ? null : next;
+          if (field === 'progress') task.progressTouched = true;
+        }, `${field === 'progress' ? '진행' : '예상'} 시간을 바꿨습니다.`);
+      }
+
       function trackEditorChange(event) {
         if (typeof event.target.setCustomValidity === 'function') event.target.setCustomValidity('');
+        if (event.target.matches?.('[data-quick-add-form] input[name="title"]') && ui.draftTask) ui.draftTask.title = event.target.value;
         const form = event.target.closest?.('[data-task-form][data-kind="edit"]');
         if (form && event.target.name) ui.dirtyFields.add(event.target.name);
       }
       card.addEventListener('input', trackEditorChange);
       card.addEventListener('change', trackEditorChange);
 
-      card.addEventListener('change', event => {
-        const input = event.target.closest('[data-due-task]');
-        if (!input) return;
-        const due = parseDate(input.value) ? input.value : null;
-        ui.popover = null;
-        updateWorkTask(input.dataset.dueTask, task => { task.due = due; }, '목표일을 바꿨습니다.');
+      card.addEventListener('dblclick', event => {
+        const time = event.target.closest('[data-cell-task][data-cell-field="start"], [data-cell-task][data-cell-field="end"]');
+        if (!time || !taskById(time.dataset.cellTask)?.[time.dataset.cellField]) return;
+        event.preventDefault();
+        beginInlineEdit(time.dataset.cellTask, time.dataset.cellField);
       });
 
       card.addEventListener('click', event => {
@@ -1162,138 +1413,136 @@
           if (saved) renderBanner();
           return;
         }
-        if (event.target.closest('[data-popover-close]')) {
+        const calendarNav = event.target.closest('[data-calendar-nav]');
+        if (calendarNav && ui.popover?.field === 'due') {
+          const month = calendarMonth(ui.popover.month);
+          ui.popover.month = monthKey(new Date(month.getFullYear(), month.getMonth() + Number(calendarNav.dataset.calendarNav), 1, 12));
+          renderCellPopover();
+          return;
+        }
+        const projectNew = event.target.closest('[data-project-new]');
+        if (projectNew && ui.popover?.field === 'project') {
+          ui.projectAdding = true;
+          renderCellPopover();
+          const input = cellPopover.querySelector('.project-new-input');
+          input?.focus();
+          return;
+        }
+        const projectChoice = event.target.closest('[data-project-choice]');
+        if (projectChoice && ui.popover) {
+          const id = ui.popover.taskId;
+          const value = projectChoice.dataset.projectChoice;
           closeCellPopover();
+          updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.');
+          return;
+        }
+        const qChoice = event.target.closest('[data-q-choice]');
+        if (qChoice && ui.popover) {
+          const id = ui.popover.taskId;
+          const value = Number(qChoice.dataset.qChoice);
+          closeCellPopover();
+          updateTask(id, task => { task.q = value >= 1 && value <= 4 ? value : null; }, 'Q를 바꿨습니다.');
+          return;
+        }
+        const dateChoice = event.target.closest('[data-date-choice]');
+        if (dateChoice && ui.popover) {
+          const id = ui.popover.taskId;
+          const value = dateChoice.dataset.dateChoice;
+          closeCellPopover();
+          updateTask(id, task => { task.due = parseDate(value) ? value : null; }, '목표일을 바꿨습니다.');
           return;
         }
         const adjustmentButton = event.target.closest('[data-adjust-hours]');
-        if (adjustmentButton && ui.popover && ['progress','est'].includes(ui.popover.field)) {
-          const { taskId, field } = ui.popover;
-          const delta = Number(adjustmentButton.dataset.adjustHours);
-          updateWorkTask(taskId, task => {
-            const current = field === 'progress' ? progressOf(task) : task.est;
-            task[field] = Math.max(0, Math.round(((current ?? 0) + delta) * 100) / 100);
-          }, `${field === 'progress' ? '진행' : '예상'} 시간을 바꿨습니다.`);
+        if (adjustmentButton) {
+          adjustHours(Number(adjustmentButton.dataset.adjustHours));
           return;
         }
         if (event.target.closest('[data-add-task]')) {
           if (ui.adding) {
             focusAddTitle();
-            window.setTimeout(focusAddTitle, 0);
             return;
           }
           if (!drainPendingSync()) return;
+          resetTransient();
           ui.adding = true;
           ui.draftTask = createQuickDraft(state.mode);
-          ui.editingId = null;
-          ui.confirmDeleteId = null;
-          ui.popover = null;
-          ui.dirtyFields = new Set();
           renderAll();
-          focusAddTitle();
           window.setTimeout(focusAddTitle, 0);
+          return;
+        }
+        const retry = event.target.closest('[data-time-retry]');
+        if (retry) {
+          const field = retry.dataset.timeRetry;
+          updateTask(retry.dataset.taskId, task => {
+            task[field] = currentTimeKey();
+            if (field === 'end' && !task.progressTouched && task.start) task.progress = durationOf(task);
+          }, `${field === 'start' ? '시작' : '종료'} 시간을 기록했습니다.`);
+          return;
+        }
+        const clear = event.target.closest('[data-time-clear]');
+        if (clear) {
+          const field = clear.dataset.timeClear;
+          updateTask(clear.dataset.taskId, task => {
+            task[field] = null;
+            if (field === 'end' && !task.progressTouched) task.progress = null;
+          }, `${field === 'start' ? '시작' : '종료'} 시간을 비웠습니다.`);
+          return;
+        }
+        const inlineStart = event.target.closest('[data-inline-start]');
+        if (inlineStart) {
+          if (event.shiftKey) {
+            resetTransient();
+            ui.editingId = inlineStart.dataset.taskId;
+            renderAll();
+            taskList.querySelector('input[name="title"]')?.focus();
+          } else beginInlineEdit(inlineStart.dataset.taskId, inlineStart.dataset.inlineStart);
           return;
         }
         const cellButton = event.target.closest('[data-cell-task][data-cell-field]');
         if (cellButton) {
-          if (ui.adding || ui.editingId) return;
           const id = cellButton.dataset.cellTask;
           const field = cellButton.dataset.cellField;
-          if (field === 'project' || field === 'progress' || field === 'est') {
-            const alreadyOpen = ui.popover?.taskId === id && ui.popover?.field === field;
-            ui.popover = alreadyOpen ? null : { taskId:id, field };
-            renderCellPopover();
-            if (!alreadyOpen && field === 'project') {
-              const input = cellPopover.querySelector('input[name="project"]');
-              input?.focus();
-              input?.select();
-            }
+          if (['project','q','due','progress','est'].includes(field)) {
+            openPopover(id, field);
             return;
           }
-          ui.popover = null;
-          if (field === 'q') {
-            updateWorkTask(id, task => { task.q = task.q === 4 ? null : (task.q || 0) + 1; }, 'Q를 바꿨습니다.');
+          if ((field === 'start' || field === 'end') && !taskById(id)?.[field]) {
+            updateTask(id, task => {
+              task[field] = currentTimeKey();
+              if (field === 'end' && !task.progressTouched && task.start) task.progress = durationOf(task);
+            }, `${field === 'start' ? '시작' : '종료'} 시간을 기록했습니다.`);
             return;
           }
-          if (field === 'start' || field === 'end') {
-            updateWorkTask(id, task => { task[field] = currentTimeKey(); }, `${field === 'start' ? '시작' : '종료'} 시간을 기록했습니다.`);
+          if ((field === 'start' || field === 'end') && mobileQuery.matches) {
+            beginInlineEdit(id, field);
             return;
           }
           if (field === 'status') {
-            updateWorkTask(id, task => {
+            updateTask(id, task => {
               const next = task.status === 'wait' ? 'doing' : task.status === 'doing' ? 'done' : 'wait';
               task.status = next;
               task.done = next === 'done';
             }, '상태를 바꿨습니다.');
             return;
           }
-          return;
-        }
-        const editButton = event.target.closest('[data-edit-task]');
-        if (editButton) {
-          ui.editingId = editButton.dataset.editTask;
-          ui.adding = false;
-          ui.draftTask = null;
-          ui.confirmDeleteId = null;
-          ui.popover = null;
-          ui.dirtyFields = new Set();
-          renderAll();
-          taskList.querySelector('input[name="title"]')?.focus();
-          return;
         }
         const toggleButton = event.target.closest('[data-toggle-task]');
         if (toggleButton) {
-          if (ui.adding || ui.editingId) return;
           const id = toggleButton.dataset.toggleTask;
-          const saved = mutate(fresh => {
-            const task = fresh.tasks.find(item => item.id === id);
-            if (!task) return fresh;
+          updateTask(id, task => {
             task.done = !task.done;
-            task.status = task.done ? 'done' : 'wait';
-            return fresh;
-          });
-          if (saved) taskList.querySelector(`[data-toggle-task="${CSS.escape(id)}"]`)?.focus();
+            task.status = task.done ? 'done' : 'doing';
+          }, '완료 상태를 바꿨습니다.');
+          return;
+        }
+        const rowDelete = event.target.closest('[data-row-delete], [data-delete-task]');
+        if (rowDelete) {
+          armDelete(rowDelete.dataset.rowDelete || rowDelete.dataset.deleteTask);
           return;
         }
         if (event.target.closest('[data-cancel-editor]')) {
-          ui.adding = false;
-          ui.draftTask = null;
-          ui.editingId = null;
-          ui.confirmDeleteId = null;
-          ui.popover = null;
-          ui.dirtyFields = new Set();
+          resetTransient();
           syncFromStorage();
-          return;
-        }
-        const deleteButton = event.target.closest('[data-delete-task]');
-        if (deleteButton) {
-          const id = deleteButton.dataset.deleteTask;
-          if (ui.confirmDeleteId !== id) {
-            ui.confirmDeleteId = id;
-            deleteButton.classList.remove('danger');
-            deleteButton.classList.add('confirm-danger');
-            deleteButton.textContent = '정말 삭제';
-            return;
-          }
-          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`) || taskList.querySelector('[data-task-form]');
-          const remove = () => {
-            if (!drainPendingSync()) {
-              row?.classList.remove('motion-close');
-              return;
-            }
-            ui.editingId = null;
-            ui.confirmDeleteId = null;
-            ui.dirtyFields = new Set();
-            const saved = mutate(fresh => { fresh.tasks = fresh.tasks.filter(task => task.id !== id); return fresh; });
-            if (saved) announce('삭제했습니다.');
-            else {
-              ui.editingId = id;
-              row?.classList.remove('motion-close');
-              renderAll();
-            }
-          };
-          if (window.widgetMotion?.close && row) window.widgetMotion.close(row, remove);
-          else remove();
         }
       });
 
@@ -1301,112 +1550,93 @@
         const quickForm = event.target.closest('[data-quick-add-form]');
         if (quickForm) {
           event.preventDefault();
-          saveQuickTask(quickForm);
+          saveQuickTask(quickForm, true);
           return;
         }
-        const projectForm = event.target.closest('[data-project-form]');
-        if (projectForm) {
+        const newProjectForm = event.target.closest('[data-project-new-form]');
+        if (newProjectForm && ui.popover) {
           event.preventDefault();
-          const id = projectForm.dataset.taskId;
-          const project = String(new FormData(projectForm).get('project') || '').trim() || '미분류';
+          const id = ui.popover.taskId;
+          const value = String(new FormData(newProjectForm).get('project') || '').trim();
+          if (!value) return;
           closeCellPopover();
-          updateWorkTask(id, task => { task.proj = project; }, '구분을 바꿨습니다.');
+          updateTask(id, task => { task.proj = value; }, '구분을 바꿨습니다.');
           return;
         }
         const form = event.target.closest('[data-task-form]');
         if (!form) return;
         event.preventDefault();
-        if (form.dataset.mode === 'work') {
-          for (const name of ['start','end']) {
-            const input = form.elements.namedItem(name);
-            const raw = String(input?.value || '').trim();
-            if (raw && !normalizeTime(raw)) {
-              input.setCustomValidity('00:00 형식으로 입력해 주세요.');
-              input.reportValidity();
-              input.focus();
-              return;
-            }
-            input?.setCustomValidity('');
-          }
-        }
-        if (!drainPendingSync()) return;
-        const id = form.dataset.taskId;
-        const existing = id ? state.tasks.find(task => task.id === id) : null;
+        const existing = state.tasks.find(task => task.id === form.dataset.taskId);
         const task = taskFromForm(form, existing);
-        if (!task || !task.title) {
-          form.querySelector('input[name="title"]')?.focus();
-          return;
-        }
-        const isNew = form.dataset.kind === 'add';
-        const dirtyFields = new Set(ui.dirtyFields);
-        const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, newId:ui.newId, popover:ui.popover, dirtyFields:ui.dirtyFields };
-        ui.newId = isNew ? task.id : null;
-        ui.adding = false;
-        ui.draftTask = null;
-        ui.editingId = null;
-        ui.confirmDeleteId = null;
-        ui.popover = null;
-        ui.dirtyFields = new Set();
-        let updatedExisting = isNew;
-        const saved = mutate(fresh => {
+        if (!task?.title) return;
+        resetTransient();
+        mutate(fresh => {
           const index = fresh.tasks.findIndex(item => item.id === task.id);
-          if (index >= 0) {
-            const current = fresh.tasks[index];
-            const merged = { ...current };
-            ['proj','q','title','due','start','end','est','status','memo'].forEach(fieldName => {
-              if (dirtyFields.has(fieldName)) merged[fieldName] = task[fieldName];
-            });
-            if (current.mode === 'work' && dirtyFields.has('status')) {
-              merged.done = task.done;
-              merged.status = task.status;
-            }
-            fresh.tasks[index] = normalizeTask(merged);
-            updatedExisting = true;
-          } else if (isNew) {
-            fresh.tasks.push(task);
-          }
+          if (index >= 0) fresh.tasks[index] = task;
           return fresh;
         });
-        if (!saved) {
-          Object.assign(ui, previousUi);
+        announce('수정했습니다.');
+      });
+
+      card.addEventListener('keydown', event => {
+        if (event.isComposing) return;
+        const quickInput = event.target.closest('[data-quick-add-form] input[name="title"]');
+        if (quickInput && event.key === 'Enter') {
+          event.preventDefault();
+          const form = quickInput.closest('[data-quick-add-form]');
+          if (quickInput.value.trim()) saveQuickTask(form, true);
+          else cancelQuickAdd();
           return;
         }
-        if (!updatedExisting) {
-          announce('다른 창에서 삭제된 항목입니다.');
+        if (quickInput && event.key === 'Escape') {
+          event.preventDefault();
+          cancelQuickAdd();
           return;
         }
-        announce(isNew ? '추가했습니다.' : '수정했습니다.');
-        if (isNew) window.setTimeout(() => { ui.newId = null; }, 1200);
+        const inlineInput = event.target.closest('[data-inline-input]');
+        if (inlineInput && (event.key === 'Enter' || event.key === 'Escape')) {
+          event.preventDefault();
+          finishInlineEdit(inlineInput, event.key === 'Enter');
+        }
       });
 
       card.addEventListener('focusout', event => {
+        const inlineInput = event.target.closest('[data-inline-input]');
+        if (inlineInput) {
+          window.setTimeout(() => { if (ui.inlineEdit && !inlineInput.contains(document.activeElement)) finishInlineEdit(inlineInput, true); }, 0);
+          return;
+        }
         const form = event.target.closest('[data-quick-add-form]');
         if (!form || !event.target.matches('input[name="title"]')) return;
         window.setTimeout(() => {
           if (!ui.adding || !form.isConnected || form.contains(document.activeElement)) return;
-          if (String(event.target.value || '').trim()) saveQuickTask(form);
+          if (!String(event.target.value || '').trim()) cancelQuickAdd();
         }, 0);
       });
 
       document.addEventListener('pointerdown', event => {
-        if (!ui.popover) return;
-        if (event.target.closest('#cellPopover, [data-cell-task][data-cell-field]')) return;
-        closeCellPopover();
+        if (ui.popover && !event.target.closest('#cellPopover, [data-cell-task][data-cell-field]')) closeCellPopover();
+        if (ui.confirmDeleteId && !event.target.closest('[data-row-delete], [data-delete-task]')) clearDeleteConfirm(false);
       });
 
       document.addEventListener('keydown', event => {
         if (event.isComposing) return;
-        if (event.key === 'Escape' && ui.popover) {
+        if (ui.popover && ['progress','est'].includes(ui.popover.field) && ['ArrowUp','ArrowDown'].includes(event.key)) {
+          event.preventDefault();
+          adjustHours(event.key === 'ArrowUp' ? 0.5 : -0.5);
+          return;
+        }
+        if (ui.popover && (event.key === 'Enter' || event.key === 'Escape')) {
+          event.preventDefault();
           closeCellPopover();
           return;
         }
+        if (event.key === 'Escape' && ui.confirmDeleteId) {
+          clearDeleteConfirm();
+          return;
+        }
         if (event.key === 'Escape' && (ui.adding || ui.editingId)) {
-          ui.adding = false;
-          ui.draftTask = null;
-          ui.editingId = null;
-          ui.confirmDeleteId = null;
-          ui.popover = null;
-          ui.dirtyFields = new Set();
+          resetTransient();
           syncFromStorage();
           return;
         }
@@ -1417,7 +1647,7 @@
       });
 
       function syncFromStorage(resetToToday = false) {
-        if (ui.adding || ui.editingId) {
+        if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover) {
           pendingExternalSync = true;
           return;
         }
@@ -1438,10 +1668,10 @@
       document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(true); });
       channel?.addEventListener('message', () => syncFromStorage());
       mobileQuery.addEventListener?.('change', () => {
-        if (!ui.adding && !ui.editingId) renderAll();
+        if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderAll();
       });
       narrowQuery.addEventListener?.('change', () => {
-        if (!ui.adding && !ui.editingId) renderDays();
+        if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderDays();
       });
 
       state = readState();
