@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>이번 주 목표</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A;
+      --text:#12303C; --title:#33505C; --done:#A9BAC2;
+      --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --cell-empty:#E3EAEE; --seg-home:#F1F5F7; --field-border:#E1EAEE;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD;
+      --mode-work:oklch(0.62 0.09 245);
+      --mode-life:oklch(0.62 0.09 168);
+    }
+
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body {
+      margin:0; color:var(--text);
+      font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+      font-weight:600; -webkit-font-smoothing:antialiased;
+    }
+    button { margin:0; color:inherit; font:inherit; }
+    input { color:inherit; font:inherit; }
+
+    .goals-wrap { width:100%; max-width:480px; margin:0 auto; }
+    .goals-card {
+      width:100%; display:flex; flex-direction:column; gap:12px;
+      padding:16px; border-radius:18px; background:var(--surface);
+      box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
+    }
+
+    /* 헤더 */
+    .goals-head {
+      min-width:0; min-height:26px; display:flex; align-items:center; gap:6px;
+      flex-wrap:nowrap; overflow:hidden;
+    }
+    .goals-title { margin:0; flex:0 0 auto; color:var(--title); font-size:12px; font-weight:800; line-height:1.2; }
+    .week-range {
+      flex:0 0 auto; color:var(--faint); font-size:9px; font-weight:700; line-height:1.2;
+      white-space:nowrap; font-variant-numeric:tabular-nums;
+    }
+    .week-range.is-hidden { display:none; }
+    .mode-seg {
+      flex:0 0 auto; margin-left:auto; display:flex; gap:2px;
+      padding:3px; border-radius:9px; background:var(--seg-home);
+    }
+    .mode-tab {
+      padding:4px 10px; border:0; border-radius:7px; background:transparent;
+      color:var(--muted); font-size:10px; font-weight:800; line-height:1.2;
+      white-space:nowrap; cursor:pointer;
+    }
+    .mode-tab.is-on {
+      background:var(--surface); color:var(--title);
+      box-shadow:0 1px 2px rgba(18,48,60,.06);
+    }
+    .mode-tab:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+
+    /* 달성률 줄 */
+    .goals-rate {
+      min-width:0; min-height:22px; display:flex; align-items:center; gap:6px;
+    }
+    .goals-rate.is-hidden { display:none; }
+    .rate-count {
+      flex:0 0 auto; display:flex; align-items:baseline; gap:1px;
+      font-variant-numeric:tabular-nums;
+    }
+    .rate-done { color:var(--text); font-size:14px; font-weight:800; line-height:1.1; }
+    .rate-total { color:var(--muted); font-size:10px; font-weight:700; line-height:1.1; }
+    .rate-note { flex:0 0 auto; color:var(--faint); font-size:9px; font-weight:700; line-height:1.2; }
+    .rate-note.is-hidden { display:none; }
+    .rate-cells { flex:0 0 auto; margin-left:auto; display:flex; align-items:center; gap:4px; }
+    .rate-cell {
+      width:14px; height:14px; flex:0 0 14px; border-radius:5px; background:var(--cell-empty);
+    }
+    .rate-cell.is-work { background:var(--mode-work); }
+    .rate-cell.is-life { background:var(--mode-life); }
+    .rate-cell.is-off { opacity:.35; }
+
+    /* 목록 */
+    .goals-list { min-width:0; display:flex; flex-direction:column; gap:5px; }
+
+    .goal-item {
+      width:100%; min-width:0; padding:7px 9px; display:grid;
+      grid-template-columns:17px minmax(0,1fr) auto; align-items:center; gap:8px;
+      border:0; border-radius:9px; background:var(--surface); text-align:left;
+      box-shadow:0 1px 2px rgba(18,48,60,.05); cursor:pointer;
+    }
+    .goal-item:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+    .goal-check {
+      width:17px; height:17px; border-radius:5px; border:1.5px solid var(--inactive);
+      display:grid; place-items:center; color:transparent; font-size:10px; font-weight:800; line-height:1;
+    }
+    .goal-item.is-done .goal-check { border-color:var(--action); background:var(--action); color:var(--surface); }
+    .goal-text {
+      min-width:0; color:var(--text); font-size:11px; font-weight:600; line-height:1.5;
+      overflow-wrap:anywhere;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .goal-item.is-done .goal-text { color:var(--done); }
+    .goal-remove {
+      width:22px; height:22px; padding:0; display:grid; place-items:center;
+      border:0; border-radius:5px; background:transparent;
+      color:var(--inactive); font-size:11px; font-weight:700; line-height:1; cursor:pointer;
+    }
+    .goal-remove:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+
+    /* 추가 */
+    .add-row {
+      width:100%; min-height:32px; padding:0 9px; display:flex; align-items:center;
+      justify-content:center; gap:5px;
+      border:1px dashed var(--inactive); border-radius:9px; background:transparent;
+      color:var(--muted); font-size:11px; font-weight:700; line-height:1.2; cursor:pointer;
+    }
+    .add-row:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+    .add-form { min-width:0; display:flex; flex-direction:column; gap:4px; }
+    .add-field { min-width:0; display:flex; align-items:center; gap:5px; }
+    .add-input {
+      min-width:0; flex:1; height:34px; padding:0 9px;
+      border:1px solid var(--field-border); border-radius:9px; background:var(--surface);
+      color:var(--text); font-size:11px; font-weight:600;
+    }
+    .add-input::placeholder { color:var(--muted); font-weight:600; }
+    .add-input:focus { outline:2px solid var(--action); outline-offset:-2px; }
+    .add-submit {
+      flex:0 0 auto; height:34px; padding:0 12px; border:0; border-radius:9px;
+      background:var(--action); color:var(--surface); font-size:11px; font-weight:700; cursor:pointer;
+    }
+    .add-submit:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
+    .add-hint { color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
+    .limit-note { padding:0 2px; color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
+
+    /* 빈 상태 */
+    .empty-state {
+      width:100%; padding:18px 12px; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:3px;
+      border:1px dashed var(--inactive); border-radius:12px; background:var(--surface-soft);
+      text-align:center; cursor:pointer;
+    }
+    .empty-state:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+    .empty-title { color:var(--title); font-size:12px; font-weight:800; line-height:1.3; }
+    .empty-copy { color:var(--muted); font-size:10px; font-weight:600; line-height:1.4; }
+
+    /* 넓은 규격 (컨테이너 ≥ 400) */
+    .goals-card.is-wide .mode-tab { padding:7px 14px; font-size:11px; }
+    .goals-card.is-wide .rate-done { font-size:15px; }
+    .goals-card.is-wide .rate-cells { flex:1; margin-left:auto; gap:6px; }
+    .goals-card.is-wide .rate-cell { flex:1; min-width:14px; }
+    .goals-card.is-wide .goal-item { min-height:44px; padding:6px 10px; }
+    .goals-card.is-wide .goal-text {
+      font-size:12px; display:block; -webkit-line-clamp:none; overflow:visible;
+    }
+    .goals-card.is-wide .goal-remove { width:40px; height:40px; }
+
+    @media (hover:hover) {
+      .goal-remove:hover { color:var(--muted); }
+    }
+  </style>
+</head>
+<body>
+  <div class="goals-wrap" id="goalsWrap">
+    <section class="goals-card" id="goalsCard">
+      <div class="goals-head" id="goalsHead">
+        <h1 class="goals-title">이번 주 목표</h1>
+        <span class="week-range" id="weekRange"></span>
+        <div class="mode-seg" id="modeSeg" role="group" aria-label="목표 모드">
+          <button class="mode-tab" type="button" data-mode="work">업무</button>
+          <button class="mode-tab" type="button" data-mode="life">일상</button>
+        </div>
+      </div>
+      <div class="goals-rate" id="goalsRate">
+        <span class="rate-count"><span class="rate-done" id="rateDone">0</span><span class="rate-total" id="rateTotal">/0</span></span>
+        <span class="rate-note is-hidden" id="rateNote">다 했어요</span>
+        <span class="rate-cells" id="rateCells" aria-hidden="true"></span>
+      </div>
+      <div class="goals-list" id="goalsList"></div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var KEY = 'weekly-goals-v1';
+      var MAX = 5;
+      var MODES = {
+        work: { placeholder: '이번 주에 할 일 한 줄', empty: '이번 주 업무 목표 없음' },
+        life: { placeholder: '이번 주에 챙길 일 한 줄', empty: '이번 주 일상 목표 없음' }
+      };
+
+      var wrap = document.getElementById('goalsWrap');
+      var card = document.getElementById('goalsCard');
+      var head = document.getElementById('goalsHead');
+      var seg = document.getElementById('modeSeg');
+      var rangeEl = document.getElementById('weekRange');
+      var rateRow = document.getElementById('goalsRate');
+      var rateDone = document.getElementById('rateDone');
+      var rateTotal = document.getElementById('rateTotal');
+      var rateNote = document.getElementById('rateNote');
+      var rateCells = document.getElementById('rateCells');
+      var list = document.getElementById('goalsList');
+
+      var mode = 'work';
+      var observer = null;
+      var adding = false;
+      var draft = '';
+      var state = { week: '', items: [], seq: 0 };
+
+      /* ── 주 계산 ───────────────────────────── */
+      function mondayOf(date) {
+        var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        return d;
+      }
+      function weekKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+      function weekLabel(mon) {
+        var sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+        return (mon.getMonth() + 1) + '/' + mon.getDate() + '–' + (sun.getMonth() + 1) + '/' + sun.getDate();
+      }
+
+      /* ── 저장소 ───────────────────────────── */
+      function load() {
+        var monday = mondayOf(new Date());
+        var key = weekKey(monday);
+        var next = { week: key, items: [], seq: 0 };
+        var raw = null;
+        try { raw = localStorage.getItem(KEY); } catch (e) { raw = null; }
+        if (!raw) return next;
+        var saved = null;
+        try { saved = JSON.parse(raw); } catch (e) { saved = null; }
+        if (!saved || typeof saved !== 'object') return next;
+        if (saved.week !== key) return next;
+        var items = Array.isArray(saved.items) ? saved.items : [];
+        next.items = items.filter(function (it) {
+          return it && typeof it.text === 'string' && it.text !== '' && (it.m === 'work' || it.m === 'life');
+        }).slice(0, MAX).map(function (it) {
+          return { id: Number(it.id) || 0, m: it.m, done: it.done === true, text: it.text };
+        });
+        next.seq = Number(saved.seq) || 0;
+        next.items.forEach(function (it) {
+          if (!it.id || it.id > next.seq) { next.seq += 1; it.id = next.seq; }
+        });
+        return next;
+      }
+
+      function save() {
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 저장 불가 시 무시 */ }
+      }
+
+      /* ── 렌더 ───────────────────────────── */
+      function esc(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function renderSeg() {
+        var tabs = seg.querySelectorAll('.mode-tab');
+        for (var i = 0; i < tabs.length; i++) {
+          var on = tabs[i].getAttribute('data-mode') === mode;
+          tabs[i].classList.toggle('is-on', on);
+          tabs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
+      }
+
+      function renderRate() {
+        var total = state.items.length;
+        var done = state.items.filter(function (it) { return it.done; }).length;
+        rateRow.classList.toggle('is-hidden', total === 0);
+        if (total === 0) { rateCells.innerHTML = ''; return; }
+        rateDone.textContent = String(done);
+        rateTotal.textContent = '/' + total;
+        rateNote.classList.toggle('is-hidden', done !== total);
+        rateCells.innerHTML = state.items.map(function (it) {
+          if (!it.done) return '<span class="rate-cell"></span>';
+          var cls = 'rate-cell is-' + it.m + (it.m === mode ? '' : ' is-off');
+          return '<span class="' + cls + '"></span>';
+        }).join('');
+      }
+
+      function itemMarkup(it) {
+        return '<div class="goal-item' + (it.done ? ' is-done' : '') + '" role="button" tabindex="0"' +
+          ' aria-pressed="' + (it.done ? 'true' : 'false') + '" data-id="' + it.id + '">' +
+          '<span class="goal-check" aria-hidden="true">✓</span>' +
+          '<span class="goal-text">' + esc(it.text) + '</span>' +
+          '<button class="goal-remove" type="button" data-remove="' + it.id + '" aria-label="목표 삭제">✕</button>' +
+          '</div>';
+      }
+
+      function addMarkup() {
+        if (state.items.length >= MAX) {
+          return '<p class="limit-note">5개까지만 세웁니다 — 하나 지우면 더 넣을 수 있어요</p>';
+        }
+        if (!adding) {
+          return '<button class="add-row" type="button" data-add><span>＋</span><span>목표 추가</span></button>';
+        }
+        return '<div class="add-form">' +
+          '<div class="add-field">' +
+          '<input class="add-input" id="goalInput" type="text" autocomplete="off" ' +
+          'placeholder="' + esc(MODES[mode].placeholder) + '" aria-label="새 목표" value="' + esc(draft) + '">' +
+          '<button class="add-submit" type="button" data-submit>추가</button>' +
+          '</div>' +
+          '<p class="add-hint">Enter로 추가 · Esc로 닫기</p>' +
+          '</div>';
+      }
+
+      function emptyMarkup() {
+        if (adding) return addMarkup();
+        return '<button class="empty-state" type="button" data-add>' +
+          '<span class="empty-title">' + MODES[mode].empty + '</span>' +
+          '<span class="empty-copy">＋ 목표 추가로 3개쯤 세워두세요</span>' +
+          '</button>';
+      }
+
+      function render(focusInput) {
+        renderSeg();
+        renderRate();
+        var mine = state.items.filter(function (it) { return it.m === mode; });
+        list.innerHTML = mine.length
+          ? mine.map(itemMarkup).join('') + addMarkup()
+          : emptyMarkup();
+        layoutHead();
+        if (adding && focusInput) {
+          var input = document.getElementById('goalInput');
+          if (input) {
+            input.focus();
+            var v = input.value;
+            input.value = '';
+            input.value = v;
+          }
+        }
+      }
+
+      /* ── 좁은 폭에서 주 범위 캡션 위치 ───────── */
+      function layoutHead() {
+        rangeEl.classList.remove('is-hidden');
+        if (rangeEl.parentNode !== head) head.insertBefore(rangeEl, seg);
+        if (head.scrollWidth <= head.clientWidth + 1) return;
+        if (!rateRow.classList.contains('is-hidden')) {
+          rateRow.insertBefore(rangeEl, rateNote);
+          return;
+        }
+        rangeEl.classList.add('is-hidden');
+      }
+
+      /* ── 동작 ───────────────────────────── */
+      function toggle(id) {
+        var it = state.items.filter(function (x) { return x.id === id; })[0];
+        if (!it) return;
+        it.done = !it.done;
+        save();
+        render(false);
+      }
+
+      function remove(id) {
+        state.items = state.items.filter(function (x) { return x.id !== id; });
+        save();
+        render(true);
+      }
+
+      function commit() {
+        var input = document.getElementById('goalInput');
+        if (!input) return;
+        var text = input.value.trim();
+        if (!text) { closeAdd(); return; }
+        if (state.items.length >= MAX) { closeAdd(); return; }
+        state.seq += 1;
+        state.items.push({ id: state.seq, m: mode, done: false, text: text });
+        draft = '';
+        save();
+        render(state.items.length < MAX);
+      }
+
+      function openAdd() {
+        if (state.items.length >= MAX) return;
+        adding = true;
+        draft = '';
+        render(true);
+      }
+
+      function closeAdd() {
+        adding = false;
+        draft = '';
+        render(false);
+      }
+
+      seg.addEventListener('click', function (e) {
+        var tab = e.target.closest('.mode-tab');
+        if (!tab) return;
+        var next = tab.getAttribute('data-mode');
+        if (next === mode) return;
+        mode = next;
+        adding = false;
+        draft = '';
+        render(false);
+      });
+
+      list.addEventListener('click', function (e) {
+        var rm = e.target.closest('[data-remove]');
+        if (rm) {
+          e.stopPropagation();
+          remove(Number(rm.getAttribute('data-remove')));
+          return;
+        }
+        if (e.target.closest('[data-add]')) { openAdd(); return; }
+        if (e.target.closest('[data-submit]')) { commit(); return; }
+        var item = e.target.closest('.goal-item');
+        if (item) toggle(Number(item.getAttribute('data-id')));
+      });
+
+      list.addEventListener('keydown', function (e) {
+        var item = e.target.closest('.goal-item');
+        if (item && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {
+          e.preventDefault();
+          toggle(Number(item.getAttribute('data-id')));
+          return;
+        }
+        if (e.target.id !== 'goalInput') return;
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeAdd(); }
+      });
+
+      list.addEventListener('input', function (e) {
+        if (e.target.id === 'goalInput') draft = e.target.value;
+      });
+
+      /* ── 컨테이너 폭 ───────────────────────── */
+      function applyWidth() {
+        var w = wrap.clientWidth || card.clientWidth;
+        if (!w) return;
+        var wide = w >= 400;
+        if (wide !== card.classList.contains('is-wide')) {
+          card.classList.toggle('is-wide', wide);
+        }
+        layoutHead();
+      }
+
+      state = load();
+      save();
+      rangeEl.textContent = weekLabel(mondayOf(new Date()));
+      render(false);
+      applyWidth();
+
+      // 임베드가 숨겨져 있으면 ResizeObserver 콜백이 돌지 않는다. resize도 함께 건다.
+      if (typeof ResizeObserver === 'function') {
+        observer = new ResizeObserver(applyWidth);
+        observer.observe(wrap);
+      }
+      window.addEventListener('resize', applyWidth);
+      window.addEventListener('pageshow', applyWidth);
+    })();
+  </script>
+</body>
+</html>
