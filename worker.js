@@ -13,9 +13,31 @@ export default {
       new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
     try {
+      if (path === "/api/instance/create" && request.method === "POST") {
+        const instanceId = `w_${crypto.randomUUID().replaceAll("-", "")}`;
+        const meta = { id: instanceId, createdAt: new Date().toISOString() };
+        await saveRawSetting(env, instanceMetaKey(instanceId), meta);
+        return json({ ok: true, data: meta }, 201);
+      }
+
+      const rawInstanceId = url.searchParams.get("w") || "";
+      if (rawInstanceId && !isValidInstanceId(rawInstanceId)) {
+        return json({ ok: false, error: "invalid widget instance" }, 400);
+      }
+      if (rawInstanceId) {
+        const meta = await loadRawSetting(env, instanceMetaKey(rawInstanceId), null);
+        if (!meta) return json({ ok: false, error: "unknown widget instance" }, 404);
+        env = instanceEnv(env, rawInstanceId);
+      }
+
+      if (path === "/api/instance" && request.method === "GET") {
+        return json({ ok: true, data: rawInstanceId ? { id: rawInstanceId } : { id: null, legacy: true } });
+      }
+
       // ───────── 일기 ─────────
       if (path === "/api/diary/save" && request.method === "POST") {
         const d = await request.json();
+        if (!validDateKey(d?.date)) return json({ ok: false, error: "invalid date" }, 400);
         const now = new Date().toISOString();
         await env.DB.prepare(
           `INSERT INTO diary (date, mode, mood, achievements, images, quest, createdAt, updatedAt)
@@ -23,7 +45,7 @@ export default {
            ON CONFLICT(date) DO UPDATE SET
              mode=excluded.mode, mood=excluded.mood, achievements=excluded.achievements,
              images=excluded.images, quest=excluded.quest, updatedAt=excluded.updatedAt`
-        ).bind(d.date, d.mode || null, d.mood || null,
+        ).bind(diaryStorageDate(env, d.date), d.mode || null, d.mood || null,
                JSON.stringify(d.achievements || []), JSON.stringify(d.images || []),
                JSON.stringify(d.quest || null), d.createdAt || now, now).run();
         return json({ ok: true });
@@ -31,46 +53,48 @@ export default {
 
       if (path === "/api/diary/get") {
         const date = url.searchParams.get("date");
-        const row = await env.DB.prepare(`SELECT * FROM diary WHERE date = ?`).bind(date).first();
-        return json({ ok: true, data: row ? parseDiary(row) : null });
+        if (!validDateKey(date)) return json({ ok: false, error: "invalid date" }, 400);
+        const row = await env.DB.prepare(`SELECT * FROM diary WHERE date = ?`).bind(diaryStorageDate(env, date)).first();
+        return json({ ok: true, data: row ? parseDiary(row, env) : null });
       }
 
       if (path === "/api/diary/range") {
         const start = url.searchParams.get("start");
         const end = url.searchParams.get("end");
+        if (!validDiaryRangeKey(start) || !validDiaryRangeKey(end) || start > end) {
+          return json({ ok: false, error: "invalid date range" }, 400);
+        }
         const { results } = await env.DB.prepare(
           `SELECT * FROM diary WHERE date >= ? AND date <= ? ORDER BY date ASC`
-        ).bind(start, end).all();
-        return json({ ok: true, data: (results || []).map(parseDiary) });
+        ).bind(diaryStorageDate(env, start), diaryStorageDate(env, end)).all();
+        return json({ ok: true, data: (results || []).map(row => parseDiary(row, env)) });
       }
 
       if (path === "/api/diary/dates") {
-        const { results } = await env.DB.prepare(`SELECT date FROM diary ORDER BY date ASC`).all();
-        return json({ ok: true, data: (results || []).map(r => r.date) });
+        const { results } = env.__instanceId
+          ? await env.DB.prepare(`SELECT date FROM diary WHERE date >= ? AND date <= ? ORDER BY date ASC`)
+              .bind(diaryStorageDate(env, "0000-01-01"), diaryStorageDate(env, "9999-12-31")).all()
+          : await env.DB.prepare(`SELECT date FROM diary WHERE length(date) = 10 ORDER BY date ASC`).all();
+        return json({ ok: true, data: (results || []).map(row => diaryPublicDate(env, row.date)) });
       }
 
       if (path === "/api/diary/delete" && request.method === "POST") {
         const { date } = await request.json();
-        await env.DB.prepare(`DELETE FROM diary WHERE date = ?`).bind(date).run();
+        if (!validDateKey(date)) return json({ ok: false, error: "invalid date" }, 400);
+        await env.DB.prepare(`DELETE FROM diary WHERE date = ?`).bind(diaryStorageDate(env, date)).run();
         return json({ ok: true });
       }
 
       // ───────── 감정 단어 ─────────
       if (path === "/api/settings/mood-words" && request.method === "GET") {
-        const row = await env.DB.prepare(`SELECT value FROM widget_settings WHERE key = ?`)
-          .bind("moodWords").first();
-        return json({ ok: true, data: normalizeMoodWords(safeParse(row?.value, [])) });
+        return json({ ok: true, data: normalizeMoodWords(await loadSetting(env, "moodWords", [])) });
       }
 
       if (path === "/api/settings/mood-words" && request.method === "POST") {
         const body = await request.json();
         if (!Array.isArray(body?.words)) return json({ ok: false, error: "words must be an array" }, 400);
         const words = normalizeMoodWords(body?.words);
-        const now = new Date().toISOString();
-        await env.DB.prepare(
-          `INSERT INTO widget_settings (key, value, updatedAt) VALUES (?, ?, ?)
-           ON CONFLICT(key) DO UPDATE SET value=excluded.value, updatedAt=excluded.updatedAt`
-        ).bind("moodWords", JSON.stringify(words), now).run();
+        await saveSetting(env, "moodWords", words);
         return json({ ok: true, data: words });
       }
 
@@ -403,9 +427,37 @@ export default {
   },
 };
 
-function parseDiary(row) {
+const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
+
+function isValidInstanceId(value) {
+  return INSTANCE_RE.test(String(value || ""));
+}
+
+function instanceMetaKey(instanceId) {
+  return `instance-meta:${instanceId}`;
+}
+
+function instanceEnv(env, instanceId) {
+  const scoped = Object.create(env);
+  Object.defineProperty(scoped, "__instanceId", { value: instanceId, enumerable: false });
+  return scoped;
+}
+
+function diaryStorageDate(env, date) {
+  return env.__instanceId ? `instance:${env.__instanceId}:${date}` : date;
+}
+
+function diaryPublicDate(env, date) {
+  return env.__instanceId ? String(date || "").slice(`instance:${env.__instanceId}:`.length) : date;
+}
+
+function validDiaryRangeKey(value) {
+  return value === "0000-01-01" || value === "9999-12-31" || validDateKey(value);
+}
+
+function parseDiary(row, env) {
   return {
-    date: row.date,
+    date: diaryPublicDate(env, row.date),
     mode: row.mode,
     mood: row.mood,
     achievements: safeParse(row.achievements, []),
@@ -425,11 +477,23 @@ function normalizeMoodWords(value) {
 }
 
 async function loadSetting(env, key, fallback) {
+  return loadRawSetting(env, settingStorageKey(env, key), fallback);
+}
+
+async function loadRawSetting(env, key, fallback) {
   const row = await env.DB.prepare(`SELECT value FROM widget_settings WHERE key = ?`).bind(key).first();
   return safeParse(row?.value, fallback);
 }
 
 async function saveSetting(env, key, value) {
+  return saveRawSetting(env, settingStorageKey(env, key), value);
+}
+
+function settingStorageKey(env, key) {
+  return env.__instanceId ? `instance:${env.__instanceId}:${key}` : key;
+}
+
+async function saveRawSetting(env, key, value) {
   const now = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO widget_settings (key, value, updatedAt) VALUES (?, ?, ?)

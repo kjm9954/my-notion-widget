@@ -2,7 +2,21 @@
 // 위젯은 이 파일의 함수만 부른다. 직접 fetch/localStorage 하지 않는다.
 
 const API = "https://notion-widget.wldnjsdkk.workers.dev";
-const STORE_CHANNEL = "notion-widget-store-v1";
+const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
+
+function readWidgetInstanceId() {
+  try {
+    const search = new URLSearchParams(window.location.search || "");
+    const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    return search.get("w") || hash.get("w") || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+const RAW_INSTANCE_ID = readWidgetInstanceId();
+const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID : "";
+const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
 const storeListeners = new Set();
 let storeChannel = null;
 
@@ -42,14 +56,21 @@ function watch(callback, interval = 3000) {
 }
 
 // 공통 요청 헬퍼
+function apiUrl(path, includeInstance = true) {
+  if (RAW_INSTANCE_ID && !WIDGET_INSTANCE_ID) throw new Error("올바르지 않은 위젯 인스턴스 주소입니다.");
+  const url = new URL(API + path);
+  if (includeInstance && WIDGET_INSTANCE_ID) url.searchParams.set("w", WIDGET_INSTANCE_ID);
+  return url.toString();
+}
+
 async function apiGet(path) {
-  const res = await fetch(API + path);
+  const res = await fetch(apiUrl(path));
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "요청 실패");
   return data;
 }
-async function apiPost(path, body) {
-  const res = await fetch(API + path, {
+async function apiPost(path, body, includeInstance = true) {
+  const res = await fetch(apiUrl(path, includeInstance), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -58,6 +79,14 @@ async function apiPost(path, body) {
   if (!data.ok) throw new Error(data.error || "요청 실패");
   announceChange(path);
   return data;
+}
+
+async function createWidgetInstance() {
+  return (await apiPost("/api/instance/create", {}, false)).data;
+}
+
+function getWidgetInstanceId() {
+  return WIDGET_INSTANCE_ID || null;
 }
 
 // ───────── 하루 경계 (자정 기준) ─────────
@@ -247,6 +276,7 @@ async function getMoodOfDate(date) {
 
 // 위젯에서 window.Store.saveDiary(...)처럼 씀
 window.Store = {
+  createWidgetInstance, getWidgetInstanceId,
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,
   loadMoodWords, saveMoodWords,
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
