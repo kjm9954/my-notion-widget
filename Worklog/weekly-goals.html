@@ -14,6 +14,7 @@
       --surface:#FFFFFF; --surface-soft:#FAFCFD;
       --mode-work:oklch(0.62 0.09 245);
       --mode-life:oklch(0.62 0.09 168);
+      --card-h:426px;   /* 목표 5개 + 안내 캡션이 들어가는 높이 — 모든 상태가 이 높이를 쓴다 */
     }
 
     * { box-sizing:border-box; }
@@ -26,9 +27,9 @@
     button { margin:0; color:inherit; font:inherit; }
     input { color:inherit; font:inherit; }
 
-    .goals-wrap { width:100%; max-width:480px; margin:0 auto; }
+    .goals-wrap { width:100%; max-width:570px; margin:0 auto; }
     .goals-card {
-      width:100%; display:flex; flex-direction:column; gap:12px;
+      width:100%; height:var(--card-h); display:flex; flex-direction:column; gap:12px;
       padding:16px; border-radius:18px; background:var(--surface);
       box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
     }
@@ -81,10 +82,14 @@
     .rate-cell.is-off { opacity:.35; }
 
     /* 목록 */
-    .goals-list { min-width:0; display:flex; flex-direction:column; gap:5px; }
+    .goals-list {
+      min-width:0; min-height:0; flex:1; display:flex; flex-direction:column; gap:5px;
+      overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+      scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
 
     .goal-item {
-      width:100%; min-width:0; padding:7px 9px; display:grid;
+      width:100%; min-width:0; flex:0 0 auto; padding:7px 9px; display:grid;
       grid-template-columns:17px minmax(0,1fr) auto; align-items:center; gap:8px;
       border:0; border-radius:9px; background:var(--surface); text-align:left;
       box-shadow:0 1px 2px rgba(18,48,60,.05); cursor:pointer;
@@ -110,13 +115,13 @@
 
     /* 추가 */
     .add-row {
-      width:100%; min-height:32px; padding:0 9px; display:flex; align-items:center;
+      width:100%; min-height:32px; flex:0 0 auto; padding:0 9px; display:flex; align-items:center;
       justify-content:center; gap:5px;
       border:1px dashed var(--inactive); border-radius:9px; background:transparent;
       color:var(--muted); font-size:11px; font-weight:700; line-height:1.2; cursor:pointer;
     }
     .add-row:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
-    .add-form { min-width:0; display:flex; flex-direction:column; gap:4px; }
+    .add-form { min-width:0; flex:0 0 auto; display:flex; flex-direction:column; gap:4px; }
     .add-field { min-width:0; display:flex; align-items:center; gap:5px; }
     .add-input {
       min-width:0; flex:1; height:34px; padding:0 9px;
@@ -131,11 +136,11 @@
     }
     .add-submit:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
     .add-hint { color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
-    .limit-note { padding:0 2px; color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
+    .limit-note { flex:0 0 auto; padding:0 2px; color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
 
     /* 빈 상태 */
     .empty-state {
-      width:100%; padding:18px 12px; display:flex; flex-direction:column;
+      width:100%; min-height:0; flex:1; padding:18px 12px; display:flex; flex-direction:column;
       align-items:center; justify-content:center; gap:3px;
       border:1px dashed var(--inactive); border-radius:12px; background:var(--surface-soft);
       text-align:center; cursor:pointer;
