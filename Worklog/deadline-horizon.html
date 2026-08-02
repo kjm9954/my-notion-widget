@@ -174,7 +174,7 @@
       let today = localNoon(new Date());
       let renderedDateKey = '';
       let state = { tasks:[] };
-      let worklogState = { tasks:[], lastUsed:{} };
+      let worklogState = { tasks:[], projects:[], lastUsed:{} };
       let projects = [];
       let midnightTimer = 0;
       let animationTimer = 0;
@@ -250,6 +250,7 @@
 
       function readProjects() {
         const values = [
+          ...(Array.isArray(worklogState?.projects) ? worklogState.projects : []),
           worklogState?.lastUsed?.work?.proj,
           worklogState?.lastUsed?.life?.proj,
           ...(Array.isArray(worklogState?.tasks) ? worklogState.tasks.map(task => task?.proj) : [])

@@ -292,7 +292,7 @@
       const todayKey = dateKey(today);
       let shownMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
       let state = { tasks:[] };
-      let worklogState = { tasks:[], lastUsed:{} };
+      let worklogState = { tasks:[], projects:[], lastUsed:{} };
       let projects = [];
       let pendingCalendarSync = false;
       let pendingProjectSync = false;
@@ -369,6 +369,7 @@
 
       function readProjects() {
         const values = [
+          ...(Array.isArray(worklogState?.projects) ? worklogState.projects : []),
           worklogState?.lastUsed?.work?.proj,
           worklogState?.lastUsed?.life?.proj,
           ...(Array.isArray(worklogState?.tasks) ? worklogState.tasks.map(task => task?.proj) : [])

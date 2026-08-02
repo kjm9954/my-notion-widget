@@ -579,6 +579,7 @@ function defaultWorklogState() {
   return {
     mode: "work",
     tasks: [],
+    projects: [],
     lastRollWeek: "",
     bannerDismissedWeek: "",
     lastRollCount: 0,
@@ -621,16 +622,29 @@ function normalizeWorklogState(raw) {
     };
   }).filter(Boolean);
   const weekKey = value => /^\d{4}-W\d{2}$/.test(String(value || "")) ? String(value) : "";
+  const lastUsed = {
+    work: normalizeWorklogLastUsed(source.lastUsed?.work),
+    life: normalizeWorklogLastUsed(source.lastUsed?.life),
+  };
+  const projects = [];
+  [
+    ...(Array.isArray(source.projects) ? source.projects : []),
+    lastUsed.work.proj,
+    lastUsed.life.proj,
+    ...tasks.map(task => task.proj),
+  ].forEach(value => {
+    const project = cleanText(value, 30);
+    if (!project || project === "미분류" || projects.includes(project) || projects.length >= 40) return;
+    projects.push(project);
+  });
   return {
     mode: source.mode === "life" ? "life" : "work",
     tasks,
+    projects,
     lastRollWeek: weekKey(source.lastRollWeek),
     bannerDismissedWeek: weekKey(source.bannerDismissedWeek),
     lastRollCount: Number.isFinite(Number(source.lastRollCount)) ? Math.max(0, Math.floor(Number(source.lastRollCount))) : 0,
-    lastUsed: {
-      work: normalizeWorklogLastUsed(source.lastUsed?.work),
-      life: normalizeWorklogLastUsed(source.lastUsed?.life),
-    },
+    lastUsed,
   };
 }
 

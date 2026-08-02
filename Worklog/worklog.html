@@ -479,7 +479,7 @@
 
       function defaultState() {
         return {
-          mode:'work', tasks:[], lastRollWeek:isoWeekKey(todayDate()),
+          mode:'work', tasks:[], projects:[], lastRollWeek:isoWeekKey(todayDate()),
           bannerDismissedWeek:'', lastRollCount:0,
           lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } }
         };
@@ -559,17 +559,30 @@
             tasks.push(task);
           });
         }
+        const lastUsed = {
+          work:normalizeLastUsed(raw.lastUsed?.work),
+          life:normalizeLastUsed(raw.lastUsed?.life)
+        };
+        const projects = [];
+        [
+          ...(Array.isArray(raw.projects) ? raw.projects : []),
+          lastUsed.work.proj,
+          lastUsed.life.proj,
+          ...tasks.map(task => task.proj)
+        ].forEach(value => {
+          const project = String(value || '').trim().slice(0,30);
+          if (!project || project === '미분류' || projects.includes(project) || projects.length >= 40) return;
+          projects.push(project);
+        });
         return {
           ...raw,
           mode:raw.mode === 'life' ? 'life' : 'work',
           tasks,
+          projects,
           lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
           bannerDismissedWeek:validWeekKey(raw.bannerDismissedWeek) ? raw.bannerDismissedWeek : '',
           lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0,
-          lastUsed:{
-            work:normalizeLastUsed(raw.lastUsed?.work),
-            life:normalizeLastUsed(raw.lastUsed?.life)
-          }
+          lastUsed
         };
       }
 
@@ -1021,9 +1034,18 @@
       }
 
       function projectChoices(task) {
-        const values = [task?.proj, state.lastUsed?.work?.proj, state.lastUsed?.life?.proj, ...state.tasks.map(item => item.proj)]
+        const values = [task?.proj, ...(state.projects || []), state.lastUsed?.work?.proj, state.lastUsed?.life?.proj, ...state.tasks.map(item => item.proj)]
           .map(value => String(value || '').trim()).filter(Boolean);
         return [...new Set(['미분류', ...values])];
+      }
+
+      function rememberProject(value) {
+        const project = String(value || '').trim().slice(0,30);
+        if (!project || project === '미분류') return project || '미분류';
+        const fresh = readState();
+        fresh.projects = [...new Set([...(fresh.projects || []),project])].slice(0,40);
+        persist(fresh);
+        return project;
       }
 
       function calendarMonth(value) {
@@ -1538,20 +1560,21 @@
       });
 
       card.addEventListener('submit', event => {
-        const quickForm = event.target.closest('[data-quick-add-form]');
-        if (quickForm) {
-          event.preventDefault();
-          saveQuickTask(quickForm, true);
-          return;
-        }
         const newProjectForm = event.target.closest('[data-project-new-form]');
         if (newProjectForm && ui.popover) {
           event.preventDefault();
           const id = ui.popover.taskId;
           const value = String(new FormData(newProjectForm).get('project') || '').trim();
           if (!value) return;
+          const project = rememberProject(value);
           closeCellPopover();
-          updateTask(id, task => { task.proj = value; }, '구분을 바꿨습니다.');
+          updateTask(id, task => { task.proj = project; }, '구분을 추가했습니다.');
+          return;
+        }
+        const quickForm = event.target.closest('[data-quick-add-form]');
+        if (quickForm) {
+          event.preventDefault();
+          saveQuickTask(quickForm, true);
           return;
         }
         const form = event.target.closest('[data-task-form]');
