@@ -247,6 +247,7 @@
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
+  <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host" data-widget-host data-widget-key="widget-size-weekly.html" data-widget-max-width="2100" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:2100px;--widget-base-width:2100px;--widget-base-height:560px;--widget-visual-height:560px">
@@ -293,7 +294,6 @@
     (() => {
       'use strict';
 
-      const DATA_KEY = 'worklog-v1';
       const SHORT_DAYS = ['일','월','화','수','목','금','토'];
       const LEVEL_LIMITS = [4,8,Infinity];
       const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
@@ -316,7 +316,6 @@
       const modalBody = document.getElementById('modalBody');
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
-      let channel = null;
       let initialized = false;
       let lastFocused = null;
       const state = { mode:'work', weekStart:null, level:0, selectedDay:'', modalDate:null, tasks:[] };
@@ -378,18 +377,10 @@
         };
       }
 
-      function readWorklog() {
-        try {
-          const rawText = localStorage.getItem(DATA_KEY);
-          if (!rawText) return { mode:'work', tasks:[] };
-          const raw = JSON.parse(rawText);
-          if (!raw || typeof raw !== 'object') return { mode:'work', tasks:[] };
-          const tasks = Array.isArray(raw.tasks) ? raw.tasks.map(normalizeTask).filter(task => task && task.title) : [];
-          return { mode:raw.mode === 'life' ? 'life' : 'work', tasks };
-        } catch (error) {
-          console.warn('주간 요약 데이터를 불러오지 못했습니다.', error);
-          return { mode:'work', tasks:[] };
-        }
+      function normalizeWorklog(raw) {
+        if (!raw || typeof raw !== 'object') return { mode:'work', tasks:[] };
+        const tasks = Array.isArray(raw.tasks) ? raw.tasks.map(normalizeTask).filter(task => task && task.title) : [];
+        return { mode:raw.mode === 'life' ? 'life' : 'work', tasks };
       }
 
       function activeKeys() {
@@ -603,18 +594,27 @@
         modalClose.focus({ preventScroll:true });
       }
 
-      function syncData(external = false, resetToCurrentWeek = false) {
+      async function syncData(external = false, resetToCurrentWeek = false) {
         if (resetToCurrentWeek) {
           closeModal();
           state.weekStart = startOfWeek(todayDate());
           state.selectedDay = '';
         }
-        const loaded = readWorklog();
+        let loaded;
+        try {
+          loaded = normalizeWorklog(await Store.loadWorklogState());
+        } catch (error) {
+          console.warn('주간 요약 데이터를 불러오지 못했습니다.', error);
+          liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+          return;
+        }
+        const previous = JSON.stringify({ mode:state.mode, tasks:state.tasks });
         if (!initialized) {
           state.mode = loaded.mode;
           initialized = true;
         }
         state.tasks = loaded.tasks;
+        if (initialized && previous === JSON.stringify({ mode:state.mode, tasks:state.tasks }) && !resetToCurrentWeek) return;
         ensureSelectedDay();
         const modalScroll = modalBody.scrollTop;
         render();
@@ -697,22 +697,15 @@
         }
       });
 
-      window.addEventListener('storage', event => { if (event.key === DATA_KEY) syncData(true); });
       window.addEventListener('focus', () => syncData(true,true));
       window.addEventListener('pageshow', () => syncData(true,true));
       document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true,true); });
       mobileQuery.addEventListener?.('change', render);
-      try {
-        if ('BroadcastChannel' in window) {
-          channel = new BroadcastChannel(DATA_KEY);
-          channel.addEventListener('message', () => syncData(true));
-        }
-      } catch (error) {
-        console.warn('주간 요약 실시간 동기화를 시작하지 못했습니다.', error);
-      }
 
       state.weekStart = startOfWeek(todayDate());
+      render();
       syncData(false);
+      Store.watch(() => syncData(true));
     })();
   </script>
   <script src="../widget-frame.js"></script>

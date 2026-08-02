@@ -376,6 +376,7 @@
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
+  <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog.html" data-widget-max-width="1350" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:1350px;--widget-base-width:1350px;--widget-base-height:595px;--widget-visual-height:595px">
@@ -407,7 +408,6 @@
     (() => {
       'use strict';
 
-      const STORAGE_KEY = 'worklog-v1';
       const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
       const SHORT_DAYS = ['일','월','화','수','목','금','토'];
       const VALID_STATUS = new Set(['doing','done','wait']);
@@ -424,19 +424,15 @@
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
       const narrowQuery = window.matchMedia('(max-width: 320px)');
-      let channel = null;
-      try {
-        if ('BroadcastChannel' in window) channel = new BroadcastChannel(STORAGE_KEY);
-      } catch (error) {
-        console.warn('업무일지 실시간 동기화를 시작하지 못했습니다.', error);
-      }
       const ui = {
         selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
         confirmDeleteId:null, deleteTimer:null, newId:null, popover:null, projectAdding:false,
         dirtyFields:new Set()
       };
-      let state;
+      let state = defaultState();
       let pendingExternalSync = false;
+      let pendingServerState = null;
+      let saveQueue = Promise.resolve();
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -578,29 +574,19 @@
       }
 
       function readState() {
-        try {
-          const saved = localStorage.getItem(STORAGE_KEY);
-          return saved ? normalizeState(JSON.parse(saved)) : defaultState();
-        } catch (error) {
-          console.warn('업무일지 데이터를 불러오지 못했습니다.', error);
-          return defaultState();
-        }
+        return normalizeState(state);
       }
 
-      function persist(next, announce = true) {
+      function persist(next) {
         const normalized = normalizeState(next);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-          state = normalized;
-        } catch (error) {
-          console.warn('업무일지 데이터를 저장하지 못했습니다.', error);
-          liveRegion.textContent = '저장하지 못했습니다. 다시 시도해 주세요.';
-          return false;
-        }
-        if (announce) {
-          try { channel?.postMessage({ type:'changed' }); }
-          catch (error) { console.warn('업무일지 변경 알림을 보내지 못했습니다.', error); }
-        }
+        state = normalized;
+        const snapshot = normalizeState(normalized);
+        saveQueue = saveQueue
+          .then(() => Store.saveWorklogState(snapshot))
+          .catch(error => {
+            console.warn('업무일지 데이터를 저장하지 못했습니다.', error);
+            liveRegion.textContent = '저장하지 못했습니다. 다시 시도해 주세요.';
+          });
         return true;
       }
 
@@ -1139,6 +1125,8 @@
 
       function drainPendingSync() {
         if (!pendingExternalSync) return true;
+        if (pendingServerState) state = normalizeState(pendingServerState);
+        pendingServerState = null;
         if (!rollWeekIfNeeded()) return false;
         pendingExternalSync = false;
         const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), state.mode);
@@ -1545,7 +1533,7 @@
         }
         if (event.target.closest('[data-cancel-editor]')) {
           resetTransient();
-          syncFromStorage();
+          syncFromServer();
         }
       });
 
@@ -1642,7 +1630,7 @@
         }
         if (event.key === 'Escape' && (ui.adding || ui.editingId)) {
           resetTransient();
-          syncFromStorage();
+          syncFromServer();
           return;
         }
         if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
@@ -1651,27 +1639,42 @@
         changeDate(event.key === 'ArrowRight' ? 1 : -1);
       });
 
-      function syncFromStorage(resetToToday = false) {
-        if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover) {
-          pendingExternalSync = true;
+      async function syncFromServer(resetToToday = false) {
+        let loaded;
+        try {
+          await saveQueue;
+          loaded = normalizeState(await Store.loadWorklogState());
+        } catch (error) {
+          console.warn('업무일지 데이터를 불러오지 못했습니다.', error);
+          liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+          if (!ui.selectedDate) ui.selectedDate = localDateKey(clampDateToMode(todayDate(),state.mode));
+          renderAll();
           return;
         }
+        if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover) {
+          if (JSON.stringify(loaded) !== JSON.stringify(state)) {
+            pendingExternalSync = true;
+            pendingServerState = loaded;
+          }
+          return;
+        }
+        const changed = JSON.stringify(loaded) !== JSON.stringify(state);
+        if (!changed && !resetToToday) return;
+        state = loaded;
+        pendingServerState = null;
         pendingExternalSync = !rollWeekIfNeeded();
         if (resetToToday) applyOpenDefaults();
         else {
           const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
           ui.selectedDate = localDateKey(selected);
         }
+        liveRegion.textContent = '';
         renderAll();
       }
 
-      window.addEventListener('storage', event => {
-        if (event.key === STORAGE_KEY) syncFromStorage();
-      });
-      window.addEventListener('focus', () => syncFromStorage(true));
-      window.addEventListener('pageshow', () => syncFromStorage(true));
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(true); });
-      channel?.addEventListener('message', () => syncFromStorage());
+      window.addEventListener('focus', () => syncFromServer(true));
+      window.addEventListener('pageshow', () => syncFromServer(true));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(true); });
       mobileQuery.addEventListener?.('change', () => {
         if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderAll();
       });
@@ -1679,10 +1682,13 @@
         if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderDays();
       });
 
-      state = readState();
-      pendingExternalSync = !rollWeekIfNeeded();
-      applyOpenDefaults();
-      renderAll();
+      async function bootstrap() {
+        liveRegion.textContent = '업무일지를 불러오는 중입니다.';
+        await syncFromServer(true);
+        Store.watch(() => syncFromServer(false));
+      }
+
+      bootstrap();
       window.addEventListener('load', alignSelectedDay, { once:true });
     })();
   </script>

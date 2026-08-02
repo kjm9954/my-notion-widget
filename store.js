@@ -163,6 +163,38 @@ async function deleteIndexItem(id) {
   return apiPost("/api/index/delete", { id });
 }
 
+// ───────── 업무일지 ─────────
+async function loadWorklogState() {
+  return (await apiGet("/api/worklog/state")).data;
+}
+async function saveWorklogState(state) {
+  return (await apiPost("/api/worklog/state", state)).data;
+}
+
+// ───────── 중요 업무 ─────────
+async function loadImportantCalendarState() {
+  return (await apiGet("/api/important-calendar/state")).data;
+}
+async function saveImportantCalendarState(state) {
+  return (await apiPost("/api/important-calendar/state", state)).data;
+}
+
+// ───────── 이번 주 목표 ─────────
+async function loadWeeklyGoalsState() {
+  return (await apiGet("/api/weekly-goals/state")).data;
+}
+async function saveWeeklyGoalsState(state) {
+  return (await apiPost("/api/weekly-goals/state", state)).data;
+}
+
+// ───────── 메모장 ─────────
+async function loadNotesState() {
+  return (await apiGet("/api/notes/state")).data;
+}
+async function saveNotesState(state) {
+  return (await apiPost("/api/notes/state", state)).data;
+}
+
 // ───────── 계산 (저장 안 함, 호출 시 계산) ─────────
 async function getHP() {
   const dates = await getWrittenDates();
@@ -217,6 +249,10 @@ window.Store = {
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,
+  loadWorklogState, saveWorklogState,
+  loadImportantCalendarState, saveImportantCalendarState,
+  loadWeeklyGoalsState, saveWeeklyGoalsState,
+  loadNotesState, saveNotesState,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
   watch,
 };

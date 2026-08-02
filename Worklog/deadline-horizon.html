@@ -116,6 +116,7 @@
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
+  <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host" data-widget-host data-widget-key="widget-size-deadline-horizon.html"
@@ -155,8 +156,6 @@
     (() => {
       'use strict';
 
-      const STORAGE_KEY = 'important-calendar-v1';
-      const WORKLOG_KEY = 'worklog-v1';
       const STATUS_LABELS = { wait:'대기', doing:'진행', done:'완료' };
       const STATUS_ORDER = { doing:0, wait:1, done:2 };
       const STATUS_VALUES = new Set(Object.keys(STATUS_LABELS));
@@ -174,10 +173,9 @@
       let selectedOffset = 0;
       let today = localNoon(new Date());
       let renderedDateKey = '';
-      let state = readCalendar();
-      let projects = readProjects();
-      let calendarChannel = null;
-      let worklogChannel = null;
+      let state = { tasks:[] };
+      let worklogState = { tasks:[], lastUsed:{} };
+      let projects = [];
       let midnightTimer = 0;
       let animationTimer = 0;
 
@@ -247,35 +245,22 @@
       }
 
       function readCalendar() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          return normalizeCalendar(raw ? JSON.parse(raw) : {});
-        } catch (error) {
-          console.warn('중요 업무를 불러오지 못했습니다.', error);
-          return { tasks:[] };
-        }
+        return normalizeCalendar(state);
       }
 
       function readProjects() {
-        try {
-          const raw = localStorage.getItem(WORKLOG_KEY);
-          const worklog = raw ? JSON.parse(raw) : {};
-          const values = [
-            worklog?.lastUsed?.work?.proj,
-            worklog?.lastUsed?.life?.proj,
-            ...(Array.isArray(worklog?.tasks) ? worklog.tasks.map(task => task?.proj) : [])
-          ];
-          const unique = [];
-          values.forEach(value => {
-            const project = String(value || '').trim();
-            if (!project || project === '미분류' || unique.includes(project)) return;
-            unique.push(project);
-          });
-          return unique.slice(0,4);
-        } catch (error) {
-          console.warn('업무일지 프로젝트를 불러오지 못했습니다.', error);
-          return [];
-        }
+        const values = [
+          worklogState?.lastUsed?.work?.proj,
+          worklogState?.lastUsed?.life?.proj,
+          ...(Array.isArray(worklogState?.tasks) ? worklogState.tasks.map(task => task?.proj) : [])
+        ];
+        const unique = [];
+        values.forEach(value => {
+          const project = String(value || '').trim();
+          if (!project || project === '미분류' || unique.includes(project)) return;
+          unique.push(project);
+        });
+        return unique.slice(0,4);
       }
 
       function compareTasks(a, b) {
@@ -385,11 +370,32 @@
         }
       }
 
-      function refresh({ calendar=true, worklog=true, mark=false } = {}) {
+      async function refresh({ calendar=true, worklog=true, mark=false } = {}) {
         const nextToday = localNoon(new Date());
-        if (dateKey(nextToday) !== dateKey(today)) today = nextToday;
-        if (calendar) state = readCalendar();
-        if (worklog) projects = readProjects();
+        const dateChanged = dateKey(nextToday) !== dateKey(today);
+        if (dateChanged) today = nextToday;
+        let changed = false;
+        try {
+          const [calendarState,worklogData] = await Promise.all([
+            calendar ? Store.loadImportantCalendarState() : Promise.resolve(null),
+            worklog ? Store.loadWorklogState() : Promise.resolve(null)
+          ]);
+          if (calendarState) {
+            const nextCalendar = normalizeCalendar(calendarState);
+            changed ||= JSON.stringify(nextCalendar) !== JSON.stringify(state);
+            state = nextCalendar;
+          }
+          if (worklogData) {
+            changed ||= JSON.stringify(worklogData) !== JSON.stringify(worklogState);
+            worklogState = worklogData;
+            projects = readProjects();
+          }
+        } catch (error) {
+          console.warn('마감 업무를 불러오지 못했습니다.', error);
+          liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+          return;
+        }
+        if (!changed && !dateChanged) return;
         render({ motion:mark ? 'motion-new' : '', announce:false });
       }
 
@@ -413,22 +419,6 @@
         render({ motion:'motion-swap', announce:true });
       });
 
-      try {
-        if ('BroadcastChannel' in window) {
-          calendarChannel = new BroadcastChannel(STORAGE_KEY);
-          worklogChannel = new BroadcastChannel(WORKLOG_KEY);
-          calendarChannel.addEventListener('message', () => refresh({ calendar:true, worklog:false, mark:true }));
-          worklogChannel.addEventListener('message', () => refresh({ calendar:false, worklog:true, mark:true }));
-        }
-      } catch (error) {
-        console.warn('동기화 채널을 열지 못했습니다.', error);
-      }
-
-      window.addEventListener('storage', event => {
-        if (event.key === STORAGE_KEY) refresh({ calendar:true, worklog:false, mark:true });
-        else if (event.key === WORKLOG_KEY) refresh({ calendar:false, worklog:true, mark:true });
-        else if (event.key === null) refresh({ mark:true });
-      });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           refresh();
@@ -441,11 +431,11 @@
       });
       window.addEventListener('pagehide', () => {
         clearTimeout(midnightTimer);
-        try { calendarChannel?.close(); } catch (_) {}
-        try { worklogChannel?.close(); } catch (_) {}
       });
 
       render();
+      refresh();
+      Store.watch(() => refresh({ mark:true }));
       scheduleMidnightRefresh();
     })();
   </script>

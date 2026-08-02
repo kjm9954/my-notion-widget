@@ -188,6 +188,7 @@
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
+  <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host goals-wrap" id="goalsWrap" data-widget-host
@@ -222,7 +223,6 @@
     (function () {
       'use strict';
 
-      var KEY = 'weekly-goals-v1';
       var MAX = 5;
       var MODES = {
         work: { placeholder: '이번 주에 할 일 한 줄', empty: '이번 주 업무 목표 없음' },
@@ -246,6 +246,7 @@
       var editingId = null;
       var editDraft = '';
       var state = { week: '', items: [], seq: 0 };
+      var saveQueue = Promise.resolve();
 
       /* ── 주 계산 ───────────────────────────── */
       function mondayOf(date) {
@@ -255,15 +256,11 @@
       }
       function weekKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
       /* ── 저장소 ───────────────────────────── */
-      function load() {
+      async function load() {
         var monday = mondayOf(new Date());
         var key = weekKey(monday);
         var next = { week: key, items: [], seq: 0 };
-        var raw = null;
-        try { raw = localStorage.getItem(KEY); } catch (e) { raw = null; }
-        if (!raw) return next;
-        var saved = null;
-        try { saved = JSON.parse(raw); } catch (e) { saved = null; }
+        var saved = await Store.loadWeeklyGoalsState();
         if (!saved || typeof saved !== 'object') return next;
         if (saved.week !== key) return next;
         var items = Array.isArray(saved.items) ? saved.items : [];
@@ -280,7 +277,27 @@
       }
 
       function save() {
-        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 저장 불가 시 무시 */ }
+        var snapshot = JSON.parse(JSON.stringify(state));
+        saveQueue = saveQueue.then(function () {
+          return Store.saveWeeklyGoalsState(snapshot);
+        }).catch(function (error) {
+          console.warn('이번 주 목표를 저장하지 못했습니다.', error);
+          list.innerHTML = '<div class="empty-state"><strong class="empty-title">저장하지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
+        });
+      }
+
+      async function syncFromServer() {
+        if (adding || editingId !== null) return;
+        try {
+          await saveQueue;
+          var next = await load();
+          if (JSON.stringify(next) === JSON.stringify(state)) return;
+          state = next;
+          render(false);
+        } catch (error) {
+          console.warn('이번 주 목표를 불러오지 못했습니다.', error);
+          list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
+        }
       }
 
       /* ── 렌더 ───────────────────────────── */
@@ -515,10 +532,18 @@
         }
       }
 
-      state = load();
-      save();
+      state = { week: weekKey(mondayOf(new Date())), items: [], seq: 0 };
       render(false);
       applyWidth();
+      load().then(function (loaded) {
+        state = loaded;
+        save();
+        render(false);
+      }).catch(function (error) {
+        console.warn('이번 주 목표를 불러오지 못했습니다.', error);
+        list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
+      });
+      Store.watch(syncFromServer);
 
       // 임베드가 숨겨져 있으면 ResizeObserver 콜백이 돌지 않는다. resize도 함께 건다.
       if (typeof ResizeObserver === 'function') {

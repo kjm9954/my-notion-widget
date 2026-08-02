@@ -10,7 +10,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
     const json = (obj, status = 200) =>
-      new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
+      new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
     try {
       // ───────── 일기 ─────────
@@ -332,6 +332,50 @@ export default {
         return json({ ok: true });
       }
 
+      // ───────── 업무일지 ─────────
+      if (path === "/api/worklog/state" && request.method === "GET") {
+        return json({ ok: true, data: await loadWorklogState(env) });
+      }
+
+      if (path === "/api/worklog/state" && request.method === "POST") {
+        const state = normalizeWorklogState(await request.json());
+        await saveSetting(env, "worklog", state);
+        return json({ ok: true, data: state });
+      }
+
+      // ───────── 중요 업무 ─────────
+      if (path === "/api/important-calendar/state" && request.method === "GET") {
+        return json({ ok: true, data: await loadImportantCalendarState(env) });
+      }
+
+      if (path === "/api/important-calendar/state" && request.method === "POST") {
+        const state = normalizeImportantCalendarState(await request.json());
+        await saveSetting(env, "importantCalendar", state);
+        return json({ ok: true, data: state });
+      }
+
+      // ───────── 이번 주 목표 ─────────
+      if (path === "/api/weekly-goals/state" && request.method === "GET") {
+        return json({ ok: true, data: await loadWeeklyGoalsState(env) });
+      }
+
+      if (path === "/api/weekly-goals/state" && request.method === "POST") {
+        const state = normalizeWeeklyGoalsState(await request.json());
+        await saveSetting(env, "weeklyGoals", state);
+        return json({ ok: true, data: state });
+      }
+
+      // ───────── 메모장 ─────────
+      if (path === "/api/notes/state" && request.method === "GET") {
+        return json({ ok: true, data: await loadNotesState(env) });
+      }
+
+      if (path === "/api/notes/state" && request.method === "POST") {
+        const state = normalizeNotesState(await request.json());
+        await saveSetting(env, "notes", state);
+        return json({ ok: true, data: state });
+      }
+
       // 기본 화면
       return new Response(
         `<html><body style="font-family:sans-serif;padding:40px;text-align:center">
@@ -502,4 +546,159 @@ async function buildIndexState(env) {
     return { id, source: "goal", sourceId: goal.id, scope: meta.scope || index.scope, q: meta.q || null, st: goal.done ? "done" : (meta.st === "doing" ? "doing" : "todo"), t: goal.t, p: meta.p || parent };
   });
   return { items: [...thoughtItems, ...goalItems], scope: index.scope };
+}
+
+function validDateKey(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+  if (!match) return false;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return date.getFullYear() === Number(match[1])
+    && date.getMonth() === Number(match[2]) - 1
+    && date.getDate() === Number(match[3]);
+}
+
+function normalizeClockTime(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(String(value).trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeWorklogLastUsed(raw) {
+  const q = Number(raw?.q);
+  return {
+    proj: cleanText(raw?.proj, 80) || "미분류",
+    q: Number.isInteger(q) && q >= 1 && q <= 4 ? q : null,
+  };
+}
+
+function defaultWorklogState() {
+  return {
+    mode: "work",
+    tasks: [],
+    lastRollWeek: "",
+    bannerDismissedWeek: "",
+    lastRollCount: 0,
+    lastUsed: {
+      work: { proj: "미분류", q: null },
+      life: { proj: "미분류", q: null },
+    },
+  };
+}
+
+function normalizeWorklogState(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const ids = new Set();
+  const tasks = (Array.isArray(source.tasks) ? source.tasks : []).map(value => {
+    const id = cleanText(value?.id, 120);
+    if (!id || ids.has(id) || !validDateKey(value?.date)) return null;
+    ids.add(id);
+    const q = Number(value?.q);
+    const progress = Number(value?.progress);
+    const estimate = Number(value?.est);
+    const status = ["doing", "done", "wait"].includes(value?.status) ? value.status : "wait";
+    const done = value?.done === true || status === "done";
+    return {
+      id,
+      mode: value?.mode === "life" ? "life" : "work",
+      date: value.date,
+      proj: cleanText(value?.proj, 80),
+      q: Number.isInteger(q) && q >= 1 && q <= 4 ? q : null,
+      title: cleanText(value?.title, 240),
+      due: validDateKey(value?.due) ? value.due : null,
+      start: normalizeClockTime(value?.start),
+      end: normalizeClockTime(value?.end),
+      progress: value?.progress !== null && value?.progress !== undefined && value?.progress !== "" && Number.isFinite(progress) && progress >= 0 ? progress : null,
+      est: value?.est !== null && value?.est !== undefined && value?.est !== "" && Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
+      status: done ? "done" : status,
+      done,
+      memo: cleanText(value?.memo, 4000),
+      rolledFrom: validDateKey(value?.rolledFrom) ? value.rolledFrom : null,
+      progressTouched: value?.progressTouched === true,
+    };
+  }).filter(Boolean);
+  const weekKey = value => /^\d{4}-W\d{2}$/.test(String(value || "")) ? String(value) : "";
+  return {
+    mode: source.mode === "life" ? "life" : "work",
+    tasks,
+    lastRollWeek: weekKey(source.lastRollWeek),
+    bannerDismissedWeek: weekKey(source.bannerDismissedWeek),
+    lastRollCount: Number.isFinite(Number(source.lastRollCount)) ? Math.max(0, Math.floor(Number(source.lastRollCount))) : 0,
+    lastUsed: {
+      work: normalizeWorklogLastUsed(source.lastUsed?.work),
+      life: normalizeWorklogLastUsed(source.lastUsed?.life),
+    },
+  };
+}
+
+async function loadWorklogState(env) {
+  return normalizeWorklogState(await loadSetting(env, "worklog", defaultWorklogState()));
+}
+
+function normalizeImportantCalendarState(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const ids = new Set();
+  const tasks = (Array.isArray(source.tasks) ? source.tasks : []).map(value => {
+    const id = cleanText(value?.id, 120);
+    const title = cleanText(value?.title, 240);
+    if (!id || ids.has(id) || !title || !validDateKey(value?.due)) return null;
+    ids.add(id);
+    const createdAt = Number(value?.createdAt);
+    const updatedAt = Number(value?.updatedAt);
+    return {
+      id,
+      title,
+      proj: cleanText(value?.proj, 80),
+      status: ["wait", "doing", "done"].includes(value?.status) ? value.status : "wait",
+      due: value.due,
+      memo: cleanText(value?.memo, 4000),
+      createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+    };
+  }).filter(Boolean);
+  return { tasks };
+}
+
+async function loadImportantCalendarState(env) {
+  return normalizeImportantCalendarState(await loadSetting(env, "importantCalendar", { tasks: [] }));
+}
+
+function normalizeWeeklyGoalsState(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  let seq = Number.isFinite(Number(source.seq)) ? Math.max(0, Math.floor(Number(source.seq))) : 0;
+  const ids = new Set();
+  const items = (Array.isArray(source.items) ? source.items : []).map(value => {
+    let id = Number(value?.id);
+    if (!Number.isInteger(id) || id <= 0 || ids.has(id)) id = ++seq;
+    ids.add(id);
+    seq = Math.max(seq, id);
+    const text = cleanText(value?.text, 240);
+    if (!text || !["work", "life"].includes(value?.m)) return null;
+    return { id, m: value.m, done: value?.done === true, text };
+  }).filter(Boolean).slice(0, 5);
+  return { week: cleanText(source.week, 24), items, seq };
+}
+
+async function loadWeeklyGoalsState(env) {
+  return normalizeWeeklyGoalsState(await loadSetting(env, "weeklyGoals", { week: "", items: [], seq: 0 }));
+}
+
+function normalizeNotesState(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const ids = new Set();
+  const items = (Array.isArray(source.items) ? source.items : []).map(value => {
+    const id = cleanText(value?.id, 120);
+    const text = cleanText(value?.text, 1000);
+    if (!id || ids.has(id) || !text) return null;
+    ids.add(id);
+    return { id, text, done: value?.done === true };
+  }).filter(Boolean);
+  return { items };
+}
+
+async function loadNotesState(env) {
+  return normalizeNotesState(await loadSetting(env, "notes", { items: [] }));
 }

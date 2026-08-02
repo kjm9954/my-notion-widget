@@ -250,6 +250,7 @@
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
+  <script src="../store.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
   <div class="widget-host" data-widget-host data-widget-key="widget-size-important-calendar.html" data-widget-max-width="1335" data-widget-height="854" data-widget-max-scale="4" style="--widget-max-width:1335px;--widget-base-width:1335px;--widget-base-height:854px;--widget-visual-height:854px">
@@ -278,8 +279,6 @@
     (() => {
       'use strict';
 
-      const STORAGE_KEY = 'important-calendar-v1';
-      const WORKLOG_KEY = 'worklog-v1';
       const STATUS_LABELS = { wait:'대기', doing:'진행', done:'완료' };
       const STATUS_VALUES = new Set(Object.keys(STATUS_LABELS));
       const PROJECT_COLORS = ['project-1','project-2','project-3','project-4'];
@@ -292,12 +291,14 @@
       const today = localNoon(new Date());
       const todayKey = dateKey(today);
       let shownMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
-      let state = readCalendar();
-      let projects = readProjects();
-      let calendarChannel = null;
-      let worklogChannel = null;
+      let state = { tasks:[] };
+      let worklogState = { tasks:[], lastUsed:{} };
+      let projects = [];
       let pendingCalendarSync = false;
       let pendingProjectSync = false;
+      let pendingCalendarState = null;
+      let pendingWorklogState = null;
+      let saveQueue = Promise.resolve();
       let deleteTimer = 0;
       let ui = freshUi();
 
@@ -363,54 +364,38 @@
       }
 
       function readCalendar() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          return normalizeCalendar(raw ? JSON.parse(raw) : {});
-        } catch (error) {
-          console.warn('중요 업무를 불러오지 못했습니다.', error);
-          liveRegion && (liveRegion.textContent = '중요 업무를 불러오지 못했습니다.');
-          return { tasks:[] };
-        }
+        return normalizeCalendar(state);
       }
 
       function readProjects() {
-        try {
-          const raw = localStorage.getItem(WORKLOG_KEY);
-          const worklog = raw ? JSON.parse(raw) : {};
-          const values = [
-            worklog?.lastUsed?.work?.proj,
-            worklog?.lastUsed?.life?.proj,
-            ...(Array.isArray(worklog?.tasks) ? worklog.tasks.map(task => task?.proj) : [])
-          ];
-          const unique = [];
-          values.forEach(value => {
-            const project = String(value || '').trim();
-            if (!project || project === '미분류' || unique.includes(project)) return;
-            unique.push(project);
-          });
-          return unique.slice(0,4);
-        } catch (error) {
-          console.warn('업무일지 프로젝트를 불러오지 못했습니다.', error);
-          return [];
-        }
+        const values = [
+          worklogState?.lastUsed?.work?.proj,
+          worklogState?.lastUsed?.life?.proj,
+          ...(Array.isArray(worklogState?.tasks) ? worklogState.tasks.map(task => task?.proj) : [])
+        ];
+        const unique = [];
+        values.forEach(value => {
+          const project = String(value || '').trim();
+          if (!project || project === '미분류' || unique.includes(project)) return;
+          unique.push(project);
+        });
+        return unique.slice(0,4);
       }
 
       function writeMutation(mutator) {
-        try {
-          const fresh = readCalendar();
-          const byId = new Map(fresh.tasks.map(task => [task.id, task]));
-          mutator(byId);
-          const next = normalizeCalendar({ tasks:[...byId.values()] });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          state = next;
-          try { calendarChannel?.postMessage({ type:'changed' }); }
-          catch (error) { console.warn('중요 업무 변경 알림을 보내지 못했습니다.', error); }
-          return true;
-        } catch (error) {
+        const fresh = readCalendar();
+        const byId = new Map(fresh.tasks.map(task => [task.id, task]));
+        mutator(byId);
+        const next = normalizeCalendar({ tasks:[...byId.values()] });
+        state = next;
+        pendingCalendarSync = false;
+        pendingCalendarState = null;
+        const snapshot = normalizeCalendar(next);
+        saveQueue = saveQueue.then(() => Store.saveImportantCalendarState(snapshot)).catch(error => {
           console.warn('중요 업무를 저장하지 못했습니다.', error);
           liveRegion.textContent = '저장하지 못했습니다. 다시 시도해 주세요.';
-          return false;
-        }
+        });
+        return true;
       }
 
       function saveDraft() {
@@ -908,29 +893,58 @@
 
       function applyPendingSync() {
         if (pendingCalendarSync) {
-          state = readCalendar();
+          if (pendingCalendarState) state = normalizeCalendar(pendingCalendarState);
           pendingCalendarSync = false;
+          pendingCalendarState = null;
         }
         if (pendingProjectSync) {
+          if (pendingWorklogState) worklogState = pendingWorklogState;
           projects = readProjects();
           pendingProjectSync = false;
+          pendingWorklogState = null;
         }
       }
 
-      function syncCalendar() {
-        if (ui.mode === 'add' || ui.mode === 'edit') {
-          pendingCalendarSync = true;
+      async function syncCalendar() {
+        let loaded;
+        try {
+          await saveQueue;
+          loaded = normalizeCalendar(await Store.loadImportantCalendarState());
+        } catch (error) {
+          console.warn('중요 업무를 불러오지 못했습니다.', error);
+          liveRegion.textContent = '중요 업무를 불러오지 못했습니다.';
           return;
         }
-        state = readCalendar();
+        if (ui.mode === 'add' || ui.mode === 'edit') {
+          if (JSON.stringify(loaded) !== JSON.stringify(state)) {
+            pendingCalendarSync = true;
+            pendingCalendarState = loaded;
+          }
+          return;
+        }
+        if (JSON.stringify(loaded) === JSON.stringify(state)) return;
+        state = loaded;
         renderMonth();
       }
 
-      function syncProjects() {
-        if (ui.mode === 'add' || ui.mode === 'edit') {
-          pendingProjectSync = true;
+      async function syncProjects() {
+        let loaded;
+        try {
+          loaded = await Store.loadWorklogState();
+        } catch (error) {
+          console.warn('업무일지 프로젝트를 불러오지 못했습니다.', error);
+          liveRegion.textContent = '업무일지 구분을 불러오지 못했습니다.';
           return;
         }
+        if (ui.mode === 'add' || ui.mode === 'edit') {
+          if (JSON.stringify(loaded) !== JSON.stringify(worklogState)) {
+            pendingProjectSync = true;
+            pendingWorklogState = loaded;
+          }
+          return;
+        }
+        if (JSON.stringify(loaded) === JSON.stringify(worklogState)) return;
+        worklogState = loaded;
         projects = readProjects();
         renderMonth();
         if (ui.mode === 'list') renderListPopup();
@@ -940,17 +954,6 @@
         closePopover({ save:false });
         shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + delta, 1, 12);
         renderMonth();
-      }
-
-      try {
-        if ('BroadcastChannel' in window) {
-          calendarChannel = new BroadcastChannel(STORAGE_KEY);
-          worklogChannel = new BroadcastChannel(WORKLOG_KEY);
-          calendarChannel.addEventListener('message',syncCalendar);
-          worklogChannel.addEventListener('message',syncProjects);
-        }
-      } catch (error) {
-        console.warn('탭 동기화 채널을 열지 못했습니다.', error);
       }
 
       document.getElementById('previousMonth').addEventListener('click', () => setShownMonth(-1));
@@ -1060,10 +1063,6 @@
         else closePopover({ save:false, revert:true });
       });
 
-      window.addEventListener('storage', event => {
-        if (event.key === STORAGE_KEY) syncCalendar();
-        if (event.key === WORKLOG_KEY) syncProjects();
-      });
       window.addEventListener('focus', () => { syncCalendar(); syncProjects(); });
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) { syncCalendar(); syncProjects(); }
@@ -1071,6 +1070,8 @@
       window.addEventListener('resize', () => requestAnimationFrame(positionPopover));
 
       renderMonth();
+      Promise.all([syncCalendar(),syncProjects()]);
+      Store.watch(() => Promise.all([syncCalendar(),syncProjects()]));
     })();
   </script>
   <script src="../widget-frame.js"></script>
