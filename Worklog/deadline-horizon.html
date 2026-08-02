@@ -436,7 +436,7 @@
 
       render();
       refresh();
-      Store.watch(() => refresh({ mark:true }));
+      Store.watch(() => refresh({ mark:true }),1000);
       scheduleMidnightRefresh();
     })();
   </script>

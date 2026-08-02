@@ -69,8 +69,6 @@
       transition:border-color .12s, outline-color .12s;
     }
     .day.other { opacity:.3; }
-    .day.future:not(.other) > .date,
-    .day.future:not(.other) > .events { opacity:.35; }
     .day.today { outline:2px solid var(--action); outline-offset:-2px; }
     .day:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
     .date {
@@ -1072,7 +1070,7 @@
 
       renderMonth();
       Promise.all([syncCalendar(),syncProjects()]);
-      Store.watch(() => Promise.all([syncCalendar(),syncProjects()]));
+      Store.watch(() => Promise.all([syncCalendar(),syncProjects()]),1000);
     })();
   </script>
   <script src="../widget-frame.js"></script>

@@ -104,24 +104,44 @@
     .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
     .column-head, .task-row { display:grid; align-items:center; gap:10px; }
     .column-head.work, .task-row.work {
-      grid-template-columns:62px 22px minmax(0,1fr) 52px 46px 46px 42px 42px 52px 24px 24px;
+      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
     }
     .column-head.life, .task-row.life {
-      grid-template-columns:62px 22px minmax(0,1.2fr) 52px minmax(0,1fr) 24px 24px;
+      grid-template-columns:62px 22px minmax(100px,var(--life-title-track,1.2fr)) 52px minmax(100px,1fr) 24px 24px;
     }
     .column-head {
-      flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
+      position:relative; flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
       background:transparent; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em;
     }
     .column-head span { text-align:center; }
     .column-head span:nth-child(3), .column-head.life span:nth-child(5) { text-align:left; }
     .column-head span.numeric { text-align:center; }
+    .title-column-head { position:relative; overflow:visible; }
+    .column-resize-handle {
+      position:absolute; z-index:3; top:-4px; right:-6px; width:10px; height:24px; padding:0; border:0;
+      background:transparent; cursor:col-resize; touch-action:none;
+    }
+    .column-resize-handle::before {
+      content:""; position:absolute; left:4px; top:3px; bottom:3px; border-left:2px solid var(--inactive);
+      opacity:0; transition:opacity var(--t-color), border-color var(--t-color);
+    }
+    .column-resize-handle:hover::before, .column-resize-handle:focus-visible::before,
+    .column-resize-handle.is-dragging::before { opacity:1; }
+    .column-resize-handle.is-dragging::before { border-color:var(--action); }
+    .card.is-column-resizing { user-select:none; }
     .task-row {
-      height:40px; min-height:40px; flex:0 0 auto; padding:7px 10px; background:var(--surface); border-radius:9px;
+      position:relative; height:40px; min-height:40px; flex:0 0 auto; padding:7px 10px; background:var(--surface); border-radius:9px;
       box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid transparent; outline-offset:-1px;
-      transition:outline-color .12s var(--ease);
+      transition:outline-color .12s var(--ease); -webkit-touch-callout:none;
     }
     @media (hover:hover) { .task-row:hover { outline-color:var(--border-soft); } }
+    .task-row.is-reordering { outline-color:var(--action); cursor:grabbing; }
+    .task-row.is-drop-before::before, .task-row.is-drop-after::after {
+      content:""; position:absolute; z-index:4; left:4px; right:4px; border-top:2px solid var(--action); pointer-events:none;
+    }
+    .task-row.is-drop-before::before { top:-4px; }
+    .task-row.is-drop-after::after { bottom:-4px; }
+    .rows-scroll.is-reordering { user-select:none; }
     .project-pill {
       min-width:0; padding:3px 5px; overflow:hidden; border-radius:999px; background:var(--pill); color:var(--secondary);
       font-size:10px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
@@ -245,7 +265,7 @@
     }
     .cell-popover[hidden] { display:none; }
     .cell-popover.kind-project { width:108px; max-height:220px; overflow-y:auto; }
-    .cell-popover.kind-q { width:60px; }
+    .cell-popover.kind-q { width:148px; }
     .cell-popover.kind-due { width:176px; }
     .popover-label { display:block; margin-bottom:7px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .project-options, .q-options { display:flex; flex-direction:column; gap:5px; }
@@ -260,7 +280,12 @@
     }
     .project-new-input { width:100%; height:24px; padding:4px 5px; border:1px solid var(--border); border-radius:8px; background:var(--surface); font-size:9px; font-weight:700; outline:none; }
     .project-new-input:focus { border-color:var(--action); }
-    .q-option { width:36px; min-height:28px; padding:0; border:0; border-radius:8px; display:grid; place-items:center; background:transparent; }
+    .q-option {
+      width:100%; min-height:28px; padding:0 8px; border:0; border-radius:8px;
+      display:grid; grid-template-columns:24px minmax(0,1fr); align-items:center; gap:7px; background:transparent;
+    }
+    .q-option .q-badge { justify-self:center; }
+    .q-option-label { color:var(--secondary); font-size:9px; font-weight:700; text-align:left; white-space:nowrap; }
     .q-option.is-selected { outline:2px solid var(--action); outline-offset:-2px; }
     .popover-controls { display:grid; grid-template-columns:28px minmax(40px,1fr) 28px; align-items:center; gap:8px; }
     .popover-step {
@@ -287,7 +312,7 @@
     }
     @media (max-width:999px) and (min-width:640px) {
       .column-head.work, .task-row.work {
-        grid-template-columns:62px 22px minmax(90px,1fr) 52px 46px 46px 42px 42px 52px 24px 24px;
+        grid-template-columns:62px 22px minmax(90px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
       }
     }
     @media (max-width:639px) {
@@ -362,6 +387,7 @@
       .editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .editor-field.is-wide { grid-column:span 2; }
       .editor-button { min-height:40px; }
+      .column-resize-handle { display:none; }
     }
     @media (max-width:447px) { .task-row.life { grid-template-columns:52px 22px minmax(0,1fr) 40px 40px; gap:5px; } }
     @media (max-width:320px) {
@@ -411,6 +437,9 @@
       const WEEKDAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
       const SHORT_DAYS = ['일','월','화','수','목','금','토'];
       const VALID_STATUS = new Set(['doing','done','wait']);
+      const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
+      const DEFAULT_COLUMN_SPLIT = { work:.73, life:6 / 11 };
+      const WORK_DETAIL_WEIGHT = 6.68;
       const card = document.querySelector('[data-widget-card]');
       const modeRow = document.getElementById('modeRow');
       const dayTrack = document.getElementById('dayTrack');
@@ -427,7 +456,7 @@
       const ui = {
         selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
         confirmDeleteId:null, deleteTimer:null, newId:null, popover:null, projectAdding:false,
-        dirtyFields:new Set()
+        projectChoiceTimer:null, dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0
       };
       let state = defaultState();
       let pendingExternalSync = false;
@@ -481,7 +510,8 @@
         return {
           mode:'work', tasks:[], projects:[], lastRollWeek:isoWeekKey(todayDate()),
           bannerDismissedWeek:'', lastRollCount:0,
-          lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } }
+          lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } },
+          columnSplit:{ ...DEFAULT_COLUMN_SPLIT }, manualOrder:{}
         };
       }
 
@@ -546,6 +576,11 @@
         };
       }
 
+      function normalizeSplit(value, fallback, minimum, maximum) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.min(maximum, Math.max(minimum, number)) : fallback;
+      }
+
       function normalizeState(raw) {
         const fallback = defaultState();
         if (!raw || typeof raw !== 'object') return fallback;
@@ -571,9 +606,24 @@
           ...tasks.map(task => task.proj)
         ].forEach(value => {
           const project = String(value || '').trim().slice(0,30);
-          if (!project || project === '미분류' || projects.includes(project) || projects.length >= 40) return;
+          if (!project || project === '미분류' || projects.includes(project) || projects.length >= 3) return;
           projects.push(project);
         });
+        const taskById = new Map(tasks.map(task => [task.id,task]));
+        const manualOrder = {};
+        if (raw.manualOrder && typeof raw.manualOrder === 'object') {
+          Object.entries(raw.manualOrder).slice(0,180).forEach(([key,value]) => {
+            const match = /^(work|life):(\d{4}-\d{2}-\d{2})$/.exec(key);
+            if (!match || !Array.isArray(value)) return;
+            const ids = [];
+            value.forEach(id => {
+              const task = taskById.get(String(id || ''));
+              if (!task || task.mode !== match[1] || task.date !== match[2] || ids.includes(task.id)) return;
+              ids.push(task.id);
+            });
+            if (ids.length) manualOrder[key] = ids;
+          });
+        }
         return {
           ...raw,
           mode:raw.mode === 'life' ? 'life' : 'work',
@@ -582,7 +632,12 @@
           lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
           bannerDismissedWeek:validWeekKey(raw.bannerDismissedWeek) ? raw.bannerDismissedWeek : '',
           lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0,
-          lastUsed
+          lastUsed,
+          columnSplit:{
+            work:normalizeSplit(raw.columnSplit?.work,DEFAULT_COLUMN_SPLIT.work,.2,.82),
+            life:normalizeSplit(raw.columnSplit?.life,DEFAULT_COLUMN_SPLIT.life,.25,.75)
+          },
+          manualOrder
         };
       }
 
@@ -620,14 +675,31 @@
         return addDays(date, date.getDay() === 6 ? -1 : -2);
       }
 
+      function rememberedView() {
+        const view = history.state?.worklogView;
+        const date = parseDate(view?.date);
+        if (!date || !['work','life'].includes(view?.mode)) return null;
+        return { mode:view.mode, date };
+      }
+
+      function rememberView() {
+        if (!ui.selectedDate) return;
+        try {
+          history.replaceState({ ...(history.state || {}), worklogView:{ mode:state.mode, date:ui.selectedDate } },'');
+        } catch (_) {}
+      }
+
       function applyOpenDefaults() {
         const today = todayDate();
-        if ((today.getDay() === 0 || today.getDay() === 6) && state.mode !== 'life') {
+        const remembered = rememberedView();
+        const mode = remembered?.mode || ((today.getDay() === 0 || today.getDay() === 6) ? 'life' : 'work');
+        if (state.mode !== mode) {
           const fresh = readState();
-          fresh.mode = 'life';
+          fresh.mode = mode;
           if (!persist(fresh)) return false;
         }
-        ui.selectedDate = localDateKey(clampDateToMode(today,state.mode));
+        ui.selectedDate = localDateKey(clampDateToMode(remembered?.date || today,state.mode));
+        rememberView();
         return true;
       }
 
@@ -689,7 +761,177 @@
       }
 
       function tasksFor(mode, dateKey) {
-        return state.tasks.filter(task => task.mode === mode && task.date === dateKey);
+        const sourceIndex = new Map(state.tasks.map((task,index) => [task.id,index]));
+        const items = state.tasks.filter(task => task.mode === mode && task.date === dateKey);
+        const manual = state.manualOrder?.[`${mode}:${dateKey}`];
+        if (Array.isArray(manual) && manual.length) {
+          const position = new Map(manual.map((id,index) => [id,index]));
+          return items.sort((a,b) => {
+            const aPosition = position.has(a.id) ? position.get(a.id) : Number.MAX_SAFE_INTEGER;
+            const bPosition = position.has(b.id) ? position.get(b.id) : Number.MAX_SAFE_INTEGER;
+            return aPosition - bPosition || (a.q ?? 5) - (b.q ?? 5) || sourceIndex.get(a.id) - sourceIndex.get(b.id);
+          });
+        }
+        return items.sort((a,b) => (a.q ?? 5) - (b.q ?? 5) || sourceIndex.get(a.id) - sourceIndex.get(b.id));
+      }
+
+      function applyColumnSplit() {
+        const work = normalizeSplit(state.columnSplit?.work,DEFAULT_COLUMN_SPLIT.work,.2,.82);
+        const life = normalizeSplit(state.columnSplit?.life,DEFAULT_COLUMN_SPLIT.life,.25,.75);
+        const workWeight = work / (1 - work) * WORK_DETAIL_WEIGHT;
+        const lifeWeight = life / (1 - life);
+        card.style.setProperty('--work-title-track',`${workWeight.toFixed(3)}fr`);
+        card.style.setProperty('--life-title-track',`${lifeWeight.toFixed(3)}fr`);
+        card.querySelectorAll('[data-column-resize]').forEach(handle => {
+          const value = handle.dataset.columnResize === 'work' ? work : life;
+          handle.setAttribute('aria-valuenow',String(Math.round(value * 100)));
+        });
+      }
+
+      function columnMetrics(mode) {
+        const head = taskList.querySelector(`.column-head.${mode}`);
+        const title = head?.querySelector('[data-column-title]');
+        const details = head ? [...head.querySelectorAll('[data-column-detail]')] : [];
+        if (!head || !title || !details.length) return null;
+        const headRect = head.getBoundingClientRect();
+        const scale = head.offsetWidth ? headRect.width / head.offsetWidth : 1;
+        const flexible = [title,...details];
+        const pool = flexible.reduce((sum,element) => sum + element.getBoundingClientRect().width / scale,0);
+        return { head, title, scale:scale || 1, pool, titleWidth:title.getBoundingClientRect().width / (scale || 1) };
+      }
+
+      function setColumnSplit(mode, value, save = false) {
+        const minimum = mode === 'work' ? .2 : .25;
+        const maximum = mode === 'work' ? .82 : .75;
+        const next = normalizeSplit(value,DEFAULT_COLUMN_SPLIT[mode],minimum,maximum);
+        state = { ...state, columnSplit:{ ...(state.columnSplit || DEFAULT_COLUMN_SPLIT), [mode]:next } };
+        applyColumnSplit();
+        if (save) persist(state);
+        return next;
+      }
+
+      function beginColumnResize(event, handle) {
+        if (mobileQuery.matches || event.button !== 0) return;
+        const mode = handle.dataset.columnResize === 'life' ? 'life' : 'work';
+        const metrics = columnMetrics(mode);
+        if (!metrics) return;
+        event.preventDefault();
+        closeCellPopover();
+        const minimumTitle = mode === 'work' ? (window.innerWidth < 1000 ? 90 : 120) : 100;
+        const minimumOther = mode === 'work' ? 220 : 100;
+        ui.columnResize = {
+          pointerId:event.pointerId, handle, mode, startX:event.clientX, startTitle:metrics.titleWidth,
+          scale:metrics.scale, pool:metrics.pool, minimumTitle, maximumTitle:Math.max(minimumTitle,metrics.pool - minimumOther),
+          changed:false
+        };
+        handle.classList.add('is-dragging');
+        card.classList.add('is-column-resizing');
+        handle.setPointerCapture?.(event.pointerId);
+      }
+
+      function moveColumnResize(event) {
+        const drag = ui.columnResize;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        const titleWidth = Math.min(drag.maximumTitle,Math.max(drag.minimumTitle,drag.startTitle + (event.clientX - drag.startX) / drag.scale));
+        const next = setColumnSplit(drag.mode,titleWidth / drag.pool,false);
+        drag.changed = drag.changed || Math.abs(next - DEFAULT_COLUMN_SPLIT[drag.mode]) > .0001 || Math.abs(event.clientX - drag.startX) > 1;
+      }
+
+      function endColumnResize(event) {
+        const drag = ui.columnResize;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        drag.handle.classList.remove('is-dragging');
+        card.classList.remove('is-column-resizing');
+        drag.handle.releasePointerCapture?.(event.pointerId);
+        ui.columnResize = null;
+        if (drag.changed) {
+          persist(state);
+          announce(`${drag.mode === 'work' ? '업무명' : '할 일'} 열 너비를 저장했습니다.`);
+        }
+      }
+
+      function cancelLongPress() {
+        if (!ui.longPress) return;
+        window.clearTimeout(ui.longPress.timer);
+        ui.longPress = null;
+      }
+
+      function clearRowDropTarget() {
+        taskList.querySelectorAll('.is-drop-before, .is-drop-after').forEach(row => row.classList.remove('is-drop-before','is-drop-after'));
+      }
+
+      function activateRowDrag(press) {
+        if (ui.longPress !== press || !press.row.isConnected) return;
+        ui.longPress = null;
+        ui.rowDrag = { ...press, targetId:null, before:true };
+        press.row.classList.add('is-reordering');
+        press.row.closest('.rows-scroll')?.classList.add('is-reordering');
+        press.row.setPointerCapture?.(press.pointerId);
+        announce('위아래로 끌어 순서를 바꿀 수 있습니다.');
+      }
+
+      function beginRowLongPress(event) {
+        if (event.button !== 0 || ui.adding || ui.editingId || ui.inlineEdit || ui.columnResize) return;
+        if (event.target.closest('input, select, textarea, [data-row-delete], [data-toggle-task], [data-column-resize]')) return;
+        const row = event.target.closest('.task-row[data-task-id]:not(.quick-add-row)');
+        if (!row) return;
+        cancelLongPress();
+        const press = { pointerId:event.pointerId, row, taskId:row.dataset.taskId, startX:event.clientX, startY:event.clientY, timer:0 };
+        press.timer = window.setTimeout(() => activateRowDrag(press),420);
+        ui.longPress = press;
+      }
+
+      function updateRowDrop(event) {
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        let target = document.elementFromPoint(event.clientX,event.clientY)?.closest?.('.task-row[data-task-id]:not(.quick-add-row)');
+        if (target === drag.row) target = null;
+        clearRowDropTarget();
+        if (!target || !taskList.contains(target)) {
+          drag.targetId = null;
+          return;
+        }
+        const rect = target.getBoundingClientRect();
+        drag.before = event.clientY < rect.top + rect.height / 2;
+        drag.targetId = target.dataset.taskId;
+        target.classList.add(drag.before ? 'is-drop-before' : 'is-drop-after');
+      }
+
+      function moveLongPress(event) {
+        if (ui.rowDrag) {
+          updateRowDrop(event);
+          return;
+        }
+        const press = ui.longPress;
+        if (!press || press.pointerId !== event.pointerId) return;
+        if (Math.hypot(event.clientX - press.startX,event.clientY - press.startY) > 7) cancelLongPress();
+      }
+
+      function finishRowDrag(event, cancelled = false) {
+        const press = ui.longPress;
+        if (press?.pointerId === event.pointerId) cancelLongPress();
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        drag.row.classList.remove('is-reordering');
+        drag.row.closest('.rows-scroll')?.classList.remove('is-reordering');
+        drag.row.releasePointerCapture?.(event.pointerId);
+        clearRowDropTarget();
+        ui.rowDrag = null;
+        ui.suppressClickUntil = Date.now() + 350;
+        if (cancelled || !drag.targetId || drag.targetId === drag.taskId) return;
+        const ordered = tasksFor(state.mode,ui.selectedDate).map(task => task.id).filter(id => id !== drag.taskId);
+        const targetIndex = ordered.indexOf(drag.targetId);
+        if (targetIndex < 0) return;
+        ordered.splice(targetIndex + (drag.before ? 0 : 1),0,drag.taskId);
+        mutate(fresh => {
+          fresh.manualOrder ||= {};
+          fresh.manualOrder[`${state.mode}:${ui.selectedDate}`] = ordered;
+          return fresh;
+        });
+        announce('순서를 저장했습니다.');
       }
 
       function durationOf(task) {
@@ -752,9 +994,13 @@
         return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '<span class="q-badge q-none">–</span>';
       }
 
+      function qDescription(q) {
+        return Q_LABELS[q] || '미설정';
+      }
+
       function qButton(task) {
         const label = task.q ? `Q${task.q}` : '–';
-        return `<button class="cell-button q-button ${cellActive(task.id,'q')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label}" title="눌러서 Q 변경">${qBadge(task.q)}</button>`;
+        return `<button class="cell-button q-button ${cellActive(task.id,'q')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="q" aria-label="Q 변경, 현재 ${label} ${qDescription(task.q)}" title="눌러서 Q 변경">${qBadge(task.q)}</button>`;
       }
 
       function latestDefaults(mode) {
@@ -960,9 +1206,9 @@
 
       function columnHead(mode) {
         if (mode === 'work') {
-          return `<div class="column-head work" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>업무명</span><span class="numeric">목표</span><span class="numeric">시작</span><span class="numeric">종료</span><span class="numeric">진행</span><span class="numeric">예상</span><span>상태</span><span></span><span></span></div>`;
+          return `<div class="column-head work" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>업무명<button class="column-resize-handle" type="button" data-column-resize="work" aria-label="업무명 열 너비 조절" aria-valuemin="20" aria-valuemax="82"></button></span><span class="numeric" data-column-detail>목표</span><span class="numeric" data-column-detail>시작</span><span class="numeric" data-column-detail>종료</span><span class="numeric" data-column-detail>진행</span><span class="numeric" data-column-detail>예상</span><span data-column-detail>상태</span><span></span><span></span></div>`;
         }
-        return `<div class="column-head life" data-worklog-head aria-hidden="true"><span>구분</span><span>Q</span><span>할 일</span><span class="numeric">목표</span><span>메모</span><span></span><span></span></div>`;
+        return `<div class="column-head life" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>할 일<button class="column-resize-handle" type="button" data-column-resize="life" aria-label="할 일 열 너비 조절" aria-valuemin="25" aria-valuemax="75"></button></span><span class="numeric">목표</span><span data-column-detail>메모</span><span></span><span></span></div>`;
       }
 
       function field(label, name, value, options = {}) {
@@ -1021,6 +1267,8 @@
       }
 
       function closeCellPopover() {
+        if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
+        ui.projectChoiceTimer = null;
         ui.popover = null;
         ui.projectAdding = false;
         card.querySelectorAll('.is-popover-open').forEach(element => element.classList.remove('is-popover-open'));
@@ -1039,13 +1287,39 @@
         return [...new Set(['미분류', ...values])];
       }
 
+      function customProjects(task) {
+        return projectChoices(task).filter(project => project !== '미분류');
+      }
+
       function rememberProject(value) {
         const project = String(value || '').trim().slice(0,30);
         if (!project || project === '미분류') return project || '미분류';
+        const current = customProjects();
+        if (!current.includes(project) && current.length >= 3) {
+          announce('구분은 미분류를 포함해 최대 4개까지 사용할 수 있습니다.');
+          return null;
+        }
         const fresh = readState();
-        fresh.projects = [...new Set([...(fresh.projects || []),project])].slice(0,40);
+        fresh.projects = [...new Set([...(fresh.projects || []),project])].slice(0,3);
         persist(fresh);
         return project;
+      }
+
+      function removeProject(project) {
+        const value = String(project || '').trim();
+        if (!value || value === '미분류') return false;
+        const fresh = readState();
+        fresh.projects = (fresh.projects || []).filter(item => item !== value);
+        fresh.tasks = fresh.tasks.map(task => task.proj === value ? { ...task, proj:'미분류' } : task);
+        ['work','life'].forEach(mode => {
+          if (fresh.lastUsed?.[mode]?.proj === value) fresh.lastUsed[mode] = { ...fresh.lastUsed[mode], proj:'미분류' };
+        });
+        if (ui.draftTask?.proj === value) ui.draftTask = { ...ui.draftTask, proj:'미분류' };
+        closeCellPopover();
+        persist(fresh);
+        renderAll();
+        announce('구분을 제거하고 해당 업무를 미분류로 옮겼습니다.');
+        return true;
       }
 
       function calendarMonth(value) {
@@ -1094,13 +1368,14 @@
         }
         cellPopover.className = `cell-popover kind-${ui.popover.field}`;
         if (ui.popover.field === 'project') {
-          const options = projectChoices(task).map(project => `<button class="project-option ${project === (task.proj || '미분류') ? 'is-selected' : ''}" type="button" data-project-choice="${escapeHtml(project)}">${escapeHtml(project)}</button>`).join('');
-          const add = ui.projectAdding
+          const options = projectChoices(task).map(project => `<button class="project-option ${project === (task.proj || '미분류') ? 'is-selected' : ''}" type="button" data-project-choice="${escapeHtml(project)}" aria-label="${escapeHtml(project)}${project === '미분류' ? '' : ', 두 번 누르면 구분 제거'}">${escapeHtml(project)}</button>`).join('');
+          const canAdd = customProjects(task).length < 3;
+          const add = !canAdd ? '' : ui.projectAdding
             ? `<form data-project-new-form><input class="project-new-input" name="project" maxlength="30" autocomplete="off" aria-label="새 구분 이름"></form>`
             : '<button class="project-new" type="button" data-project-new>＋ 새 구분</button>';
           cellPopover.innerHTML = `<div class="project-options">${options}${add}</div>`;
         } else if (ui.popover.field === 'q') {
-          cellPopover.innerHTML = `<div class="q-options">${[1,2,3,4,null].map(q => `<button class="q-option ${task.q === q ? 'is-selected' : ''}" type="button" data-q-choice="${q ?? ''}" aria-label="${q ? `Q${q}` : 'Q 없음'}">${qBadge(q)}</button>`).join('')}</div>`;
+          cellPopover.innerHTML = `<div class="q-options">${[1,2,3,4,null].map(q => `<button class="q-option ${task.q === q ? 'is-selected' : ''}" type="button" data-q-choice="${q ?? ''}" aria-label="${q ? `Q${q} ${qDescription(q)}` : 'Q 미설정'}">${qBadge(q)}<span class="q-option-label">${qDescription(q)}</span></button>`).join('')}</div>`;
         } else if (ui.popover.field === 'due') {
           cellPopover.innerHTML = miniCalendarHtml(task);
         } else {
@@ -1134,6 +1409,7 @@
         renderBanner();
         renderHeader(items);
         renderList(items);
+        applyColumnSplit();
         const nextScroll = taskList.querySelector('.rows-scroll');
         if (nextScroll) nextScroll.scrollTop = listScroll;
         renderAdd(items);
@@ -1158,7 +1434,12 @@
 
       function resetTransient() {
         if (ui.deleteTimer) window.clearTimeout(ui.deleteTimer);
+        if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
+        cancelLongPress();
+        clearRowDropTarget();
+        taskList.querySelectorAll('.is-reordering').forEach(element => element.classList.remove('is-reordering'));
         ui.deleteTimer = null;
+        ui.projectChoiceTimer = null;
         ui.adding = false;
         ui.draftTask = null;
         ui.editingId = null;
@@ -1166,6 +1447,7 @@
         ui.confirmDeleteId = null;
         ui.popover = null;
         ui.projectAdding = false;
+        ui.rowDrag = null;
         ui.dirtyFields = new Set();
       }
 
@@ -1175,6 +1457,7 @@
         const current = parseDate(ui.selectedDate) || todayDate();
         ui.selectedDate = localDateKey(nextActiveDate(current, state.mode, direction));
         resetTransient();
+        rememberView();
         renderAll();
         if (keepDayFocus) dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       }
@@ -1293,10 +1576,11 @@
           && ui.selectedDate === localDateKey(clampDateToMode(today,'work'));
         const selected = followsClampedWorkToday ? today : clampDateToMode(parseDate(ui.selectedDate) || today,nextMode);
         ui.selectedDate = localDateKey(selected);
-        if (!mutate(fresh => { fresh.mode = nextMode; return fresh; })) {
+        const saved = mutate(fresh => { fresh.mode = nextMode; return fresh; });
+        if (!saved) {
           ui.selectedDate = previousDate;
           Object.assign(ui, previousUi);
-        }
+        } else rememberView();
       });
 
       previousDay.addEventListener('click', () => changeDate(-1));
@@ -1308,6 +1592,7 @@
         if (!drainPendingSync()) return;
         ui.selectedDate = button.dataset.date;
         resetTransient();
+        rememberView();
         renderAll();
         dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       });
@@ -1412,6 +1697,26 @@
       }
       card.addEventListener('input', trackEditorChange);
       card.addEventListener('change', trackEditorChange);
+      taskList.addEventListener('pointerdown', event => {
+        const handle = event.target.closest('[data-column-resize]');
+        if (handle) beginColumnResize(event,handle);
+        else beginRowLongPress(event);
+      });
+      taskList.addEventListener('touchmove', event => {
+        if (ui.rowDrag) event.preventDefault();
+      },{ passive:false });
+      document.addEventListener('pointermove', event => {
+        moveColumnResize(event);
+        moveLongPress(event);
+      });
+      document.addEventListener('pointerup', event => {
+        endColumnResize(event);
+        finishRowDrag(event,false);
+      });
+      document.addEventListener('pointercancel', event => {
+        endColumnResize(event);
+        finishRowDrag(event,true);
+      });
 
       card.addEventListener('dblclick', event => {
         const time = event.target.closest('[data-cell-task][data-cell-field="start"], [data-cell-task][data-cell-field="end"]');
@@ -1421,6 +1726,11 @@
       });
 
       card.addEventListener('click', event => {
+        if (Date.now() < ui.suppressClickUntil && event.target.closest('.task-row')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         if (event.target.closest('[data-dismiss-banner]')) {
           const saved = mutate(fresh => { fresh.bannerDismissedWeek = isoWeekKey(todayDate()); return fresh; }, false);
           if (saved) renderBanner();
@@ -1445,8 +1755,18 @@
         if (projectChoice && ui.popover) {
           const id = ui.popover.taskId;
           const value = projectChoice.dataset.projectChoice;
-          closeCellPopover();
-          updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.');
+          if (event.detail >= 2 && value !== '미분류') {
+            if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
+            ui.projectChoiceTimer = null;
+            removeProject(value);
+            return;
+          }
+          if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
+          ui.projectChoiceTimer = window.setTimeout(() => {
+            ui.projectChoiceTimer = null;
+            closeCellPopover();
+            updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.');
+          },220);
           return;
         }
         const qChoice = event.target.closest('[data-q-choice]');
@@ -1567,6 +1887,7 @@
           const value = String(new FormData(newProjectForm).get('project') || '').trim();
           if (!value) return;
           const project = rememberProject(value);
+          if (!project) return;
           closeCellPopover();
           updateTask(id, task => { task.proj = project; }, '구분을 추가했습니다.');
           return;
@@ -1635,6 +1956,15 @@
 
       document.addEventListener('keydown', event => {
         if (event.isComposing) return;
+        const columnHandle = event.target.closest?.('[data-column-resize]');
+        if (columnHandle && ['ArrowLeft','ArrowRight'].includes(event.key)) {
+          event.preventDefault();
+          const mode = columnHandle.dataset.columnResize === 'life' ? 'life' : 'work';
+          const direction = event.key === 'ArrowRight' ? 1 : -1;
+          setColumnSplit(mode,(state.columnSplit?.[mode] ?? DEFAULT_COLUMN_SPLIT[mode]) + direction * .02,true);
+          announce(`${mode === 'work' ? '업무명' : '할 일'} 열 너비를 저장했습니다.`);
+          return;
+        }
         const newProjectInput = event.target.closest('[data-project-new-form] .project-new-input');
         if (newProjectInput && ui.popover?.field === 'project' && event.key === 'Enter') return;
         if (ui.popover && ['progress','est'].includes(ui.popover.field) && ['ArrowUp','ArrowDown'].includes(event.key)) {
@@ -1657,7 +1987,7 @@
           return;
         }
         if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
-        if (event.target.closest('input, select, textarea, [contenteditable="true"], [data-widget-scale-handle], [data-widget-list-handle]')) return;
+        if (event.target.closest('input, select, textarea, [contenteditable="true"], [data-widget-scale-handle], [data-widget-list-handle], [data-column-resize]')) return;
         event.preventDefault();
         changeDate(event.key === 'ArrowRight' ? 1 : -1);
       });
@@ -1674,7 +2004,7 @@
           renderAll();
           return;
         }
-        if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover) {
+        if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover || ui.columnResize || ui.longPress || ui.rowDrag) {
           if (JSON.stringify(loaded) !== JSON.stringify(state)) {
             pendingExternalSync = true;
             pendingServerState = loaded;
@@ -1690,6 +2020,7 @@
         else {
           const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
           ui.selectedDate = localDateKey(selected);
+          rememberView();
         }
         liveRegion.textContent = '';
         renderAll();
@@ -1708,7 +2039,7 @@
       async function bootstrap() {
         liveRegion.textContent = '업무일지를 불러오는 중입니다.';
         await syncFromServer(true);
-        Store.watch(() => syncFromServer(false));
+        Store.watch(() => syncFromServer(false),1000);
       }
 
       bootstrap();

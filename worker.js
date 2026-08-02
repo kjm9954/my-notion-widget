@@ -587,6 +587,8 @@ function defaultWorklogState() {
       work: { proj: "미분류", q: null },
       life: { proj: "미분류", q: null },
     },
+    columnSplit: { work: 0.73, life: 6 / 11 },
+    manualOrder: {},
   };
 }
 
@@ -634,9 +636,28 @@ function normalizeWorklogState(raw) {
     ...tasks.map(task => task.proj),
   ].forEach(value => {
     const project = cleanText(value, 30);
-    if (!project || project === "미분류" || projects.includes(project) || projects.length >= 40) return;
+    if (!project || project === "미분류" || projects.includes(project) || projects.length >= 3) return;
     projects.push(project);
   });
+  const split = (value, fallback, minimum, maximum) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(maximum, Math.max(minimum, number)) : fallback;
+  };
+  const taskById = new Map(tasks.map(task => [task.id,task]));
+  const manualOrder = {};
+  if (source.manualOrder && typeof source.manualOrder === "object") {
+    Object.entries(source.manualOrder).slice(0, 180).forEach(([key,value]) => {
+      const match = /^(work|life):(\d{4}-\d{2}-\d{2})$/.exec(key);
+      if (!match || !Array.isArray(value)) return;
+      const ids = [];
+      value.forEach(id => {
+        const task = taskById.get(String(id || ""));
+        if (!task || task.mode !== match[1] || task.date !== match[2] || ids.includes(task.id)) return;
+        ids.push(task.id);
+      });
+      if (ids.length) manualOrder[key] = ids;
+    });
+  }
   return {
     mode: source.mode === "life" ? "life" : "work",
     tasks,
@@ -645,6 +666,11 @@ function normalizeWorklogState(raw) {
     bannerDismissedWeek: weekKey(source.bannerDismissedWeek),
     lastRollCount: Number.isFinite(Number(source.lastRollCount)) ? Math.max(0, Math.floor(Number(source.lastRollCount))) : 0,
     lastUsed,
+    columnSplit: {
+      work: split(source.columnSplit?.work, 0.73, 0.2, 0.82),
+      life: split(source.columnSplit?.life, 6 / 11, 0.25, 0.75),
+    },
+    manualOrder,
   };
 }
 

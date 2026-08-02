@@ -295,7 +295,7 @@
       'use strict';
 
       const SHORT_DAYS = ['일','월','화','수','목','금','토'];
-      const LEVEL_LIMITS = [4,8,Infinity];
+      const LEVEL_LIMITS = [8,Infinity];
       const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
       const card = document.querySelector('[data-widget-card]');
       const weekRange = document.getElementById('weekRange');
@@ -490,13 +490,13 @@
           return `<button class="mobile-day ${key === state.selectedDay ? 'is-selected' : ''} ${key > todayKey ? 'is-future' : ''}" type="button" data-mobile-day="${key}" aria-pressed="${key === state.selectedDay}"><span class="mobile-day-name">${SHORT_DAYS[date.getDay()]}</span><span class="mobile-day-count">${count || ''}</span></button>`;
         }).join('');
         const items = sortedTasks(tasksForDate(state.selectedDay));
-        const visible = items.slice(0,5);
+        const visible = items.slice(0,8);
         const hidden = Math.max(0, items.length - visible.length);
         return `<div class="mobile-view"><div class="mobile-days mode-${state.mode}">${tabs}</div><div class="mobile-list">${visible.map(mobileTask).join('')}${hidden ? `<button class="mobile-more" type="button" data-open-day="${state.selectedDay}">이 날 전체 보기 <span class="expand-count">· ${hidden}건 더</span></button>` : ''}</div></div>`;
       }
 
       function renderExpand(items) {
-        const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 4);
+        const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 8);
         if (!hasExpandable || mobileQuery.matches) {
           expandArea.hidden = true;
           expandArea.innerHTML = '';
@@ -505,9 +505,8 @@
         const limit = LEVEL_LIMITS[state.level];
         const hidden = activeKeys().reduce((sum,key) => sum + Math.max(0, tasksForDate(key).length - limit), 0);
         const controls = [];
-        if (state.level < 2 && hidden > 0) {
-          const nextIsAll = state.level === 1 || activeKeys().every(key => tasksForDate(key).length <= 8);
-          controls.push(`<button class="expand-button" type="button" data-expand>${nextIsAll ? '전체 펼치기' : '더 펼치기'} <span class="expand-count">· ${hidden}건 더</span></button>`);
+        if (state.level === 0 && hidden > 0) {
+          controls.push(`<button class="expand-button" type="button" data-expand>전체 펼치기 <span class="expand-count">· ${hidden}건 더</span></button>`);
         }
         if (state.level > 0) controls.push('<button class="collapse-button" type="button" data-collapse>− 접기</button>');
         expandArea.hidden = controls.length === 0;
@@ -663,7 +662,7 @@
       });
       expandArea.addEventListener('click', event => {
         if (event.target.closest('[data-expand]')) {
-          state.level = Math.min(2,state.level + 1);
+          state.level = 1;
           render();
           return;
         }
@@ -705,7 +704,7 @@
       state.weekStart = startOfWeek(todayDate());
       render();
       syncData(false);
-      Store.watch(() => syncData(true));
+      Store.watch(() => syncData(true),1000);
     })();
   </script>
   <script src="../widget-frame.js"></script>
