@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>기록 찾기</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; background: transparent; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #12303C;
+      font-family: "Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif;
+    }
+    button, input { font: inherit; }
+    button { border: 0; }
+    .history-card {
+      width: 100%;
+      max-width: 570px;
+      height: 825px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+      border: 1px solid #EDF2F4;
+      border-radius: 18px;
+      background: #FFFFFF;
+      box-shadow: 0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    .history-header {
+      flex: 0 0 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .history-title { color: #33505C; font-size: 12px; font-weight: 800; }
+    .result-label {
+      color: #93A5AD;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+    .search-shell {
+      position: relative;
+      flex: 0 0 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      border: 1px solid #E1EAEE;
+      border-radius: 9px;
+      background: #FFFFFF;
+      transition: border-color .12s, outline-color .12s;
+    }
+    .search-shell:focus-within {
+      border-color: transparent;
+      outline: 2px solid #0E5C7A;
+      outline-offset: -2px;
+    }
+    .search-icon {
+      flex: 0 0 auto;
+      padding-left: 10px;
+      color: #A2B4BC;
+      font-size: 12px;
+      font-weight: 700;
+      transition: color .12s;
+    }
+    .search-shell:focus-within .search-icon { color: #6B8794; }
+    .search-input {
+      width: 100%;
+      min-width: 0;
+      height: 32px;
+      padding: 0 8px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #12303C;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .search-input::placeholder { color: #93A5AD; }
+    .enter-hint {
+      display: none;
+      flex: 0 0 auto;
+      color: #C6D6DD;
+      font-size: 9px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .clear-search {
+      display: none;
+      flex: 0 0 22px;
+      width: 22px;
+      height: 22px;
+      margin-right: 5px;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: transparent;
+      color: #A2B4BC;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 800;
+      transition: color .12s, outline-color .12s;
+    }
+    .search-shell.has-value .enter-hint,
+    .search-shell.has-value .clear-search { display: flex; }
+    .range-group {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .range-pill {
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #F5F9FB;
+      color: #6B8794;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      transition: color .12s, outline-color .12s;
+    }
+    .range-pill[aria-checked="true"] { background: #0E5C7A; color: #FFFFFF; }
+    .range-pill:focus-visible,
+    .clear-search:focus-visible,
+    .secondary-button:focus-visible {
+      outline: 2px solid #0E5C7A;
+      outline-offset: -2px;
+    }
+    .list-area {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 8px;
+      border: 1px solid #F1F5F7;
+      border-radius: 12px;
+      background: #FAFCFD;
+    }
+    .list-content { display: flex; flex-direction: column; gap: 5px; }
+    .list-area.is-loading .list-content { opacity: .45; }
+    .month-group { display: flex; flex-direction: column; gap: 5px; }
+    .month-header {
+      position: sticky;
+      top: -8px;
+      z-index: 2;
+      min-height: 25px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 2px 4px;
+      background: #FAFCFD;
+    }
+    .month-name {
+      color: #93A5AD;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+    .month-line { flex: 1; height: 1px; background: #EDF2F4; }
+    .month-count { color: #C6D6DD; font-size: 9px; font-weight: 700; white-space: nowrap; }
+    .result-row {
+      min-height: 72px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      padding: 9px 10px;
+      border-radius: 9px;
+      background: #FFFFFF;
+      box-shadow: 0 1px 2px rgba(18,48,60,.05);
+      cursor: default;
+    }
+    .result-title {
+      overflow: hidden;
+      color: #12303C;
+      font-size: 11px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .result-excerpt {
+      overflow: hidden;
+      color: #6B8794;
+      font-size: 9px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .result-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .result-date { color: #93A5AD; font-size: 9px; font-weight: 700; white-space: nowrap; }
+    .location-pill {
+      min-width: 0;
+      overflow: hidden;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #F5F9FB;
+      color: #6B8794;
+      font-size: 10px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .match { color: #0E5C7A; font-weight: 800; }
+    .state-block {
+      padding: 16px 12px;
+      border: 1px dashed #C6D6DD;
+      border-radius: 12px;
+      background: #FAFCFD;
+      text-align: center;
+    }
+    .state-title { color: #33505C; font-size: 12px; font-weight: 800; line-height: 1.4; }
+    .state-copy { margin-top: 5px; color: #93A5AD; font-size: 10px; font-weight: 600; line-height: 1.5; }
+    .secondary-button {
+      margin-top: 9px;
+      padding: 4px 10px;
+      border: 1px solid #DCE7ED;
+      border-radius: 8px;
+      background: #FFFFFF;
+      color: #55707C;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      transition: color .12s, border-color .12s, outline-color .12s;
+    }
+    .recent-caption {
+      padding: 5px 2px 2px;
+      color: #93A5AD;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+    .skeleton-list { display: flex; flex-direction: column; gap: 5px; }
+    .skeleton-row { height: 72px; border-radius: 9px; background: #F1F5F7; }
+    @media (max-width: 639px) {
+      .history-card { max-width: none; }
+    }
+    @media (max-width: 399px) {
+      .result-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .location-pill { max-width: 100%; }
+      .result-row { min-height: 72px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="history-card" aria-label="히스토리 검색 위젯">
+    <header class="history-header">
+      <div class="history-title">기록 찾기</div>
+      <div class="result-label" id="resultLabel" aria-live="polite">최근 기록</div>
+    </header>
+
+    <div class="search-shell" id="searchShell">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input class="search-input" id="searchInput" type="search" autocomplete="off" placeholder="회의록·작업 기록 검색" aria-label="기록 검색">
+      <span class="enter-hint" aria-hidden="true">Enter</span>
+      <button class="clear-search" id="clearSearch" type="button" aria-label="검색어 지우기">✕</button>
+    </div>
+
+    <div class="range-group" id="rangeGroup" role="radiogroup" aria-label="검색 기간">
+      <button class="range-pill" type="button" role="radio" data-range="3m" aria-checked="true">3개월</button>
+      <button class="range-pill" type="button" role="radio" data-range="6m" aria-checked="false">6개월</button>
+      <button class="range-pill" type="button" role="radio" data-range="1y" aria-checked="false">1년</button>
+      <button class="range-pill" type="button" role="radio" data-range="all" aria-checked="false">전체 기간</button>
+    </div>
+
+    <section class="list-area" id="listArea" role="list" aria-label="검색 결과">
+      <div class="skeleton-list" aria-hidden="true">
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    const CONFIG = {
+      useSampleData: true,
+      proxyUrl: '',
+      token: '',
+      DATABASE_ID: '',
+      properties: {
+        title: '제목',
+        date: '작성일',
+        project: '프로젝트',
+        view: '뷰'
+      },
+      defaultRange: '3m'
+    };
+
+    const SAMPLE_DATA = [
+      { id:'s01', title:'캐릭터 밸런스 회의 정리', body:'신규 구간의 캐릭터 밸런스 수치를 검토하고 다음 테스트 기준을 정리했다.', date:'2026-08-01', project:'타운', view:'달력' },
+      { id:'s02', title:'팝콘 보상 밸런스 초안', body:'주간 보상 밸런스가 실제 플레이 시간과 맞는지 비교했다.', date:'2026-07-30', project:'팝콘', view:'갤러리' },
+      { id:'s03', title:'콘텐츠 밸런스 체크', body:'밸런스 테스트 결과를 기준으로 난이도 구간을 다시 나눴다.', date:'2026-07-25', project:'타운', view:'달력' },
+      { id:'s04', title:'7월 밸런스 회고', body:'이번 회고에서는 밸런스 변경 이후 이탈 구간을 먼저 살펴봤다.', date:'2026-07-18', project:'팝콘', view:'갤러리' },
+      { id:'s05', title:'상점 밸런스 작업 기록', body:'재화 소모와 획득 밸런스가 맞지 않는 구간을 기록했다.', date:'2026-07-10', project:'타운', view:'달력' },
+      { id:'s06', title:'레벨 밸런스 검토', body:'중반 레벨 밸런스 기준과 반복 플레이 시간을 함께 확인했다.', date:'2026-07-03', project:'팝콘', view:'갤러리' },
+      { id:'s07', title:'전투 밸런스 메모', body:'보스 전투 밸런스 수치와 체감 난이도 차이를 정리했다.', date:'2026-06-29', project:'타운', view:'달력' },
+      { id:'s08', title:'이벤트 밸런스 회의', body:'이벤트 밸런스 조정 범위와 담당 작업을 회의에서 확정했다.', date:'2026-06-21', project:'팝콘', view:'갤러리' },
+      { id:'s09', title:'스테이지 밸런스 수정', body:'후반 스테이지의 밸런스 간격을 좁히는 작업을 진행했다.', date:'2026-06-12', project:'타운', view:'달력' },
+      { id:'s10', title:'경제 밸런스 확인', body:'아이템 가격 밸런스와 구매 전환 기록을 함께 확인했다.', date:'2026-06-04', project:'팝콘', view:'갤러리' },
+      { id:'s11', title:'초반 밸런스 테스트', body:'첫 진입 구간의 밸런스가 안내 흐름과 맞는지 테스트했다.', date:'2026-05-25', project:'타운', view:'달력' },
+      { id:'s12', title:'보상 밸런스 기준', body:'보상 밸런스 기준표를 정리하고 다음 반영 일정을 남겼다.', date:'2026-05-10', project:'팝콘', view:'갤러리' },
+      { id:'s13', title:'신규 기능 회의록', body:'검색 기능의 우선순위와 배포 전 확인 항목을 회의에서 정리했다.', date:'2026-07-29', project:'타운', view:'갤러리' },
+      { id:'s14', title:'주간 작업 기록', body:'완료한 작업과 다음 주에 이어갈 항목을 한 줄씩 남겼다.', date:'2026-07-22', project:'팝콘', view:'달력' },
+      { id:'s15', title:'디자인 회의 메모', body:'카드 간격과 검색 결과 행의 정보 순서를 회의에서 확정했다.', date:'2026-06-15', project:'타운', view:'갤러리' },
+      { id:'s16', title:'장기 아카이브 회고', body:'예전 프로젝트 기록을 다시 읽고 장기 아카이브 기준을 만들었다.', date:'2024-11-08', project:'팝콘', view:'달력' }
+    ];
+
+    const RANGE_KEY = 'historyWidget.range';
+    const RANGE_OPTIONS = {
+      '3m': { label:'3개월', months:3 },
+      '6m': { label:'6개월', months:6 },
+      '1y': { label:'1년', months:12 },
+      'all': { label:'전체 기간', months:null }
+    };
+    const searchInput = document.getElementById('searchInput');
+    const searchShell = document.getElementById('searchShell');
+    const clearSearch = document.getElementById('clearSearch');
+    const rangeGroup = document.getElementById('rangeGroup');
+    const resultLabel = document.getElementById('resultLabel');
+    const listArea = document.getElementById('listArea');
+    let selectedRange = loadRange();
+    let currentQuery = '';
+    let requestSequence = 0;
+    let lastRun = { query:'', range:selectedRange };
+
+    function loadRange() {
+      try {
+        const saved = localStorage.getItem(RANGE_KEY);
+        if (RANGE_OPTIONS[saved]) return saved;
+      } catch (_) {}
+      return RANGE_OPTIONS[CONFIG.defaultRange] ? CONFIG.defaultRange : '3m';
+    }
+
+    function saveRange(value) {
+      try { localStorage.setItem(RANGE_KEY, value); } catch (_) {}
+    }
+
+    function sinceDateFor(range) {
+      const months = RANGE_OPTIONS[range]?.months;
+      if (!months) return null;
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setMonth(date.getMonth() - months);
+      return localDateKey(date);
+    }
+
+    function localDateKey(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function queryTerms(query) {
+      return String(query || '').trim().toLocaleLowerCase('ko').split(/\s+/).filter(Boolean);
+    }
+
+    function matchesQuery(record, query) {
+      const terms = queryTerms(query);
+      if (!terms.length) return true;
+      const target = `${record.title}\n${record.body}`.toLocaleLowerCase('ko');
+      return terms.every(term => target.includes(term));
+    }
+
+    function readRichText(property, type) {
+      const values = property?.[type] || property?.rich_text || [];
+      return values.map(value => value?.plain_text || value?.text?.content || '').join('');
+    }
+
+    function mapProxyRecord(record) {
+      const properties = record?.properties || {};
+      const mapped = CONFIG.properties;
+      return {
+        id: String(record?.id || crypto.randomUUID()),
+        title: String(record?.title || readRichText(properties[mapped.title], 'title') || '제목 없음'),
+        body: String(record?.body || record?.content || ''),
+        date: String(record?.date || properties[mapped.date]?.date?.start || record?.created_time || '').slice(0, 10),
+        project: String(record?.project || properties[mapped.project]?.select?.name || ''),
+        view: String(record?.view || properties[mapped.view]?.select?.name || '')
+      };
+    }
+
+    async function fetchRecords({ query, sinceDate }) {
+      if (CONFIG.useSampleData) {
+        await new Promise(resolve => setTimeout(resolve, 240));
+        if (String(query || '').trim() === '오류 테스트') throw new Error('샘플 프록시 응답 오류');
+        return SAMPLE_DATA
+          .map(mapProxyRecord)
+          .filter(record => !sinceDate || record.date >= sinceDate)
+          .filter(record => matchesQuery(record, query))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      if (!CONFIG.proxyUrl) throw new Error('프록시 URL이 설정되지 않았어요');
+      const headers = { 'Content-Type':'application/json', 'Accept':'application/json' };
+      if (CONFIG.token) headers['X-Widget-Token'] = CONFIG.token;
+      const response = await fetch(CONFIG.proxyUrl, {
+        method:'POST',
+        headers,
+        body:JSON.stringify({
+          databaseId:CONFIG.DATABASE_ID,
+          properties:CONFIG.properties,
+          query:String(query || '').trim(),
+          sinceDate:sinceDate || null
+        })
+      });
+      if (!response.ok) throw new Error(`프록시 응답 ${response.status}`);
+      const payload = await response.json();
+      const records = Array.isArray(payload) ? payload : payload.records || payload.results || [];
+      return records.map(mapProxyRecord).filter(record => record.date).sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[character]);
+    }
+
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function highlighted(value, query) {
+      const terms = [...new Set(queryTerms(query))].sort((a, b) => b.length - a.length);
+      if (!terms.length) return escapeHtml(value);
+      const expression = new RegExp(`(${terms.map(escapeRegExp).join('|')})`, 'gi');
+      return String(value ?? '').split(expression).map(part =>
+        terms.includes(part.toLocaleLowerCase('ko'))
+          ? `<span class="match">${escapeHtml(part)}</span>`
+          : escapeHtml(part)
+      ).join('');
+    }
+
+    function excerptFor(body, query) {
+      const text = String(body || '').replace(/\s+/g, ' ').trim();
+      if (!text) return '';
+      const terms = queryTerms(query);
+      const lower = text.toLocaleLowerCase('ko');
+      const positions = terms.map(term => lower.indexOf(term)).filter(position => position >= 0);
+      if (positions.length) {
+        const center = Math.min(...positions);
+        const start = Math.max(0, center - 28);
+        const end = Math.min(text.length, center + 32);
+        return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+      }
+      const sentence = text.match(/^.*?[.!?。](?:\s|$)/)?.[0] || text;
+      return sentence.length > 60 ? `${sentence.slice(0, 60)}…` : sentence;
+    }
+
+    function formatDate(value) {
+      const [year, month, day] = String(value || '').split('-').map(Number);
+      return `${year}. ${month}. ${day}.`;
+    }
+
+    function groupByMonth(records) {
+      const groups = [];
+      records.forEach(record => {
+        const key = record.date.slice(0, 7);
+        let group = groups[groups.length - 1];
+        if (!group || group.key !== key) {
+          group = { key, records:[] };
+          groups.push(group);
+        }
+        group.records.push(record);
+      });
+      return groups;
+    }
+
+    function recordRow(record, query) {
+      const excerpt = excerptFor(record.body, query);
+      return `
+        <article class="result-row" role="listitem">
+          <div class="result-title">${highlighted(record.title, query)}</div>
+          <div class="result-excerpt">${highlighted(excerpt, query)}</div>
+          <div class="result-meta">
+            <span class="result-date">${formatDate(record.date)}</span>
+            <span class="location-pill">${escapeHtml(record.project)} · ${escapeHtml(record.view)}</span>
+          </div>
+        </article>`;
+    }
+
+    function recordsHtml(records, query) {
+      return groupByMonth(records).map(group => {
+        const [year, month] = group.key.split('-').map(Number);
+        return `
+          <section class="month-group">
+            <div class="month-header">
+              <span class="month-name">${year}년 ${month}월</span>
+              <span class="month-line" aria-hidden="true"></span>
+              <span class="month-count">${group.records.length}건</span>
+            </div>
+            ${group.records.map(record => recordRow(record, query)).join('')}
+          </section>`;
+      }).join('');
+    }
+
+    function renderRecords(records, query) {
+      listArea.classList.remove('is-loading');
+      listArea.innerHTML = `<div class="list-content">${recordsHtml(records, query)}</div>`;
+    }
+
+    function stateBlock(title, copy, button) {
+      return `
+        <div class="state-block">
+          <div class="state-title">${title}</div>
+          <div class="state-copy">${copy}</div>
+          ${button ? `<button class="secondary-button" type="button" data-state-action="${button.action}">${button.label}</button>` : ''}
+        </div>`;
+    }
+
+    function renderStateWithRecent(block, recent) {
+      listArea.classList.remove('is-loading');
+      listArea.innerHTML = `
+        <div class="list-content">
+          ${block}
+          <div class="recent-caption">최근 기록</div>
+          ${recordsHtml(recent, '')}
+        </div>`;
+    }
+
+    function renderError(error) {
+      listArea.classList.remove('is-loading');
+      listArea.innerHTML = `<div class="list-content">${stateBlock('기록을 불러오지 못했어요', escapeHtml(error?.message || '잠시 후 다시 시도해 주세요.'), { action:'retry', label:'다시 시도' })}</div>`;
+    }
+
+    function showLoading() {
+      resultLabel.textContent = '찾는 중';
+      const content = listArea.querySelector('.list-content');
+      if (content) {
+        listArea.classList.add('is-loading');
+        return;
+      }
+      listArea.classList.remove('is-loading');
+      listArea.innerHTML = '<div class="skeleton-list" aria-hidden="true"><div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div></div>';
+    }
+
+    function shorterQueries(query) {
+      const value = String(query || '').trim();
+      const candidates = [];
+      if (value.endsWith('싱')) candidates.push(`${value.slice(0, -1)}스`);
+      for (let length = value.length - 1; length >= Math.max(2, value.length - 3); length -= 1) candidates.push(value.slice(0, length));
+      return [...new Set(candidates)].filter(Boolean);
+    }
+
+    async function suggestionFor(query, sinceDate) {
+      for (const candidate of shorterQueries(query)) {
+        const records = await fetchRecords({ query:candidate, sinceDate });
+        if (records.length) return { query:candidate, count:records.length };
+      }
+      return null;
+    }
+
+    async function runSearch(query = currentQuery, range = selectedRange) {
+      const sequence = ++requestSequence;
+      currentQuery = String(query || '').trim();
+      selectedRange = RANGE_OPTIONS[range] ? range : '3m';
+      lastRun = { query:currentQuery, range:selectedRange };
+      updateControls();
+      showLoading();
+      const sinceDate = sinceDateFor(selectedRange);
+      try {
+        const records = await fetchRecords({ query:currentQuery, sinceDate });
+        if (sequence !== requestSequence) return;
+        if (!currentQuery) {
+          resultLabel.textContent = '최근 기록';
+          renderRecords(records, '');
+          return;
+        }
+        resultLabel.textContent = `${records.length}건 · ${RANGE_OPTIONS[selectedRange].label}`;
+        if (records.length) {
+          renderRecords(records, currentQuery);
+          return;
+        }
+
+        const recent = await fetchRecords({ query:'', sinceDate });
+        if (sequence !== requestSequence) return;
+        if (selectedRange !== 'all') {
+          const allResults = await fetchRecords({ query:currentQuery, sinceDate:null });
+          if (sequence !== requestSequence) return;
+          if (allResults.length) {
+            const block = stateBlock(
+              `최근 ${RANGE_OPTIONS[selectedRange].label}엔 없어요`,
+              `전체 기간에는 ${allResults.length}건`,
+              { action:'all', label:'전체 기간에서 찾기' }
+            );
+            renderStateWithRecent(block, recent);
+            return;
+          }
+        }
+
+        const suggestion = await suggestionFor(currentQuery, sinceDate);
+        if (sequence !== requestSequence) return;
+        const copy = suggestion
+          ? `&quot;${escapeHtml(suggestion.query)}&quot;로는 ${suggestion.count}건`
+          : '다른 검색어로 다시 찾아보세요';
+        renderStateWithRecent(stateBlock(`&quot;${escapeHtml(currentQuery)}&quot;으로 찾은 게 없어요`, copy), recent);
+      } catch (error) {
+        if (sequence !== requestSequence) return;
+        resultLabel.textContent = '기록 오류';
+        renderError(error);
+      }
+    }
+
+    function updateControls() {
+      searchShell.classList.toggle('has-value', Boolean(searchInput.value));
+      rangeGroup.querySelectorAll('[data-range]').forEach(button => {
+        button.setAttribute('aria-checked', String(button.dataset.range === selectedRange));
+      });
+    }
+
+    searchInput.addEventListener('input', updateControls);
+    searchInput.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing) return;
+      event.preventDefault();
+      runSearch(searchInput.value, selectedRange);
+    });
+
+    clearSearch.addEventListener('click', () => {
+      searchInput.value = '';
+      currentQuery = '';
+      updateControls();
+      searchInput.focus();
+      runSearch('', selectedRange);
+    });
+
+    rangeGroup.addEventListener('click', event => {
+      const button = event.target.closest('[data-range]');
+      if (!button || button.dataset.range === selectedRange) return;
+      selectedRange = button.dataset.range;
+      saveRange(selectedRange);
+      runSearch(currentQuery, selectedRange);
+    });
+
+    rangeGroup.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      const buttons = [...rangeGroup.querySelectorAll('[data-range]')];
+      const index = buttons.indexOf(event.target);
+      if (index < 0) return;
+      event.preventDefault();
+      const offset = event.key === 'ArrowRight' ? 1 : -1;
+      buttons[(index + offset + buttons.length) % buttons.length].focus();
+    });
+
+    listArea.addEventListener('click', event => {
+      const action = event.target.closest('[data-state-action]')?.dataset.stateAction;
+      if (action === 'all') {
+        selectedRange = 'all';
+        saveRange(selectedRange);
+        runSearch(currentQuery, selectedRange);
+      }
+      if (action === 'retry') runSearch(lastRun.query, lastRun.range);
+    });
+
+    updateControls();
+    runSearch('', selectedRange);
+  </script>
+</body>
+</html>
