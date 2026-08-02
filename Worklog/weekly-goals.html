@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <style>
     :root {
-      --action:#0E5C7A;
+      --action:#0E5C7A; --action-soft:#E2F0F6; --mid:#CFE2EA;
       --text:#12303C; --title:#33505C; --done:#A9BAC2;
-      --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --secondary:#6B8794; --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --border:#DCE7ED;
       --cell-empty:#E3EAEE; --seg-home:#F1F5F7; --field-border:#E1EAEE;
       --surface:#FFFFFF; --surface-soft:#FAFCFD;
       --mode-work:oklch(0.62 0.09 245);
@@ -29,7 +30,7 @@
 
     .goals-wrap { width:100%; max-width:570px; margin:0 auto; }
     .goals-card {
-      width:100%; height:var(--card-h); display:flex; flex-direction:column; gap:12px;
+      position:relative; width:100%; height:var(--card-h); display:flex; flex-direction:column; gap:12px;
       padding:16px; border-radius:18px; background:var(--surface);
       box-shadow:0 1px 2px rgba(18,48,60,.05), 0 10px 34px rgba(18,48,60,.08);
     }
@@ -40,25 +41,18 @@
       flex-wrap:nowrap; overflow:hidden;
     }
     .goals-title { margin:0; flex:0 0 auto; color:var(--title); font-size:12px; font-weight:800; line-height:1.2; }
-    .week-range {
-      flex:0 0 auto; color:var(--faint); font-size:9px; font-weight:700; line-height:1.2;
-      white-space:nowrap; font-variant-numeric:tabular-nums;
+    .mode-row { min-height:30px; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+    .mode-pill {
+      min-height:30px; padding:6px 13px; border:1px solid var(--border); border-radius:999px;
+      background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700; cursor:pointer;
     }
-    .week-range.is-hidden { display:none; }
-    .mode-seg {
-      flex:0 0 auto; margin-left:auto; display:flex; gap:2px;
-      padding:3px; border-radius:9px; background:var(--seg-home);
+    .mode-pill.is-selected[data-mode="work"] { border-color:var(--action); background:var(--action); color:#FFFFFF; }
+    .mode-pill.is-selected[data-mode="life"] { border-color:var(--mid); background:var(--mid); color:var(--action); }
+    .mode-pill:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
+
+    .goals-content {
+      min-width:0; min-height:0; flex:1; display:flex; flex-direction:column; gap:12px;
     }
-    .mode-tab {
-      padding:4px 10px; border:0; border-radius:7px; background:transparent;
-      color:var(--muted); font-size:10px; font-weight:800; line-height:1.2;
-      white-space:nowrap; cursor:pointer;
-    }
-    .mode-tab.is-on {
-      background:var(--surface); color:var(--title);
-      box-shadow:0 1px 2px rgba(18,48,60,.06);
-    }
-    .mode-tab:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
 
     /* 달성률 줄 */
     .goals-rate {
@@ -92,20 +86,35 @@
       width:100%; min-width:0; flex:0 0 auto; padding:7px 9px; display:grid;
       grid-template-columns:17px minmax(0,1fr) auto; align-items:center; gap:8px;
       border:0; border-radius:9px; background:var(--surface); text-align:left;
-      box-shadow:0 1px 2px rgba(18,48,60,.05); cursor:pointer;
+      box-shadow:0 1px 2px rgba(18,48,60,.05);
     }
-    .goal-item:focus-visible { outline:2px solid var(--action); outline-offset:-2px; }
+    .goal-item.is-editing { grid-template-columns:17px minmax(0,1fr) auto auto; }
     .goal-check {
-      width:17px; height:17px; border-radius:5px; border:1.5px solid var(--inactive);
+      width:17px; height:17px; padding:0; border-radius:5px; border:1.5px solid var(--inactive);
+      background:var(--surface); cursor:pointer;
       display:grid; place-items:center; color:transparent; font-size:10px; font-weight:800; line-height:1;
     }
     .goal-item.is-done .goal-check { border-color:var(--action); background:var(--action); color:var(--surface); }
+    .goal-check:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
     .goal-text {
-      min-width:0; color:var(--text); font-size:11px; font-weight:600; line-height:1.5;
+      min-width:0; width:100%; padding:0; border:0; background:transparent; text-align:left; cursor:text;
+      color:var(--text); font-size:11px; font-weight:600; line-height:1.5;
       overflow-wrap:anywhere;
       display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
     }
     .goal-item.is-done .goal-text { color:var(--done); }
+    .goal-text:focus-visible { outline:2px solid var(--action); outline-offset:3px; border-radius:3px; }
+    .goal-edit-input {
+      min-width:0; width:100%; height:30px; padding:0 8px;
+      border:1px solid var(--field-border); border-radius:7px; background:var(--surface);
+      color:var(--text); font-size:11px; font-weight:600;
+    }
+    .goal-edit-input:focus { outline:2px solid var(--action); outline-offset:-2px; }
+    .goal-edit-save {
+      height:30px; padding:0 9px; border:0; border-radius:7px;
+      background:var(--action); color:var(--surface); font-size:10px; font-weight:700; cursor:pointer;
+    }
+    .goal-edit-save:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
     .goal-remove {
       width:22px; height:22px; padding:0; display:grid; place-items:center;
       border:0; border-radius:5px; background:transparent;
@@ -135,7 +144,6 @@
       background:var(--action); color:var(--surface); font-size:11px; font-weight:700; cursor:pointer;
     }
     .add-submit:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
-    .add-hint { color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
     .limit-note { flex:0 0 auto; padding:0 2px; color:var(--faint); font-size:9px; font-weight:700; line-height:1.3; }
 
     /* 빈 상태 */
@@ -150,7 +158,6 @@
     .empty-copy { color:var(--muted); font-size:10px; font-weight:600; line-height:1.4; }
 
     /* 넓은 규격 (컨테이너 ≥ 400) */
-    .goals-card.is-wide .mode-tab { padding:7px 14px; font-size:11px; }
     .goals-card.is-wide .rate-done { font-size:15px; }
     .goals-card.is-wide .rate-cells { flex:1; margin-left:auto; gap:6px; }
     .goals-card.is-wide .rate-cell { flex:1; min-width:14px; }
@@ -158,30 +165,56 @@
     .goals-card.is-wide .goal-text {
       font-size:12px; display:block; -webkit-line-clamp:none; overflow:visible;
     }
+    .goals-card.is-wide .goal-edit-input { height:34px; font-size:12px; }
+    .goals-card.is-wide .goal-edit-save { height:34px; }
     .goals-card.is-wide .goal-remove { width:40px; height:40px; }
 
     @media (hover:hover) {
       .goal-remove:hover { color:var(--muted); }
     }
+    @media (max-width:639px) {
+      .mode-pill {
+        position:relative; min-width:44px; min-height:44px; padding:0 13px;
+        border-color:transparent; background:transparent; isolation:isolate;
+      }
+      .mode-pill::before {
+        content:""; position:absolute; left:0; right:0; top:7px; height:30px;
+        z-index:-1; border:1px solid var(--border); border-radius:999px; background:var(--surface);
+      }
+      .mode-pill.is-selected[data-mode="work"] { border-color:transparent; background:transparent; }
+      .mode-pill.is-selected[data-mode="work"]::before { border-color:var(--action); background:var(--action); }
+      .mode-pill.is-selected[data-mode="life"] { border-color:transparent; background:transparent; }
+      .mode-pill.is-selected[data-mode="life"]::before { border-color:var(--mid); background:var(--mid); }
+    }
   </style>
+  <link rel="stylesheet" href="../widget-frame.css">
 </head>
-<body>
-  <div class="goals-wrap" id="goalsWrap">
-    <section class="goals-card" id="goalsCard">
-      <div class="goals-head" id="goalsHead">
+<body class="widget-page widget-page-centered">
+  <div class="widget-host goals-wrap" id="goalsWrap" data-widget-host
+    data-widget-key="widget-size-weekly-goals.html" data-widget-max-width="570"
+    data-widget-height="426" data-widget-max-scale="4"
+    style="--widget-max-width:570px;--widget-base-width:570px;--widget-base-height:426px;--widget-visual-height:426px">
+    <section class="goals-card" id="goalsCard" data-widget-card aria-label="이번 주 목표 위젯">
+      <div class="goals-head" id="goalsHead" data-widget-fixed>
         <h1 class="goals-title">이번 주 목표</h1>
-        <span class="week-range" id="weekRange"></span>
-        <div class="mode-seg" id="modeSeg" role="group" aria-label="목표 모드">
-          <button class="mode-tab" type="button" data-mode="work">업무</button>
-          <button class="mode-tab" type="button" data-mode="life">일상</button>
+        <div class="mode-row" id="modeSeg" role="group" aria-label="목표 모드">
+          <button class="mode-pill" type="button" data-mode="work" aria-pressed="false">업무</button>
+          <button class="mode-pill" type="button" data-mode="life" aria-pressed="false">일상</button>
         </div>
       </div>
-      <div class="goals-rate" id="goalsRate">
-        <span class="rate-count"><span class="rate-done" id="rateDone">0</span><span class="rate-total" id="rateTotal">/0</span></span>
-        <span class="rate-note is-hidden" id="rateNote">다 했어요</span>
-        <span class="rate-cells" id="rateCells" aria-hidden="true"></span>
+      <div class="goals-content" data-widget-list data-widget-list-height="352">
+        <div class="goals-rate" id="goalsRate">
+          <span class="rate-count"><span class="rate-done" id="rateDone">0</span><span class="rate-total" id="rateTotal">/0</span></span>
+          <span class="rate-note is-hidden" id="rateNote">다 했어요</span>
+          <span class="rate-cells" id="rateCells" aria-hidden="true"></span>
+        </div>
+        <div class="goals-list" id="goalsList"></div>
       </div>
-      <div class="goals-list" id="goalsList"></div>
+      <button class="widget-list-resize-handle" data-widget-list-handle type="button"
+        aria-label="목표 목록 세로 크기 조절" aria-valuemin="120"></button>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button"
+        aria-label="위젯 비율 고정 크기 조절"></button>
     </section>
   </div>
 
@@ -198,9 +231,7 @@
 
       var wrap = document.getElementById('goalsWrap');
       var card = document.getElementById('goalsCard');
-      var head = document.getElementById('goalsHead');
       var seg = document.getElementById('modeSeg');
-      var rangeEl = document.getElementById('weekRange');
       var rateRow = document.getElementById('goalsRate');
       var rateDone = document.getElementById('rateDone');
       var rateTotal = document.getElementById('rateTotal');
@@ -212,6 +243,8 @@
       var observer = null;
       var adding = false;
       var draft = '';
+      var editingId = null;
+      var editDraft = '';
       var state = { week: '', items: [], seq: 0 };
 
       /* ── 주 계산 ───────────────────────────── */
@@ -221,11 +254,6 @@
         return d;
       }
       function weekKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
-      function weekLabel(mon) {
-        var sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
-        return (mon.getMonth() + 1) + '/' + mon.getDate() + '–' + (sun.getMonth() + 1) + '/' + sun.getDate();
-      }
-
       /* ── 저장소 ───────────────────────────── */
       function load() {
         var monday = mondayOf(new Date());
@@ -261,10 +289,10 @@
       }
 
       function renderSeg() {
-        var tabs = seg.querySelectorAll('.mode-tab');
+        var tabs = seg.querySelectorAll('.mode-pill');
         for (var i = 0; i < tabs.length; i++) {
           var on = tabs[i].getAttribute('data-mode') === mode;
-          tabs[i].classList.toggle('is-on', on);
+          tabs[i].classList.toggle('is-selected', on);
           tabs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
         }
       }
@@ -285,10 +313,18 @@
       }
 
       function itemMarkup(it) {
-        return '<div class="goal-item' + (it.done ? ' is-done' : '') + '" role="button" tabindex="0"' +
-          ' aria-pressed="' + (it.done ? 'true' : 'false') + '" data-id="' + it.id + '">' +
-          '<span class="goal-check" aria-hidden="true">✓</span>' +
-          '<span class="goal-text">' + esc(it.text) + '</span>' +
+        var editing = editingId === it.id;
+        var content = editing
+          ? '<input class="goal-edit-input" id="goalEdit" type="text" autocomplete="off"' +
+            ' data-edit-input aria-label="목표 문구 수정" value="' + esc(editDraft) + '">' +
+            '<button class="goal-edit-save" type="button" data-save-edit>저장</button>'
+          : '<button class="goal-text" type="button" data-edit="' + it.id + '" aria-label="목표 문구 수정">' +
+            esc(it.text) + '</button>';
+        return '<div class="goal-item' + (it.done ? ' is-done' : '') + (editing ? ' is-editing' : '') +
+          '" data-id="' + it.id + '">' +
+          '<button class="goal-check" type="button" data-toggle="' + it.id + '" aria-label="목표 완료 상태 변경"' +
+          ' aria-pressed="' + (it.done ? 'true' : 'false') + '">✓</button>' +
+          content +
           '<button class="goal-remove" type="button" data-remove="' + it.id + '" aria-label="목표 삭제">✕</button>' +
           '</div>';
       }
@@ -305,9 +341,7 @@
           '<input class="add-input" id="goalInput" type="text" autocomplete="off" ' +
           'placeholder="' + esc(MODES[mode].placeholder) + '" aria-label="새 목표" value="' + esc(draft) + '">' +
           '<button class="add-submit" type="button" data-submit>추가</button>' +
-          '</div>' +
-          '<p class="add-hint">Enter로 추가 · Esc로 닫기</p>' +
-          '</div>';
+          '</div></div>';
       }
 
       function emptyMarkup() {
@@ -325,7 +359,6 @@
         list.innerHTML = mine.length
           ? mine.map(itemMarkup).join('') + addMarkup()
           : emptyMarkup();
-        layoutHead();
         if (adding && focusInput) {
           var input = document.getElementById('goalInput');
           if (input) {
@@ -335,18 +368,13 @@
             input.value = v;
           }
         }
-      }
-
-      /* ── 좁은 폭에서 주 범위 캡션 위치 ───────── */
-      function layoutHead() {
-        rangeEl.classList.remove('is-hidden');
-        if (rangeEl.parentNode !== head) head.insertBefore(rangeEl, seg);
-        if (head.scrollWidth <= head.clientWidth + 1) return;
-        if (!rateRow.classList.contains('is-hidden')) {
-          rateRow.insertBefore(rangeEl, rateNote);
-          return;
+        if (editingId !== null && focusInput) {
+          var editInput = document.getElementById('goalEdit');
+          if (editInput) {
+            editInput.focus();
+            editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+          }
         }
-        rangeEl.classList.add('is-hidden');
       }
 
       /* ── 동작 ───────────────────────────── */
@@ -360,8 +388,40 @@
 
       function remove(id) {
         state.items = state.items.filter(function (x) { return x.id !== id; });
+        if (editingId === id) {
+          editingId = null;
+          editDraft = '';
+        }
         save();
         render(true);
+      }
+
+      function openEdit(id) {
+        var it = state.items.filter(function (x) { return x.id === id; })[0];
+        if (!it) return;
+        adding = false;
+        draft = '';
+        editingId = id;
+        editDraft = it.text;
+        render(true);
+      }
+
+      function commitEdit() {
+        if (editingId === null) return;
+        var input = document.getElementById('goalEdit');
+        var text = input ? input.value.trim() : editDraft.trim();
+        var it = state.items.filter(function (x) { return x.id === editingId; })[0];
+        if (it && text) it.text = text;
+        editingId = null;
+        editDraft = '';
+        save();
+        render(false);
+      }
+
+      function cancelEdit() {
+        editingId = null;
+        editDraft = '';
+        render(false);
       }
 
       function commit() {
@@ -379,6 +439,8 @@
 
       function openAdd() {
         if (state.items.length >= MAX) return;
+        editingId = null;
+        editDraft = '';
         adding = true;
         draft = '';
         render(true);
@@ -391,13 +453,15 @@
       }
 
       seg.addEventListener('click', function (e) {
-        var tab = e.target.closest('.mode-tab');
+        var tab = e.target.closest('.mode-pill');
         if (!tab) return;
         var next = tab.getAttribute('data-mode');
         if (next === mode) return;
         mode = next;
         adding = false;
         draft = '';
+        editingId = null;
+        editDraft = '';
         render(false);
       });
 
@@ -408,17 +472,27 @@
           remove(Number(rm.getAttribute('data-remove')));
           return;
         }
+        var toggleButton = e.target.closest('[data-toggle]');
+        if (toggleButton) {
+          toggle(Number(toggleButton.getAttribute('data-toggle')));
+          return;
+        }
+        if (e.target.closest('[data-save-edit]')) { commitEdit(); return; }
+        var editButton = e.target.closest('[data-edit]');
+        if (editButton) { openEdit(Number(editButton.getAttribute('data-edit'))); return; }
         if (e.target.closest('[data-add]')) { openAdd(); return; }
         if (e.target.closest('[data-submit]')) { commit(); return; }
         var item = e.target.closest('.goal-item');
-        if (item) toggle(Number(item.getAttribute('data-id')));
+        if (item && !e.target.closest('[data-edit-input]')) {
+          var id = Number(item.getAttribute('data-id'));
+          if (editingId !== id) openEdit(id);
+        }
       });
 
       list.addEventListener('keydown', function (e) {
-        var item = e.target.closest('.goal-item');
-        if (item && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {
-          e.preventDefault();
-          toggle(Number(item.getAttribute('data-id')));
+        if (e.target.id === 'goalEdit') {
+          if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+          else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
           return;
         }
         if (e.target.id !== 'goalInput') return;
@@ -428,6 +502,7 @@
 
       list.addEventListener('input', function (e) {
         if (e.target.id === 'goalInput') draft = e.target.value;
+        else if (e.target.id === 'goalEdit') editDraft = e.target.value;
       });
 
       /* ── 컨테이너 폭 ───────────────────────── */
@@ -438,12 +513,10 @@
         if (wide !== card.classList.contains('is-wide')) {
           card.classList.toggle('is-wide', wide);
         }
-        layoutHead();
       }
 
       state = load();
       save();
-      rangeEl.textContent = weekLabel(mondayOf(new Date()));
       render(false);
       applyWidth();
 
@@ -456,5 +529,6 @@
       window.addEventListener('pageshow', applyWidth);
     })();
   </script>
+  <script src="../widget-frame.js"></script>
 </body>
 </html>
