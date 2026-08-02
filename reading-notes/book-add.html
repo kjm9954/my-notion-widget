@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>독서 노트 · 책 추가</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    :root {
+      --action:#0E5C7A; --action-soft:#E2F0F6; --text:#12303C; --title:#33505C;
+      --secondary:#6B8794; --muted:#93A5AD; --faint:#A2B4BC; --inactive:#C6D6DD;
+      --border:#DCE7ED; --border-soft:#E6EDF0; --border-faint:#F1F5F7;
+      --surface:#FFFFFF; --surface-soft:#FAFCFD; --pill:#F5F9FB;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; background:transparent; }
+    body { margin:0; color:var(--text); font-family:"Pretendard Variable", Pretendard, -apple-system, "Helvetica Neue", sans-serif; -webkit-font-smoothing:antialiased; }
+    button, input { font:inherit; color:inherit; }
+    button { cursor:pointer; }
+    .shell { min-height:0; }
+    .widget { position:relative; width:100%; display:flex; flex-direction:column; padding:13px; overflow:hidden; background:var(--surface); border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
+
+    /* 접힘 — 버튼 하나 */
+    .trigger { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:11px; color:#FFFFFF; background:var(--action); border:1px solid var(--action); border-radius:9px; font-size:11px; font-weight:700; }
+    .trigger .plus { font-size:12px; font-weight:800; line-height:1; }
+    .widget.is-open .trigger { display:none; }
+
+    /* 오버레이 — 위젯 영역 안에만 (클래스는 공용 CSS와 겹치지 않게 ba- 접두사) */
+    .ba-overlay { position:relative; display:flex; align-items:flex-start; justify-content:center; }
+    .ba-overlay[hidden] { display:none; }
+    .ba-backdrop { position:absolute; inset:-13px; background:rgba(18,48,60,.06); }
+    .ba-panel { position:relative; z-index:1; width:100%; max-width:520px; display:flex; flex-direction:column; gap:11px; padding:14px; background:var(--surface); border:1px solid var(--border-faint); border-radius:14px; box-shadow:0 8px 28px rgba(18,48,60,.14); }
+
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .panel-title { color:var(--title); font-size:12px; font-weight:800; }
+    .close { padding:2px 4px; color:var(--faint); background:transparent; border:0; font-size:12px; font-weight:700; }
+    @media (hover:hover) { .close:hover { color:var(--secondary); } }
+
+    /* 검색 */
+    .search { display:flex; align-items:center; gap:7px; padding:9px 12px; background:var(--surface); border:1px solid var(--action); border-radius:9px; }
+    .search .glass { color:var(--action); font-size:12px; font-weight:700; line-height:1; }
+    .search input { flex:1; min-width:0; border:0; outline:none; background:transparent; font-size:12px; font-weight:600; }
+    .search input::placeholder { color:var(--muted); font-weight:600; }
+
+    .rule { display:flex; align-items:center; gap:8px; }
+    .rule-label { flex:0 0 auto; color:var(--action); font-size:9px; font-weight:800; letter-spacing:.06em; }
+    .rule-line { flex:1; height:1px; background:var(--border-faint); }
+
+    .candidates { min-height:0; overflow-y:auto; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+    .cell { display:flex; flex-direction:column; gap:5px; padding:0; text-align:left; background:transparent; border:0; }
+    .cover { position:relative; width:100%; aspect-ratio:2 / 3; overflow:hidden; display:flex; align-items:flex-end; padding:7px; background:#F1F5F7; border:1px solid var(--border-soft); border-radius:8px; }
+    .cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .cover.no-image { background:var(--surface-soft); border:1px dashed var(--inactive); }
+    .cover-name { position:relative; z-index:1; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.25; }
+    .cell .cover { outline:2px solid transparent; outline-offset:-2px; transition:outline-color var(--t-color) var(--ease), border-color var(--t-color) var(--ease); }
+    .cell:not(.selected) .cover { opacity:.8; }
+    .cell.selected .cover { border-color:var(--action); outline-color:var(--action); }
+    .cell-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
+
+    /* 확인 카드 */
+    .confirm-top { display:flex; align-items:flex-start; gap:11px; }
+    .confirm-cover { flex:0 0 52px; width:52px; aspect-ratio:2 / 3; overflow:hidden; position:relative; display:flex; align-items:flex-end; padding:5px; background:#F1F5F7; border:1px solid var(--border-soft); border-radius:9px; }
+    .confirm-cover.no-image { background:var(--surface-soft); border:1px dashed var(--inactive); }
+    .confirm-cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .confirm-info { min-width:0; flex:1; display:flex; flex-direction:column; gap:3px; }
+    .confirm-title { color:var(--text); font-size:13px; font-weight:800; overflow-wrap:anywhere; }
+    .confirm-meta { color:var(--secondary); font-size:10px; font-weight:700; }
+    .confirm-hint { color:var(--faint); font-size:9px; font-weight:700; }
+    .confirm-hint .edit-toggle { padding:0; color:var(--action); background:transparent; border:0; font-size:9px; font-weight:700; }
+    .edit-fields { display:flex; flex-direction:column; gap:6px; margin-top:5px; }
+    .edit-fields input { width:100%; padding:8px 10px; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:9px; font-size:12px; font-weight:600; outline:none; }
+
+    .status-row { display:flex; flex-wrap:wrap; gap:5px; }
+    .status-pill { padding:5px 11px; color:var(--secondary); background:var(--pill); border:0; border-radius:999px; font-size:10px; font-weight:700; }
+    .status-pill.selected { color:var(--action); background:var(--action-soft); }
+
+    .action-row { display:flex; align-items:center; gap:8px; padding-top:12px; border-top:1px solid var(--border-faint); }
+    .year { display:flex; align-items:center; gap:8px; }
+    .year-label { color:var(--secondary); font-size:10px; font-weight:700; }
+    .year-value { min-width:38px; text-align:center; color:var(--title); font-size:10px; font-weight:800; }
+    .stepper { min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; color:var(--secondary); background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:14px; font-weight:700; line-height:1; }
+    .stepper:disabled { color:var(--inactive); cursor:default; }
+    .action-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+    .back { padding:8px 4px; color:var(--secondary); background:transparent; border:0; font-size:11px; font-weight:700; }
+    .add { padding:8px 18px; color:#FFFFFF; background:var(--action); border:1px solid var(--action); border-radius:8px; font-size:11px; font-weight:700; }
+
+    /* 빈 상태 — 결과 없음 */
+    .no-results { display:flex; flex-direction:column; align-items:center; gap:5px; padding:26px 16px; text-align:center; background:var(--surface-soft); border:1px dashed var(--inactive); border-radius:12px; }
+    .no-results-title { color:var(--title); font-size:12px; font-weight:800; }
+    .no-results-copy { color:var(--muted); font-size:10px; font-weight:600; }
+    .manual-entry { margin-top:2px; padding:0; color:var(--action); background:transparent; border:0; font-size:11px; font-weight:700; }
+
+    /* 완료 카드 */
+    .done { display:flex; flex-direction:column; gap:9px; align-items:center; padding:8px 0; }
+    .done-row { display:flex; align-items:center; gap:9px; }
+    .done-cover { flex:0 0 40px; width:40px; aspect-ratio:2 / 3; overflow:hidden; position:relative; display:flex; align-items:flex-end; padding:4px; background:#F1F5F7; border:1px solid var(--border-soft); border-radius:8px; }
+    .done-cover.no-image { background:var(--surface-soft); border:1px dashed var(--inactive); }
+    .done-cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .done-line { color:var(--text); font-size:11px; font-weight:700; }
+    .done-note { color:var(--action); font-size:10px; font-weight:700; }
+    .again { padding:6px 4px; color:var(--secondary); background:transparent; border:0; font-size:10px; font-weight:700; }
+
+    @media (max-width:639px) {
+      .ba-overlay { align-items:flex-end; }
+      .ba-panel { max-width:none; border-radius:14px 14px 0 0; }
+      .grid { grid-template-columns:repeat(3,1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cell .cover, .status-pill, .add, .back { transition:none !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="../widget-frame.css">
+</head>
+<body class="widget-page widget-page-centered">
+  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-book-add.html" data-widget-max-width="1280" data-widget-height="62" style="--widget-max-width:1280px;--widget-base-width:1280px;--widget-base-height:62px;--widget-visual-height:62px">
+    <section class="widget" data-widget-card aria-label="책 추가 위젯">
+      <button class="trigger" type="button" data-open><span class="plus" aria-hidden="true">＋</span>책장에 책 추가</button>
+      <div class="ba-overlay" data-overlay hidden>
+        <div class="ba-backdrop" data-backdrop aria-hidden="true"></div>
+        <div class="ba-panel" role="dialog" aria-modal="true" aria-label="책 추가" data-panel></div>
+      </div>
+      <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+      <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절" aria-valuemin="70" aria-valuemax="100"></button>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ── 가짜 데이터. 나중에 searchBooks만 실제 도서 API로 교체한다. ──
+      function cover(bg, label) {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300"><rect width="200" height="300" fill="${bg}"/><rect x="14" y="230" width="150" height="10" rx="5" fill="rgba(255,255,255,.5)"/><text x="16" y="42" font-family="sans-serif" font-size="20" font-weight="700" fill="rgba(255,255,255,.92)">${label}</text></svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+      }
+      const MOCK = {
+        '데미안': [
+          { title:'데미안', author:'헤르만 헤세', publisher:'민음사',   year:2023, cover:cover('#0E5C7A','Demian') },
+          { title:'데미안', author:'헤르만 헤세', publisher:'열린책들', year:2010, cover:cover('#33505C','Demian') },
+          { title:'데미안', author:'헤르만 헤세', publisher:'문예출판사', year:2001, cover:null },
+        ],
+        '토지': [
+          { title:'토지', author:'박경리', publisher:'마로니에북스', year:2012, cover:cover('#6B8794','토지') },
+          { title:'토지', author:'박경리', publisher:'나남출판',   year:2002, cover:null },
+        ],
+      };
+      function searchBooks(query) {
+        const key = String(query || '').trim();
+        // 같은 제목 여러 판본 포함. 출판연도 내림차순(최신 먼저).
+        return (MOCK[key] || []).slice().sort((a, b) => b.year - a.year);
+      }
+
+      const STATUSES = ['읽는 중', '완독', '중도포기', '구입 전'];
+      const NOW_YEAR = new Date().getFullYear();
+
+      const widget = document.querySelector('[data-widget-card]');
+      const trigger = widget.querySelector('[data-open]');
+      const overlay = widget.querySelector('[data-overlay]');
+      const backdrop = widget.querySelector('[data-backdrop]');
+      const panel = widget.querySelector('[data-panel]');
+
+      let state = null;
+      let searchTimer = 0;
+      let doneTimer = 0;
+
+      function escapeHtml(value) {
+        return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+      }
+
+      function open() {
+        state = { step: 'search', query: '', results: [], selected: 0, editing: false, draft: null, status: '완독', year: NOW_YEAR };
+        widget.classList.add('is-open');
+        overlay.hidden = false;
+        render();
+        requestAnimationFrame(() => panel.querySelector('[data-search-input]')?.focus());
+      }
+
+      function close() {
+        clearTimeout(doneTimer);
+        widget.classList.remove('is-open');
+        overlay.hidden = true;
+        panel.innerHTML = '';
+        state = null;
+        reflow();
+      }
+
+      function currentBook() {
+        return state.draft || state.results[state.selected] || null;
+      }
+
+      function coverMarkup(book, className) {
+        if (book && book.cover) {
+          return `<span class="${className}"><img src="${escapeHtml(book.cover)}" alt="" onerror="this.remove();this.parentNode.classList.add('no-image')">${book ? `<span class="cover-name">${escapeHtml(book.title || '')}</span>` : ''}</span>`;
+        }
+        return `<span class="${className} no-image"><span class="cover-name">${escapeHtml(book?.title || '')}</span></span>`;
+      }
+
+      function renderSearch() {
+        const results = state.results;
+        let body = '';
+        if (state.query.trim()) {
+          if (results.length) {
+            body = `
+              <div class="rule"><span class="rule-label">최신 판본 먼저</span><span class="rule-line" aria-hidden="true"></span></div>
+              <div class="candidates"><div class="grid">
+                ${results.map((book, index) => `
+                  <button class="cell${index === state.selected ? ' selected' : ''}" type="button" data-cell="${index}">
+                    ${coverMarkup(book, 'cover')}
+                    <span class="cell-meta">${escapeHtml(book.publisher)} · ${escapeHtml(String(book.year))}</span>
+                  </button>`).join('')}
+              </div></div>`;
+          } else {
+            body = `
+              <div class="no-results">
+                <span class="no-results-title">찾는 책이 없어요</span>
+                <span class="no-results-copy">제목을 다르게 써보거나 직접 추가할 수 있어요</span>
+                <button class="manual-entry" type="button" data-manual>직접 입력</button>
+              </div>`;
+          }
+        }
+        panel.innerHTML = `
+          <div class="panel-head"><span class="panel-title">책 추가</span><button class="close" type="button" data-close aria-label="닫기">✕</button></div>
+          <div class="search"><span class="glass" aria-hidden="true">⌕</span><input type="text" data-search-input value="${escapeHtml(state.query)}" placeholder="제목으로 검색…" aria-label="제목으로 검색"></div>
+          ${body}`;
+        reflow();
+      }
+
+      function renderConfirm() {
+        const book = currentBook() || { title: '', author: '', publisher: '', year: state.year, cover: null };
+        const metaBits = [book.author, book.publisher, book.year].map(v => String(v ?? '').trim()).filter(Boolean);
+        const editable = state.editing || state.manual;
+        panel.innerHTML = `
+          <div class="panel-head"><span class="panel-title">책 추가</span><button class="close" type="button" data-close aria-label="닫기">✕</button></div>
+          <div class="confirm-top">
+            ${coverMarkup(book, 'confirm-cover')}
+            <div class="confirm-info">
+              ${editable ? '' : `<span class="confirm-title">${escapeHtml(book.title) || '제목 없음'}</span>`}
+              ${editable ? '' : (metaBits.length ? `<span class="confirm-meta">${metaBits.map(escapeHtml).join(' · ')}</span>` : '')}
+              ${editable
+                ? `<div class="edit-fields">
+                     <input type="text" data-field="title" value="${escapeHtml(book.title)}" placeholder="제목" aria-label="제목">
+                     <input type="text" data-field="author" value="${escapeHtml(book.author)}" placeholder="저자" aria-label="저자">
+                     <input type="text" data-field="publisher" value="${escapeHtml(book.publisher)}" placeholder="출판사" aria-label="출판사">
+                   </div>`
+                : `<span class="confirm-hint">자동으로 채워짐 · <button class="edit-toggle" type="button" data-edit>표지·저자 수정</button></span>`}
+            </div>
+          </div>
+          <div class="status-row">
+            ${STATUSES.map(s => `<button class="status-pill${s === state.status ? ' selected' : ''}" type="button" data-status="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}
+          </div>
+          <div class="action-row">
+            <div class="year">
+              <span class="year-label">연도</span>
+              <button class="stepper" type="button" data-year="-1" aria-label="연도 낮추기">‹</button>
+              <span class="year-value">${state.year}</span>
+              <button class="stepper" type="button" data-year="1" aria-label="연도 높이기"${state.year >= NOW_YEAR ? ' disabled' : ''}>›</button>
+            </div>
+            <div class="action-right">
+              <button class="back" type="button" data-back>뒤로</button>
+              <button class="add" type="button" data-add>노션에 추가</button>
+            </div>
+          </div>`;
+        reflow();
+      }
+
+      function renderDone() {
+        const book = state.added;
+        const metaBits = [book.title, book.status, book.year].filter(Boolean);
+        panel.innerHTML = `
+          <div class="panel-head"><span class="panel-title">책 추가</span><button class="close" type="button" data-close aria-label="닫기">✕</button></div>
+          <div class="done">
+            <div class="done-row">
+              ${coverMarkup(book, 'done-cover')}
+              <span class="done-line">${metaBits.map(escapeHtml).join(' · ')}</span>
+            </div>
+            <span class="done-note">책장에 추가했어요</span>
+            <button class="again" type="button" data-again>한 권 더</button>
+          </div>`;
+        reflow();
+      }
+
+      // 오버레이 높이가 바뀌면 위젯 프레임에 다시 맞추라고 알린다.
+      function reflow() {
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+      }
+
+      function render() {
+        if (!state) return;
+        if (state.step === 'search') renderSearch();
+        else if (state.step === 'confirm') renderConfirm();
+        else if (state.step === 'done') renderDone();
+      }
+
+      function runSearch() {
+        state.results = searchBooks(state.query);
+        state.selected = 0;
+        renderSearch();
+      }
+
+      function goConfirm(manual) {
+        state.manual = !!manual;
+        state.editing = false;
+        if (manual) {
+          state.draft = { title: state.query.trim(), author: '', publisher: '', year: state.year, cover: null };
+        } else {
+          state.draft = null;
+        }
+        state.year = NOW_YEAR;
+        state.status = '완독';
+        state.step = 'confirm';
+        renderConfirm();
+      }
+
+      // 트리거·바깥판·Esc
+      trigger.addEventListener('click', open);
+      backdrop.addEventListener('click', close);
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && state) close();
+      });
+
+      panel.addEventListener('click', event => {
+        const target = event.target;
+        if (target.closest('[data-close]')) { close(); return; }
+        const cell = target.closest('[data-cell]');
+        if (cell) { state.selected = Number(cell.dataset.cell); goConfirm(false); return; }
+        if (target.closest('[data-manual]')) { goConfirm(true); return; }
+        if (target.closest('[data-edit]')) { state.editing = true; renderConfirm(); return; }
+        const status = target.closest('[data-status]');
+        if (status) { state.status = status.dataset.status; renderConfirm(); return; }
+        const year = target.closest('[data-year]');
+        if (year) {
+          const next = state.year + Number(year.dataset.year);
+          if (next <= NOW_YEAR) state.year = next;
+          renderConfirm();
+          return;
+        }
+        if (target.closest('[data-back]')) { state.step = 'search'; state.draft = null; state.manual = false; renderSearch(); requestAnimationFrame(() => panel.querySelector('[data-search-input]')?.focus()); return; }
+        if (target.closest('[data-add]')) { submit(); return; }
+        if (target.closest('[data-again]')) { open(); return; }
+      });
+
+      panel.addEventListener('input', event => {
+        const input = event.target;
+        if (input.matches('[data-search-input]')) {
+          state.query = input.value;
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(runSearch, 200);
+          return;
+        }
+        const field = input.closest('[data-field]');
+        if (field) {
+          state.draft = state.draft || Object.assign({}, currentBook());
+          state.draft[field.dataset.field] = input.value;
+        }
+      });
+
+      function submit() {
+        const book = currentBook() || {};
+        const payload = {
+          title: String(book.title || '').trim(),
+          author: String(book.author || '').trim(),
+          publisher: String(book.publisher || '').trim(),
+          cover: book.cover || null,
+          year: state.year,
+          status: state.status,
+        };
+        // 이번 범위는 화면까지 — 실제 저장 대신 로그만.
+        console.log('[book-add] 노션에 추가할 데이터', payload);
+        state.added = payload;
+        state.step = 'done';
+        renderDone();
+        clearTimeout(doneTimer);
+        doneTimer = setTimeout(close, 2000);
+      }
+    })();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>
