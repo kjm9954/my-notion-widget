@@ -299,24 +299,7 @@
       defaultRange: '3m'
     };
 
-    const SAMPLE_DATA = [
-      { id:'s01', title:'캐릭터 밸런스 회의 정리', body:'신규 구간의 캐릭터 밸런스 수치를 검토하고 다음 테스트 기준을 정리했다.', date:'2026-08-01', project:'타운', view:'달력' },
-      { id:'s02', title:'팝콘 보상 밸런스 초안', body:'주간 보상 밸런스가 실제 플레이 시간과 맞는지 비교했다.', date:'2026-07-30', project:'팝콘', view:'갤러리' },
-      { id:'s03', title:'콘텐츠 밸런스 체크', body:'밸런스 테스트 결과를 기준으로 난이도 구간을 다시 나눴다.', date:'2026-07-25', project:'타운', view:'달력' },
-      { id:'s04', title:'7월 밸런스 회고', body:'이번 회고에서는 밸런스 변경 이후 이탈 구간을 먼저 살펴봤다.', date:'2026-07-18', project:'팝콘', view:'갤러리' },
-      { id:'s05', title:'상점 밸런스 작업 기록', body:'재화 소모와 획득 밸런스가 맞지 않는 구간을 기록했다.', date:'2026-07-10', project:'타운', view:'달력' },
-      { id:'s06', title:'레벨 밸런스 검토', body:'중반 레벨 밸런스 기준과 반복 플레이 시간을 함께 확인했다.', date:'2026-07-03', project:'팝콘', view:'갤러리' },
-      { id:'s07', title:'전투 밸런스 메모', body:'보스 전투 밸런스 수치와 체감 난이도 차이를 정리했다.', date:'2026-06-29', project:'타운', view:'달력' },
-      { id:'s08', title:'이벤트 밸런스 회의', body:'이벤트 밸런스 조정 범위와 담당 작업을 회의에서 확정했다.', date:'2026-06-21', project:'팝콘', view:'갤러리' },
-      { id:'s09', title:'스테이지 밸런스 수정', body:'후반 스테이지의 밸런스 간격을 좁히는 작업을 진행했다.', date:'2026-06-12', project:'타운', view:'달력' },
-      { id:'s10', title:'경제 밸런스 확인', body:'아이템 가격 밸런스와 구매 전환 기록을 함께 확인했다.', date:'2026-06-04', project:'팝콘', view:'갤러리' },
-      { id:'s11', title:'초반 밸런스 테스트', body:'첫 진입 구간의 밸런스가 안내 흐름과 맞는지 테스트했다.', date:'2026-05-25', project:'타운', view:'달력' },
-      { id:'s12', title:'보상 밸런스 기준', body:'보상 밸런스 기준표를 정리하고 다음 반영 일정을 남겼다.', date:'2026-05-10', project:'팝콘', view:'갤러리' },
-      { id:'s13', title:'신규 기능 회의록', body:'검색 기능의 우선순위와 배포 전 확인 항목을 회의에서 정리했다.', date:'2026-07-29', project:'타운', view:'갤러리' },
-      { id:'s14', title:'주간 작업 기록', body:'완료한 작업과 다음 주에 이어갈 항목을 한 줄씩 남겼다.', date:'2026-07-22', project:'팝콘', view:'달력' },
-      { id:'s15', title:'디자인 회의 메모', body:'카드 간격과 검색 결과 행의 정보 순서를 회의에서 확정했다.', date:'2026-06-15', project:'타운', view:'갤러리' },
-      { id:'s16', title:'장기 아카이브 회고', body:'예전 프로젝트 기록을 다시 읽고 장기 아카이브 기준을 만들었다.', date:'2024-11-08', project:'팝콘', view:'달력' }
-    ];
+    const SAMPLE_DATA = [];
 
     const RANGE_KEY = 'historyWidget.range';
     const RANGE_OPTIONS = {
@@ -396,7 +379,6 @@
     async function fetchRecords({ query, sinceDate }) {
       if (CONFIG.useSampleData) {
         await new Promise(resolve => setTimeout(resolve, 240));
-        if (String(query || '').trim() === '오류 테스트') throw new Error('샘플 프록시 응답 오류');
         return SAMPLE_DATA
           .map(mapProxyRecord)
           .filter(record => !sinceDate || record.date >= sinceDate)
