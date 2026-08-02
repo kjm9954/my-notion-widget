@@ -170,6 +170,9 @@ async function loadWorklogState() {
 async function saveWorklogState(state) {
   return (await apiPost("/api/worklog/state", state)).data;
 }
+async function saveWorklogColumnSplit(mode, value) {
+  return (await apiPost("/api/worklog/column-split", { mode, value })).data;
+}
 
 // ───────── 중요 업무 ─────────
 async function loadImportantCalendarState() {
@@ -249,7 +252,7 @@ window.Store = {
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,
-  loadWorklogState, saveWorklogState,
+  loadWorklogState, saveWorklogState, saveWorklogColumnSplit,
   loadImportantCalendarState, saveImportantCalendarState,
   loadWeeklyGoalsState, saveWeeklyGoalsState,
   loadNotesState, saveNotesState,

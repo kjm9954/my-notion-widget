@@ -462,6 +462,7 @@
       let pendingExternalSync = false;
       let pendingServerState = null;
       let saveQueue = Promise.resolve();
+      let columnSaveTimer = 0;
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -806,8 +807,35 @@
         const next = normalizeSplit(value,DEFAULT_COLUMN_SPLIT[mode],minimum,maximum);
         state = { ...state, columnSplit:{ ...(state.columnSplit || DEFAULT_COLUMN_SPLIT), [mode]:next } };
         applyColumnSplit();
-        if (save) persist(state);
+        if (save) commitColumnSplit(mode);
         return next;
+      }
+
+      function persistColumnSplit(mode, value) {
+        const minimum = mode === 'work' ? .2 : .25;
+        const maximum = mode === 'work' ? .82 : .75;
+        const next = normalizeSplit(value,DEFAULT_COLUMN_SPLIT[mode],minimum,maximum);
+        saveQueue = saveQueue
+          .then(() => Store.saveWorklogColumnSplit(mode,next))
+          .catch(error => {
+            console.warn('열 너비를 저장하지 못했습니다.', error);
+            liveRegion.textContent = '열 너비를 저장하지 못했습니다. 다시 조절해 주세요.';
+          });
+        return saveQueue;
+      }
+
+      function scheduleColumnSplitSave(mode) {
+        window.clearTimeout(columnSaveTimer);
+        columnSaveTimer = window.setTimeout(() => {
+          columnSaveTimer = 0;
+          persistColumnSplit(mode,state.columnSplit?.[mode]);
+        },220);
+      }
+
+      function commitColumnSplit(mode) {
+        window.clearTimeout(columnSaveTimer);
+        columnSaveTimer = 0;
+        return persistColumnSplit(mode,state.columnSplit?.[mode]);
       }
 
       function beginColumnResize(event, handle) {
@@ -836,6 +864,7 @@
         const titleWidth = Math.min(drag.maximumTitle,Math.max(drag.minimumTitle,drag.startTitle + (event.clientX - drag.startX) / drag.scale));
         const next = setColumnSplit(drag.mode,titleWidth / drag.pool,false);
         drag.changed = drag.changed || Math.abs(next - DEFAULT_COLUMN_SPLIT[drag.mode]) > .0001 || Math.abs(event.clientX - drag.startX) > 1;
+        if (drag.changed) scheduleColumnSplitSave(drag.mode);
       }
 
       function endColumnResize(event) {
@@ -846,7 +875,7 @@
         drag.handle.releasePointerCapture?.(event.pointerId);
         ui.columnResize = null;
         if (drag.changed) {
-          persist(state);
+          commitColumnSplit(drag.mode);
           announce(`${drag.mode === 'work' ? '업무명' : '할 일'} 열 너비를 저장했습니다.`);
         }
       }

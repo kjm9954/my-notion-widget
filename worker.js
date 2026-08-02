@@ -343,6 +343,20 @@ export default {
         return json({ ok: true, data: state });
       }
 
+      if (path === "/api/worklog/column-split" && request.method === "POST") {
+        const body = await request.json();
+        const mode = body?.mode === "life" ? "life" : "work";
+        const state = await loadWorklogState(env);
+        const value = Number(body?.value);
+        const minimum = mode === "life" ? 0.25 : 0.2;
+        const maximum = mode === "life" ? 0.75 : 0.82;
+        state.columnSplit[mode] = Number.isFinite(value)
+          ? Math.min(maximum, Math.max(minimum, value))
+          : state.columnSplit[mode];
+        await saveSetting(env, "worklog", state);
+        return json({ ok: true, data: state });
+      }
+
       // ───────── 중요 업무 ─────────
       if (path === "/api/important-calendar/state" && request.method === "GET") {
         return json({ ok: true, data: await loadImportantCalendarState(env) });
