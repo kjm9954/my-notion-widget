@@ -134,6 +134,7 @@
       box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid transparent; outline-offset:-1px;
       transition:outline-color .12s var(--ease); -webkit-touch-callout:none;
     }
+    .task-row.has-roll { height:auto; min-height:50px; }
     @media (hover:hover) { .task-row:hover { outline-color:var(--border-soft); } }
     .task-row.is-reordering { outline-color:var(--action); cursor:grabbing; }
     .task-row.is-drop-before::before, .task-row.is-drop-after::after {
@@ -440,6 +441,7 @@
       const Q_LABELS = { 1:'중요·긴급', 2:'중요·비긴급', 3:'비중요·긴급', 4:'비중요·비긴급' };
       const DEFAULT_COLUMN_SPLIT = { work:.73, life:6 / 11 };
       const WORK_DETAIL_WEIGHT = 6.68;
+      const DAY_ROLLOVER_HOUR = 6;
       const card = document.querySelector('[data-widget-card]');
       const modeRow = document.getElementById('modeRow');
       const dayTrack = document.getElementById('dayTrack');
@@ -463,6 +465,7 @@
       let pendingServerState = null;
       let saveQueue = Promise.resolve();
       let columnSaveTimer = 0;
+      let activeDayKey = localDateKey(todayDate());
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -502,8 +505,9 @@
         return `${year}-W${String(week).padStart(2, '0')}`;
       }
 
-      function todayDate() {
-        const now = new Date();
+      function todayDate(reference = new Date()) {
+        const now = new Date(reference);
+        if (now.getHours() < DAY_ROLLOVER_HOUR) now.setDate(now.getDate() - 1);
         return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
       }
 
@@ -1199,7 +1203,7 @@
         const status = statusMeta(task);
         const tag = draft ? 'form' : 'article';
         const draftAttr = draft ? ' data-quick-add-form' : '';
-        return `<${tag} class="task-row work ${draft ? 'quick-add-row' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+        return `<${tag} class="task-row work ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
@@ -1220,7 +1224,7 @@
       function lifeRow(task, draft = false) {
         const tag = draft ? 'form' : 'article';
         const draftAttr = draft ? ' data-quick-add-form' : '';
-        return `<${tag} class="task-row life ${draft ? 'quick-add-row' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+        return `<${tag} class="task-row life ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
@@ -1594,13 +1598,21 @@
 
       modeRow.addEventListener('click', event => {
         const button = event.target.closest('[data-mode]');
-        if (!button || button.dataset.mode === state.mode) return;
+        if (!button) return;
         const nextMode = button.dataset.mode;
+        const today = todayDate();
+        if (nextMode === state.mode) {
+          if (!drainPendingSync()) return;
+          resetTransient();
+          ui.selectedDate = localDateKey(clampDateToMode(today,state.mode));
+          rememberView();
+          renderAll();
+          return;
+        }
         const previousDate = ui.selectedDate;
         const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, popover:ui.popover, dirtyFields:ui.dirtyFields };
         if (!drainPendingSync()) return;
         resetTransient();
-        const today = todayDate();
         const followsClampedWorkToday = state.mode === 'work' && nextMode === 'life'
           && ui.selectedDate === localDateKey(clampDateToMode(today,'work'));
         const selected = followsClampedWorkToday ? today : clampDateToMode(parseDate(ui.selectedDate) || today,nextMode);
@@ -2040,8 +2052,12 @@
           }
           return;
         }
+        const currentDayKey = localDateKey(todayDate());
+        const dayChanged = currentDayKey !== activeDayKey;
         const changed = JSON.stringify(loaded) !== JSON.stringify(state);
-        if (!changed && !resetToToday) return;
+        if (!changed && !resetToToday && !dayChanged) return;
+        activeDayKey = currentDayKey;
+        resetToToday = resetToToday || dayChanged;
         state = loaded;
         pendingServerState = null;
         pendingExternalSync = !rollWeekIfNeeded();
