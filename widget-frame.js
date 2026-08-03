@@ -177,8 +177,144 @@
 (() => {
   'use strict';
 
+  function setupListOnlyFrame(host, card) {
+    const list = card?.querySelector('[data-widget-list]');
+    const listHandle = card?.querySelector('[data-widget-list-handle]');
+    if (!host || !card || !list || !listHandle) return;
+
+    const fixedParts = Array.from(card.querySelectorAll('[data-widget-fixed]'));
+    const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
+    const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
+    const defaultListHeight = Number(list.dataset.widgetListHeight) || list.offsetHeight || 160;
+    const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+    let requestedListHeight = defaultListHeight;
+    let renderedListHeight = defaultListHeight;
+    let listLocked = false;
+    let drag = null;
+
+    function number(value, fallback) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function readSize() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key));
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveSize() {
+      try {
+        localStorage.setItem(key, JSON.stringify({
+          scale: 1,
+          scaleLocked: true,
+          contentW: designWidth,
+          widthLocked: false,
+          frameH: Math.round(card.offsetHeight),
+          heightLocked: true,
+          listH: Math.round(requestedListHeight),
+          listLocked,
+        }));
+      } catch (_) {}
+    }
+
+    function listOffset() {
+      const style = getComputedStyle(card);
+      const verticalPadding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+      const gap = parseFloat(style.rowGap || style.gap) || 0;
+      const visible = fixedParts.filter(part => part.offsetParent !== null);
+      return verticalPadding + visible.reduce((sum, part) => sum + part.offsetHeight, 0) + gap * visible.length;
+    }
+
+    function commit() {
+      const visualWidth = Math.max(1, Math.min(designWidth, window.innerWidth));
+      const offset = listOffset();
+      const maximum = Math.max(120, window.innerHeight - offset);
+      if (!listLocked) requestedListHeight = Math.max(120, declaredHeight - offset);
+      renderedListHeight = Math.max(Math.min(160, maximum), Math.min(maximum, requestedListHeight));
+      const frameHeight = offset + renderedListHeight;
+      host.style.setProperty('--widget-content-width', `${visualWidth}px`);
+      host.style.setProperty('--widget-base-width', `${visualWidth}px`);
+      host.style.setProperty('--widget-visual-width', `${visualWidth}px`);
+      host.style.setProperty('--widget-base-height', `${frameHeight}px`);
+      host.style.setProperty('--widget-visual-height', `${frameHeight}px`);
+      host.style.setProperty('--widget-content-scale', '1');
+      card.style.setProperty('--widget-content-width', `${visualWidth}px`);
+      card.style.setProperty('--widget-content-scale', '1');
+      card.style.height = `${frameHeight}px`;
+      list.style.flex = `0 0 ${renderedListHeight}px`;
+      list.style.height = `${renderedListHeight}px`;
+      listHandle.setAttribute('aria-valuemin', String(Math.round(Math.min(160, maximum))));
+      listHandle.setAttribute('aria-valuemax', String(Math.round(maximum)));
+      listHandle.setAttribute('aria-valuenow', String(Math.round(renderedListHeight)));
+      host.dataset.widgetSizeReady = 'true';
+      document.body.classList.toggle('is-widget-overflowing', frameHeight > window.innerHeight + .5);
+    }
+
+    function applyListHeight(value, fromUser = false) {
+      if (!Number.isFinite(Number(value))) return;
+      if (fromUser) listLocked = true;
+      requestedListHeight = Math.max(120, Number(value));
+      commit();
+      if (fromUser) saveSize();
+    }
+
+    listHandle.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      drag = { pointerId: event.pointerId, y: event.clientY, height: renderedListHeight };
+      listLocked = true;
+      listHandle.setPointerCapture?.(event.pointerId);
+      document.body.classList.add('is-widget-list-resizing');
+    });
+    listHandle.addEventListener('pointermove', event => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      requestedListHeight = Math.max(120, drag.height + event.clientY - drag.y);
+      commit();
+    });
+    const finish = event => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (listHandle.hasPointerCapture?.(event.pointerId)) listHandle.releasePointerCapture(event.pointerId);
+      drag = null;
+      document.body.classList.remove('is-widget-list-resizing');
+      saveSize();
+    };
+    listHandle.addEventListener('pointerup', finish);
+    listHandle.addEventListener('pointercancel', finish);
+    listHandle.addEventListener('keydown', event => {
+      if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      applyListHeight(renderedListHeight + (event.key === 'ArrowDown' ? 20 : -20), true);
+    });
+
+    const saved = readSize();
+    listLocked = saved.listLocked === true;
+    requestedListHeight = Math.max(120, number(saved.listH, defaultListHeight));
+    commit();
+    new ResizeObserver(() => { if (!drag) commit(); }).observe(card);
+    const fixedObserver = new ResizeObserver(() => { if (!drag) commit(); });
+    fixedParts.forEach(part => fixedObserver.observe(part));
+    window.addEventListener('resize', commit);
+    window.addEventListener('storage', event => {
+      if (event.key !== key) return;
+      const next = readSize();
+      listLocked = next.listLocked === true;
+      requestedListHeight = Math.max(120, number(next.listH, requestedListHeight));
+      commit();
+    });
+  }
+
   const host = document.querySelector('[data-widget-host]');
   const card = host?.querySelector('[data-widget-card]');
+  if (host?.dataset.widgetResize === 'list-only') {
+    setupListOnlyFrame(host, card);
+    return;
+  }
   const scaleHandle = card?.querySelector('[data-widget-scale-handle]');
   const sizeLabel = card?.querySelector('[data-widget-size-label]');
   if (!host || !card || !scaleHandle || !sizeLabel) return;

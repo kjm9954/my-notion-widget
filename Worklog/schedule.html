@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>업무 관리용</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../widget-frame.css">
+  <style>
+    :root {
+      --bg:#FFFFFF; --surface:#FAFCFD; --text:#12303C; --title:#33505C;
+      --secondary:#6B8794; --secondary-strong:#55707C; --muted:#93A5AD;
+      --done:#A9BAC2; --inactive:#C6D6DD; --border:#DCE7ED;
+      --border-soft:#E6EDF0; --track:#F1F5F7; --edge:#F7F9FA; --pill:#F5F9FB;
+      --action:#0E5C7A; --action-soft:#E2F0F6; --action-mid:#CFE2EA;
+      --danger:#A56B6B;
+      --item-shadow:0 1px 2px rgba(18,48,60,.05);
+      --font:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; min-height:100%; }
+    body { color:var(--text); font-family:var(--font); font-weight:600; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    h1,p { margin:0; }
+    .management-widget {
+      width:100%; max-width:570px!important; height:550px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:10px;
+      overflow:hidden; border:1px solid var(--edge); border-radius:18px; background:var(--bg);
+    }
+    .management-head,.head-actions,.editor-head,.editor-foot,.item-tools,.name-line,.schedule-line,.creation-line,.preset-list,.template-adds,.empty-actions {
+      display:flex; align-items:center;
+    }
+    .management-head { min-height:34px; flex:0 0 auto; justify-content:space-between; gap:12px; }
+    .management-title { min-width:0; display:grid; gap:4px; }
+    .management-title h1 { color:var(--title); font-size:12px; font-weight:800; }
+    .management-title span { overflow:hidden; color:var(--muted); font-size:9px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .head-actions,.item-tools,.preset-list,.template-adds { gap:6px; }
+    .management-button {
+      min-height:30px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;
+      background:var(--bg); color:var(--secondary-strong); font-size:10px; font-weight:700; white-space:nowrap;
+    }
+    .management-button.primary { border-color:var(--action); background:var(--action); color:var(--bg); }
+    .management-button.text { padding-inline:4px; border-color:transparent; background:transparent; color:var(--secondary); }
+    .management-button:disabled,.item-action:disabled { cursor:default; opacity:.5; }
+    .management-list {
+      min-height:0; flex:1 1 auto; height:auto; padding:10px; display:flex; flex-direction:column;
+      gap:6px; border:1px solid var(--track); border-radius:12px; background:var(--surface); overflow:auto;
+      scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+    }
+    .management-list::-webkit-scrollbar { width:4px; }
+    .management-list::-webkit-scrollbar-thumb { border-radius:2px; background:var(--inactive); }
+    .management-item {
+      min-height:84px; padding:8px; display:grid; grid-template-columns:58px minmax(0,1fr); gap:8px;
+      align-items:start; flex:0 0 auto; border-radius:9px; background:var(--bg); box-shadow:var(--item-shadow);
+    }
+    .management-item.skipped { outline:1px dashed var(--inactive); outline-offset:-1px; box-shadow:none; }
+    .management-item.skipped .name-line strong { color:var(--done); text-decoration:line-through; }
+    .type-pill,.project-pill,.skip-pill,.preset,.template-chip {
+      width:max-content; max-width:100%; padding:4px 8px; border-radius:999px; background:var(--pill);
+      color:var(--secondary); font-size:10px; font-weight:700; white-space:nowrap;
+    }
+    .type-pill.repeat { border:1px dashed var(--inactive); background:var(--bg); color:var(--muted); }
+    .skip-pill { border:1px dashed var(--inactive); background:var(--bg); color:var(--muted); }
+    .item-body { min-width:0; display:grid; gap:4px; }
+    .name-line,.schedule-line,.creation-line { min-width:0; gap:6px; }
+    .name-line strong { min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .schedule-line span,.creation-line span { color:var(--muted); font-size:9px; font-weight:700; white-space:nowrap; }
+    .schedule-line b,.creation-line b { color:var(--secondary-strong); font-size:9px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .creation-line b { color:var(--title); font-weight:800; }
+    .run-error { overflow:hidden; color:var(--secondary-strong); font-size:9px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .item-tools { justify-content:flex-end; margin-top:1px; }
+    .item-action { min-height:24px; padding:4px 6px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:9px; font-weight:700; }
+    .item-action.delete-confirm { color:var(--danger); }
+    .inline-editor,.title-composer {
+      flex:0 0 auto; padding:10px; display:grid; align-content:start; gap:8px; border-radius:9px;
+      background:var(--bg); box-shadow:var(--item-shadow); outline:1px solid var(--border-soft); outline-offset:-1px;
+    }
+    .editor-head,.editor-foot { min-height:30px; justify-content:space-between; gap:8px; }
+    .type-segment { width:174px; padding:4px; display:grid; grid-template-columns:1fr 1fr; gap:4px; border-radius:9px; background:var(--track); }
+    .type-segment button { min-height:28px; border:0; border-radius:7px; background:transparent; color:var(--muted); font-size:11px; font-weight:800; }
+    .type-segment button.selected { background:var(--action); color:var(--bg); }
+    .micro,.field-label { color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.04em; }
+    .editor-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .editor-field { min-width:0; display:grid; gap:4px; }
+    .editor-field.wide { grid-column:span 2; }
+    .management-input {
+      width:100%; min-width:0; height:32px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;
+      background:var(--surface); color:var(--text); font-size:11px; font-weight:600; outline:none;
+    }
+    .management-input:focus { outline:2px solid var(--action); outline-offset:-2px; }
+    .preset-list,.template-adds { flex-wrap:wrap; }
+    .preset { border:0; }
+    .preset.selected { background:var(--action); color:var(--bg); }
+    .time-result { min-height:38px; padding:8px 10px; display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:6px; border-radius:9px; background:var(--action-soft); }
+    .time-result span { color:var(--secondary-strong); font-size:9px; font-weight:700; }
+    .time-result b { color:var(--action); font-size:10px; font-weight:800; text-align:right; font-variant-numeric:tabular-nums; }
+    .quiet-link { padding:0; border:0; background:transparent; color:var(--secondary); font-size:10px; font-weight:700; }
+    .form-note { min-height:14px; color:var(--secondary-strong); font-size:9px; font-weight:700; }
+    .title-composer { gap:10px; }
+    .template-order { min-height:72px; padding:8px; display:flex; align-items:center; align-content:center; gap:6px; flex-wrap:wrap; border:1px dashed var(--inactive); border-radius:9px; background:var(--surface); }
+    .template-part { display:inline-flex; align-items:center; gap:2px; }
+    .template-chip { border:1px solid var(--border); background:var(--bg); }
+    .template-part.literal .template-chip { color:var(--muted); }
+    .part-control { width:22px; height:22px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--inactive); font-size:9px; }
+    .separator-select { width:78px; }
+    .title-preview { min-height:82px; padding:12px; display:grid; align-content:center; gap:4px; border-radius:12px; background:var(--action-soft); }
+    .title-preview span { color:var(--secondary); font-size:9px; font-weight:800; letter-spacing:.06em; }
+    .title-preview strong { overflow-wrap:anywhere; color:var(--action); font-size:15px; font-weight:800; line-height:1.4; }
+    .management-empty,.loading-state,.error-state { min-height:100%; padding:16px; display:grid; place-content:center; gap:12px; text-align:center; }
+    .management-empty { border:1px dashed var(--inactive); border-radius:12px; background:var(--surface); }
+    .empty-copy { display:grid; gap:4px; }
+    .empty-copy strong,.loading-state strong,.error-state strong { color:var(--title); font-size:12px; font-weight:800; }
+    .empty-copy span,.loading-state span,.error-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    .error-state strong { color:var(--title); }
+    .empty-actions { justify-content:center; align-items:stretch; gap:8px; }
+    .empty-choice { width:210px; min-height:86px; padding:10px; display:grid; align-content:center; gap:4px; border:1px dashed var(--inactive); border-radius:12px; background:var(--bg); text-align:left; }
+    .empty-choice.primary { border-style:solid; border-color:var(--action); background:var(--action); }
+    .empty-choice strong { color:var(--title); font-size:11px; font-weight:800; }
+    .empty-choice span { color:var(--muted); font-size:9px; font-weight:600; line-height:1.5; }
+    .empty-choice.primary strong,.empty-choice.primary span { color:var(--bg); }
+    @media (max-width:480px) {
+      .management-widget { padding:12px; }
+      .management-head { align-items:flex-start; }
+      .management-list { padding-inline:8px; }
+      .empty-actions { flex-direction:column; }
+      .empty-choice { width:100%; }
+    }
+    @media (max-width:380px) {
+      .management-button,.type-segment button,.item-action,.quiet-link,.preset,.part-control { min-height:40px; }
+      .management-head { min-height:40px; }
+      .head-actions { gap:4px; }
+      .management-button { padding-inline:7px; }
+      .editor-head,.editor-foot { align-items:stretch; flex-direction:column; }
+      .type-segment { width:100%; }
+      .editor-fields { grid-template-columns:1fr; }
+      .editor-field.wide { grid-column:auto; }
+      .time-result { grid-template-columns:1fr; }
+      .time-result b { text-align:left; }
+      .management-item { grid-template-columns:52px minmax(0,1fr); }
+      .name-line { align-items:flex-start; flex-direction:column; }
+      .editor-foot .head-actions { width:100%; }
+      .editor-foot .management-button { flex:1; }
+    }
+  </style>
+  <script src="../store.js"></script>
+</head>
+<body class="widget-page widget-page-centered">
+  <main class="widget-host" data-widget-host data-widget-card-host data-widget-resize="list-only"
+        data-widget-key="widget-size-schedule.html" data-widget-max-width="570" data-widget-height="550">
+    <section class="management-widget" data-widget-card>
+      <header class="management-head" data-widget-fixed>
+        <div class="management-title">
+          <h1>업무 관리용</h1>
+          <span id="subtitle">예약을 불러오는 중</span>
+        </div>
+        <div class="head-actions" id="headActions"></div>
+      </header>
+      <section class="management-list" id="content" data-widget-list aria-live="polite"></section>
+      <button class="widget-list-resize-handle" type="button" data-widget-list-handle
+              aria-label="예약 목록 높이 조절" role="slider" aria-orientation="vertical"></button>
+    </section>
+  </main>
+  <script type="module">
+    import {
+      DEFAULT_TITLE_TEMPLATE,
+      LEAD_MINUTES,
+      TITLE_SEPARATORS,
+      TITLE_TOKENS,
+      WEEKDAY_LABELS,
+      addDateKeyDays,
+      formatScheduleDate,
+      formatScheduleTitle,
+      occurrenceForDate,
+      seoulDateKey,
+      weekdayOfDateKey,
+    } from "../schedule-core.js";
+
+    const content = document.getElementById("content");
+    const subtitle = document.getElementById("subtitle");
+    const headActions = document.getElementById("headActions");
+    const tokenLabels = { date: "날짜", name: "일정 이름", project: "프로젝트" };
+    let schedules = [];
+    let loading = true;
+    let loadError = "";
+    let saving = false;
+    let editor = null;
+    let composerOpen = false;
+    let deleteConfirmId = null;
+    let deleteTimer = 0;
+    let formError = "";
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>'"]/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[char]);
+    }
+
+    function defaultDraft(kind = "once") {
+      const target = Date.now() + 3 * 60 * 60 * 1000;
+      const shifted = new Date(target + 9 * 60 * 60 * 1000);
+      const time = `${String(shifted.getUTCHours()).padStart(2, "0")}:${String(shifted.getUTCMinutes()).padStart(2, "0")}`;
+      const date = seoulDateKey(target);
+      return {
+        id: "", kind, name: "", date, weekday: weekdayOfDateKey(date), scheduleTime: time,
+        project: "미분류", leadMinutes: 60,
+        titleTemplate: DEFAULT_TITLE_TEMPLATE.map(part => ({ ...part })),
+      };
+    }
+
+    function openEditor(kind = "once", schedule = null) {
+      clearTimeout(deleteTimer);
+      deleteConfirmId = null;
+      formError = "";
+      composerOpen = false;
+      editor = schedule ? {
+        ...schedule,
+        titleTemplate: (schedule.titleTemplate || DEFAULT_TITLE_TEMPLATE).map(part => ({ ...part })),
+      } : defaultDraft(kind);
+      render();
+      requestAnimationFrame(() => document.getElementById("scheduleName")?.focus());
+    }
+
+    function closeEditor() {
+      editor = null;
+      composerOpen = false;
+      formError = "";
+      render();
+    }
+
+    function render() {
+      subtitle.textContent = saving
+        ? "저장 중"
+        : editor
+          ? (composerOpen ? `${editor.name || "새 예약"} · 항목별 제목 형식` : `${editor.id ? "예약 수정" : "예약 등록"} 중`)
+          : "다음으로 만들어질 페이지부터 표시";
+      headActions.innerHTML = editor
+        ? `<button class="management-button text" type="button" data-action="close">Esc 닫기</button>`
+        : `<button class="management-button text" type="button" data-action="new-weekly">반복 등록</button><button class="management-button primary" type="button" data-action="new-once">＋ 예약</button>`;
+
+      if (loading) {
+        content.innerHTML = `<div class="loading-state"><strong>예약을 불러오는 중</strong><span>서버의 최신 내용을 확인하고 있어요.</span></div>`;
+        return;
+      }
+      if (loadError && !editor) {
+        content.innerHTML = `<div class="error-state"><strong>예약을 불러오지 못했어요</strong><span>${escapeHtml(loadError)}</span><button class="management-button" type="button" data-action="retry">다시 불러오기</button></div>`;
+        return;
+      }
+      if (editor) {
+        content.innerHTML = composerOpen ? titleComposerMarkup() : editorMarkup();
+        if (!composerOpen && schedules.length) content.insertAdjacentHTML("beforeend", schedulesMarkup(schedules.filter(item => item.id !== editor.id)));
+        return;
+      }
+      if (!schedules.length) {
+        content.innerHTML = `<div class="management-empty"><div class="empty-copy"><strong>아직 만들어질 페이지가 없어요</strong><span>한 번 생길 일정은 예약으로, 매주 같은 일정은 반복 업무로 등록합니다.</span></div><div class="empty-actions"><button class="empty-choice primary" type="button" data-action="new-once"><strong>＋ 예약 만들기</strong><span>특정 날짜에 한 번 생성</span></button><button class="empty-choice" type="button" data-action="new-weekly"><strong>반복 업무 등록</strong><span>매주 같은 요일에 생성</span></button></div></div>`;
+        return;
+      }
+      content.innerHTML = schedulesMarkup(schedules);
+    }
+
+    function schedulesMarkup(items) {
+      if (!items.length) return "";
+      return items.map(scheduleMarkup).join("");
+    }
+
+    function scheduleMarkup(item) {
+      const skipped = Boolean(item.skippedOccurrence);
+      const next = item.nextOccurrence;
+      const kind = item.kind === "weekly" ? "반복" : "예약";
+      const scheduleText = item.kind === "weekly"
+        ? `매주 ${WEEKDAY_LABELS[Number(item.weekday) - 1]} · ${item.scheduleTime}`
+        : `${formatScheduleDate(item.date)} · ${item.scheduleTime}`;
+      const nextText = skipped
+        ? (item.kind === "weekly" && next ? `${formatOccurrence(next.createAt)} 자동 재개` : "페이지 생성 안 함")
+        : (next ? `${formatOccurrence(next.createAt)}에 페이지 생성` : "페이지 생성 시각 확인 중");
+      const skipText = item.kind === "weekly" ? "이번 주는 건너뜀" : "이번 예약은 건너뜀";
+      const confirm = deleteConfirmId === item.id;
+      const runError = ["failed", "uncertain"].includes(item.runStatus)
+        ? `<p class="run-error" title="${escapeHtml(item.runError || "")}">${escapeHtml(item.runError || "Notion 연결을 확인해주세요")}</p>` : "";
+      return `<article class="management-item${skipped ? " skipped" : ""}" data-id="${escapeHtml(item.id)}"><span class="type-pill${item.kind === "weekly" ? " repeat" : ""}">${kind}</span><div class="item-body"><div class="name-line"><strong>${escapeHtml(item.name)}</strong>${skipped ? `<span class="skip-pill">${skipText}</span>` : `<span class="project-pill">${escapeHtml(item.project)}</span>`}</div><div class="schedule-line"><b>${escapeHtml(scheduleText)}</b><span>${leadLabel(item.leadMinutes)} 전 생성</span></div><div class="creation-line"><b>${escapeHtml(nextText)}</b>${item.lastCreatedAt ? `<span>마지막 ${escapeHtml(formatOccurrence(item.lastCreatedAt))}</span>` : ""}</div>${runError}<div class="item-tools"><button class="item-action" type="button" data-action="skip" data-id="${escapeHtml(item.id)}">${skipped ? "↻ 되돌리기" : "건너뛰기"}</button><button class="item-action" type="button" data-action="edit" data-id="${escapeHtml(item.id)}">수정</button><button class="item-action${confirm ? " delete-confirm" : ""}" type="button" data-action="delete" data-id="${escapeHtml(item.id)}">${confirm ? "삭제 확인" : "삭제"}</button></div></div></article>`;
+    }
+
+    function editorMarkup() {
+      const once = editor.kind === "once";
+      return `<form class="inline-editor" id="scheduleForm"><div class="editor-head"><div class="type-segment"><button type="button" class="${once ? "selected" : ""}" data-action="kind" data-kind="once">예약</button><button type="button" class="${once ? "" : "selected"}" data-action="kind" data-kind="weekly">반복</button></div><span class="micro">${once ? "특정 날짜 한 번" : "선택한 요일마다"}</span></div><div class="editor-fields"><label class="editor-field wide"><span class="field-label">일정 이름</span><input class="management-input" id="scheduleName" name="name" maxlength="120" required value="${escapeHtml(editor.name)}"></label>${once ? `<label class="editor-field"><span class="field-label">날짜</span><input class="management-input" name="date" type="date" required value="${escapeHtml(editor.date)}"></label>` : `<label class="editor-field"><span class="field-label">매주 요일</span><select class="management-input" name="weekday">${WEEKDAY_LABELS.map((label, index) => `<option value="${index + 1}"${Number(editor.weekday) === index + 1 ? " selected" : ""}>${label}요일</option>`).join("")}</select></label>`}<label class="editor-field"><span class="field-label">일정 시각</span><input class="management-input" name="scheduleTime" type="time" required value="${escapeHtml(editor.scheduleTime)}"></label><label class="editor-field"><span class="field-label">프로젝트</span><input class="management-input" name="project" maxlength="80" required value="${escapeHtml(editor.project)}"></label><div class="editor-field"><span class="field-label">사전 생성</span><div class="preset-list">${LEAD_MINUTES.map(value => `<button class="preset${Number(editor.leadMinutes) === value ? " selected" : ""}" type="button" data-action="lead" data-value="${value}">${leadLabel(value)}</button>`).join("")}</div></div></div><div class="time-result" id="timeResult">${timeResultMarkup()}</div><p class="form-note" id="formNote">${escapeHtml(formError)}</p><div class="editor-foot"><button class="quiet-link" type="button" data-action="composer">제목 형식 설정</button><div class="head-actions"><button class="management-button" type="button" data-action="close">취소</button><button class="management-button" type="submit"${saving ? " disabled" : ""}>${saving ? "저장 중" : editor.id ? "수정 저장" : "예약 등록"}</button></div></div></form>`;
+    }
+
+    function titleComposerMarkup() {
+      const parts = editor.titleTemplate || [];
+      const preview = draftPreviewTitle();
+      return `<section class="title-composer"><p class="field-label">사용할 항목과 구분자</p><div class="template-adds">${TITLE_TOKENS.map(token => `<button class="management-button" type="button" data-action="template-add-token" data-value="${token}">＋ ${tokenLabels[token]}</button>`).join("")}<select class="management-input separator-select" id="separatorPick" aria-label="구분자">${TITLE_SEPARATORS.map(value => `<option value="${escapeHtml(value)}">${value === " " ? "공백" : escapeHtml(value)}</option>`).join("")}</select><button class="management-button" type="button" data-action="template-add-separator">＋ 구분자</button></div><p class="field-label">제목 순서</p><div class="template-order">${parts.map((part, index) => `<span class="template-part ${part.type === "literal" ? "literal" : "token"}"><button class="part-control" type="button" data-action="template-move" data-index="${index}" data-direction="-1" aria-label="왼쪽으로 이동">‹</button><span class="template-chip">${escapeHtml(part.type === "token" ? tokenLabels[part.value] : part.value === " " ? "공백" : part.value)}</span><button class="part-control" type="button" data-action="template-remove" data-index="${index}" aria-label="삭제">✕</button><button class="part-control" type="button" data-action="template-move" data-index="${index}" data-direction="1" aria-label="오른쪽으로 이동">›</button></span>`).join("")}</div><div class="title-preview"><span>완성 제목 미리보기</span><strong id="titlePreview">${escapeHtml(preview || "제목 항목을 추가해주세요")}</strong></div><p class="form-note">${escapeHtml(formError)}</p><div class="editor-foot"><button class="quiet-link" type="button" data-action="template-default">기본값으로</button><div class="head-actions"><button class="management-button" type="button" data-action="composer-back">‹ 기본 정보</button><button class="management-button" type="button" data-action="composer-use">이 형식 사용</button></div></div></section>`;
+    }
+
+    function leadLabel(value) {
+      return ({ 30:"30분", 60:"1시간", 120:"2시간", 180:"3시간" })[Number(value)] || `${value}분`;
+    }
+
+    function formatOccurrence(iso) {
+      if (!iso) return "";
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return "";
+      const parts = new Intl.DateTimeFormat("ko-KR", { timeZone:"Asia/Seoul", month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false }).formatToParts(date);
+      const get = type => parts.find(part => part.type === type)?.value || "";
+      return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
+    }
+
+    function draftOccurrence() {
+      const schedule = {
+        ...editor,
+        name:editor.name || "일정 이름",
+        project:editor.project || "미분류",
+        status:"active",
+        createdAt:new Date(0).toISOString(),
+      };
+      if (schedule.kind === "once") return occurrenceForDate(schedule, schedule.date);
+      const today = seoulDateKey();
+      for (let offset = 0; offset < 7; offset += 1) {
+        const date = addDateKeyDays(today, offset);
+        if (weekdayOfDateKey(date) === Number(schedule.weekday)) return occurrenceForDate(schedule, date);
+      }
+      return null;
+    }
+
+    function timeResultMarkup() {
+      const occurrence = draftOccurrence();
+      if (!occurrence) return `<span>일정 정보를 선택해주세요</span><b>생성 시각을 계산할 수 없어요</b>`;
+      return `<span>일정 · ${escapeHtml(formatScheduleDate(occurrence.date))} ${escapeHtml(editor.scheduleTime)}</span><b>이 일정은 ${escapeHtml(formatOccurrence(occurrence.createAt))}에 페이지 생성</b>`;
+    }
+
+    function draftPreviewTitle() {
+      if (!editor.titleTemplate.some(part => part.type === "token" && TITLE_TOKENS.includes(part.value))) return "";
+      const occurrence = draftOccurrence();
+      return formatScheduleTitle(editor.titleTemplate, { date:occurrence?.date || editor.date, name:editor.name || "일정 이름", project:editor.project || "프로젝트" });
+    }
+
+    function readForm() {
+      const form = document.getElementById("scheduleForm");
+      if (!form) return;
+      const data = new FormData(form);
+      editor.name = String(data.get("name") || "");
+      editor.project = String(data.get("project") || "");
+      editor.scheduleTime = String(data.get("scheduleTime") || "");
+      if (editor.kind === "once") editor.date = String(data.get("date") || "");
+      else editor.weekday = Number(data.get("weekday"));
+    }
+
+    async function loadSchedules({ quiet = false } = {}) {
+      if (editor && quiet) return;
+      let shouldRender = !quiet;
+      if (!quiet) loading = true;
+      loadError = "";
+      if (!quiet) render();
+      try {
+        const nextSchedules = await window.Store.loadSchedules();
+        if (JSON.stringify(nextSchedules) !== JSON.stringify(schedules)) {
+          schedules = nextSchedules;
+          shouldRender = true;
+        }
+      } catch (error) {
+        loadError = error?.message || "서버 요청에 실패했습니다.";
+        shouldRender = true;
+      } finally {
+        loading = false;
+        if (shouldRender) render();
+      }
+    }
+
+    async function submitEditor() {
+      readForm();
+      formError = "";
+      if (!editor.name.trim()) formError = "예약 이름을 입력해주세요.";
+      else if (!editor.project.trim()) formError = "프로젝트를 입력해주세요.";
+      else if (!draftOccurrence()) formError = "날짜와 시간을 확인해주세요.";
+      if (formError) { render(); return; }
+      saving = true;
+      render();
+      try {
+        if (editor.id) await window.Store.updateSchedule(editor.id, editor);
+        else await window.Store.createSchedule(editor);
+        editor = null;
+        composerOpen = false;
+        await loadSchedules({ quiet:true });
+      } catch (error) {
+        formError = error?.message || "저장 실패, 다시 시도해주세요.";
+      } finally {
+        saving = false;
+        render();
+      }
+    }
+
+    async function toggleSkip(id) {
+      const item = schedules.find(schedule => schedule.id === id);
+      if (!item || saving) return;
+      saving = true;
+      render();
+      try {
+        await window.Store.skipScheduleOccurrence(id, !item.skippedOccurrence);
+        await loadSchedules({ quiet:true });
+      } catch (error) {
+        loadError = error?.message || "변경 실패, 다시 시도해주세요.";
+      } finally {
+        saving = false;
+        render();
+      }
+    }
+
+    async function requestDelete(id) {
+      if (deleteConfirmId !== id) {
+        deleteConfirmId = id;
+        clearTimeout(deleteTimer);
+        deleteTimer = setTimeout(() => { deleteConfirmId = null; render(); }, 3500);
+        render();
+        return;
+      }
+      if (saving) return;
+      clearTimeout(deleteTimer);
+      saving = true;
+      render();
+      try {
+        await window.Store.deleteSchedule(id);
+        deleteConfirmId = null;
+        await loadSchedules({ quiet:true });
+      } catch (error) {
+        loadError = error?.message || "삭제 실패, 다시 시도해주세요.";
+      } finally {
+        saving = false;
+        render();
+      }
+    }
+
+    function changeTemplate(action, button) {
+      readForm();
+      const parts = editor.titleTemplate;
+      if (["template-add-token", "template-add-separator"].includes(action) && parts.length >= 20) {
+        formError = "제목 항목은 20개까지 조합할 수 있어요.";
+        render();
+        return;
+      }
+      if (action === "template-add-token") parts.push({ type:"token", value:button.dataset.value });
+      if (action === "template-add-separator") {
+        const value = document.getElementById("separatorPick")?.value || " ";
+        parts.push({ type:"literal", value });
+      }
+      if (action === "template-remove") parts.splice(Number(button.dataset.index), 1);
+      if (action === "template-move") {
+        const index = Number(button.dataset.index);
+        const next = index + Number(button.dataset.direction);
+        if (index >= 0 && next >= 0 && next < parts.length) [parts[index], parts[next]] = [parts[next], parts[index]];
+      }
+      if (action === "template-default") editor.titleTemplate = DEFAULT_TITLE_TEMPLATE.map(part => ({ ...part }));
+      formError = "";
+      render();
+    }
+
+    headActions.addEventListener("click", event => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "close") closeEditor();
+      if (button.dataset.action === "new-once") openEditor("once");
+      if (button.dataset.action === "new-weekly") openEditor("weekly");
+    });
+
+    content.addEventListener("click", event => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      if (action === "retry") loadSchedules();
+      if (action === "new-once") openEditor("once");
+      if (action === "new-weekly") openEditor("weekly");
+      if (action === "close") closeEditor();
+      if (action === "edit") openEditor("once", schedules.find(item => item.id === button.dataset.id));
+      if (action === "skip") toggleSkip(button.dataset.id);
+      if (action === "delete") requestDelete(button.dataset.id);
+      if (action === "kind") { readForm(); editor.kind = button.dataset.kind; render(); }
+      if (action === "lead") { readForm(); editor.leadMinutes = Number(button.dataset.value); render(); }
+      if (action === "composer") { readForm(); composerOpen = true; render(); }
+      if (action === "composer-back") { composerOpen = false; formError = ""; render(); }
+      if (action === "composer-use") {
+        if (!editor.titleTemplate.some(part => part.type === "token" && TITLE_TOKENS.includes(part.value))) {
+          formError = "제목 항목을 하나 이상 넣어주세요.";
+          render();
+        } else {
+          composerOpen = false;
+          formError = "";
+          render();
+        }
+      }
+      if (action.startsWith("template-")) changeTemplate(action, button);
+    });
+
+    content.addEventListener("input", event => {
+      if (!editor || composerOpen || !event.target.closest("#scheduleForm")) return;
+      readForm();
+      const result = document.getElementById("timeResult");
+      if (result) result.innerHTML = timeResultMarkup();
+    });
+    content.addEventListener("change", event => {
+      if (!editor || composerOpen || !event.target.closest("#scheduleForm")) return;
+      readForm();
+      const result = document.getElementById("timeResult");
+      if (result) result.innerHTML = timeResultMarkup();
+    });
+    content.addEventListener("submit", event => {
+      if (!event.target.matches("#scheduleForm")) return;
+      event.preventDefault();
+      submitEditor();
+    });
+    document.addEventListener("click", event => {
+      if (!deleteConfirmId) return;
+      const deleteButton = event.target instanceof Element
+        ? event.target.closest('button[data-action="delete"]')
+        : null;
+      if (deleteButton) return;
+      clearTimeout(deleteTimer);
+      deleteConfirmId = null;
+      render();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      if (deleteConfirmId) {
+        clearTimeout(deleteTimer);
+        deleteConfirmId = null;
+        render();
+      } else if (composerOpen) {
+        composerOpen = false;
+        render();
+      } else if (editor) closeEditor();
+    });
+
+    window.Store.watch(() => loadSchedules({ quiet:true }), 3000);
+    loadSchedules();
+  </script>
+  <script src="../widget-frame.js"></script>
+</body>
+</html>

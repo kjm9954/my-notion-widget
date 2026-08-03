@@ -1,3 +1,13 @@
+import {
+  NOTION_API_VERSION,
+  currentSkippableOccurrence,
+  dueOccurrence,
+  expiredSkipAction,
+  normalizeScheduleInput,
+  seoulDateTimeToMs,
+  upcomingOccurrences,
+} from "./schedule-core.js";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -356,6 +366,115 @@ export default {
         return json({ ok: true });
       }
 
+      // ───────── 업무 관리 예약 ─────────
+      if (path.startsWith("/api/schedules/")) {
+        if (!env.__instanceId) return json({ ok: false, error: "위젯 고유 주소의 w 값이 필요합니다." }, 400);
+
+        if (path === "/api/schedules/list" && request.method === "GET") {
+          const now = Date.now();
+          await settleExpiredScheduleSkips(env, now);
+          const { results } = await env.DB.prepare(
+            `SELECT s.*,
+              (SELECT r.status FROM schedule_runs r
+               WHERE r.instance_id = s.instance_id AND r.schedule_id = s.id
+               ORDER BY r.updated_at DESC LIMIT 1) AS run_status,
+              (SELECT r.error FROM schedule_runs r
+               WHERE r.instance_id = s.instance_id AND r.schedule_id = s.id
+               ORDER BY r.updated_at DESC LIMIT 1) AS run_error
+             FROM schedule_items s
+             WHERE s.instance_id = ? AND s.status = 'active'`
+          ).bind(env.__instanceId).all();
+          const schedules = (results || []).map(row => scheduleListItem(row, now));
+          schedules.sort((a, b) => (a.nextOccurrence?.createAt || "9999").localeCompare(b.nextOccurrence?.createAt || "9999") || a.createdAt.localeCompare(b.createdAt));
+          return json({ ok: true, data: schedules, serverNow: new Date(now).toISOString() });
+        }
+
+        if (path === "/api/schedules/create" && request.method === "POST") {
+          const now = new Date();
+          const body = await request.json();
+          const checked = normalizeScheduleInput({ ...body, createdAt: now.toISOString(), updatedAt: now.toISOString(), status: "active" });
+          if (checked.errors.length) return json({ ok: false, error: checked.errors[0] }, 400);
+          const schedule = checked.value;
+          if (schedule.kind === "once" && seoulDateTimeToMs(schedule.date, schedule.scheduleTime) <= now.getTime()) {
+            return json({ ok: false, error: "일회 예약은 현재보다 뒤의 시간을 선택해주세요." }, 400);
+          }
+          const id = crypto.randomUUID();
+          await env.DB.prepare(
+            `INSERT INTO schedule_items
+              (id, instance_id, kind, name, date_key, weekday, schedule_time, project, lead_minutes,
+               title_template, status, skipped_occurrence_key, last_occurrence_key, last_created_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL, NULL, NULL, ?, ?)`
+          ).bind(id, env.__instanceId, schedule.kind, schedule.name, schedule.date, schedule.weekday,
+            schedule.scheduleTime, schedule.project, schedule.leadMinutes, JSON.stringify(schedule.titleTemplate),
+            schedule.createdAt, schedule.updatedAt).run();
+          const row = await loadScheduleRow(env, id);
+          return json({ ok: true, data: scheduleListItem(row, now.getTime()) }, 201);
+        }
+
+        if (path === "/api/schedules/update" && request.method === "POST") {
+          const body = await request.json();
+          const current = await loadScheduleRow(env, body?.id);
+          if (!current) return json({ ok: false, error: "예약을 찾을 수 없습니다." }, 404);
+          const currentSchedule = scheduleRowToModel(current);
+          const now = new Date().toISOString();
+          const checked = normalizeScheduleInput({
+            ...currentSchedule,
+            ...body,
+            id: current.id,
+            createdAt: current.created_at,
+            updatedAt: now,
+            status: "active",
+          });
+          if (checked.errors.length) return json({ ok: false, error: checked.errors[0] }, 400);
+          const schedule = checked.value;
+          if (schedule.kind === "once" && current.last_occurrence_key !== `once:${schedule.date}`
+              && seoulDateTimeToMs(schedule.date, schedule.scheduleTime) <= Date.now()) {
+            return json({ ok: false, error: "일회 예약은 현재보다 뒤의 시간을 선택해주세요." }, 400);
+          }
+          await env.DB.prepare(
+            `UPDATE schedule_items SET kind = ?, name = ?, date_key = ?, weekday = ?, schedule_time = ?,
+               project = ?, lead_minutes = ?, title_template = ?, skipped_occurrence_key = NULL, updated_at = ?
+             WHERE id = ? AND instance_id = ?`
+          ).bind(schedule.kind, schedule.name, schedule.date, schedule.weekday, schedule.scheduleTime,
+            schedule.project, schedule.leadMinutes, JSON.stringify(schedule.titleTemplate), now,
+            current.id, env.__instanceId).run();
+          const row = await loadScheduleRow(env, current.id);
+          return json({ ok: true, data: scheduleListItem(row, Date.now()) });
+        }
+
+        if (path === "/api/schedules/skip" && request.method === "POST") {
+          const body = await request.json();
+          const row = await loadScheduleRow(env, body?.id);
+          if (!row) return json({ ok: false, error: "예약을 찾을 수 없습니다." }, 404);
+          const schedule = scheduleRowToModel(row);
+          const undo = body?.skip === false;
+          let occurrenceKey = null;
+          if (!undo) {
+            const occurrence = currentSkippableOccurrence({ ...schedule, skippedOccurrenceKey: null }, Date.now());
+            if (!occurrence) return json({ ok: false, error: "건너뛸 다음 회차가 없습니다." }, 400);
+            occurrenceKey = occurrence.key;
+          }
+          await env.DB.prepare(
+            `UPDATE schedule_items SET skipped_occurrence_key = ?, updated_at = ? WHERE id = ? AND instance_id = ?`
+          ).bind(occurrenceKey, new Date().toISOString(), row.id, env.__instanceId).run();
+          const updated = await loadScheduleRow(env, row.id);
+          return json({ ok: true, data: scheduleListItem(updated, Date.now()) });
+        }
+
+        if (path === "/api/schedules/delete" && request.method === "POST") {
+          const body = await request.json();
+          const id = cleanText(body?.id, 120);
+          if (!id) return json({ ok: false, error: "예약을 선택해주세요." }, 400);
+          const result = await env.DB.prepare(
+            `DELETE FROM schedule_items WHERE id = ? AND instance_id = ?`
+          ).bind(id, env.__instanceId).run();
+          if (!Number(result?.meta?.changes)) return json({ ok: false, error: "예약을 찾을 수 없습니다." }, 404);
+          return json({ ok: true });
+        }
+
+        return json({ ok: false, error: "schedule endpoint not found" }, 404);
+      }
+
       // ───────── 업무일지 ─────────
       if (path === "/api/worklog/state" && request.method === "GET") {
         return json({ ok: true, data: await loadWorklogState(env) });
@@ -425,7 +544,256 @@ export default {
       return json({ ok: false, error: String(e) }, 500);
     }
   },
+
+  async scheduled(controller, env, ctx) {
+    const now = Number(controller?.scheduledTime) || Date.now();
+    ctx.waitUntil(runDueSchedules(env, now));
+  },
 };
+
+function scheduleRowToModel(row) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    date: row.date_key,
+    weekday: row.weekday,
+    scheduleTime: row.schedule_time,
+    project: row.project,
+    leadMinutes: row.lead_minutes,
+    titleTemplate: safeParse(row.title_template, []),
+    status: row.status,
+    skippedOccurrenceKey: row.skipped_occurrence_key,
+    lastOccurrenceKey: row.last_occurrence_key,
+    lastCreatedAt: row.last_created_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function scheduleListItem(row, now) {
+  const schedule = scheduleRowToModel(row);
+  const skipped = currentSkippableOccurrence(schedule, now);
+  const next = upcomingOccurrences(schedule, now, 1)[0] || null;
+  return {
+    ...schedule,
+    skippedOccurrence: skipped && skipped.key === schedule.skippedOccurrenceKey ? skipped : null,
+    nextOccurrence: next,
+    runStatus: row.run_status || null,
+    runError: row.run_error || null,
+  };
+}
+
+async function loadScheduleRow(env, id) {
+  const scheduleId = cleanText(id, 120);
+  if (!scheduleId || !env.__instanceId) return null;
+  return env.DB.prepare(
+    `SELECT * FROM schedule_items WHERE id = ? AND instance_id = ?`
+  ).bind(scheduleId, env.__instanceId).first();
+}
+
+async function settleExpiredScheduleSkips(env, now) {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM schedule_items
+     WHERE instance_id = ? AND status = 'active' AND skipped_occurrence_key IS NOT NULL`
+  ).bind(env.__instanceId).all();
+  const statements = [];
+  for (const row of results || []) {
+    const schedule = scheduleRowToModel(row);
+    const action = expiredSkipAction(schedule, now);
+    if (!action) continue;
+    if (action === "complete") {
+      statements.push(env.DB.prepare(
+        `UPDATE schedule_items SET status = 'completed', updated_at = ? WHERE id = ? AND instance_id = ?`
+      ).bind(new Date(now).toISOString(), schedule.id, env.__instanceId));
+    } else {
+      statements.push(env.DB.prepare(
+        `UPDATE schedule_items
+         SET last_occurrence_key = skipped_occurrence_key, skipped_occurrence_key = NULL, updated_at = ?
+         WHERE id = ? AND instance_id = ?`
+      ).bind(new Date(now).toISOString(), schedule.id, env.__instanceId));
+    }
+  }
+  if (statements.length) await env.DB.batch(statements);
+}
+
+async function runDueSchedules(env, now) {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM schedule_items WHERE status = 'active' ORDER BY created_at ASC`
+  ).all();
+  const byInstance = new Map();
+  for (const row of results || []) {
+    if (!byInstance.has(row.instance_id)) byInstance.set(row.instance_id, []);
+    byInstance.get(row.instance_id).push(row);
+  }
+  for (const [instanceId, rows] of byInstance) {
+    const scoped = instanceEnv(env, instanceId);
+    await settleExpiredScheduleSkips(scoped, now);
+    for (const row of rows) {
+      const occurrence = dueOccurrence(scheduleRowToModel(row), now);
+      if (!occurrence) continue;
+      await processScheduleOccurrence(env, row, occurrence, now);
+    }
+  }
+}
+
+async function processScheduleOccurrence(env, row, occurrence, now) {
+  const runId = crypto.randomUUID();
+  const nowIso = new Date(now).toISOString();
+  const leaseUntil = new Date(now + 5 * 60_000).toISOString();
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO schedule_runs
+      (id, instance_id, schedule_id, occurrence_key, scheduled_at, status, attempt_count,
+       lease_until, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'claimed', 1, ?, ?, ?)`
+  ).bind(runId, row.instance_id, row.id, occurrence.key, occurrence.scheduledAt,
+    leaseUntil, nowIso, nowIso).run();
+
+  let claimed = Number(inserted?.meta?.changes) > 0;
+  let run = claimed
+    ? { id: runId, status: "claimed", lease_until: leaseUntil }
+    : await env.DB.prepare(
+      `SELECT * FROM schedule_runs WHERE instance_id = ? AND schedule_id = ? AND occurrence_key = ?`
+    ).bind(row.instance_id, row.id, occurrence.key).first();
+  if (!run || run.status === "succeeded") return;
+
+  if (!claimed) {
+    const lease = Date.parse(run.lease_until || "");
+    if (run.status === "claimed" && Number.isFinite(lease) && lease > now) return;
+    const acquired = await env.DB.prepare(
+      `UPDATE schedule_runs
+       SET status = 'claimed', attempt_count = attempt_count + 1, lease_until = ?, updated_at = ?
+       WHERE id = ? AND status != 'succeeded' AND (lease_until IS NULL OR lease_until <= ? OR status IN ('failed', 'uncertain'))`
+    ).bind(leaseUntil, nowIso, run.id, nowIso).run();
+    claimed = Number(acquired?.meta?.changes) > 0;
+    if (!claimed) return;
+  }
+
+  const schedule = scheduleRowToModel(row);
+  const marker = `${row.instance_id}:${row.id}:${occurrence.key}`;
+  let pageId = null;
+  try {
+    const config = notionScheduleConfig(env);
+    pageId = await findNotionPageByMarker(config, marker);
+    if (!pageId) pageId = await createNotionSchedulePage(config, schedule, occurrence, marker);
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE schedule_runs
+         SET status = 'succeeded', notion_page_id = ?, error = NULL, lease_until = NULL, updated_at = ?
+         WHERE id = ?`
+      ).bind(pageId, new Date().toISOString(), run.id),
+      env.DB.prepare(
+        `UPDATE schedule_items
+         SET last_occurrence_key = ?, last_created_at = ?, skipped_occurrence_key = NULL,
+             status = CASE WHEN kind = 'once' THEN 'completed' ELSE status END, updated_at = ?
+         WHERE id = ? AND instance_id = ?`
+      ).bind(occurrence.key, new Date().toISOString(), new Date().toISOString(), row.id, row.instance_id),
+    ]);
+  } catch (error) {
+    const uncertain = error?.uncertain === true;
+    await env.DB.prepare(
+      `UPDATE schedule_runs SET status = ?, error = ?, lease_until = NULL, updated_at = ? WHERE id = ?`
+    ).bind(uncertain ? "uncertain" : "failed", safeScheduleError(error), new Date().toISOString(), run.id).run();
+  }
+}
+
+export function notionScheduleConfig(env) {
+  const values = {
+    token: String(env.NOTION_TOKEN || "").trim(),
+    dataSourceId: String(env.NOTION_DATABASE_ID || "").trim(),
+    titleProperty: String(env.NOTION_TITLE_PROPERTY || "").trim(),
+    dateProperty: String(env.NOTION_DATE_PROPERTY || "").trim(),
+    projectProperty: String(env.NOTION_PROJECT_PROPERTY || "").trim(),
+    occurrenceProperty: String(env.NOTION_OCCURRENCE_PROPERTY || "").trim(),
+    projectType: String(env.NOTION_PROJECT_PROPERTY_TYPE || "select").trim(),
+  };
+  const missing = Object.entries(values)
+    .filter(([key, value]) => key !== "projectType" && !value)
+    .map(([key]) => key);
+  if (missing.length) throw new Error(`Notion 연결 설정이 필요합니다: ${missing.join(", ")}`);
+  if (!['select', 'rich_text'].includes(values.projectType)) {
+    throw new Error("NOTION_PROJECT_PROPERTY_TYPE은 select 또는 rich_text여야 합니다.");
+  }
+  return values;
+}
+
+function notionHeaders(config) {
+  return {
+    Authorization: `Bearer ${config.token}`,
+    "Content-Type": "application/json",
+    "Notion-Version": NOTION_API_VERSION,
+  };
+}
+
+async function notionRequest(url, init) {
+  let response;
+  try {
+    response = await fetch(url, init);
+  } catch (_) {
+    const error = new Error("Notion 네트워크 응답을 확인하지 못했습니다.");
+    error.uncertain = true;
+    throw error;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(`Notion API ${response.status}: ${cleanText(payload?.message, 280) || "요청 실패"}`);
+    error.uncertain = response.status >= 500;
+    throw error;
+  }
+  return payload;
+}
+
+async function findNotionPageByMarker(config, marker) {
+  const payload = await notionRequest(
+    `https://api.notion.com/v1/data_sources/${encodeURIComponent(config.dataSourceId)}/query`,
+    {
+      method: "POST",
+      headers: notionHeaders(config),
+      body: JSON.stringify({
+        page_size: 1,
+        filter: {
+          property: config.occurrenceProperty,
+          rich_text: { equals: marker },
+        },
+      }),
+    }
+  );
+  return payload?.results?.[0]?.id || null;
+}
+
+async function createNotionSchedulePage(config, schedule, occurrence, marker) {
+  const projectValue = config.projectType === "select"
+    ? { type: "select", select: { name: schedule.project } }
+    : { type: "rich_text", rich_text: [{ type: "text", text: { content: schedule.project } }] };
+  const payload = await notionRequest("https://api.notion.com/v1/pages", {
+    method: "POST",
+    headers: notionHeaders(config),
+    body: JSON.stringify({
+      parent: { type: "data_source_id", data_source_id: config.dataSourceId },
+      properties: {
+        [config.titleProperty]: {
+          type: "title",
+          title: [{ type: "text", text: { content: occurrence.title || schedule.name } }],
+        },
+        [config.dateProperty]: {
+          type: "date",
+          date: { start: occurrence.scheduledAtSeoul },
+        },
+        [config.projectProperty]: projectValue,
+        [config.occurrenceProperty]: {
+          type: "rich_text",
+          rich_text: [{ type: "text", text: { content: marker } }],
+        },
+      },
+    }),
+  });
+  if (!payload?.id) throw new Error("Notion 페이지 ID가 응답에 없습니다.");
+  return payload.id;
+}
+
+function safeScheduleError(error) {
+  return cleanText(error?.message || error || "예약 실행 실패", 360, false);
+}
 
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
 

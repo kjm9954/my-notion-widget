@@ -227,6 +227,23 @@ async function saveNotesState(state) {
   return (await apiPost("/api/notes/state", state)).data;
 }
 
+// ───────── 업무 관리 예약 ─────────
+async function loadSchedules() {
+  return (await apiGet("/api/schedules/list")).data;
+}
+async function createSchedule(schedule) {
+  return (await apiPost("/api/schedules/create", schedule)).data;
+}
+async function updateSchedule(id, patch) {
+  return (await apiPost("/api/schedules/update", { id, ...patch })).data;
+}
+async function skipScheduleOccurrence(id, skip = true) {
+  return (await apiPost("/api/schedules/skip", { id, skip })).data;
+}
+async function deleteSchedule(id) {
+  return apiPost("/api/schedules/delete", { id });
+}
+
 // ───────── 계산 (저장 안 함, 호출 시 계산) ─────────
 async function getHP() {
   const dates = await getWrittenDates();
@@ -286,6 +303,7 @@ window.Store = {
   loadImportantCalendarState, saveImportantCalendarState,
   loadWeeklyGoalsState, saveWeeklyGoalsState,
   loadNotesState, saveNotesState,
+  loadSchedules, createSchedule, updateSchedule, skipScheduleOccurrence, deleteSchedule,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
   watch,
 };

@@ -4,6 +4,9 @@ compatibility_date = "2026-07-26"
 workers_dev = true
 keep_vars = true
 
+[triggers]
+crons = ["* * * * *"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "notion_widget_db"

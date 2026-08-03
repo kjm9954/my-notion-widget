@@ -1,40 +1,4 @@
-CREATE TABLE diary (
-  date TEXT PRIMARY KEY,
-  mode TEXT,
-  mood TEXT,
-  achievements TEXT,
-  images TEXT,
-  quest TEXT,
-  createdAt TEXT,
-  updatedAt TEXT
-);
-
-CREATE TABLE thoughts (
-  id TEXT PRIMARY KEY,
-  content TEXT,
-  category TEXT,
-  createdAt TEXT,
-  updatedAt TEXT
-);
-
-CREATE TABLE goals (
-  id TEXT PRIMARY KEY,
-  title TEXT,
-  scope TEXT,
-  parentId TEXT,
-  done INTEGER DEFAULT 0,
-  completedAt TEXT,
-  createdAt TEXT,
-  updatedAt TEXT
-);
-
-CREATE TABLE widget_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updatedAt TEXT
-);
-
-CREATE TABLE schedule_items (
+CREATE TABLE IF NOT EXISTS schedule_items (
   id TEXT PRIMARY KEY,
   instance_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('once', 'weekly')),
@@ -53,10 +17,10 @@ CREATE TABLE schedule_items (
   updated_at TEXT NOT NULL
 );
 
-CREATE INDEX idx_schedule_items_instance_status
+CREATE INDEX IF NOT EXISTS idx_schedule_items_instance_status
   ON schedule_items (instance_id, status);
 
-CREATE TABLE schedule_runs (
+CREATE TABLE IF NOT EXISTS schedule_runs (
   id TEXT PRIMARY KEY,
   instance_id TEXT NOT NULL,
   schedule_id TEXT NOT NULL,
@@ -72,5 +36,5 @@ CREATE TABLE schedule_runs (
   UNIQUE (instance_id, schedule_id, occurrence_key)
 );
 
-CREATE INDEX idx_schedule_runs_retry
+CREATE INDEX IF NOT EXISTS idx_schedule_runs_retry
   ON schedule_runs (status, lease_until);
