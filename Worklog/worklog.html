@@ -217,7 +217,8 @@
     .done-check.is-done.mode-life { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .task-row.is-done .task-title-button, .task-row.is-done .cell, .task-row.is-done .number-cell, .task-row.is-done .memo { color:var(--complete); }
     .task-row.is-done .task-title-button { text-decoration:line-through; }
-    .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:center; }
+    .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:center; user-select:none; }
+    .time-cell .inline-cell-input { user-select:text; }
     .time-value { width:100%; height:24px; text-align:center; font-variant-numeric:tabular-nums; }
     .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:2px; background:var(--surface); }
     .time-action { width:20px; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:700; }
@@ -458,7 +459,8 @@
       const ui = {
         selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
         confirmDeleteId:null, deleteTimer:null, newId:null, popover:null, projectAdding:false,
-        projectChoiceTimer:null, dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0
+        projectChoiceTimer:null, dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0,
+        timeClick:null
       };
       let state = defaultState();
       let pendingExternalSync = false;
@@ -536,6 +538,21 @@
         if (!match) return null;
         const hour = Number(match[1]);
         const minute = Number(match[2]);
+        if (hour > 23 || minute > 59) return null;
+        return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      }
+
+      // 사람이 직접 친 시간 문자열을 관대하게 읽는다. "1024"→10:24, "930"→09:30, "9"→09:00, "10.24"·"10시24분"→10:24
+      function parseTimeEntry(value) {
+        if (value === null || value === undefined) return null;
+        const text = String(value).trim();
+        if (!text) return null;
+        const strict = normalizeTime(text);
+        if (strict) return strict;
+        const digits = text.replace(/\D/g, '');
+        if (!digits || digits.length > 4) return null;
+        const hour = digits.length <= 2 ? Number(digits) : Number(digits.slice(0, -2));
+        const minute = digits.length <= 2 ? 0 : Number(digits.slice(-2));
         if (hour > 23 || minute > 59) return null;
         return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
       }
@@ -1151,10 +1168,10 @@
         const value = task[field];
         const label = field === 'start' ? '시작' : '종료';
         if (ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === field) {
-          return `<span class="time-cell"><input class="inline-cell-input time-input" value="${escapeHtml(value || '')}" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="${field}" aria-label="${label} 시간 편집"></span>`;
+          return `<span class="time-cell"><input class="inline-cell-input time-input" value="${escapeHtml(value || '')}" inputmode="numeric" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="${field}" aria-label="${label} 시간 편집"></span>`;
         }
         return `<span class="time-cell ${value ? 'has-value' : ''}">
-          <button class="cell-button number-cell time-value ${value ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간 ${value ? value : '현재 시각으로 기록'}">${value || '–'}</button>
+          <button class="cell-button number-cell time-value ${value ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간 ${value ? value : '현재 시각으로 기록'}, 두 번 클릭하면 직접 입력" title="클릭: 현재 시각 · 두 번 클릭: 직접 입력">${value || '–'}</button>
           ${value ? `<span class="time-actions"><button class="time-action" type="button" data-time-retry="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 다시 찍기">↻</button><button class="time-action" type="button" data-time-clear="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 비우기">✕</button></span>` : ''}
         </span>`;
       }
@@ -1512,8 +1529,8 @@
           q:values.get('q') || null,
           title,
           due:values.get('due') || null,
-          start:mode === 'work' ? normalizeTime(values.get('start')) : null,
-          end:mode === 'work' ? normalizeTime(values.get('end')) : null,
+          start:mode === 'work' ? parseTimeEntry(values.get('start')) : null,
+          end:mode === 'work' ? parseTimeEntry(values.get('end')) : null,
           progress:mode === 'work' ? (existing?.progress ?? null) : null,
           est:Number.isFinite(estimate) ? estimate : null,
           status:done ? 'done' : status,
@@ -1695,7 +1712,7 @@
         const raw = String(input.value || '');
         let value = raw.trim();
         if ((field === 'start' || field === 'end') && value) {
-          value = normalizeTime(value);
+          value = parseTimeEntry(value);
           if (!value) save = false;
         }
         if (field === 'title' && !value) save = false;
@@ -1759,17 +1776,39 @@
         finishRowDrag(event,true);
       });
 
-      card.addEventListener('dblclick', event => {
-        const time = event.target.closest('[data-cell-task][data-cell-field="start"], [data-cell-task][data-cell-field="end"]');
-        if (!time || !taskById(time.dataset.cellTask)?.[time.dataset.cellField]) return;
-        event.preventDefault();
-        beginInlineEdit(time.dataset.cellTask, time.dataset.cellField);
-      });
+      const DOUBLE_CLICK_MS = 500;
+
+      // 시작·종료 칸의 두 번째 클릭 = 직접 입력. 첫 클릭 뒤 셀이 다시 그려지고
+      // 호버 시 ↻·✕ 오버레이가 덮이는 탓에 브라우저 dblclick은 신뢰할 수 없어 직접 판정한다.
+      function timeCellDoubleClick(event) {
+        const zone = event.target.closest('[data-cell-task][data-cell-field="start"], [data-cell-task][data-cell-field="end"], [data-time-retry], [data-time-clear]');
+        if (!zone) {
+          ui.timeClick = null;
+          return null;
+        }
+        const id = zone.dataset.cellTask || zone.dataset.taskId;
+        const field = zone.dataset.cellField || zone.dataset.timeRetry || zone.dataset.timeClear;
+        const previous = ui.timeClick;
+        const now = Date.now();
+        ui.timeClick = { id, field, at:now };
+        if (previous && previous.id === id && previous.field === field && now - previous.at <= DOUBLE_CLICK_MS) {
+          ui.timeClick = null;
+          return { id, field };
+        }
+        return null;
+      }
 
       card.addEventListener('click', event => {
         if (Date.now() < ui.suppressClickUntil && event.target.closest('.task-row')) {
           event.preventDefault();
           event.stopImmediatePropagation();
+          return;
+        }
+        const timeDouble = timeCellDoubleClick(event);
+        if (timeDouble) {
+          event.preventDefault();
+          window.getSelection?.()?.removeAllRanges();
+          beginInlineEdit(timeDouble.id, timeDouble.field);
           return;
         }
         if (event.target.closest('[data-dismiss-banner]')) {
