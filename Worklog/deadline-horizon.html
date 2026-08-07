@@ -387,9 +387,10 @@
             state = nextCalendar;
           }
           if (worklogData) {
-            changed ||= JSON.stringify(worklogData) !== JSON.stringify(worklogState);
+            const previousProjects = projects;
             worklogState = worklogData;
             projects = readProjects();
+            changed ||= JSON.stringify(projects) !== JSON.stringify(previousProjects);
           }
         } catch (error) {
           console.warn('마감 업무를 불러오지 못했습니다.', error);
@@ -436,7 +437,7 @@
 
       render();
       refresh();
-      Store.watch(() => refresh({ mark:true }),1000);
+      Store.watch(() => refresh({ mark:true }),3000);
       scheduleMidnightRefresh();
     })();
   </script>

@@ -484,6 +484,7 @@
       let saveQueue = Promise.resolve();
       let columnSaveTimer = 0;
       let activeDayKey = localDateKey(todayDate());
+      let timeTitleMeasurement = null;
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -834,7 +835,9 @@
         card.style.setProperty('--work-title-track',`${workWeight.toFixed(3)}fr`);
         card.style.setProperty('--life-title-track',`${lifeWeight.toFixed(3)}fr`);
         if (state.mode === 'work' && state.workView === 'memo' && !mobileQuery.matches) {
-          const timeTitleWidth = measuredTimeTitleWidth(taskList.querySelector('.column-head.work.view-memo'));
+          const memoHead = taskList.querySelector('.column-head.work.view-memo');
+          const cached = timeTitleMeasurement?.headWidth === memoHead?.offsetWidth ? timeTitleMeasurement.titleWidth : 0;
+          const timeTitleWidth = cached || measuredTimeTitleWidth(memoHead);
           if (timeTitleWidth) card.style.setProperty('--work-title-track',`${timeTitleWidth}px`);
         }
         card.querySelectorAll('[data-column-resize]').forEach(handle => {
@@ -1511,6 +1514,26 @@
         renderCellPopover();
       }
 
+      function renderWorkView() {
+        const listScroll = taskList.querySelector('.rows-scroll')?.scrollTop || 0;
+        const items = tasksFor(state.mode,ui.selectedDate);
+        renderHeader(items);
+        renderList(items);
+        applyColumnSplit();
+        const nextScroll = taskList.querySelector('.rows-scroll');
+        if (nextScroll) nextScroll.scrollTop = listScroll;
+        renderCellPopover();
+      }
+
+      function persistWorkView(view) {
+        saveQueue = saveQueue
+          .then(() => Store.saveWorklogView(view))
+          .catch(error => {
+            console.warn('업무 보기 설정을 저장하지 못했습니다.',error);
+            liveRegion.textContent = '보기 설정을 저장하지 못했습니다. 다시 시도해 주세요.';
+          });
+      }
+
       function announce(message) {
         liveRegion.textContent = '';
         requestAnimationFrame(() => { liveRegion.textContent = message; });
@@ -1692,9 +1715,16 @@
         const nextView = button.dataset.workView;
         if (!['time','memo'].includes(nextView) || nextView === state.workView) return;
         if (!drainPendingSync()) return;
+        if (state.workView === 'time' && nextView === 'memo' && !mobileQuery.matches) {
+          const head = taskList.querySelector('.column-head.work.view-time');
+          const title = head?.querySelector('[data-column-title]');
+          if (head && title) timeTitleMeasurement = { headWidth:head.offsetWidth, titleWidth:title.offsetWidth };
+        }
         resetTransient();
-        const saved = mutate(fresh => { fresh.workView = nextView; return fresh; });
-        if (saved) announce(`${nextView === 'memo' ? '메모' : '시간'} 보기로 전환했습니다.`);
+        state = { ...state, workView:nextView };
+        renderWorkView();
+        persistWorkView(nextView);
+        announce(`${nextView === 'memo' ? '메모' : '시간'} 보기로 전환했습니다.`);
       });
 
       previousDay.addEventListener('click', () => changeDate(-1));
@@ -2179,7 +2209,7 @@
       async function bootstrap() {
         liveRegion.textContent = '업무일지를 불러오는 중입니다.';
         await syncFromServer(true);
-        Store.watch(() => syncFromServer(false),1000);
+        Store.watch(() => syncFromServer(false),3000);
       }
 
       bootstrap();

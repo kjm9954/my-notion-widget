@@ -15,6 +15,14 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /data-work-view="memo"/);
   assert.match(html, /column-head work view-memo/);
   assert.match(html, /메모 \$\{memoCount\}건/);
+  assert.match(html, /Store\.saveWorklogView\(view\)/);
+  assert.match(html, /function renderWorkView\(\)/);
+});
+
+test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으로 오인하지 않음", async () => {
+  const html = await readFile(new URL("../Worklog/deadline-horizon.html", import.meta.url), "utf8");
+  assert.match(html, /JSON\.stringify\(projects\) !== JSON\.stringify\(previousProjects\)/);
+  assert.doesNotMatch(html, /JSON\.stringify\(worklogData\) !== JSON\.stringify\(worklogState\)/);
 });
 
 test("업무 관리용 위젯은 전체 크기 조절 프레임을 사용", async () => {

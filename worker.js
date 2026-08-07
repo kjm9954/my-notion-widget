@@ -486,6 +486,14 @@ export default {
         return json({ ok: true, data: state });
       }
 
+      if (path === "/api/worklog/view" && request.method === "POST") {
+        const body = await request.json();
+        const state = await loadWorklogState(env);
+        state.workView = body?.view === "memo" ? "memo" : "time";
+        await saveSetting(env, "worklog", state);
+        return json({ ok: true, data: state });
+      }
+
       if (path === "/api/worklog/column-split" && request.method === "POST") {
         const body = await request.json();
         const mode = body?.mode === "life" ? "life" : "work";
