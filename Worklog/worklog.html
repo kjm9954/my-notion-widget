@@ -87,6 +87,9 @@
     .summary-divider { color:var(--inactive); }
     .time-summary { color:var(--text); font-variant-numeric:tabular-nums; }
     .time-summary span { color:var(--faint); font-size:10px; }
+    .view-toggle { flex:0 0 auto; margin-left:4px; padding:3px; display:inline-flex; gap:2px; background:var(--border-pale); border-radius:999px; }
+    .view-toggle-button { min-height:24px; padding:7px 11px; border:0; border-radius:999px; background:transparent; color:#8AA0AA; font-size:10px; font-weight:800; line-height:1; transition:background-color .12s var(--ease), color .12s var(--ease); }
+    .view-toggle-button.is-selected { background:var(--surface); color:var(--action); box-shadow:0 1px 2px rgba(18,48,60,.10); }
     .list-shell {
       min-height:160px; flex:1; padding:12px; overflow:hidden;
       display:flex; flex-direction:column; gap:6px; background:var(--surface-soft);
@@ -105,6 +108,9 @@
     .column-head, .task-row { display:grid; align-items:center; gap:10px; }
     .column-head.work, .task-row.work {
       grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
+    }
+    .column-head.work.view-memo, .task-row.work.view-memo {
+      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(120px,4.5fr) minmax(40px,1.24fr) 24px 24px;
     }
     .column-head.life, .task-row.life {
       grid-template-columns:62px 22px minmax(100px,var(--life-title-track,1.2fr)) 52px minmax(100px,1fr) 24px 24px;
@@ -316,6 +322,9 @@
       .column-head.work, .task-row.work {
         grid-template-columns:62px 22px minmax(90px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
       }
+      .column-head.work.view-memo, .task-row.work.view-memo {
+        grid-template-columns:62px 22px minmax(90px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(100px,4.5fr) minmax(40px,1.24fr) 24px 24px;
+      }
     }
     @media (max-width:639px) {
       .card { padding:14px; }
@@ -340,6 +349,10 @@
       .day-button { min-height:40px; padding-left:0; padding-right:0; }
       .card-header { align-items:flex-start; }
       .summary-side { flex-wrap:wrap; row-gap:3px; }
+      .view-toggle-button { position:relative; min-width:56px; min-height:44px; padding:0 14px; display:grid; place-items:center; background:transparent; isolation:isolate; }
+      .view-toggle-button.is-selected { background:transparent; }
+      .view-toggle-button.is-selected::before { content:""; position:absolute; z-index:-1; left:0; right:0; top:10px; height:24px; border-radius:999px; background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.10); }
+      .view-toggle { padding:0 3px; }
       .column-head.work { display:none; }
       .task-row.work {
         height:auto; min-height:0; padding:9px 10px; display:grid; grid-template-columns:minmax(0,1fr) 44px 40px; gap:6px;
@@ -368,6 +381,9 @@
       .task-row.work .mobile-work-meta.times {
         grid-column:1; grid-row:3; flex-wrap:wrap; color:var(--deep); font-size:10px; font-weight:700; font-variant-numeric:tabular-nums;
       }
+      .task-row.work.view-memo .mobile-work-meta.times { flex-wrap:nowrap; }
+      .task-row.work.view-memo .mobile-work-meta.times .memo { width:100%; }
+      .task-row.work.view-memo .mobile-work-meta.times .memo-button { width:100%; }
       .task-row.work .mobile-work-meta .cell-button { width:auto; color:inherit; font-size:inherit; font-weight:inherit; }
       .task-row.work .mobile-work-meta .date-cell { width:auto; }
       .task-row.work .mobile-work-meta .project-button { max-width:110px; }
@@ -515,7 +531,7 @@
 
       function defaultState() {
         return {
-          mode:'work', tasks:[], projects:[], lastRollWeek:isoWeekKey(todayDate()),
+          mode:'work', workView:'time', tasks:[], projects:[], lastRollWeek:isoWeekKey(todayDate()),
           bannerDismissedWeek:'', lastRollCount:0,
           lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } },
           columnSplit:{ ...DEFAULT_COLUMN_SPLIT }, manualOrder:{}
@@ -649,6 +665,7 @@
         return {
           ...raw,
           mode:raw.mode === 'life' ? 'life' : 'work',
+          workView:raw.workView === 'memo' ? 'memo' : 'time',
           tasks,
           projects,
           lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
@@ -797,6 +814,18 @@
         return items.sort((a,b) => (a.q ?? 5) - (b.q ?? 5) || sourceIndex.get(a.id) - sourceIndex.get(b.id));
       }
 
+      function measuredTimeTitleWidth(head) {
+        if (!head) return 0;
+        const probe = document.createElement('div');
+        probe.className = 'column-head work view-time';
+        probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:-10000px;top:0;width:${head.offsetWidth}px`;
+        probe.innerHTML = '<span></span><span></span><span data-column-title></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>';
+        card.appendChild(probe);
+        const width = probe.querySelector('[data-column-title]')?.offsetWidth || 0;
+        probe.remove();
+        return width;
+      }
+
       function applyColumnSplit() {
         const work = normalizeSplit(state.columnSplit?.work,DEFAULT_COLUMN_SPLIT.work,.2,.82);
         const life = normalizeSplit(state.columnSplit?.life,DEFAULT_COLUMN_SPLIT.life,.25,.75);
@@ -804,6 +833,10 @@
         const lifeWeight = life / (1 - life);
         card.style.setProperty('--work-title-track',`${workWeight.toFixed(3)}fr`);
         card.style.setProperty('--life-title-track',`${lifeWeight.toFixed(3)}fr`);
+        if (state.mode === 'work' && state.workView === 'memo' && !mobileQuery.matches) {
+          const timeTitleWidth = measuredTimeTitleWidth(taskList.querySelector('.column-head.work.view-memo'));
+          if (timeTitleWidth) card.style.setProperty('--work-title-track',`${timeTitleWidth}px`);
+        }
         card.querySelectorAll('[data-column-resize]').forEach(handle => {
           const value = handle.dataset.columnResize === 'work' ? work : life;
           handle.setAttribute('aria-valuenow',String(Math.round(value * 100)));
@@ -819,7 +852,9 @@
         const scale = head.offsetWidth ? headRect.width / head.offsetWidth : 1;
         const flexible = [title,...details];
         const pool = flexible.reduce((sum,element) => sum + element.getBoundingClientRect().width / scale,0);
-        return { head, title, scale:scale || 1, pool, titleWidth:title.getBoundingClientRect().width / (scale || 1) };
+        const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
+        const splitPool = mode === 'work' && state.workView === 'memo' ? Math.max(1,pool - gap * 3) : pool;
+        return { head, title, scale:scale || 1, pool, splitPool, titleWidth:title.getBoundingClientRect().width / (scale || 1) };
       }
 
       function setColumnSplit(mode, value, save = false) {
@@ -870,7 +905,7 @@
         const minimumOther = mode === 'work' ? 220 : 100;
         ui.columnResize = {
           pointerId:event.pointerId, handle, mode, startX:event.clientX, startTitle:metrics.titleWidth,
-          scale:metrics.scale, pool:metrics.pool, minimumTitle, maximumTitle:Math.max(minimumTitle,metrics.pool - minimumOther),
+          scale:metrics.scale, pool:metrics.splitPool, minimumTitle, maximumTitle:Math.max(minimumTitle,metrics.splitPool - minimumOther),
           changed:false
         };
         handle.classList.add('is-dragging');
@@ -1127,28 +1162,34 @@
         const today = ui.selectedDate === localDateKey(todayDate());
         const caption = weekCaption(ui.selectedDate);
         const datePieces = `<span class="date-title">${info.title}</span><span class="weekday-label">${info.weekday}</span>${today ? '<span class="today-pill">오늘</span>' : ''}${caption ? `<span class="week-caption">${caption}</span>` : ''}`;
+        const viewToggle = state.mode === 'work' ? `<div class="view-toggle" role="group" aria-label="업무 보기 전환"><button class="view-toggle-button ${state.workView === 'time' ? 'is-selected' : ''}" type="button" data-work-view="time" aria-pressed="${state.workView === 'time'}">시간</button><button class="view-toggle-button ${state.workView === 'memo' ? 'is-selected' : ''}" type="button" data-work-view="memo" aria-pressed="${state.workView === 'memo'}">메모</button></div>` : '';
         if (!items.length) {
-          cardHeader.innerHTML = `<div class="date-side">${datePieces}</div>`;
+          cardHeader.innerHTML = `<div class="date-side">${datePieces}</div>${viewToggle ? `<div class="summary-side">${viewToggle}</div>` : ''}`;
           return;
         }
         const done = items.filter(task => task.done).length;
         const count = `<span><strong>${items.length}</strong>개 중 <strong>${done}</strong> 완료</span>`;
         let modeSummary = '';
         if (state.mode === 'work') {
-          const durations = items.map(progressOf).filter(value => value !== null);
-          const estimates = items.map(task => task.est).filter(value => value !== null);
-          const duration = durations.reduce((sum, value) => sum + value, 0);
-          const estimate = estimates.reduce((sum, value) => sum + value, 0);
-          if (durations.length || estimates.length) {
-            const durationText = durations.length ? numberHours(duration) : '';
-            const estimateText = estimates.length ? `<span>${durations.length ? '/ ' : ''}예상 ${numberHours(estimate)}</span>` : '';
-            modeSummary = `<span class="summary-divider">·</span><span class="time-summary">${durationText} ${estimateText}</span>`;
+          if (state.workView === 'memo') {
+            const memoCount = items.filter(task => task.memo.trim()).length;
+            modeSummary = `<span class="summary-divider">·</span><span class="time-summary">메모 ${memoCount}건</span>`;
+          } else {
+            const durations = items.map(progressOf).filter(value => value !== null);
+            const estimates = items.map(task => task.est).filter(value => value !== null);
+            const duration = durations.reduce((sum, value) => sum + value, 0);
+            const estimate = estimates.reduce((sum, value) => sum + value, 0);
+            if (durations.length || estimates.length) {
+              const durationText = durations.length ? numberHours(duration) : '';
+              const estimateText = estimates.length ? `<span>${durations.length ? '/ ' : ''}예상 ${numberHours(estimate)}</span>` : '';
+              modeSummary = `<span class="summary-divider">·</span><span class="time-summary">${durationText} ${estimateText}</span>`;
+            }
           }
         } else {
           const rolled = items.filter(task => task.rolledFrom).length;
           modeSummary = rolled ? `<span class="summary-divider">·</span><span>↷ 넘어온 <strong>${rolled}</strong>건</span>` : '';
         }
-        cardHeader.innerHTML = `<div class="date-side">${datePieces}</div><div class="summary-side">${count}${modeSummary}</div>`;
+        cardHeader.innerHTML = `<div class="date-side">${datePieces}</div><div class="summary-side">${count}${modeSummary}${viewToggle}</div>`;
       }
 
       function cellActive(id, field) {
@@ -1211,6 +1252,9 @@
       }
 
       function mobileWorkMeta(task, status, progress, estimate) {
+        if (state.workView === 'memo') {
+          return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span><span class="mobile-work-meta times memo-view">${memoCell(task)}</span>`;
+        }
         return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span>
           <span class="mobile-work-meta times"><span>목표</span>${dueCell(task)}<span>·</span>${timeCell(task, 'start')}<span>–</span>${timeCell(task, 'end')}<span>· 진행</span>${hourButton(task, 'progress', progress)}<span>/ 예상</span>${hourButton(task, 'est', estimate)}</span>`;
       }
@@ -1218,17 +1262,15 @@
       function workRow(task, draft = false) {
         const progress = progressOf(task);
         const status = statusMeta(task);
+        const memoView = state.workView === 'memo';
         const tag = draft ? 'form' : 'article';
         const draftAttr = draft ? ' data-quick-add-form' : '';
-        return `<${tag} class="task-row work ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+        return `<${tag} class="task-row work ${memoView ? 'view-memo' : 'view-time'} ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
           ${dueCell(task)}
-          ${timeCell(task, 'start')}
-          ${timeCell(task, 'end')}
-          ${hourButton(task, 'progress', progress)}
-          ${hourButton(task, 'est', task.est)}
+          ${memoView ? memoCell(task) : `${timeCell(task, 'start')}${timeCell(task, 'end')}${hourButton(task, 'progress', progress)}${hourButton(task, 'est', task.est)}`}
           ${statusButton(task, status)}
           ${completionButton(task)}
           ${deleteButton(task)}
@@ -1256,7 +1298,10 @@
 
       function columnHead(mode) {
         if (mode === 'work') {
-          return `<div class="column-head work" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>업무명<button class="column-resize-handle" type="button" data-column-resize="work" aria-label="업무명 열 너비 조절" aria-valuemin="20" aria-valuemax="82"></button></span><span class="numeric" data-column-detail>목표</span><span class="numeric" data-column-detail>시작</span><span class="numeric" data-column-detail>종료</span><span class="numeric" data-column-detail>진행</span><span class="numeric" data-column-detail>예상</span><span data-column-detail>상태</span><span></span><span></span></div>`;
+          if (state.workView === 'memo') {
+            return `<div class="column-head work view-memo" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>업무명<button class="column-resize-handle" type="button" data-column-resize="work" aria-label="업무명 열 너비 조절" aria-valuemin="20" aria-valuemax="82"></button></span><span class="numeric" data-column-detail>목표</span><span data-column-detail>메모</span><span data-column-detail>상태</span><span></span><span></span></div>`;
+          }
+          return `<div class="column-head work view-time" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>업무명<button class="column-resize-handle" type="button" data-column-resize="work" aria-label="업무명 열 너비 조절" aria-valuemin="20" aria-valuemax="82"></button></span><span class="numeric" data-column-detail>목표</span><span class="numeric" data-column-detail>시작</span><span class="numeric" data-column-detail>종료</span><span class="numeric" data-column-detail>진행</span><span class="numeric" data-column-detail>예상</span><span data-column-detail>상태</span><span></span><span></span></div>`;
         }
         return `<div class="column-head life" data-worklog-head><span>구분</span><span>Q</span><span class="title-column-head" data-column-title>할 일<button class="column-resize-handle" type="button" data-column-resize="life" aria-label="할 일 열 너비 조절" aria-valuemin="25" aria-valuemax="75"></button></span><span class="numeric">목표</span><span data-column-detail>메모</span><span></span><span></span></div>`;
       }
@@ -1639,6 +1684,17 @@
           ui.selectedDate = previousDate;
           Object.assign(ui, previousUi);
         } else rememberView();
+      });
+
+      cardHeader.addEventListener('click', event => {
+        const button = event.target.closest('[data-work-view]');
+        if (!button || state.mode !== 'work') return;
+        const nextView = button.dataset.workView;
+        if (!['time','memo'].includes(nextView) || nextView === state.workView) return;
+        if (!drainPendingSync()) return;
+        resetTransient();
+        const saved = mutate(fresh => { fresh.workView = nextView; return fresh; });
+        if (saved) announce(`${nextView === 'memo' ? '메모' : '시간'} 보기로 전환했습니다.`);
       });
 
       previousDay.addEventListener('click', () => changeDate(-1));

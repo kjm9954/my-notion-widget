@@ -1024,6 +1024,7 @@ function normalizeWorklogLastUsed(raw) {
 function defaultWorklogState() {
   return {
     mode: "work",
+    workView: "time",
     tasks: [],
     projects: [],
     lastRollWeek: "",
@@ -1038,7 +1039,7 @@ function defaultWorklogState() {
   };
 }
 
-function normalizeWorklogState(raw) {
+export function normalizeWorklogState(raw) {
   const source = raw && typeof raw === "object" ? raw : {};
   const ids = new Set();
   const tasks = (Array.isArray(source.tasks) ? source.tasks : []).map(value => {
@@ -1106,6 +1107,7 @@ function normalizeWorklogState(raw) {
   }
   return {
     mode: source.mode === "life" ? "life" : "work",
+    workView: source.workView === "memo" ? "memo" : "time",
     tasks,
     projects,
     lastRollWeek: weekKey(source.lastRollWeek),
