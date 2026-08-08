@@ -19,6 +19,11 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /function renderWorkView\(\)/);
   assert.match(html, /requestRevision !== localRevision/);
   assert.match(html, /requestId !== syncRequestId/);
+  assert.match(html, /class="due-cell"/);
+  assert.match(html, /class="meta-rule"/);
+  assert.match(html, /class="meta-label">메모/);
+  assert.match(html, /-webkit-line-clamp:2/);
+  assert.match(html, /\.task-row\.work\.view-memo \{ grid-template-columns:minmax\(0,1fr\) 44px 40px; \}/);
 });
 
 test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으로 오인하지 않음", async () => {
