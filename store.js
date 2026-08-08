@@ -17,17 +17,24 @@ function readWidgetInstanceId() {
 const RAW_INSTANCE_ID = readWidgetInstanceId();
 const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID : "";
 const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
+const STORE_CACHE = "notion-widget-store-cache-v1";
+const CACHE_WAIT_MS = 180;
 const storeListeners = new Set();
+const memoryCache = new Map();
+const inFlightGets = new Map();
 let storeChannel = null;
+
+function notifyStoreListeners() {
+  storeListeners.forEach(listener => listener());
+}
 
 try {
   storeChannel = new BroadcastChannel(STORE_CHANNEL);
-  storeChannel.addEventListener("message", () => {
-    storeListeners.forEach(listener => listener());
-  });
+  storeChannel.addEventListener("message", notifyStoreListeners);
 } catch (_) {}
 
 function announceChange(path) {
+  notifyStoreListeners();
   try { storeChannel?.postMessage({ type: "changed", path, at: Date.now() }); } catch (_) {}
 }
 
@@ -47,9 +54,14 @@ function watch(callback, interval = 3000) {
   };
   storeListeners.add(run);
   const timer = setInterval(run, Math.max(1000, Number(interval) || 3000));
+  const onVisible = () => { if (!document.hidden) run(); };
+  window.addEventListener("focus", run);
+  document.addEventListener("visibilitychange", onVisible);
   const stop = () => {
     clearInterval(timer);
     storeListeners.delete(run);
+    window.removeEventListener("focus", run);
+    document.removeEventListener("visibilitychange", onVisible);
   };
   window.addEventListener("pagehide", stop, { once: true });
   return stop;
@@ -63,20 +75,100 @@ function apiUrl(path, includeInstance = true) {
   return url.toString();
 }
 
+function parseCached(serialized) {
+  try {
+    const data = JSON.parse(serialized);
+    return data && data.ok ? data : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function cloneData(data) {
+  if (typeof structuredClone === "function") return structuredClone(data);
+  return JSON.parse(JSON.stringify(data));
+}
+
+async function readCached(url) {
+  const inMemory = memoryCache.get(url);
+  if (inMemory) {
+    const data = parseCached(inMemory);
+    if (data) return { data, serialized: inMemory };
+    memoryCache.delete(url);
+  }
+
+  if (!("caches" in window)) return null;
+  try {
+    const cache = await caches.open(STORE_CACHE);
+    const response = await cache.match(url);
+    if (!response) return null;
+    const serialized = await response.text();
+    const data = parseCached(serialized);
+    if (!data) {
+      await cache.delete(url);
+      return null;
+    }
+    memoryCache.set(url, serialized);
+    return { data, serialized };
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeCached(url, data, serialized = JSON.stringify(data)) {
+  memoryCache.set(url, serialized);
+  if (!("caches" in window)) return;
+  void caches.open(STORE_CACHE).then(cache => cache.put(url, new Response(serialized, {
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  }))).catch(() => {});
+}
+
+function requestFresh(path, url, cachedPromise) {
+  if (inFlightGets.has(url)) return inFlightGets.get(url);
+
+  const request = fetch(url, { cache: "no-store" }).then(async res => {
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
+    const serialized = JSON.stringify(data);
+    const cached = await cachedPromise;
+    const changed = Boolean(cached && cached.serialized !== serialized);
+    writeCached(url, data, serialized);
+    if (changed) announceChange(path);
+    return data;
+  }).finally(() => {
+    inFlightGets.delete(url);
+  });
+
+  inFlightGets.set(url, request);
+  return request;
+}
+
 async function apiGet(path) {
-  const res = await fetch(apiUrl(path));
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || "요청 실패");
-  return data;
+  const url = apiUrl(path);
+  const cachedPromise = readCached(url);
+  const freshPromise = requestFresh(path, url, cachedPromise);
+  const cached = await cachedPromise;
+
+  if (!cached) return cloneData(await freshPromise);
+
+  const result = await Promise.race([
+    freshPromise.then(data => ({ type: "fresh", data }), error => ({ type: "error", error })),
+    new Promise(resolve => setTimeout(() => resolve({ type: "cached" }), CACHE_WAIT_MS)),
+  ]);
+
+  if (result.type === "fresh") return cloneData(result.data);
+  return cloneData(cached.data);
 }
 async function apiPost(path, body, includeInstance = true) {
-  const res = await fetch(apiUrl(path, includeInstance), {
+  const url = apiUrl(path, includeInstance);
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error || "요청 실패");
+  if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
+  if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
   announceChange(path);
   return data;
 }
