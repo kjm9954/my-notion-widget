@@ -17,6 +17,8 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /메모 \$\{memoCount\}건/);
   assert.match(html, /Store\.saveWorklogView\(view\)/);
   assert.match(html, /function renderWorkView\(\)/);
+  assert.match(html, /requestRevision !== localRevision/);
+  assert.match(html, /requestId !== syncRequestId/);
 });
 
 test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으로 오인하지 않음", async () => {

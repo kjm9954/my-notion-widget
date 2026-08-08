@@ -485,6 +485,8 @@
       let columnSaveTimer = 0;
       let activeDayKey = localDateKey(todayDate());
       let timeTitleMeasurement = null;
+      let localRevision = 0;
+      let syncRequestId = 0;
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -689,6 +691,7 @@
         const normalized = normalizeState(next);
         state = normalized;
         const snapshot = normalizeState(normalized);
+        localRevision += 1;
         saveQueue = saveQueue
           .then(() => Store.saveWorklogState(snapshot))
           .catch(error => {
@@ -874,6 +877,7 @@
         const minimum = mode === 'work' ? .2 : .25;
         const maximum = mode === 'work' ? .82 : .75;
         const next = normalizeSplit(value,DEFAULT_COLUMN_SPLIT[mode],minimum,maximum);
+        localRevision += 1;
         saveQueue = saveQueue
           .then(() => Store.saveWorklogColumnSplit(mode,next))
           .catch(error => {
@@ -1526,6 +1530,7 @@
       }
 
       function persistWorkView(view) {
+        localRevision += 1;
         saveQueue = saveQueue
           .then(() => Store.saveWorklogView(view))
           .catch(error => {
@@ -2159,6 +2164,8 @@
       });
 
       async function syncFromServer(resetToToday = false) {
+        const requestId = ++syncRequestId;
+        const requestRevision = localRevision;
         let loaded;
         try {
           await saveQueue;
@@ -2170,6 +2177,7 @@
           renderAll();
           return;
         }
+        if (requestId !== syncRequestId || requestRevision !== localRevision) return;
         if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover || ui.columnResize || ui.longPress || ui.rowDrag) {
           if (JSON.stringify(loaded) !== JSON.stringify(state)) {
             pendingExternalSync = true;
