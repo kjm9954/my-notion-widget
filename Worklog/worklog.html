@@ -1032,7 +1032,10 @@
         const row = event.target.closest('.task-row[data-task-id]:not(.quick-add-row)');
         if (!row) return;
         cancelLongPress();
-        const press = { pointerId:event.pointerId, row, taskId:row.dataset.taskId, startX:event.clientX, startY:event.clientY, timer:0 };
+        const press = {
+          pointerId:event.pointerId, pointerType:event.pointerType || 'mouse', row, taskId:row.dataset.taskId,
+          startX:event.clientX, startY:event.clientY, timer:0
+        };
         press.timer = window.setTimeout(() => activateRowDrag(press),420);
         ui.longPress = press;
       }
@@ -1061,7 +1064,16 @@
         }
         const press = ui.longPress;
         if (!press || press.pointerId !== event.pointerId) return;
-        if (Math.hypot(event.clientX - press.startX,event.clientY - press.startY) > 7) cancelLongPress();
+        const distance = Math.hypot(event.clientX - press.startX,event.clientY - press.startY);
+        if (distance <= 7) return;
+        // 마우스는 누른 채 끌기 시작해도 바로 재정렬로 이어지고,
+        // 손가락은 작은 떨림 때문에 420ms 길게 누르기가 취소되지 않게 여유를 둔다.
+        if (press.pointerType === 'mouse' && event.buttons === 1) {
+          activateRowDrag(press);
+          updateRowDrop(event);
+          return;
+        }
+        if (distance > 18) cancelLongPress();
       }
 
       function finishRowDrag(event, cancelled = false) {
@@ -1968,6 +1980,10 @@
       taskList.addEventListener('touchmove', event => {
         if (ui.rowDrag) event.preventDefault();
       },{ passive:false });
+      taskList.addEventListener('contextmenu', event => {
+        if (!event.target.closest('.task-row[data-task-id]:not(.quick-add-row)')) return;
+        if (ui.longPress || ui.rowDrag) event.preventDefault();
+      });
       document.addEventListener('pointermove', event => {
         moveColumnResize(event);
         moveLongPress(event);
