@@ -44,6 +44,26 @@ test("업무 모드는 주말에 금요일 날짜를 유지한다", () => {
   assert.equal(rolled.state.tasks[0].date,"2026-08-07");
 });
 
+test("오늘 이전의 미완료 항목만 이월하고 미래에 미리 쓴 항목은 건드리지 않는다", () => {
+  const mondayCutoff = new Date("2026-08-09T21:00:00.000Z"); // 서울 월요일 06:00
+  const rolled = rollWorklogState({
+    tasks:[
+      { id:"work-open", mode:"work", date:"2026-08-07", proj:"미분류", title:"금요일 미완료", status:"wait", done:false },
+      { id:"work-future", mode:"work", date:"2026-08-11", proj:"미분류", title:"화요일 미리 작성", status:"wait", done:false },
+      { id:"life-open", mode:"life", date:"2026-08-09", proj:"미분류", title:"일요일 미완료", status:"wait", done:false },
+      { id:"life-future", mode:"life", date:"2026-08-11", proj:"미분류", title:"화요일 일상 미리 작성", status:"wait", done:false },
+    ],
+  },mondayCutoff);
+
+  assert.equal(rolled.moved,2);
+  assert.equal(rolled.state.tasks.find(task => task.id === "work-open").date,"2026-08-10");
+  assert.equal(rolled.state.tasks.find(task => task.id === "life-open").date,"2026-08-10");
+  assert.equal(rolled.state.tasks.find(task => task.id === "work-future").date,"2026-08-11");
+  assert.equal(rolled.state.tasks.find(task => task.id === "life-future").date,"2026-08-11");
+  assert.equal(rolled.state.tasks.find(task => task.id === "work-future").rolledFrom,null);
+  assert.equal(rolled.state.tasks.find(task => task.id === "life-future").rolledFrom,null);
+});
+
 test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함", async () => {
   const html = await readFile(new URL("../Worklog/worklog.html", import.meta.url), "utf8");
   assert.match(html, /data-work-view="time"/);

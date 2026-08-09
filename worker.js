@@ -1194,7 +1194,7 @@ async function loadImportantCalendarState(env) {
   return normalizeImportantCalendarState(await loadSetting(env, "importantCalendar", { tasks: [] }));
 }
 
-function normalizeWeeklyGoalsState(raw) {
+export function normalizeWeeklyGoalsState(raw) {
   const source = raw && typeof raw === "object" ? raw : {};
   let seq = Number.isFinite(Number(source.seq)) ? Math.max(0, Math.floor(Number(source.seq))) : 0;
   const ids = new Set();
@@ -1207,11 +1207,18 @@ function normalizeWeeklyGoalsState(raw) {
     if (!text || !["work", "life"].includes(value?.m)) return null;
     return { id, m: value.m, done: value?.done === true, text };
   }).filter(Boolean).slice(0, 5);
-  return { week: cleanText(source.week, 24), items, seq };
+  return {
+    week: cleanText(source.week, 24),
+    items,
+    seq,
+    carryHandledWeek: cleanText(source.carryHandledWeek, 24),
+  };
 }
 
 async function loadWeeklyGoalsState(env) {
-  return normalizeWeeklyGoalsState(await loadSetting(env, "weeklyGoals", { week: "", items: [], seq: 0 }));
+  return normalizeWeeklyGoalsState(await loadSetting(env, "weeklyGoals", {
+    week: "", items: [], seq: 0, carryHandledWeek: "",
+  }));
 }
 
 function normalizeNotesState(raw) {

@@ -157,6 +157,56 @@
     .empty-title { color:var(--title); font-size:12px; font-weight:800; line-height:1.3; }
     .empty-copy { color:var(--muted); font-size:10px; font-weight:600; line-height:1.4; }
 
+    /* 새 주 이어가기 */
+    .carry-overlay {
+      position:absolute; inset:0; z-index:5; overflow:hidden;
+      padding:16px; display:flex; flex-direction:column; gap:12px;
+      border-radius:18px; background:var(--surface);
+    }
+    .carry-overlay[hidden] { display:none; }
+    .carry-head { display:flex; align-items:center; gap:6px; }
+    .carry-title { margin:0; font-size:12px; font-weight:800; color:var(--title); }
+    .carry-date { margin-left:auto; font-size:10px; font-weight:700; color:var(--faint); }
+    .carry-note {
+      padding:10px 12px; border-radius:11px; background:var(--surface-soft);
+      border:1px solid var(--field-border);
+    }
+    .carry-note p { margin:0; font-size:11.5px; font-weight:700; line-height:1.5; color:var(--title); }
+    .carry-list {
+      flex:1; min-height:0; display:flex; flex-direction:column; gap:5px;
+      overflow-y:auto; overscroll-behavior:contain;
+    }
+    .carry-item {
+      width:100%; display:flex; align-items:center; gap:8px; padding:8px 9px;
+      border:0; border-radius:9px; background:var(--surface); text-align:left;
+      box-shadow:0 1px 2px rgba(18,48,60,.05); cursor:pointer;
+    }
+    .carry-check {
+      flex:0 0 auto; width:17px; height:17px; display:grid; place-items:center;
+      border:1.5px solid var(--inactive); border-radius:5px; color:transparent;
+      font-size:10px; font-weight:800;
+    }
+    .carry-item.is-picked .carry-check { border-color:var(--action); background:var(--action); color:var(--surface); }
+    .carry-item-text {
+      flex:1; min-width:0; font-size:11px; font-weight:600; color:var(--text);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .carry-item:not(.is-picked) .carry-item-text { color:var(--secondary); }
+    .carry-actions { margin-top:auto; display:flex; gap:8px; }
+    .carry-skip {
+      flex:0 0 auto; min-height:36px; padding:0 14px; border:1px solid var(--border);
+      border-radius:10px; background:var(--surface); color:var(--secondary);
+      font-size:11px; font-weight:700; cursor:pointer;
+    }
+    .carry-go {
+      flex:1; min-height:36px; border:0; border-radius:10px;
+      background:var(--action); color:var(--surface); font-size:11.5px;
+      font-weight:800; cursor:pointer;
+    }
+    .carry-item:focus-visible,
+    .carry-skip:focus-visible,
+    .carry-go:focus-visible { outline:2px solid var(--action); outline-offset:2px; }
+
     /* 넓은 규격 (컨테이너 ≥ 400) */
     .goals-card.is-wide .rate-done { font-size:15px; }
     .goals-card.is-wide .rate-cells { flex:1; margin-left:auto; gap:6px; }
@@ -211,6 +261,19 @@
         </div>
         <div class="goals-list" id="goalsList"></div>
       </div>
+      <div class="carry-overlay" id="carryOverlay" role="dialog" aria-modal="true"
+        aria-labelledby="carryTitle" aria-hidden="true" hidden>
+        <div class="carry-head">
+          <h2 class="carry-title" id="carryTitle">새 주가 시작됐어요</h2>
+          <span class="carry-date" id="carryDate"></span>
+        </div>
+        <div class="carry-note"><p id="carryNote"></p></div>
+        <div class="carry-list" id="carryList"></div>
+        <div class="carry-actions">
+          <button class="carry-skip" type="button" data-carry-skip>건너뛰기</button>
+          <button class="carry-go" id="carryGo" type="button" data-carry-go></button>
+        </div>
+      </div>
       <button class="widget-list-resize-handle" data-widget-list-handle type="button"
         aria-label="목표 목록 세로 크기 조절" aria-valuemin="120"></button>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
@@ -238,6 +301,11 @@
       var rateNote = document.getElementById('rateNote');
       var rateCells = document.getElementById('rateCells');
       var list = document.getElementById('goalsList');
+      var carryOverlay = document.getElementById('carryOverlay');
+      var carryDate = document.getElementById('carryDate');
+      var carryNote = document.getElementById('carryNote');
+      var carryList = document.getElementById('carryList');
+      var carryGo = document.getElementById('carryGo');
 
       var mode = 'work';
       var observer = null;
@@ -245,7 +313,9 @@
       var draft = '';
       var editingId = null;
       var editDraft = '';
-      var state = { week: '', items: [], seq: 0 };
+      var state = { week: '', items: [], seq: 0, carryHandledWeek: '' };
+      var carryPrompt = null;
+      var rolloverNeedsSave = false;
       var saveQueue = Promise.resolve();
       var syncRequestId = 0;
       var localRevision = 0;
@@ -258,24 +328,52 @@
         return d;
       }
       function weekKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
-      /* ── 저장소 ───────────────────────────── */
-      async function load() {
-        var monday = mondayOf(new Date());
-        var key = weekKey(monday);
-        var next = { week: key, items: [], seq: 0 };
-        var saved = await Store.loadWeeklyGoalsState();
-        if (!saved || typeof saved !== 'object') return next;
-        if (saved.week !== key) return next;
+      function formatCarryDate(d) {
+        var weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+        return (d.getMonth() + 1) + '/' + d.getDate() + ' (' + weekdays[d.getDay()] + ')';
+      }
+      function readSavedItems(saved) {
         var items = Array.isArray(saved.items) ? saved.items : [];
-        next.items = items.filter(function (it) {
+        var parsed = items.filter(function (it) {
           return it && typeof it.text === 'string' && it.text !== '' && (it.m === 'work' || it.m === 'life');
         }).slice(0, MAX).map(function (it) {
           return { id: Number(it.id) || 0, m: it.m, done: it.done === true, text: it.text };
         });
-        next.seq = Number(saved.seq) || 0;
-        next.items.forEach(function (it) {
-          if (!it.id || it.id > next.seq) { next.seq += 1; it.id = next.seq; }
+        var seq = Number(saved.seq) || 0;
+        parsed.forEach(function (it) {
+          if (!it.id || it.id > seq) { seq += 1; it.id = seq; }
         });
+        return { items: parsed, seq: seq };
+      }
+      /* ── 저장소 ───────────────────────────── */
+      async function load() {
+        var monday = mondayOf(new Date());
+        var key = weekKey(monday);
+        var next = { week: key, items: [], seq: 0, carryHandledWeek: '' };
+        carryPrompt = null;
+        rolloverNeedsSave = false;
+        var saved = await Store.loadWeeklyGoalsState();
+        if (!saved || typeof saved !== 'object') return next;
+        next.carryHandledWeek = typeof saved.carryHandledWeek === 'string' ? saved.carryHandledWeek : '';
+        var parsed = readSavedItems(saved);
+        if (saved.week !== key) {
+          var unfinished = parsed.items.filter(function (it) { return it.done !== true; });
+          if (saved.week && unfinished.length && next.carryHandledWeek !== key) {
+            carryPrompt = {
+              week: key,
+              monday: monday,
+              total: parsed.items.length,
+              items: unfinished.map(function (it, index) {
+                return { index: index, m: it.m, text: it.text, picked: true };
+              })
+            };
+          } else {
+            rolloverNeedsSave = true;
+          }
+          return next;
+        }
+        next.items = parsed.items;
+        next.seq = parsed.seq;
         return next;
       }
 
@@ -298,7 +396,7 @@
       }
 
       async function syncFromServer() {
-        if (adding || editingId !== null) return;
+        if (adding || editingId !== null || carryPrompt !== null) return;
         var requestId = ++syncRequestId;
         var requestRevision = localRevision;
         try {
@@ -308,6 +406,18 @@
           if (retryTimer !== null) {
             window.clearTimeout(retryTimer);
             retryTimer = null;
+          }
+          if (carryPrompt !== null) {
+            state = next;
+            render(false);
+            return;
+          }
+          if (rolloverNeedsSave) {
+            rolloverNeedsSave = false;
+            state = next;
+            save();
+            render(false);
+            return;
           }
           if (JSON.stringify(next) === JSON.stringify(state)) return;
           state = next;
@@ -348,6 +458,28 @@
           var cls = 'rate-cell is-' + it.m + (it.m === mode ? '' : ' is-off');
           return '<span class="' + cls + '"></span>';
         }).join('');
+      }
+
+      function renderCarryOverlay() {
+        if (carryPrompt === null) {
+          carryOverlay.hidden = true;
+          carryOverlay.setAttribute('aria-hidden', 'true');
+          carryList.innerHTML = '';
+          return;
+        }
+        carryOverlay.hidden = false;
+        carryOverlay.setAttribute('aria-hidden', 'false');
+        carryDate.textContent = formatCarryDate(carryPrompt.monday);
+        carryNote.innerHTML = '지난주 목표 <b>' + carryPrompt.total + '개 중 ' + carryPrompt.items.length +
+          '개</b>를 못 끝냈어요.<br>이번 주로 가져올 것만 골라주세요.';
+        carryList.innerHTML = carryPrompt.items.map(function (it) {
+          return '<button class="carry-item' + (it.picked ? ' is-picked' : '') + '" type="button"' +
+            ' data-carry-index="' + it.index + '" aria-pressed="' + (it.picked ? 'true' : 'false') + '">' +
+            '<span class="carry-check">' + (it.picked ? '✓' : '') + '</span>' +
+            '<span class="carry-item-text">' + esc(it.text) + '</span></button>';
+        }).join('');
+        var picked = carryPrompt.items.filter(function (it) { return it.picked; }).length;
+        carryGo.textContent = picked ? picked + '개 가져오고 시작' : '가져오지 않고 시작';
       }
 
       function itemMarkup(it) {
@@ -413,6 +545,7 @@
             editInput.setSelectionRange(editInput.value.length, editInput.value.length);
           }
         }
+        renderCarryOverlay();
       }
 
       /* ── 동작 ───────────────────────────── */
@@ -490,6 +623,25 @@
         render(false);
       }
 
+      function finishCarry(importPicked) {
+        if (carryPrompt === null) return;
+        var handledWeek = carryPrompt.week;
+        var selected = importPicked
+          ? carryPrompt.items.filter(function (it) { return it.picked; })
+          : [];
+        var available = Math.max(0, MAX - state.items.length);
+        selected.slice(0, available).forEach(function (it) {
+          state.seq += 1;
+          state.items.push({ id: state.seq, m: it.m, done: false, text: it.text });
+        });
+        state.week = handledWeek;
+        state.carryHandledWeek = handledWeek;
+        carryPrompt = null;
+        rolloverNeedsSave = false;
+        save();
+        render(false);
+      }
+
       seg.addEventListener('click', function (e) {
         var tab = e.target.closest('.mode-pill');
         if (!tab) return;
@@ -543,6 +695,19 @@
         else if (e.target.id === 'goalEdit') editDraft = e.target.value;
       });
 
+      carryOverlay.addEventListener('click', function (e) {
+        var item = e.target.closest('[data-carry-index]');
+        if (item && carryPrompt !== null) {
+          var index = Number(item.getAttribute('data-carry-index'));
+          var target = carryPrompt.items.filter(function (it) { return it.index === index; })[0];
+          if (target) target.picked = !target.picked;
+          renderCarryOverlay();
+          return;
+        }
+        if (e.target.closest('[data-carry-skip]')) { finishCarry(false); return; }
+        if (e.target.closest('[data-carry-go]')) { finishCarry(true); }
+      });
+
       /* ── 컨테이너 폭 ───────────────────────── */
       function applyWidth() {
         var w = wrap.clientWidth || card.clientWidth;
@@ -553,7 +718,7 @@
         }
       }
 
-      state = { week: weekKey(mondayOf(new Date())), items: [], seq: 0 };
+      state = { week: weekKey(mondayOf(new Date())), items: [], seq: 0, carryHandledWeek: '' };
       render(false);
       list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오는 중입니다</strong><span class="empty-copy">이번 주 목표를 확인하고 있어요</span></div>';
       applyWidth();
