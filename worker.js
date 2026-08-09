@@ -1,11 +1,14 @@
 import {
   NOTION_API_VERSION,
+  addDateKeyDays,
   currentSkippableOccurrence,
   dueOccurrence,
   expiredSkipAction,
   normalizeScheduleInput,
+  seoulDateKey,
   seoulDateTimeToMs,
   upcomingOccurrences,
+  weekdayOfDateKey,
 } from "./schedule-core.js";
 
 export default {
@@ -1135,8 +1138,32 @@ export function normalizeWorklogState(raw) {
   };
 }
 
+export function rollWorklogState(raw, now = Date.now()) {
+  const state = normalizeWorklogState(raw);
+  const currentDay = seoulDateKey(Number(now instanceof Date ? now.getTime() : now) - 6 * 60 * 60 * 1000);
+  const weekday = weekdayOfDateKey(currentDay);
+  const currentWorkDay = weekday === 6 ? addDateKeyDays(currentDay,-1)
+    : weekday === 7 ? addDateKeyDays(currentDay,-2)
+      : currentDay;
+  const dayChanged = state.lastRollDay !== currentDay;
+  let moved = 0;
+  state.tasks = state.tasks.map(task => {
+    const targetDay = task.mode === "work" ? currentWorkDay : currentDay;
+    if (task.done || task.date >= targetDay) return task;
+    moved += 1;
+    return { ...task, date:targetDay, rolledFrom:task.date };
+  });
+  if (!dayChanged && !moved) return { state, changed:false, moved:0 };
+  state.lastRollDay = currentDay;
+  state.lastRollCount = dayChanged ? moved : state.lastRollCount + moved;
+  state.bannerDismissedDay = "";
+  return { state, changed:true, moved };
+}
+
 async function loadWorklogState(env) {
-  return normalizeWorklogState(await loadSetting(env, "worklog", defaultWorklogState()));
+  const rolled = rollWorklogState(await loadSetting(env, "worklog", defaultWorklogState()));
+  if (rolled.changed) await saveSetting(env, "worklog", rolled.state);
+  return rolled.state;
 }
 
 function normalizeImportantCalendarState(raw) {

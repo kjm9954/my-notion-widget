@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { normalizeWorklogState } from "../worker.js";
+import { normalizeWorklogState, rollWorklogState } from "../worker.js";
 
 test("업무 보기 상태는 시간 기본값과 메모 값만 허용", () => {
   assert.equal(normalizeWorklogState({}).workView, "time");
@@ -17,6 +17,31 @@ test("업무일지의 일일 이월 날짜는 서버 저장 과정에서 유지�
   assert.equal(normalized.lastRollDay,"2026-08-09");
   assert.equal(normalized.bannerDismissedDay,"2026-08-08");
   assert.equal(normalizeWorklogState({ lastRollDay:"2026-99-99" }).lastRollDay,"");
+});
+
+test("일상 모드의 토요일 미완료 항목은 일요일 오전 6시 이후 이월된다", () => {
+  const beforeCutoff = new Date("2026-08-08T20:00:00.000Z"); // 서울 일요일 05:00
+  const afterCutoff = new Date("2026-08-08T21:00:00.000Z"); // 서울 일요일 06:00
+  const source = {
+    tasks:[
+      { id:"life-open", mode:"life", date:"2026-08-08", proj:"미분류", title:"미완료", status:"wait", done:false },
+      { id:"life-done", mode:"life", date:"2026-08-08", proj:"미분류", title:"완료", status:"done", done:true },
+    ],
+  };
+  assert.equal(rollWorklogState(source,beforeCutoff).state.tasks[0].date,"2026-08-08");
+  const rolled = rollWorklogState(source,afterCutoff);
+  assert.equal(rolled.moved,1);
+  assert.equal(rolled.state.tasks[0].date,"2026-08-09");
+  assert.equal(rolled.state.tasks[0].rolledFrom,"2026-08-08");
+  assert.equal(rolled.state.tasks[1].date,"2026-08-08");
+});
+
+test("업무 모드는 주말에 금요일 날짜를 유지한다", () => {
+  const sundayMorning = new Date("2026-08-08T23:00:00.000Z"); // 서울 일요일 08:00
+  const rolled = rollWorklogState({
+    tasks:[{ id:"work-open", mode:"work", date:"2026-08-06", proj:"미분류", title:"업무", status:"wait", done:false }],
+  },sundayMorning);
+  assert.equal(rolled.state.tasks[0].date,"2026-08-07");
 });
 
 test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함", async () => {
