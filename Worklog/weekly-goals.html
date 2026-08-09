@@ -247,6 +247,9 @@
       var editDraft = '';
       var state = { week: '', items: [], seq: 0 };
       var saveQueue = Promise.resolve();
+      var syncRequestId = 0;
+      var localRevision = 0;
+      var retryTimer = null;
 
       /* ── 주 계산 ───────────────────────────── */
       function mondayOf(date) {
@@ -278,25 +281,43 @@
 
       function save() {
         var snapshot = JSON.parse(JSON.stringify(state));
+        localRevision += 1;
         saveQueue = saveQueue.then(function () {
           return Store.saveWeeklyGoalsState(snapshot);
         }).catch(function (error) {
           console.warn('이번 주 목표를 저장하지 못했습니다.', error);
-          list.innerHTML = '<div class="empty-state"><strong class="empty-title">저장하지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
         });
+      }
+
+      function scheduleRetry() {
+        if (retryTimer !== null) return;
+        retryTimer = window.setTimeout(function () {
+          retryTimer = null;
+          syncFromServer();
+        }, 1500);
       }
 
       async function syncFromServer() {
         if (adding || editingId !== null) return;
+        var requestId = ++syncRequestId;
+        var requestRevision = localRevision;
         try {
           await saveQueue;
           var next = await load();
+          if (requestId !== syncRequestId || requestRevision !== localRevision) return;
+          if (retryTimer !== null) {
+            window.clearTimeout(retryTimer);
+            retryTimer = null;
+          }
           if (JSON.stringify(next) === JSON.stringify(state)) return;
           state = next;
           render(false);
         } catch (error) {
           console.warn('이번 주 목표를 불러오지 못했습니다.', error);
-          list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
+          if (!state.items.length) {
+            list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오지 못했습니다</strong><span class="empty-copy">자동으로 다시 불러옵니다</span></div>';
+          }
+          scheduleRetry();
         }
       }
 
@@ -534,16 +555,10 @@
 
       state = { week: weekKey(mondayOf(new Date())), items: [], seq: 0 };
       render(false);
+      list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오는 중입니다</strong><span class="empty-copy">이번 주 목표를 확인하고 있어요</span></div>';
       applyWidth();
-      load().then(function (loaded) {
-        state = loaded;
-        save();
-        render(false);
-      }).catch(function (error) {
-        console.warn('이번 주 목표를 불러오지 못했습니다.', error);
-        list.innerHTML = '<div class="empty-state"><strong class="empty-title">불러오지 못했습니다</strong><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
-      });
-      Store.watch(syncFromServer);
+      syncFromServer();
+      Store.watch(syncFromServer,1500);
 
       // 임베드가 숨겨져 있으면 ResizeObserver 콜백이 돌지 않는다. resize도 함께 건다.
       if (typeof ResizeObserver === 'function') {
