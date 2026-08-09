@@ -9,6 +9,16 @@ test("업무 보기 상태는 시간 기본값과 메모 값만 허용", () => {
   assert.equal(normalizeWorklogState({ workView:"other" }).workView, "time");
 });
 
+test("업무일지의 일일 이월 날짜는 서버 저장 과정에서 유지된다", () => {
+  const normalized = normalizeWorklogState({
+    lastRollDay:"2026-08-09",
+    bannerDismissedDay:"2026-08-08",
+  });
+  assert.equal(normalized.lastRollDay,"2026-08-09");
+  assert.equal(normalized.bannerDismissedDay,"2026-08-08");
+  assert.equal(normalizeWorklogState({ lastRollDay:"2026-99-99" }).lastRollDay,"");
+});
+
 test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함", async () => {
   const html = await readFile(new URL("../Worklog/worklog.html", import.meta.url), "utf8");
   assert.match(html, /data-work-view="time"/);
@@ -19,6 +29,10 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /function renderWorkView\(\)/);
   assert.match(html, /requestRevision !== localRevision/);
   assert.match(html, /requestId !== syncRequestId/);
+  assert.match(html, /function rollDayIfNeeded\(\)/);
+  assert.match(html, /task\.date >= targetDay/);
+  assert.match(html, /function applyExternalCompletionState\(loaded\)/);
+  assert.match(html, /allowWhileEditing:true/);
   assert.match(html, /class="due-cell"/);
   assert.match(html, /class="meta-rule"/);
   assert.match(html, /class="meta-label">메모/);

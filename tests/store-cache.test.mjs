@@ -5,6 +5,11 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../store.js", import.meta.url), "utf8");
 
+test("업무일지는 입력 포커스 중에도 외부 동기화를 허용할 수 있다", () => {
+  assert.match(source,/function watch\(callback, interval = 3000, options = \{\}\)/);
+  assert.match(source,/!allowWhileEditing && active/);
+});
+
 function deferred() {
   let resolve;
   let reject;

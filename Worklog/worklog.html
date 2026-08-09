@@ -556,7 +556,7 @@
       function defaultState() {
         return {
           mode:'work', workView:'time', tasks:[], projects:[], lastRollWeek:isoWeekKey(todayDate()),
-          bannerDismissedWeek:'', lastRollCount:0,
+          bannerDismissedWeek:'', lastRollDay:'', bannerDismissedDay:'', lastRollCount:0,
           lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } },
           columnSplit:{ ...DEFAULT_COLUMN_SPLIT }, manualOrder:{}
         };
@@ -694,6 +694,8 @@
           projects,
           lastRollWeek:validWeekKey(raw.lastRollWeek) ? raw.lastRollWeek : fallback.lastRollWeek,
           bannerDismissedWeek:validWeekKey(raw.bannerDismissedWeek) ? raw.bannerDismissedWeek : '',
+          lastRollDay:parseDate(raw.lastRollDay) ? raw.lastRollDay : '',
+          bannerDismissedDay:parseDate(raw.bannerDismissedDay) ? raw.bannerDismissedDay : '',
           lastRollCount:Number.isFinite(Number(raw.lastRollCount)) ? Math.max(0, Math.floor(Number(raw.lastRollCount))) : 0,
           lastUsed,
           columnSplit:{
@@ -781,38 +783,32 @@
         return addDays(currentWeekStart, offset);
       }
 
-      function rollWeekIfNeeded() {
+      function rollDayIfNeeded() {
         const currentDate = todayDate();
+        const currentDay = localDateKey(currentDate);
+        const currentWorkDay = localDateKey(clampDateToMode(currentDate,'work'));
         const currentWeek = isoWeekKey(currentDate);
-        const currentStart = startOfWeek(currentDate);
-        const currentStartKey = localDateKey(currentStart);
         const fresh = readState();
-        if (fresh.lastRollWeek === currentWeek) {
-          state = fresh;
-          return true;
-        }
-        if (fresh.lastRollWeek > currentWeek) {
-          fresh.lastRollWeek = currentWeek;
-          fresh.lastRollCount = 0;
-          fresh.bannerDismissedWeek = '';
-          return persist(fresh);
-        }
+        const dayChanged = fresh.lastRollDay !== currentDay;
         let moved = 0;
         fresh.tasks = fresh.tasks.map(task => {
-          const cleared = { ...task, rolledFrom:null };
-          if (task.done || task.date >= currentStartKey) return cleared;
-          const source = parseDate(task.date);
-          if (!source) return cleared;
+          const targetDay = task.mode === 'work' ? currentWorkDay : currentDay;
+          if (task.done || task.date >= targetDay) return task;
           moved += 1;
           return {
-            ...cleared,
-            date:localDateKey(mapRolledDateToCurrentWeek(source, task.mode, currentStart)),
+            ...task,
+            date:targetDay,
             rolledFrom:task.date
           };
         });
+        if (!dayChanged && !moved) {
+          state = fresh;
+          return true;
+        }
         fresh.lastRollWeek = currentWeek;
-        fresh.lastRollCount = moved;
-        fresh.bannerDismissedWeek = '';
+        fresh.lastRollDay = currentDay;
+        fresh.lastRollCount = dayChanged ? moved : fresh.lastRollCount + moved;
+        if (dayChanged || moved) fresh.bannerDismissedDay = '';
         return persist(fresh);
       }
 
@@ -1218,16 +1214,16 @@
       }
 
       function renderBanner() {
-        const currentWeek = isoWeekKey(todayDate());
-        const visible = state.lastRollWeek === currentWeek && state.lastRollCount > 0 && state.bannerDismissedWeek !== currentWeek;
+        const currentDay = localDateKey(todayDate());
+        const visible = state.lastRollDay === currentDay && state.lastRollCount > 0 && state.bannerDismissedDay !== currentDay;
         card.classList.toggle('has-roll-banner', visible);
         rollBanner.hidden = !visible;
         if (!visible) {
           rollBanner.innerHTML = '';
           return;
         }
-        rollBanner.innerHTML = `<span class="banner-kicker">새 주가 시작됐습니다</span>
-          <span class="banner-copy">미완료 ${state.lastRollCount}건을 이번 주로 옮겼습니다</span>
+        rollBanner.innerHTML = `<span class="banner-kicker">새 하루가 시작됐습니다</span>
+          <span class="banner-copy">미완료 ${state.lastRollCount}건을 오늘로 옮겼습니다</span>
           <button class="banner-dismiss" type="button" data-dismiss-banner data-roll-dismiss>확인 ✕</button>`;
       }
 
@@ -1454,6 +1450,44 @@
         return state.tasks.find(item => item.id === id) || null;
       }
 
+      function applyExternalCompletionState(loaded) {
+        const remoteById = new Map(loaded.tasks.map(task => [task.id,task]));
+        const changedIds = [];
+        const tasks = state.tasks.map(task => {
+          const remote = remoteById.get(task.id);
+          if (!remote) return task;
+          const localDone = task.done || task.status === 'done';
+          const remoteDone = remote.done || remote.status === 'done';
+          if (localDone === remoteDone) return task;
+          changedIds.push(task.id);
+          return { ...task, done:remoteDone, status:remoteDone ? 'done' : remote.status };
+        });
+        if (!changedIds.length) return false;
+        state = normalizeState({ ...state, tasks });
+        changedIds.forEach(id => {
+          const task = taskById(id);
+          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
+          if (!task || !row) return;
+          row.classList.toggle('is-done',task.done);
+          const check = row.querySelector('[data-toggle-task]');
+          if (check) {
+            check.classList.toggle('is-done',task.done);
+            check.setAttribute('aria-checked',String(task.done));
+            check.setAttribute('aria-label',`${task.title || '새 항목'} ${task.done ? '완료 취소' : '완료'}`);
+            check.textContent = task.done ? '✓' : '';
+          }
+          const status = statusMeta(task);
+          row.querySelectorAll('[data-cell-field="status"]').forEach(button => {
+            button.className = `cell-button status-pill status-button ${status.className}`;
+            button.setAttribute('aria-label',`상태 변경, 현재 ${status.label}`);
+            button.textContent = status.label;
+          });
+        });
+        renderHeader(tasksFor(state.mode,ui.selectedDate));
+        announce('외부에서 바뀐 완료 상태를 반영했습니다.');
+        return true;
+      }
+
       function projectChoices(task) {
         const values = [task?.proj, ...(state.projects || []), state.lastUsed?.work?.proj, state.lastUsed?.life?.proj, ...state.tasks.map(item => item.proj)]
           .map(value => String(value || '').trim()).filter(Boolean);
@@ -1619,7 +1653,7 @@
         if (!pendingExternalSync) return true;
         if (pendingServerState) state = normalizeState(pendingServerState);
         pendingServerState = null;
-        if (!rollWeekIfNeeded()) return false;
+        if (!rollDayIfNeeded()) return false;
         pendingExternalSync = false;
         const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(), state.mode);
         ui.selectedDate = localDateKey(selected);
@@ -1983,7 +2017,7 @@
           return;
         }
         if (event.target.closest('[data-dismiss-banner]')) {
-          const saved = mutate(fresh => { fresh.bannerDismissedWeek = isoWeekKey(todayDate()); return fresh; }, false);
+          const saved = mutate(fresh => { fresh.bannerDismissedDay = localDateKey(todayDate()); return fresh; }, false);
           if (saved) renderBanner();
           return;
         }
@@ -2259,6 +2293,7 @@
         }
         if (requestId !== syncRequestId || requestRevision !== localRevision) return;
         if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover || ui.columnResize || ui.longPress || ui.rowDrag) {
+          applyExternalCompletionState(loaded);
           if (JSON.stringify(loaded) !== JSON.stringify(state)) {
             pendingExternalSync = true;
             pendingServerState = loaded;
@@ -2273,7 +2308,7 @@
         resetToToday = resetToToday || dayChanged;
         state = loaded;
         pendingServerState = null;
-        pendingExternalSync = !rollWeekIfNeeded();
+        pendingExternalSync = !rollDayIfNeeded();
         if (resetToToday) applyOpenDefaults();
         else {
           const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
@@ -2297,7 +2332,7 @@
       async function bootstrap() {
         liveRegion.textContent = '업무일지를 불러오는 중입니다.';
         await syncFromServer(true);
-        Store.watch(() => syncFromServer(false),3000);
+        Store.watch(() => syncFromServer(false),1500,{ allowWhileEditing:true });
       }
 
       bootstrap();

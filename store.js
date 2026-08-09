@@ -38,13 +38,14 @@ function announceChange(path) {
   try { storeChannel?.postMessage({ type: "changed", path, at: Date.now() }); } catch (_) {}
 }
 
-function watch(callback, interval = 3000) {
+function watch(callback, interval = 3000, options = {}) {
+  const allowWhileEditing = options?.allowWhileEditing === true;
   let running = false;
   let queued = false;
   const run = () => {
     if (document.hidden) return;
     const active = document.activeElement;
-    if (active && (active.matches("input, textarea, select") || active.isContentEditable)) return;
+    if (!allowWhileEditing && active && (active.matches("input, textarea, select") || active.isContentEditable)) return;
     if (running) { queued = true; return; }
     running = true;
     Promise.resolve(callback()).catch(() => {}).finally(() => {

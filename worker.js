@@ -1037,6 +1037,8 @@ function defaultWorklogState() {
     projects: [],
     lastRollWeek: "",
     bannerDismissedWeek: "",
+    lastRollDay: "",
+    bannerDismissedDay: "",
     lastRollCount: 0,
     lastUsed: {
       work: { proj: "미분류", q: null },
@@ -1079,6 +1081,7 @@ export function normalizeWorklogState(raw) {
     };
   }).filter(Boolean);
   const weekKey = value => /^\d{4}-W\d{2}$/.test(String(value || "")) ? String(value) : "";
+  const dayKey = value => validDateKey(value) ? String(value) : "";
   const lastUsed = {
     work: normalizeWorklogLastUsed(source.lastUsed?.work),
     life: normalizeWorklogLastUsed(source.lastUsed?.life),
@@ -1120,6 +1123,8 @@ export function normalizeWorklogState(raw) {
     projects,
     lastRollWeek: weekKey(source.lastRollWeek),
     bannerDismissedWeek: weekKey(source.bannerDismissedWeek),
+    lastRollDay: dayKey(source.lastRollDay),
+    bannerDismissedDay: dayKey(source.bannerDismissedDay),
     lastRollCount: Number.isFinite(Number(source.lastRollCount)) ? Math.max(0, Math.floor(Number(source.lastRollCount))) : 0,
     lastUsed,
     columnSplit: {
