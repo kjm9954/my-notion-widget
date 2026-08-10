@@ -9,6 +9,12 @@ test("업무 보기 상태는 시간 기본값과 메모 값만 허용", () => {
   assert.equal(normalizeWorklogState({ workView:"other" }).workView, "time");
 });
 
+test("업무일지 서버 revision은 정수로 보존", () => {
+  assert.equal(normalizeWorklogState({ revision:7 }).revision,7);
+  assert.equal(normalizeWorklogState({ revision:-3 }).revision,0);
+  assert.equal(normalizeWorklogState({ revision:"12" }).revision,12);
+});
+
 test("업무일지의 일일 이월 날짜는 서버 저장 과정에서 유지된다", () => {
   const normalized = normalizeWorklogState({
     lastRollDay:"2026-08-09",
@@ -71,6 +77,9 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /column-head work view-memo/);
   assert.match(html, /메모 \$\{memoCount\}건/);
   assert.match(html, /Store\.saveWorklogView\(view\)/);
+  assert.match(html, /Store\.patchWorklogState\(patch\)/);
+  assert.match(html, /Store\.loadWorklogState\(\{ fresh:true \}\)/);
+  assert.doesNotMatch(html, /Store\.saveWorklogState\(snapshot\)/);
   assert.match(html, /function renderWorkView\(\)/);
   assert.match(html, /requestRevision !== localRevision/);
   assert.match(html, /requestId !== syncRequestId/);

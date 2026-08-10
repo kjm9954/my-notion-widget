@@ -160,6 +160,11 @@ async function apiGet(path) {
   if (result.type === "fresh") return cloneData(result.data);
   return cloneData(cached.data);
 }
+async function apiGetFresh(path) {
+  const url = apiUrl(path);
+  const cachedPromise = readCached(url);
+  return cloneData(await requestFresh(path, url, cachedPromise));
+}
 async function apiPost(path, body, includeInstance = true) {
   const url = apiUrl(path, includeInstance);
   const res = await fetch(url, {
@@ -286,11 +291,19 @@ async function deleteIndexItem(id) {
 }
 
 // ───────── 업무일지 ─────────
-async function loadWorklogState() {
-  return (await apiGet("/api/worklog/state")).data;
+async function loadWorklogState(options = {}) {
+  const response = options?.fresh === true
+    ? await apiGetFresh("/api/worklog/state")
+    : await apiGet("/api/worklog/state");
+  return response.data;
 }
 async function saveWorklogState(state) {
   return (await apiPost("/api/worklog/state", state)).data;
+}
+async function patchWorklogState(patch) {
+  const data = (await apiPost("/api/worklog/patch", patch)).data;
+  writeCached(apiUrl("/api/worklog/state"), { ok: true, data });
+  return data;
 }
 async function saveWorklogView(view) {
   return (await apiPost("/api/worklog/view", { view })).data;
@@ -395,7 +408,7 @@ window.Store = {
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,
-  loadWorklogState, saveWorklogState, saveWorklogView, saveWorklogColumnSplit,
+  loadWorklogState, saveWorklogState, patchWorklogState, saveWorklogView, saveWorklogColumnSplit,
   loadImportantCalendarState, saveImportantCalendarState,
   loadWeeklyGoalsState, saveWeeklyGoalsState,
   loadNotesState, saveNotesState,

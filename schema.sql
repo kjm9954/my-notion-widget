@@ -74,3 +74,29 @@ CREATE TABLE schedule_runs (
 
 CREATE INDEX idx_schedule_runs_retry
   ON schedule_runs (status, lease_until);
+
+CREATE TABLE worklog_tasks (
+  instance_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (instance_id, task_id)
+);
+
+CREATE INDEX idx_worklog_tasks_instance_position
+  ON worklog_tasks (instance_id, position, updated_at);
+
+CREATE TABLE worklog_tombstones (
+  instance_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  deleted_at INTEGER NOT NULL,
+  PRIMARY KEY (instance_id, task_id)
+);
+
+CREATE TABLE worklog_sync (
+  instance_id TEXT PRIMARY KEY,
+  revision INTEGER NOT NULL DEFAULT 0,
+  migrated INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);

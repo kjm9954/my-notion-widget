@@ -483,18 +483,21 @@ export default {
         return json({ ok: true, data: await loadWorklogState(env) });
       }
 
+      if (path === "/api/worklog/patch" && request.method === "POST") {
+        const patch = await request.json();
+        return json({ ok: true, data: await patchWorklogState(env, patch) });
+      }
+
       if (path === "/api/worklog/state" && request.method === "POST") {
         const state = normalizeWorklogState(await request.json());
-        await saveSetting(env, "worklog", state);
-        return json({ ok: true, data: state });
+        return json({ ok: true, data: await mergeLegacyWorklogState(env, state) });
       }
 
       if (path === "/api/worklog/view" && request.method === "POST") {
         const body = await request.json();
         const state = await loadWorklogState(env);
         state.workView = body?.view === "memo" ? "memo" : "time";
-        await saveSetting(env, "worklog", state);
-        return json({ ok: true, data: state });
+        return json({ ok: true, data: await patchWorklogState(env, { meta: worklogMeta(state) }) });
       }
 
       if (path === "/api/worklog/column-split" && request.method === "POST") {
@@ -507,8 +510,7 @@ export default {
         state.columnSplit[mode] = Number.isFinite(value)
           ? Math.min(maximum, Math.max(minimum, value))
           : state.columnSplit[mode];
-        await saveSetting(env, "worklog", state);
-        return json({ ok: true, data: state });
+        return json({ ok: true, data: await patchWorklogState(env, { meta: worklogMeta(state) }) });
       }
 
       // ───────── 중요 업무 ─────────
@@ -1034,6 +1036,7 @@ function normalizeWorklogLastUsed(raw) {
 
 function defaultWorklogState() {
   return {
+    revision: 0,
     mode: "work",
     workView: "time",
     tasks: [],
@@ -1054,6 +1057,7 @@ function defaultWorklogState() {
 
 export function normalizeWorklogState(raw) {
   const source = raw && typeof raw === "object" ? raw : {};
+  const revision = Number(source.revision);
   const ids = new Set();
   const tasks = (Array.isArray(source.tasks) ? source.tasks : []).map(value => {
     const id = cleanText(value?.id, 120);
@@ -1120,6 +1124,7 @@ export function normalizeWorklogState(raw) {
     });
   }
   return {
+    revision: Number.isFinite(revision) ? Math.max(0, Math.floor(revision)) : 0,
     mode: source.mode === "life" ? "life" : "work",
     workView: source.workView === "memo" ? "memo" : "time",
     tasks,
@@ -1160,10 +1165,185 @@ export function rollWorklogState(raw, now = Date.now()) {
   return { state, changed:true, moved };
 }
 
+function worklogInstanceId(env) {
+  return env.__instanceId || "legacy";
+}
+
+function worklogMeta(raw) {
+  const state = normalizeWorklogState(raw);
+  return {
+    mode: state.mode,
+    workView: state.workView,
+    projects: state.projects,
+    lastRollWeek: state.lastRollWeek,
+    bannerDismissedWeek: state.bannerDismissedWeek,
+    lastRollDay: state.lastRollDay,
+    bannerDismissedDay: state.bannerDismissedDay,
+    lastRollCount: state.lastRollCount,
+    lastUsed: state.lastUsed,
+    columnSplit: state.columnSplit,
+    manualOrder: state.manualOrder,
+  };
+}
+
+function normalizeWorklogTask(value) {
+  return normalizeWorklogState({ tasks: [value] }).tasks[0] || null;
+}
+
+async function runWorklogStatements(env, statements) {
+  for (let index = 0; index < statements.length; index += 80) {
+    const batch = statements.slice(index, index + 80);
+    if (batch.length) await env.DB.batch(batch);
+  }
+}
+
+async function ensureWorklogRows(env) {
+  const instanceId = worklogInstanceId(env);
+  const existing = await env.DB.prepare(
+    `SELECT migrated FROM worklog_sync WHERE instance_id = ?`
+  ).bind(instanceId).first();
+  if (Number(existing?.migrated) === 1) return;
+
+  const legacy = normalizeWorklogState(await loadSetting(env, "worklog", defaultWorklogState()));
+  const now = Date.now();
+  const inserts = legacy.tasks.map((task, position) => env.DB.prepare(
+    `INSERT OR IGNORE INTO worklog_tasks
+       (instance_id, task_id, payload, position, updated_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(instanceId, task.id, JSON.stringify(task), position, now));
+  await runWorklogStatements(env, inserts);
+  await saveSetting(env, "worklogMeta", worklogMeta(legacy));
+  await env.DB.prepare(
+    `INSERT INTO worklog_sync (instance_id, revision, migrated, updated_at)
+     VALUES (?, 1, 1, ?)
+     ON CONFLICT(instance_id) DO UPDATE SET
+       migrated = 1,
+       revision = CASE WHEN worklog_sync.revision < 1 THEN 1 ELSE worklog_sync.revision END,
+       updated_at = excluded.updated_at`
+  ).bind(instanceId, now).run();
+}
+
+async function readWorklogRows(env) {
+  await ensureWorklogRows(env);
+  const instanceId = worklogInstanceId(env);
+  const [meta, rowsResult, sync] = await Promise.all([
+    loadSetting(env, "worklogMeta", worklogMeta(defaultWorklogState())),
+    env.DB.prepare(
+      `SELECT payload FROM worklog_tasks
+       WHERE instance_id = ?
+       ORDER BY position ASC, updated_at ASC, task_id ASC`
+    ).bind(instanceId).all(),
+    env.DB.prepare(
+      `SELECT revision FROM worklog_sync WHERE instance_id = ?`
+    ).bind(instanceId).first(),
+  ]);
+  const tasks = (rowsResult?.results || [])
+    .map(row => normalizeWorklogTask(safeParse(row.payload, null)))
+    .filter(Boolean);
+  return normalizeWorklogState({
+    ...(meta && typeof meta === "object" ? meta : {}),
+    tasks,
+    revision: Number(sync?.revision) || 0,
+  });
+}
+
+async function bumpWorklogRevisionStatement(env, instanceId, now) {
+  return env.DB.prepare(
+    `INSERT INTO worklog_sync (instance_id, revision, migrated, updated_at)
+     VALUES (?, 1, 1, ?)
+     ON CONFLICT(instance_id) DO UPDATE SET
+       revision = worklog_sync.revision + 1,
+       migrated = 1,
+       updated_at = excluded.updated_at`
+  ).bind(instanceId, now);
+}
+
+async function patchWorklogState(env, rawPatch) {
+  await ensureWorklogRows(env);
+  const patch = rawPatch && typeof rawPatch === "object" ? rawPatch : {};
+  const instanceId = worklogInstanceId(env);
+  const now = Date.now();
+  const deleteIds = [...new Set((Array.isArray(patch.deleteIds) ? patch.deleteIds : [])
+    .map(value => cleanText(value, 120))
+    .filter(Boolean))];
+  const deleted = new Set(deleteIds);
+  const upserts = [];
+  const seen = new Set();
+  (Array.isArray(patch.upserts) ? patch.upserts : []).forEach(value => {
+    const task = normalizeWorklogTask(value);
+    if (!task || deleted.has(task.id) || seen.has(task.id)) return;
+    seen.add(task.id);
+    upserts.push(task);
+  });
+
+  const statements = [];
+  upserts.forEach(task => {
+    statements.push(env.DB.prepare(
+      `DELETE FROM worklog_tombstones WHERE instance_id = ? AND task_id = ?`
+    ).bind(instanceId, task.id));
+    statements.push(env.DB.prepare(
+      `INSERT INTO worklog_tasks (instance_id, task_id, payload, position, updated_at)
+       VALUES (
+         ?, ?, ?,
+         COALESCE((SELECT MAX(position) + 1 FROM worklog_tasks WHERE instance_id = ?), 0),
+         ?
+       )
+       ON CONFLICT(instance_id, task_id) DO UPDATE SET
+         payload = excluded.payload,
+         updated_at = excluded.updated_at`
+    ).bind(instanceId, task.id, JSON.stringify(task), instanceId, now));
+  });
+  deleteIds.forEach(id => {
+    statements.push(env.DB.prepare(
+      `DELETE FROM worklog_tasks WHERE instance_id = ? AND task_id = ?`
+    ).bind(instanceId, id));
+    statements.push(env.DB.prepare(
+      `INSERT INTO worklog_tombstones (instance_id, task_id, deleted_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(instance_id, task_id) DO UPDATE SET deleted_at = excluded.deleted_at`
+    ).bind(instanceId, id, now));
+  });
+  statements.push(await bumpWorklogRevisionStatement(env, instanceId, now));
+  await runWorklogStatements(env, statements);
+
+  if (patch.meta && typeof patch.meta === "object") {
+    const current = await loadSetting(env, "worklogMeta", worklogMeta(defaultWorklogState()));
+    await saveSetting(env, "worklogMeta", worklogMeta({ ...current, ...patch.meta, tasks: [] }));
+  }
+  return readWorklogRows(env);
+}
+
+async function mergeLegacyWorklogState(env, rawState) {
+  await ensureWorklogRows(env);
+  const state = normalizeWorklogState(rawState);
+  const instanceId = worklogInstanceId(env);
+  const now = Date.now();
+  const statements = state.tasks.map(task => env.DB.prepare(
+    `INSERT INTO worklog_tasks (instance_id, task_id, payload, position, updated_at)
+     SELECT ?, ?, ?,
+       COALESCE((SELECT MAX(position) + 1 FROM worklog_tasks WHERE instance_id = ?), 0),
+       ?
+     WHERE NOT EXISTS (
+       SELECT 1 FROM worklog_tombstones WHERE instance_id = ? AND task_id = ?
+     )
+     ON CONFLICT(instance_id, task_id) DO NOTHING`
+  ).bind(instanceId, task.id, JSON.stringify(task), instanceId, now, instanceId, task.id));
+  statements.push(await bumpWorklogRevisionStatement(env, instanceId, now));
+  await runWorklogStatements(env, statements);
+  await saveSetting(env, "worklogMeta", worklogMeta(state));
+  return readWorklogRows(env);
+}
+
 async function loadWorklogState(env) {
-  const rolled = rollWorklogState(await loadSetting(env, "worklog", defaultWorklogState()));
-  if (rolled.changed) await saveSetting(env, "worklog", rolled.state);
-  return rolled.state;
+  const state = await readWorklogRows(env);
+  const rolled = rollWorklogState(state);
+  if (!rolled.changed) return state;
+  const before = new Map(state.tasks.map(task => [task.id, task]));
+  const moved = rolled.state.tasks.filter(task => {
+    const previous = before.get(task.id);
+    return previous && (previous.date !== task.date || previous.rolledFrom !== task.rolledFrom);
+  });
+  return patchWorklogState(env, { upserts: moved, meta: worklogMeta(rolled.state) });
 }
 
 function normalizeImportantCalendarState(raw) {
