@@ -14,7 +14,7 @@
     * { box-sizing:border-box; }
     html,body { width:100%; min-height:100%; }
     body { margin:0; color:var(--text); background:transparent; font-family:"Pretendard Variable",-apple-system,"Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
-    button,input,select { font:inherit; color:inherit; }
+    button,input { font:inherit; color:inherit; }
     .card { width:100%; min-height:420px; display:flex; flex-direction:column; gap:12px; padding:18px; overflow:hidden; background:var(--surface); border-radius:18px; box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06); }
     .header { min-height:30px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .year-title { font-size:15px; font-weight:850; }
@@ -31,15 +31,19 @@
     .goal-list { min-height:0; display:flex; flex:1 1 auto; flex-direction:column; gap:3px; overflow-x:hidden; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
     .empty { min-height:72px; display:grid; place-items:center; flex:1 1 auto; color:var(--faint); border:1px dashed var(--border); border-radius:10px; font-size:10px; font-weight:700; }
     .goal-row { min-width:0; min-height:39px; display:flex; align-items:center; gap:5px; padding:5px 4px; border-bottom:1px solid var(--border-soft); }
+    .goal-row.has-link { min-height:47px; align-items:flex-start; }
+    .goal-row.has-link .check { margin-top:1px; }
     .goal-row.done { opacity:.56; }
     .check { width:26px; height:28px; display:grid; flex:0 0 26px; place-items:center; padding:0; border:0; background:transparent; cursor:pointer; }
     .check::before { content:""; width:14px; height:14px; background:var(--surface); border:1.5px solid #C6D6DD; border-radius:50%; }
     .goal-row.done .check::before { background:#C6D6DD; }
-    .goal-name { position:relative; min-width:0; flex:1 1 auto; padding:0; overflow:hidden; border:0; background:transparent; font-size:11px; font-weight:650; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
+    .goal-copy { min-width:0; display:flex; flex:1 1 auto; flex-direction:column; gap:2px; }
+    .goal-name { position:relative; min-width:0; width:100%; padding:0; overflow:hidden; border:0; background:transparent; font-size:11px; font-weight:650; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
     .goal-name::after { content:""; position:absolute; left:0; top:50%; width:0; height:1px; background:var(--done); transition:width var(--t-open) var(--ease); }
     .goal-row.done .goal-name { color:var(--done); }
     .goal-row.done .goal-name::after { width:100%; }
     .goal-meta { max-width:34%; overflow:hidden; color:var(--done); font-size:8px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .goal-link { width:100%; overflow:hidden; color:var(--muted); font-size:9px; font-weight:700; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
     .edit-input { min-width:0; height:29px; flex:1 1 auto; padding:0 8px; border:1px solid #CFE2EA; border-radius:8px; outline:0; background:#F7FBFD; font-size:11px; font-weight:650; }
     .text-action { min-height:28px; padding:0 3px; border:0; background:transparent; color:var(--muted); font-size:9px; font-weight:750; cursor:pointer; }
     .text-action.danger { color:var(--danger); }
@@ -48,7 +52,17 @@
     .add-trigger:hover,.add-trigger:focus-visible { border-color:#CFE2EA; }
     .composer { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:5px; }
     .composer.has-parent { grid-template-columns:minmax(0,1fr); }
-    .composer-input,.parent-select { width:100%; height:31px; min-width:0; padding:0 8px; border:1px solid var(--border); border-radius:8px; outline:0; background:var(--surface); font-size:10px; font-weight:650; }
+    .composer-input { width:100%; height:31px; min-width:0; padding:0 8px; border:1px solid var(--border); border-radius:8px; outline:0; background:var(--surface); font-size:10px; font-weight:650; }
+    .parent-picker { min-width:0; display:flex; flex-direction:column; gap:4px; }
+    .parent-trigger { width:100%; min-height:31px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 8px; overflow:hidden; border:1px solid var(--border); border-radius:8px; outline:0; background:var(--surface); color:var(--secondary); font-size:10px; font-weight:700; text-align:left; cursor:pointer; }
+    .parent-trigger:hover,.parent-trigger:focus-visible,.parent-trigger[aria-expanded="true"] { border-color:var(--action); }
+    .parent-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .parent-caret { flex:0 0 auto; color:var(--muted); font-size:10px; }
+    .parent-options { max-height:126px; display:flex; flex-direction:column; gap:4px; padding:5px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:9px; background:var(--surface-soft); scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+    .parent-options[hidden] { display:none; }
+    .parent-option { width:100%; min-height:29px; padding:5px 7px; overflow:hidden; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--secondary); font-size:9px; font-weight:700; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+    .parent-option:hover,.parent-option:focus-visible { border-color:#CFE2EA; outline:0; }
+    .parent-option.is-selected { border-color:#CFE2EA; background:var(--action-soft); color:var(--action); }
     .composer-actions { display:flex; justify-content:flex-end; gap:5px; }
     .composer:not(.has-parent) .composer-actions { display:contents; }
     .small-button { min-height:31px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--muted); font-size:9px; font-weight:750; cursor:pointer; }
@@ -139,18 +153,25 @@
         if(goal.scope==='h1'||goal.scope==='h2')return parent?.t||'연간 연결 없음';
         return parent?.t||'구간 연결 없음';
       }
+      function linkMeta(goal){
+        const parent=byId(goal.parent);
+        if(goal.scope==='h1'||goal.scope==='h2')return parent?`연간 · ${parent.t}`:'연간 연결 없음';
+        return parent?`구간 · ${parent.t}`:'구간 연결 없음';
+      }
       function renderHeader(){
         const total=state.goals.length,done=state.goals.filter(goal=>goal.done).length;
         header.innerHTML=`<div class="year-title">${now.getFullYear()}</div><div class="summary"><span>${total}개 중 ${done}개 완료</span></div>`;
       }
       function row(goal){
         if(ui.editing===goal.id)return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><input class="edit-input" data-edit-input="${esc(goal.id)}" value="${esc(goal.t)}"><button class="text-action danger" type="button" data-delete-request="${esc(goal.id)}">삭제</button><button class="text-action" type="button" data-edit-done>완료</button></div>`;
-        return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button><span class="goal-meta">${esc(meta(goal))}</span></div>`;
+        if(goal.scope==='year')return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button><span class="goal-meta">${esc(meta(goal))}</span></div>`;
+        return `<div class="goal-row has-link${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><div class="goal-copy"><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button><span class="goal-link">${esc(linkMeta(goal))}</span></div></div>`;
       }
       function composer(scope){
         const options=parentOptions(scope);
-        const select=scope==='year'?'':`<select class="parent-select" data-parent-select><option value="">${scope==='month'?'구간 연결 없음':'연간 연결 없음'}</option>${options.map(goal=>`<option value="${esc(goal.id)}">${esc(goal.t)}</option>`).join('')}</select>`;
-        return `<div class="composer${select?' has-parent':''}" data-composer="${scope}"><input class="composer-input" data-new-goal placeholder="${columns.find(column=>column.scope===scope).label} 목표">${select}<div class="composer-actions"><button class="small-button primary" type="button" data-add="${scope}">추가</button><button class="small-button" type="button" data-compose-cancel>취소</button></div></div>`;
+        const emptyLabel=scope==='month'?'구간 연결 없음':'연간 연결 없음';
+        const picker=scope==='year'?'':`<div class="parent-picker" data-parent-picker><button class="parent-trigger" type="button" data-parent-toggle aria-expanded="false"><span class="parent-label" data-parent-label>${emptyLabel}</span><span class="parent-caret" aria-hidden="true">⌄</span></button><div class="parent-options" data-parent-options hidden><button class="parent-option is-selected" type="button" data-parent-option="">${emptyLabel}</button>${options.map(goal=>`<button class="parent-option" type="button" data-parent-option="${esc(goal.id)}">${esc(goal.t)}</button>`).join('')}</div></div>`;
+        return `<div class="composer${picker?' has-parent':''}" data-composer="${scope}" data-parent-value=""><input class="composer-input" data-new-goal placeholder="${columns.find(column=>column.scope===scope).label} 목표">${picker}<div class="composer-actions"><button class="small-button primary" type="button" data-add="${scope}">추가</button><button class="small-button" type="button" data-compose-cancel>취소</button></div></div>`;
       }
       function deleteBox(goal){
         const childCount=state.goals.filter(item=>item.parent===goal.id).length;
@@ -174,7 +195,7 @@
       function add(scope){
         const box=card.querySelector(`[data-composer="${scope}"]`),input=box?.querySelector('[data-new-goal]');
         const title=input?.value.trim();if(!title){input?.focus();return;}
-        const parent=box.querySelector('[data-parent-select]')?.value||null;
+        const parent=box?.dataset.parentValue||null;
         state.goals.push({id:id(),scope,t:title,done:false,parent,createdAt:Date.now(),completedAt:null});ui.composer='';ui.undo=null;save();render();
       }
       function remove(mode){
@@ -186,6 +207,9 @@
       }
       card.addEventListener('click',event=>{
         const target=event.target;
+        const parentToggle=target.closest('[data-parent-toggle]');if(parentToggle){const picker=parentToggle.closest('[data-parent-picker]'),options=picker?.querySelector('[data-parent-options]'),opening=parentToggle.getAttribute('aria-expanded')!=='true';parentToggle.setAttribute('aria-expanded',String(opening));if(options)options.hidden=!opening;return;}
+        const parentOption=target.closest('[data-parent-option]');if(parentOption){const box=parentOption.closest('[data-composer]'),picker=parentOption.closest('[data-parent-picker]'),trigger=picker?.querySelector('[data-parent-toggle]'),label=picker?.querySelector('[data-parent-label]');if(box)box.dataset.parentValue=parentOption.dataset.parentOption||'';picker?.querySelectorAll('[data-parent-option]').forEach(option=>option.classList.toggle('is-selected',option===parentOption));if(label)label.textContent=parentOption.textContent.trim();if(trigger)trigger.setAttribute('aria-expanded','false');const options=picker?.querySelector('[data-parent-options]');if(options)options.hidden=true;trigger?.focus();return;}
+        card.querySelectorAll('[data-parent-toggle][aria-expanded="true"]').forEach(trigger=>{trigger.setAttribute('aria-expanded','false');const options=trigger.closest('[data-parent-picker]')?.querySelector('[data-parent-options]');if(options)options.hidden=true;});
         const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:180;setTimeout(()=>render(),delay);}return;}
         const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';ui.deleting='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
@@ -200,6 +224,7 @@
       });
       card.addEventListener('input',event=>{const input=event.target.closest('[data-edit-input]');if(!input)return;const goal=byId(input.dataset.editInput);if(goal){goal.t=input.value;ui.undo=null;save();}});
       card.addEventListener('keydown',event=>{
+        if(event.key==='Escape'&&event.target.closest('[data-parent-picker]')){const picker=event.target.closest('[data-parent-picker]'),trigger=picker.querySelector('[data-parent-toggle]'),options=picker.querySelector('[data-parent-options]');trigger?.setAttribute('aria-expanded','false');if(options)options.hidden=true;trigger?.focus();return;}
         if(event.target.matches('[data-new-goal]')&&event.key==='Enter'){event.preventDefault();add(event.target.closest('[data-composer]').dataset.composer);}
         if(event.target.matches('[data-edit-input]')&&(event.key==='Enter'||event.key==='Escape')){event.preventDefault();ui.editing='';render();}
       });
