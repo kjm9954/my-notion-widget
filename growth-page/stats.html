@@ -391,15 +391,17 @@
         return dayDiff(latest, today);
       }
       function metrics() {
+        const current = tenure();
         const diaryKeys = Object.keys(activity.diary).filter(key => Boolean(activity.diary[key]));
         const readingKeys = Object.keys(activity.reading).filter(key => Number(activity.reading[key]) > 0);
         const diaryGap = gapFromLast(diaryKeys);
         const readingGap = gapFromLast(readingKeys);
         const anomalies = [];
-        if (diaryGap !== null && diaryGap >= 5) anomalies.push(`일기 공백 ${diaryGap}일`);
+        if (diaryGap === null && current.days >= 5) anomalies.push('일기 기록 없음');
+        else if (diaryGap >= 5) anomalies.push(`일기 공백 ${diaryGap}일`);
         if (readingGap !== null && readingGap >= 7) anomalies.push(`독서 공백 ${readingGap}일`);
         return {
-          ...tenure(),
+          ...current,
           hp: serverHp,
           mp: recentPercent(readingKeys),
           anomalies
