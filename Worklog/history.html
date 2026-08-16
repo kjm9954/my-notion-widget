@@ -74,6 +74,7 @@
       transition: color .12s;
     }
     .search-shell:focus-within .search-icon { color: #6B8794; }
+    .search-shell:focus-within .search-icon { animation: v2-pop var(--t-pop) var(--ease-pop) 1 both; }
     .search-input {
       width: 100%;
       min-width: 0;
@@ -502,6 +503,8 @@
     function renderRecords(records, query) {
       listArea.classList.remove('is-loading');
       listArea.innerHTML = `<div class="list-content">${recordsHtml(records, query)}</div>`;
+      widgetMotion.cascade(listArea.querySelectorAll('.result-row'));
+      if (query) setTimeout(() => widgetMotion.sweepMatches(listArea), 500);
     }
 
     function stateBlock(title, copy, button) {

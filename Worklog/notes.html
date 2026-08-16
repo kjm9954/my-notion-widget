@@ -243,12 +243,21 @@
         const text = String(input?.value || '').trim();
         if (draftNew) {
           draftNew = false;
+          let newItem = null;
           if (text) {
-            const newItem = { id:makeId(), text, done:false };
+            newItem = { id:makeId(), text, done:false };
             writeMerged(latest => latest.some(item => item.id === newItem.id) ? latest : [...latest,newItem]);
           }
           if (continueDraft && text) draftNew = true;
           render({ focus:draftNew });
+          if (newItem) {
+            const row = notesArea.querySelector(`[data-note-id="${CSS.escape(newItem.id)}"]`);
+            if (row) {
+              widgetMotion.popIn(row);
+              row.classList.add('motion-new');
+              setTimeout(() => row.classList.remove('motion-new'), 900);
+            }
+          }
           flushPendingSync();
           return;
         }
@@ -321,7 +330,12 @@
             const local = items.find(item => item.id === id);
             if (local) local.text = activeText;
           }
+          const nowDone = items.find(item => item.id === id)?.done === true;
           render({ focus:editingId === id });
+          if (nowDone) {
+            const mark = notesArea.querySelector(`[data-note-id="${CSS.escape(id)}"] .check-mark`);
+            widgetMotion.pop(mark);
+          }
           return;
         }
         const remove = event.target.closest('[data-delete]');

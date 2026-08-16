@@ -320,6 +320,7 @@
       var syncRequestId = 0;
       var localRevision = 0;
       var retryTimer = null;
+      var entranceDone = false;
 
       /* ── 주 계산 ───────────────────────────── */
       function mondayOf(date) {
@@ -410,6 +411,7 @@
           if (carryPrompt !== null) {
             state = next;
             render(false);
+            runEntrance();
             return;
           }
           if (rolloverNeedsSave) {
@@ -417,11 +419,13 @@
             state = next;
             save();
             render(false);
+            runEntrance();
             return;
           }
           if (JSON.stringify(next) === JSON.stringify(state)) return;
           state = next;
           render(false);
+          runEntrance();
         } catch (error) {
           console.warn('이번 주 목표를 불러오지 못했습니다.', error);
           if (!state.items.length) {
@@ -548,6 +552,13 @@
         renderCarryOverlay();
       }
 
+      function runEntrance() {
+        if (!entranceDone && state.items.length) {
+          entranceDone = true;
+          widgetMotion.cascade(list.querySelectorAll('.goal-item'));
+        }
+      }
+
       /* ── 동작 ───────────────────────────── */
       function toggle(id) {
         var it = state.items.filter(function (x) { return x.id === id; })[0];
@@ -555,6 +566,12 @@
         it.done = !it.done;
         save();
         render(false);
+        if (it.done) {
+          var check = list.querySelector('[data-toggle="' + id + '"]');
+          widgetMotion.pop(check);
+        }
+        var cells = rateCells.querySelectorAll('.rate-cell.is-work, .rate-cell.is-life');
+        if (it.done && cells.length) widgetMotion.pop(cells[cells.length - 1]);
       }
 
       function remove(id) {

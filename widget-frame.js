@@ -175,6 +175,98 @@
 })();
 
 (() => {
+  const wm = window.widgetMotion = window.widgetMotion || {};
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 1회성 클래스 부착: animationend 또는 타임아웃에 제거
+  function once(el, className, ms) {
+    if (!el || reduced()) return;
+    el.classList.remove(className);
+    void el.offsetWidth;
+    el.classList.add(className);
+    let done = false;
+    const clear = () => { if (done) return; done = true; el.classList.remove(className); };
+    el.addEventListener('animationend', clear, { once: true });
+    setTimeout(clear, (ms || 700) + 400);
+  }
+
+  wm.pop = el => once(el, 'motion-pop', 240);
+  wm.popIn = el => once(el, 'motion-pop-in', 240);
+  wm.drop = el => once(el, 'motion-drop', 240);
+
+  // 캐스케이드: 노드 목록 앞 4개에 --i 0~3, 이후는 --i 3(동시)
+  wm.cascade = nodes => {
+    if (reduced()) return;
+    [...nodes].forEach((el, i) => {
+      el.style.setProperty('--i', String(Math.min(i, 3)));
+      once(el, 'motion-cascade', 320 + Math.min(i, 3) * 60);
+    });
+  };
+
+  // 셀 팝(요일·분면): 순서대로 stagger. maxStagger 기본 4, weekly 요일은 7 허용
+  wm.cellPop = (nodes, maxStagger = 4) => {
+    if (reduced()) return;
+    [...nodes].forEach((el, i) => {
+      el.style.setProperty('--i', String(Math.min(i, maxStagger - 1)));
+      once(el, 'motion-cell-pop', 240 + Math.min(i, maxStagger - 1) * 60);
+    });
+  };
+
+  // 링 확산: 대상의 부모에 절대배치 링 1개 생성 → 재생 후 제거
+  wm.burst = el => {
+    if (!el || reduced()) return;
+    const host = el.parentElement;
+    if (!host) return;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const ring = document.createElement('span');
+    ring.className = 'v2-burst-ring';
+    ring.setAttribute('aria-hidden', 'true');
+    host.appendChild(ring);
+    setTimeout(() => ring.remove(), 800);
+  };
+
+  // 점 스파크 3개: anchor(절대배치 기준 요소) 안의 (x,y)px 지점에서 발사 → 제거
+  wm.spark = (anchor, x, y) => {
+    if (!anchor || reduced()) return;
+    if (getComputedStyle(anchor).position === 'static') anchor.style.position = 'relative';
+    const dots = [
+      { c: '#0E5C7A', d: ['8px', '-9px', '12px', '-4px'] },
+      { c: '#C6D6DD', d: ['10px', '-1px', '16px', '2px'] },
+      { c: '#0E5C7A', d: ['6px', '6px', '11px', '9px'] }
+    ];
+    dots.forEach(({ c, d }) => {
+      const s = document.createElement('span');
+      s.className = 'v2-spark';
+      s.setAttribute('aria-hidden', 'true');
+      s.style.background = c;
+      s.style.left = x + 'px'; s.style.top = y + 'px';
+      s.style.setProperty('--dx', d[0]); s.style.setProperty('--dy', d[1]);
+      s.style.setProperty('--dx2', d[2]); s.style.setProperty('--dy2', d[3]);
+      anchor.appendChild(s);
+      setTimeout(() => s.remove(), 800);
+    });
+  };
+
+  // 게이지 오버슛: fill의 width를 target보다 4%p 넘겼다가 되돌림 (값 상승 시에만 호출)
+  wm.gaugeOvershoot = (fill, targetPercent) => {
+    if (!fill) return;
+    const target = Math.max(0, Math.min(100, targetPercent));
+    if (reduced()) { fill.style.width = target + '%'; return; }
+    fill.style.width = Math.min(100, target + 4) + '%';
+    setTimeout(() => { fill.style.width = target + '%'; }, 400);
+  };
+
+  // 매칭 스윕: 컨테이너 안의 .match들에 20ms 간격 딜레이 스윕
+  wm.sweepMatches = container => {
+    if (!container || reduced()) return;
+    container.querySelectorAll('.match').forEach((m, i) => {
+      m.style.setProperty('--sweep-delay', (i * 20) + 'ms');
+      once(m, 'motion-sweep', 180 + i * 20);
+    });
+  };
+})();
+
+(() => {
   'use strict';
 
   function setupListOnlyFrame(host, card) {

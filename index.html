@@ -917,6 +917,7 @@
       const titleTimers = new Map();
       let scopeRevision = 0;
       let scopeSaving = false;
+      let entranceDone = false;
 
       const widget = document.getElementById('widget');
       const header = document.getElementById('header');
@@ -952,7 +953,20 @@
             ui.bottomState = 'collapsed';
             selectionChanged = true;
           }
-          if (itemsChanged || scopeChanged || selectionChanged) render();
+          if (itemsChanged || scopeChanged || selectionChanged || !entranceDone) render();
+          if (!entranceDone) {
+            entranceDone = true;
+            if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              const cells = mainContent.querySelectorAll('.quadrant');
+              [0, 1, 3, 2].forEach((domIndex, order) => {
+                const el = cells[domIndex];
+                if (!el) return;
+                el.style.setProperty('--i', String(order));
+                el.classList.add('motion-cell-pop');
+                el.addEventListener('animationend', () => el.classList.remove('motion-cell-pop'), { once:true });
+              });
+            }
+          }
         } catch (_) {}
       }
 
@@ -1294,6 +1308,8 @@
         ui.justDroppedId = item.id;
         render();
         persistItem(item);
+        const dropped = mainContent.querySelector(`[data-item-id="${CSS.escape(item.id)}"]`);
+        widgetMotion.popIn(dropped);
         setTimeout(() => { ui.justDroppedId = null; }, 800);
         return true;
       }
@@ -1365,6 +1381,8 @@
         const statusChoice = target.closest('[data-status-choice]');
         if (statusChoice) {
           updateItem(item => { item.st = statusChoice.dataset.statusChoice; });
+          const dot = mainContent.querySelector(`[data-item-id="${CSS.escape(ui.selectedId)}"] .state-dot`);
+          widgetMotion.pop(dot);
           return;
         }
 

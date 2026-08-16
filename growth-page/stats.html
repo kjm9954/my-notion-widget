@@ -337,6 +337,8 @@
       let statusExpanded = false;
       let activity = { diary:{}, reading:{} };
       let serverHp = 20;
+      let lastLevel = null;
+      let previousAnomalies = null;
 
       function clone(value) { return JSON.parse(JSON.stringify(value)); }
       function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
@@ -420,8 +422,24 @@
         `;
       }
 
+      function runMainMotions(current, newAnomalies) {
+        const level = card.querySelector('.level');
+        if (lastLevel !== null && current.level > lastLevel) {
+          widgetMotion.pop(level);
+          widgetMotion.burst(level);
+        }
+        card.querySelectorAll('.status-pill').forEach(pill => {
+          if (newAnomalies.includes(pill.textContent)) widgetMotion.popIn(pill);
+        });
+        lastLevel = current.level;
+        previousAnomalies = [...current.anomalies];
+      }
+
       function renderMain() {
         const current = metrics();
+        const newAnomalies = previousAnomalies === null
+          ? []
+          : current.anomalies.filter(item => !previousAnomalies.includes(item));
         const meters = card.querySelector('.meters');
         if (meters) {
           const status = card.querySelector('.status-row');
@@ -434,8 +452,17 @@
           if (tenureText) tenureText.textContent = `D+${current.days}`;
           if (values[0]) values[0].textContent = current.hp;
           if (values[1]) values[1].textContent = current.mp;
-          if (fills[0]) fills[0].style.width = `${current.hp}%`;
-          if (fills[1]) fills[1].style.width = `${current.mp}%`;
+          if (fills[0]) {
+            const prev = parseFloat(fills[0].style.width) || 0;
+            if (current.hp > prev) widgetMotion.gaugeOvershoot(fills[0], current.hp);
+            else fills[0].style.width = `${current.hp}%`;
+          }
+          if (fills[1]) {
+            const prev = parseFloat(fills[1].style.width) || 0;
+            if (current.mp > prev) widgetMotion.gaugeOvershoot(fills[1], current.mp);
+            else fills[1].style.width = `${current.mp}%`;
+          }
+          runMainMotions(current, newAnomalies);
           return;
         }
         card.innerHTML = `
@@ -459,6 +486,7 @@
             `).join('')}
           </nav>
         `;
+        runMainMotions(current, newAnomalies);
       }
 
       function renderSettings() {

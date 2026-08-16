@@ -317,6 +317,7 @@
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
       let initialized = false;
+      let entranceDone = false;
       let lastFocused = null;
       const state = { mode:'work', weekStart:null, level:0, selectedDay:'', modalDate:null, tasks:[] };
 
@@ -571,6 +572,7 @@
         state.modalDate = date;
         renderModal();
         dayOverlay.hidden = false;
+        widgetMotion.popIn(modalPanel);
         document.body.classList.add('has-widget-expanded');
         modalClose.focus({ preventScroll:true });
       }
@@ -608,15 +610,20 @@
           return;
         }
         const previous = JSON.stringify({ mode:state.mode, tasks:state.tasks });
+        const firstSync = !initialized;
         if (!initialized) {
           state.mode = loaded.mode;
           initialized = true;
         }
         state.tasks = loaded.tasks;
-        if (initialized && previous === JSON.stringify({ mode:state.mode, tasks:state.tasks }) && !resetToCurrentWeek) return;
+        if (!firstSync && previous === JSON.stringify({ mode:state.mode, tasks:state.tasks }) && !resetToCurrentWeek) return;
         ensureSelectedDay();
         const modalScroll = modalBody.scrollTop;
         render();
+        if (!entranceDone) {
+          entranceDone = true;
+          widgetMotion.cascade(weeklyContent.querySelectorAll('.day-column'));
+        }
         if (state.modalDate) {
           renderModal();
           modalBody.scrollTop = modalScroll;
@@ -628,18 +635,21 @@
         state.weekStart = addDays(state.weekStart,-7);
         state.selectedDay = '';
         render();
+        widgetMotion.cascade(weeklyContent.querySelectorAll('.day-column'));
       });
       nextWeek.addEventListener('click', () => {
         closeModal();
         state.weekStart = addDays(state.weekStart,7);
         state.selectedDay = '';
         render();
+        widgetMotion.cascade(weeklyContent.querySelectorAll('.day-column'));
       });
       currentWeek.addEventListener('click', () => {
         closeModal();
         state.weekStart = startOfWeek(todayDate());
         state.selectedDay = '';
         render();
+        widgetMotion.cascade(weeklyContent.querySelectorAll('.day-column'));
       });
       modeSegment.addEventListener('click', event => {
         const button = event.target.closest('[data-mode]');
@@ -649,6 +659,7 @@
         state.level = 0;
         state.selectedDay = '';
         render();
+        widgetMotion.cascade(weeklyContent.querySelectorAll('.day-column'));
       });
       weeklyContent.addEventListener('click', event => {
         const mobileDay = event.target.closest('[data-mobile-day]');

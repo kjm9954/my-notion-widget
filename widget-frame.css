@@ -7,7 +7,11 @@
   --t-close: 160ms;
   --t-gauge: 400ms;
   --t-mark: 800ms;
+  --t-pop: 240ms;
+  --t-burst: 600ms;
+  --t-stagger: 60ms;
   --ease: cubic-bezier(.2,.6,.2,1);
+  --ease-pop: cubic-bezier(.34,1.56,.64,1);
 }
 
 html,
@@ -465,6 +469,97 @@ body.is-widget-list-resizing {
   .widget-list-resize-handle {
     display: none !important;
   }
+}
+
+/* ── 활기 모션 v2 ─────────────────────────── */
+
+/* 완료 팝 — 체크박스·링·점·배지에 1회 부착 */
+@keyframes v2-pop {
+  0% { transform: scale(.3); }
+  55% { transform: scale(1.22); }
+  78% { transform: scale(.95); }
+  100% { transform: scale(1); }
+}
+.motion-pop { animation: v2-pop var(--t-pop) var(--ease-pop) 1 both; }
+
+/* 등장 캐스케이드 — JS가 --i(0~3)를 넣는다 */
+@keyframes v2-cascade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.motion-cascade {
+  animation: v2-cascade 320ms var(--ease-pop) 1 both;
+  animation-delay: calc(var(--i, 0) * var(--t-stagger));
+}
+
+/* 셀 팝 — 요일 셀·분면 웨이크·달성 칸 (배경/색은 각 위젯 CSS가 담당, 여기선 형태만) */
+@keyframes v2-cell-pop {
+  0% { opacity: .25; transform: scale(.6); }
+  60% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.motion-cell-pop {
+  animation: v2-cell-pop 240ms var(--ease-pop) 1 both;
+  animation-delay: calc(var(--i, 0) * var(--t-stagger));
+}
+
+/* 링 확산 — position:relative인 부모에 JS가 span을 만들어 붙인다 */
+@keyframes v2-burst {
+  0% { transform: scale(.4); opacity: .75; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.v2-burst-ring {
+  position: absolute; inset: 0; z-index: 3;
+  border: 2px solid #0E5C7A; border-radius: 50%;
+  pointer-events: none;
+  animation: v2-burst var(--t-burst) var(--ease) 1 both;
+}
+
+/* 점 스파크 — JS가 --dx/--dy/--dx2/--dy2를 인라인으로 넣는다 */
+@keyframes v2-spark {
+  0% { transform: translate(0,0) scale(0); opacity: 0; }
+  25% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx2), var(--dy2)) scale(.4); opacity: 0; }
+}
+.v2-spark {
+  position: absolute; z-index: 3; width: 4px; height: 4px;
+  border-radius: 50%; pointer-events: none;
+  animation: v2-spark var(--t-burst) var(--ease-pop) 1 both;
+}
+
+/* 드롭 착지 — 책장 꽂기 등. 1회 되튐 */
+@keyframes v2-drop {
+  0% { transform: translateY(-26px); opacity: 0; }
+  55% { transform: translateY(3px); opacity: 1; }
+  78% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+.motion-drop { animation: v2-drop var(--t-pop) var(--ease-pop) 1 both; }
+
+/* 옆으로 밀림 — 드롭한 항목의 양옆. JS가 --nx를 넣는다 */
+@keyframes v2-nudge {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(var(--nx, 3px)); }
+  100% { transform: translateX(0); }
+}
+.motion-nudge { animation: v2-nudge var(--t-pop) var(--ease) 1 both; }
+
+/* 팝인 — 새 카드·알약·필 등장 */
+@keyframes v2-pop-in {
+  0% { opacity: 0; transform: scale(.9); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.motion-pop-in { animation: v2-pop-in var(--t-pop) var(--ease-pop) 1 both; }
+
+/* 매칭 하이라이트 스윕 — history의 .match 전용 */
+@keyframes v2-sweep { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
+.motion-sweep {
+  background-image: linear-gradient(#E2F0F6, #E2F0F6);
+  background-repeat: no-repeat; background-position: 0 0;
+  border-radius: 3px;
+  animation: v2-sweep 180ms var(--ease) 1 both;
+  animation-delay: var(--sweep-delay, 0ms);
 }
 
 /* Motion off. The reduced-motion contract intentionally resolves every
