@@ -508,6 +508,8 @@
       let timeTitleMeasurement = null;
       let localRevision = 0;
       let syncRequestId = 0;
+      let entranceDone = false;
+      let rollBannerEntranceDone = false;
 
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
@@ -1126,6 +1128,8 @@
           fresh.manualOrder[`${state.mode}:${ui.selectedDate}`] = ordered;
           return fresh;
         });
+        const moved = taskList.querySelector(`[data-task-id="${CSS.escape(drag.taskId)}"]`);
+        if (moved && window.widgetMotion?.pop) window.widgetMotion.pop(moved);
         announce('순서를 저장했습니다.');
       }
 
@@ -1265,6 +1269,10 @@
         rollBanner.innerHTML = `<span class="banner-kicker">새 하루가 시작됐습니다</span>
           <span class="banner-copy">미완료 ${state.lastRollCount}건을 오늘로 옮겼습니다</span>
           <button class="banner-dismiss" type="button" data-dismiss-banner data-roll-dismiss>확인 ✕</button>`;
+        if (!rollBannerEntranceDone) {
+          rollBannerEntranceDone = true;
+          window.widgetMotion?.popIn?.(rollBanner);
+        }
       }
 
       function renderHeader(items) {
@@ -1601,6 +1609,7 @@
       }
 
       function renderCellPopover() {
+        const wasHidden = cellPopover.hidden;
         if (!ui.popover || ui.editingId || ui.inlineEdit) {
           cellPopover.hidden = true;
           cellPopover.innerHTML = '';
@@ -1631,6 +1640,7 @@
           cellPopover.innerHTML = `<span class="popover-label">${label}</span><div class="popover-controls"><button class="popover-step" type="button" data-adjust-hours="-0.5" aria-label="${label} 0.5시간 줄이기">−</button><span class="popover-value">${value === null ? '–' : displayHours(value)}</span><button class="popover-step" type="button" data-adjust-hours="0.5" aria-label="${label} 0.5시간 늘리기">＋</button></div><span class="popover-caption">0.5 단위 · 0.5 = 30분</span>`;
         }
         cellPopover.hidden = false;
+        if (wasHidden) window.widgetMotion?.popIn?.(cellPopover);
         const cardRect = card.getBoundingClientRect();
         const anchorRect = anchor.getBoundingClientRect();
         const scale = card.offsetWidth ? cardRect.width / card.offsetWidth : 1;
@@ -1672,6 +1682,32 @@
         const nextScroll = taskList.querySelector('.rows-scroll');
         if (nextScroll) nextScroll.scrollTop = listScroll;
         renderCellPopover();
+      }
+
+      function runOnce(element, className) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        let finished = false;
+        const clear = () => { if (finished) return; finished = true; element.classList.remove(className); };
+        element.addEventListener('animationend', clear, { once:true });
+        window.setTimeout(clear, 700);
+      }
+
+      function animateListSwap() {
+        runOnce(taskList.querySelector('.rows-scroll'), 'motion-swap');
+      }
+
+      function animateDaySelection() {
+        window.widgetMotion?.pop?.(dayTrack.querySelector('.day-button.is-selected'));
+        animateListSwap();
+      }
+
+      function popTaskCell(id, field) {
+        const cells = [...taskList.querySelectorAll(`[data-cell-task="${CSS.escape(id)}"][data-cell-field="${field}"]`)];
+        const cell = cells.find(element => element.offsetParent !== null) || cells[0];
+        window.widgetMotion?.pop?.(cell);
       }
 
       function persistWorkView(view) {
@@ -1727,6 +1763,7 @@
         resetTransient();
         rememberView();
         renderAll();
+        animateDaySelection();
         if (keepDayFocus) dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       }
 
@@ -1795,6 +1832,8 @@
           ui.draftTask = createQuickDraft(task.mode);
         }
         renderAll();
+        const newRow = taskList.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);
+        if (newRow && window.widgetMotion?.popIn) window.widgetMotion.popIn(newRow);
         if (continueAdding) window.setTimeout(focusAddTitle, 0);
         announce('추가했습니다.');
         window.setTimeout(() => { ui.newId = null; }, 1200);
@@ -1856,7 +1895,11 @@
         if (!saved) {
           ui.selectedDate = previousDate;
           Object.assign(ui, previousUi);
-        } else rememberView();
+        } else {
+          rememberView();
+          window.widgetMotion?.pop?.(modeRow.querySelector('.mode-pill.is-selected'));
+          animateListSwap();
+        }
       });
 
       cardHeader.addEventListener('click', event => {
@@ -1882,6 +1925,7 @@
         resetTransient();
         state = { ...state, workView:nextView };
         renderWorkView();
+        animateListSwap();
         persistWorkView(nextView);
         announce(`${nextView === 'memo' ? '메모' : '시간'} 보기로 전환했습니다.`);
       });
@@ -1897,6 +1941,7 @@
         resetTransient();
         rememberView();
         renderAll();
+        animateDaySelection();
         dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       });
 
@@ -2094,7 +2139,7 @@
           ui.projectChoiceTimer = window.setTimeout(() => {
             ui.projectChoiceTimer = null;
             closeCellPopover();
-            updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.');
+            if (updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.')) popTaskCell(id,'project');
           },220);
           return;
         }
@@ -2103,7 +2148,7 @@
           const id = ui.popover.taskId;
           const value = Number(qChoice.dataset.qChoice);
           closeCellPopover();
-          updateTask(id, task => { task.q = value >= 1 && value <= 4 ? value : null; }, 'Q를 바꿨습니다.');
+          if (updateTask(id, task => { task.q = value >= 1 && value <= 4 ? value : null; }, 'Q를 바꿨습니다.')) popTaskCell(id,'q');
           return;
         }
         const dateChoice = event.target.closest('[data-date-choice]');
@@ -2111,7 +2156,7 @@
           const id = ui.popover.taskId;
           const value = dateChoice.dataset.dateChoice;
           closeCellPopover();
-          updateTask(id, task => { task.due = parseDate(value) ? value : null; }, '목표일을 바꿨습니다.');
+          if (updateTask(id, task => { task.due = parseDate(value) ? value : null; }, '목표일을 바꿨습니다.')) popTaskCell(id,'due');
           return;
         }
         const adjustmentButton = event.target.closest('[data-adjust-hours]');
@@ -2191,10 +2236,13 @@
         const toggleButton = event.target.closest('[data-toggle-task]');
         if (toggleButton) {
           const id = toggleButton.dataset.toggleTask;
-          updateTask(id, task => {
+          const updated = updateTask(id, task => {
             task.done = !task.done;
             task.status = task.done ? 'done' : 'doing';
           }, '완료 상태를 바꿨습니다.');
+          if (updated && taskById(id)?.done) {
+            window.widgetMotion?.pop?.(taskList.querySelector(`[data-task-id="${CSS.escape(id)}"] [data-toggle-task]`));
+          }
           return;
         }
         const rowDelete = event.target.closest('[data-row-delete], [data-delete-task]');
@@ -2218,7 +2266,7 @@
           const project = rememberProject(value);
           if (!project) return;
           closeCellPopover();
-          updateTask(id, task => { task.proj = project; }, '구분을 추가했습니다.');
+          if (updateTask(id, task => { task.proj = project; }, '구분을 추가했습니다.')) popTaskCell(id,'project');
           return;
         }
         const quickForm = event.target.closest('[data-quick-add-form]');
@@ -2333,21 +2381,21 @@
           liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
           if (!ui.selectedDate) ui.selectedDate = localDateKey(clampDateToMode(todayDate(),state.mode));
           renderAll();
-          return;
+          return false;
         }
-        if (requestId !== syncRequestId || requestRevision !== localRevision) return;
+        if (requestId !== syncRequestId || requestRevision !== localRevision) return false;
         if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover || ui.columnResize || ui.longPress || ui.rowDrag) {
           applyExternalCompletionState(loaded);
           if (JSON.stringify(loaded) !== JSON.stringify(state)) {
             pendingExternalSync = true;
             pendingServerState = loaded;
           }
-          return;
+          return false;
         }
         const currentDayKey = localDateKey(todayDate());
         const dayChanged = currentDayKey !== activeDayKey;
         const changed = JSON.stringify(loaded) !== JSON.stringify(state);
-        if (!changed && !resetToToday && !dayChanged) return;
+        if (!changed && !resetToToday && !dayChanged) return true;
         activeDayKey = currentDayKey;
         resetToToday = resetToToday || dayChanged;
         state = loaded;
@@ -2361,6 +2409,7 @@
         }
         liveRegion.textContent = '';
         renderAll();
+        return true;
       }
 
       window.addEventListener('focus', () => syncFromServer(true));
@@ -2375,7 +2424,11 @@
 
       async function bootstrap() {
         liveRegion.textContent = '업무일지를 불러오는 중입니다.';
-        await syncFromServer(true);
+        const loaded = await syncFromServer(true);
+        if (loaded && !entranceDone) {
+          entranceDone = true;
+          window.widgetMotion?.cascade?.(taskList.querySelectorAll('.task-row'));
+        }
         Store.watch(() => syncFromServer(false),1500,{ allowWhileEditing:true });
       }
 
