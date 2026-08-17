@@ -20,7 +20,7 @@
     'achieve.html': { selector:'#content.list .row', kind:'dot', max:3, empty:'#content.empty' },
     'index.html': { selector:'.quadrant.is-selected', kind:'outline', max:1 },
     'stats.html': { selector:'.meter-fill', max:2, continuous:true },
-    'worklog.html': { selector:'.task-row:not(.quick-add-row):not(.is-done) .done-check', kind:'outline', max:3, empty:'.list-shell.is-empty' },
+    'worklog.html': { empty:'.list-shell.is-empty' },
     'goals.html': { selector:'.goal-row:not(.done) .check', max:3, empty:'.goals-grid .empty' },
     'find.html': { empty:'.empty-list' },
     'drawer.html': { empty:'.quote-list > .empty' },

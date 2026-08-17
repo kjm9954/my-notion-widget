@@ -17,7 +17,8 @@ test("노션 임베드가 늦게 펼쳐져도 프레임을 다시 맞춘다", ()
   assert.match(source, /\[60, 250, 1000\]\.forEach\(delay => setTimeout\(commitFrame, delay\)\)/);
 });
 
-test("업무일지의 미완료 체크와 빈 목록은 유휴 모션 대상이다", () => {
-  assert.match(source, /'worklog\.html': \{ selector:'\.task-row:not\(\.quick-add-row\):not\(\.is-done\) \.done-check', kind:'outline', max:3, empty:'\.list-shell\.is-empty' \}/);
+test("업무일지는 체크 외곽선을 덧그리지 않고 빈 목록만 유휴 모션을 사용한다", () => {
+  assert.match(source, /'worklog\.html': \{ empty:'\.list-shell\.is-empty' \}/);
+  assert.doesNotMatch(source, /'worklog\.html': \{[^\n]*done-check/);
   assert.doesNotMatch(source, /\[data-empty-add\]/);
 });
