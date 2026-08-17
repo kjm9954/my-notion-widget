@@ -132,6 +132,17 @@ function writeCached(url, data, serialized = JSON.stringify(data)) {
   }))).catch(() => {});
 }
 
+async function deleteCachedUrl(url) {
+  memoryCache.delete(url);
+  inFlightGets.delete(url);
+  if (!("caches" in window)) return;
+  try { await (await caches.open(STORE_CACHE)).delete(url); } catch (_) {}
+}
+
+function invalidateApiGet(path) {
+  return deleteCachedUrl(apiUrl(path));
+}
+
 function requestFresh(path, url, cachedPromise) {
   if (inFlightGets.has(url)) return inFlightGets.get(url);
 
@@ -183,6 +194,12 @@ async function apiPost(path, body, includeInstance = true) {
   const data = await res.json();
   if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
   if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
+  if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
+    await Promise.all([
+      invalidateApiGet("/api/reading/library"),
+      invalidateApiGet("/api/reading/library?fresh=1"),
+    ]);
+  }
   announceChange(path);
   return data;
 }
@@ -247,6 +264,30 @@ async function saveReadingNotesState(state) {
 }
 async function addReadingNotes(date, count) {
   return (await apiPost("/api/reading-notes/add", { date, count })).data;
+}
+async function loadReadingLibrary(options = {}) {
+  const path = options?.fresh === true ? "/api/reading/library?fresh=1" : "/api/reading/library";
+  return (await apiGet(path)).data;
+}
+async function createReadingBook(book) {
+  return (await apiPost("/api/reading/books/create", book)).data;
+}
+async function updateReadingBook(id, patch) {
+  return (await apiPost("/api/reading/books/update", { id, patch })).data;
+}
+async function createReadingQuotes(bookId, quotes, options = {}) {
+  return (await apiPost("/api/reading/quotes/create", {
+    bookId,
+    quotes,
+    date: options?.date,
+    pageRead: options?.pageRead,
+  })).data;
+}
+async function updateReadingQuote(id, patch, original = {}) {
+  return (await apiPost("/api/reading/quotes/update", { id, patch, original })).data;
+}
+async function deleteReadingQuote(id, original = {}) {
+  return apiPost("/api/reading/quotes/delete", { id, original });
 }
 
 // ───────── 생각 ─────────
@@ -432,6 +473,8 @@ window.Store = {
   loadMoodWords, saveMoodWords,
   loadStatsSettings, saveStatsSettings,
   loadReadingNotesState, saveReadingNotesState, addReadingNotes,
+  loadReadingLibrary, createReadingBook, updateReadingBook,
+  createReadingQuotes, updateReadingQuote, deleteReadingQuote,
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,

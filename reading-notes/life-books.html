@@ -66,8 +66,9 @@
     </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
-    const DATA = [];
+    let DATA = [];
 
     (() => {
       const content = document.getElementById('content');
@@ -113,6 +114,7 @@
           content.innerHTML = `<section class="empty-state"><strong>아직 고른 책이 없어요</strong><span>DB에서 인생책으로 표시하면 여기 걸립니다</span></section>`;
           return;
         }
+        if (selectedIndex >= DATA.length) selectedIndex = 0;
         const selected = DATA[selectedIndex] || DATA[0];
         content.innerHTML = `
           <div class="cover-row" aria-label="인생책 표지 목록">${DATA.slice(0, 8).map(coverMarkup).join('')}</div>
@@ -120,7 +122,18 @@
         bind();
       }
 
+      async function sync() {
+        const state = await Store.loadReadingLibrary();
+        DATA = (state?.books || []).filter(book => book.isLifeBook).map(book => ({
+          id:book.id, title:book.title, author:book.author || '저자 미입력', cover:book.cover || '',
+          line:book.one || '', url:book.url || ''
+        }));
+        render();
+      }
+
       render();
+      Store.watch(sync, 15000);
+      sync().catch(error => console.warn('인생책을 불러오지 못했습니다.', error));
     })();
   </script>
   <script src="../widget-frame.js"></script>

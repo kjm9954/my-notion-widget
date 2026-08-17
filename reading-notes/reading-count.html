@@ -76,12 +76,14 @@
     </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
-    const DATA = { total:0, years:[], recent:[] };
+    let DATA = { total:0, years:[], recent:[] };
 
     (() => {
       const card = document.querySelector('.card');
       const content = document.getElementById('content');
+      const currentYear = new Date().getFullYear();
       let entranceDone = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
       const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
@@ -103,12 +105,13 @@
           content.innerHTML = `<section class="empty-state"><strong>아직 완독한 책이 없어요</strong><span>DB에서 상태를 완독으로 바꾸면 여기 쌓입니다</span></section>`;
           return;
         }
+        card.classList.remove('is-empty');
         const years = DATA.years.filter(item => Number.isFinite(item.n) && item.n > 0).slice(0, 3);
         const recent = DATA.recent.slice(0, 5);
         content.style.display = 'contents';
         content.innerHTML = `
           <section class="total-block"><span class="eyebrow">지금까지</span><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권</span></div></section>
-          ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${index === 0 ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${index === 0 ? ' · 올해' : ''}</span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
+          ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${item.y === currentYear ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${item.y === currentYear ? ' · 올해' : ''}</span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
           ${recent.length ? `<section class="recent-section"><span class="recent-label">최근에 덮은 책</span><div class="recent-list">${recent.map(book => `<article class="book-item">${cover(book)}<div class="book-copy"><strong class="book-title">${escapeHtml(book.title)}</strong><span class="book-meta">${escapeHtml(book.author)} · ${escapeHtml(book.date)}</span></div></article>`).join('')}</div></section>` : ''}`;
         bindCoverFallbacks();
         if (!entranceDone && recent.length) {
@@ -117,7 +120,31 @@
         }
       }
 
+      function dateLabel(book) {
+        const raw = book.endDate || book.startDate;
+        if (!raw) return book.year ? `${book.year}` : '날짜 없음';
+        const date = new Date(raw);
+        return Number.isNaN(date.getTime()) ? String(raw) : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+      }
+
+      async function sync() {
+        const state = await Store.loadReadingLibrary();
+        const done = (state?.books || []).filter(book => book.status === 'done');
+        const counts = new Map();
+        done.forEach(book => { if (book.year) counts.set(book.year, (counts.get(book.year) || 0) + 1); });
+        DATA = {
+          total:done.length,
+          years:[...counts].map(([y, n]) => ({ y:Number(y), n })).sort((a, b) => b.y - a.y),
+          recent:done.slice().sort((a, b) => String(b.endDate || b.startDate || b.created).localeCompare(String(a.endDate || a.startDate || a.created))).slice(0, 5).map(book => ({
+            title:book.title, author:book.author || '저자 미입력', cover:book.cover || '', date:dateLabel(book)
+          }))
+        };
+        render();
+      }
+
       render();
+      Store.watch(sync, 15000);
+      sync().catch(error => console.warn('독서 현황을 불러오지 못했습니다.', error));
     })();
   </script>
   <script src="../widget-frame.js"></script>

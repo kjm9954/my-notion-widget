@@ -98,14 +98,15 @@
     </main>
   </div>
 
+  <script src="../store.js"></script>
   <script>
-    const DATA = [];
+    let DATA = [];
 
     (() => {
       const count = document.getElementById('count');
       const chips = document.getElementById('chips');
       const content = document.getElementById('content');
-      const categories = [...new Set(DATA.map(book => book.cat).filter(Boolean))].slice(0, 3);
+      let categories = [];
       let books = DATA.map(book => ({ ...book }));
       let category = '전체';
       let selectedId = books[0]?.id ?? null;
@@ -152,13 +153,20 @@
         if (buying) return;
         buying = true;
         const featured = content.querySelector('.featured');
-        const finish = () => {
-          books = books.filter(book => book.id !== selectedId);
-          selectedId = filteredBooks()[0]?.id ?? null;
-          expanded = false;
-          swapFeatured = true;
-          buying = false;
-          render();
+        const finish = async () => {
+          try {
+            await Store.updateReadingBook(selectedId, { status:'owned' });
+            books = books.filter(book => book.id !== selectedId);
+            selectedId = filteredBooks()[0]?.id ?? null;
+            expanded = false;
+            swapFeatured = true;
+            render();
+          } catch (error) {
+            console.warn('구매 상태를 저장하지 못했습니다.', error);
+            renderContent();
+          } finally {
+            buying = false;
+          }
         };
         if (featured && window.widgetMotion) window.widgetMotion.close(featured, finish);
         else finish();
@@ -184,7 +192,7 @@
           <section class="grid-shell" aria-label="구매 예정 책 목록">${shown.map(book => coverMarkup(book, 'grid-cover', true)).join('')}${hiddenCount > 0 ? `<button class="more" id="showAll" type="button">＋${hiddenCount}</button>` : ''}</section>`;
         document.getElementById('bought')?.addEventListener('click', buySelected);
         document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
-        content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); swapFeatured = true; renderContent(); }));
+        content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = button.dataset.bookId; swapFeatured = true; renderContent(); }));
         bindCoverFallbacks();
         if (!entranceDone) {
           entranceDone = true;
@@ -199,7 +207,29 @@
         renderContent();
       }
 
+      function ageLabel(value) {
+        const created = new Date(value);
+        if (Number.isNaN(created.getTime())) return '최근';
+        const days = Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000));
+        return days === 0 ? '오늘' : `${days}일 전`;
+      }
+
+      async function sync() {
+        const state = await Store.loadReadingLibrary();
+        DATA = (state?.books || []).filter(book => book.status === 'wishlist').map(book => ({
+          id:book.id, title:book.title, author:book.author || '저자 미입력', cover:book.cover || '',
+          cat:book.field || '미분류', addedAgo:ageLabel(book.created)
+        }));
+        books = DATA.map(book => ({ ...book }));
+        categories = [...new Set(books.map(book => book.cat).filter(Boolean))].slice(0, 3);
+        if (category !== '전체' && !categories.includes(category)) category = '전체';
+        if (!books.some(book => book.id === selectedId)) selectedId = books[0]?.id ?? null;
+        render();
+      }
+
       render();
+      Store.watch(sync, 15000);
+      sync().catch(error => console.warn('구매 예정 책을 불러오지 못했습니다.', error));
     })();
   </script>
   <script src="../widget-frame.js"></script>

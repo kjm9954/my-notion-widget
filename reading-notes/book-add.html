@@ -125,30 +125,13 @@
     </section>
   </main>
 
+  <script src="../store.js"></script>
   <script>
     (() => {
       'use strict';
 
-      // ── 가짜 데이터. 나중에 searchBooks만 실제 도서 API로 교체한다. ──
-      function cover(bg, label) {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300"><rect width="200" height="300" fill="${bg}"/><rect x="14" y="230" width="150" height="10" rx="5" fill="rgba(255,255,255,.5)"/><text x="16" y="42" font-family="sans-serif" font-size="20" font-weight="700" fill="rgba(255,255,255,.92)">${label}</text></svg>`;
-        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-      }
-      const MOCK = {
-        '데미안': [
-          { title:'데미안', author:'헤르만 헤세', publisher:'민음사',   year:2023, cover:cover('#0E5C7A','Demian') },
-          { title:'데미안', author:'헤르만 헤세', publisher:'열린책들', year:2010, cover:cover('#33505C','Demian') },
-          { title:'데미안', author:'헤르만 헤세', publisher:'문예출판사', year:2001, cover:null },
-        ],
-        '토지': [
-          { title:'토지', author:'박경리', publisher:'마로니에북스', year:2012, cover:cover('#6B8794','토지') },
-          { title:'토지', author:'박경리', publisher:'나남출판',   year:2002, cover:null },
-        ],
-      };
       function searchBooks(query) {
-        const key = String(query || '').trim();
-        // 같은 제목 여러 판본 포함. 출판연도 내림차순(최신 먼저).
-        return (MOCK[key] || []).slice().sort((a, b) => b.year - a.year);
+        return [];
       }
 
       const STATUSES = ['읽는 중', '완독', '중도포기', '구입 전'];
@@ -163,6 +146,7 @@
       let state = null;
       let searchTimer = 0;
       let doneTimer = 0;
+      let saving = false;
 
       function escapeHtml(value) {
         return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
@@ -366,7 +350,8 @@
         }
       });
 
-      function submit() {
+      async function submit() {
+        if (saving) return;
         const book = currentBook() || {};
         const payload = {
           title: String(book.title || '').trim(),
@@ -376,14 +361,22 @@
           year: state.year,
           status: state.status,
         };
-        // 이번 범위는 화면까지 — 실제 저장 대신 로그만.
-        console.log('[book-add] 노션에 추가할 데이터', payload);
-        state.added = payload;
-        state.step = 'done';
-        renderDone();
-        widgetMotion.popIn(panel.querySelector('.done'));
-        clearTimeout(doneTimer);
-        doneTimer = setTimeout(close, 2000);
+        if (!payload.title) return;
+        saving = true;
+        const button = panel.querySelector('[data-add]');
+        if (button) { button.disabled = true; button.textContent = '저장 중'; }
+        try {
+          const saved = await Store.createReadingBook({ ...payload, status:({ '읽는 중':'reading', '완독':'done', '중도포기':'dropped', '구입 전':'wishlist' })[payload.status] });
+          state.added = { ...payload, id:saved.id };
+          state.step = 'done';
+          renderDone();
+          widgetMotion.popIn(panel.querySelector('.done'));
+          clearTimeout(doneTimer);
+          doneTimer = setTimeout(close, 2000);
+        } catch (error) {
+          console.warn('책을 노션에 추가하지 못했습니다.', error);
+          if (button) { button.disabled = false; button.textContent = '저장 실패 · 다시'; }
+        } finally { saving = false; }
       }
     })();
   </script>

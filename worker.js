@@ -10,6 +10,15 @@ import {
   upcomingOccurrences,
   weekdayOfDateKey,
 } from "./schedule-core.js";
+import {
+  createReadingBook,
+  createReadingQuotes,
+  deleteReadingQuote,
+  loadReadingLibrary,
+  readingDateKey,
+  updateReadingBook,
+  updateReadingQuote,
+} from "./reading-notion.js";
 
 export default {
   async fetch(request, env) {
@@ -146,6 +155,48 @@ export default {
         state.byDate[body.date] = Math.min(1000000, (state.byDate[body.date] || 0) + count);
         await saveSetting(env, "readingNotes", state);
         return json({ ok: true, data: state });
+      }
+
+      // ───────── 노션 독서 DB ─────────
+      if (path === "/api/reading/library" && request.method === "GET") {
+        const fresh = url.searchParams.get("fresh") === "1";
+        return json({ ok: true, data: await loadReadingLibrary(env, { fresh }) });
+      }
+
+      if (path === "/api/reading/books/create" && request.method === "POST") {
+        const book = await createReadingBook(env, await request.json());
+        return json({ ok: true, data: book }, 201);
+      }
+
+      if (path === "/api/reading/books/update" && request.method === "POST") {
+        const body = await request.json();
+        const book = await updateReadingBook(env, body?.id, body?.patch || {});
+        return json({ ok: true, data: book });
+      }
+
+      if (path === "/api/reading/quotes/create" && request.method === "POST") {
+        const body = await request.json();
+        const result = await createReadingQuotes(env, body);
+        if (result.createdCount > 0) {
+          const date = validDateKey(body?.date) ? body.date : readingDateKey();
+          const state = normalizeReadingNotesState(await loadSetting(env, "readingNotes", { byDate: {} }));
+          state.byDate[date] = Math.min(1000000, (state.byDate[date] || 0) + result.createdCount);
+          await saveSetting(env, "readingNotes", state);
+          result.readingNotes = state;
+        }
+        return json({ ok: true, data: result }, 201);
+      }
+
+      if (path === "/api/reading/quotes/update" && request.method === "POST") {
+        const body = await request.json();
+        const quote = await updateReadingQuote(env, body?.id, body?.patch || {}, body?.original || {});
+        return json({ ok: true, data: quote });
+      }
+
+      if (path === "/api/reading/quotes/delete" && request.method === "POST") {
+        const body = await request.json();
+        await deleteReadingQuote(env, body?.id, body?.original || {});
+        return json({ ok: true });
       }
 
       // ───────── 생각 ─────────
@@ -749,7 +800,7 @@ async function processScheduleOccurrence(env, row, occurrence, now) {
 
 export function notionScheduleConfig(env) {
   const values = {
-    token: String(env.NOTION_TOKEN || "").trim(),
+    token: String(env.NOTION_TOKEN || env.NOTION_CLIENT_SECRET || "").trim(),
     dataSourceId: String(env.NOTION_DATABASE_ID || "").trim(),
     titleProperty: String(env.NOTION_TITLE_PROPERTY || "").trim(),
     dateProperty: String(env.NOTION_DATE_PROPERTY || "").trim(),

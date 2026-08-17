@@ -130,16 +130,10 @@
   <script src="../store.js"></script>
   <script>
     (() => {
-      const LIBRARY_KEY = 'reading-library-v1';
-      const QUOTES_KEY = 'reading-quotes-v1';
-      const NOTES_KEY = 'reading-notes-v1';
-      const CHANNEL = 'reading';
-      const isDemoItem = item => String(item?.id || '').startsWith('demo-') || String(item?.bookId || '').startsWith('demo-');
       const makeDate = offset => {
         const date = new Date(); date.setDate(date.getDate() - offset);
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       };
-      const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL) : null;
       const els = {
         today:document.getElementById('todayLabel'), session:document.getElementById('sessionLabel'), mp:document.getElementById('mpPill'),
         books:document.getElementById('bookRow'), from:document.getElementById('pageFrom'), to:document.getElementById('pageTo'),
@@ -153,30 +147,7 @@
       let sessionNumber = 1;
       let addingBook = false;
       let pillTimer = 0;
-      let notesSyncRunning = false;
-      let notesReady = Promise.resolve();
 
-      function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
-      function readCollection(key, field) {
-        let raw = null; try { raw = localStorage.getItem(key); } catch (_) {}
-        const value = safeParse(raw, null);
-        if (!value || !Array.isArray(value[field])) return { [field]:[] };
-        const items = value[field].filter(item => !isDemoItem(item));
-        const cleaned = { ...value, [field]:items };
-        if (items.length !== value[field].length) try { localStorage.setItem(key, JSON.stringify(cleaned)); } catch (_) {}
-        return cleaned;
-      }
-      function readLibrary() {
-        return readCollection(LIBRARY_KEY, 'books');
-      }
-      function readQuotes() {
-        return readCollection(QUOTES_KEY, 'quotes');
-      }
-      function readNotes() {
-        let raw = null; try { raw = localStorage.getItem(NOTES_KEY); } catch (_) {}
-        const value = safeParse(raw, null);
-        return value && value.byDate && typeof value.byDate === 'object' ? value : { byDate:{} };
-      }
       function normalizeNotes(value) {
         const source = value?.byDate && typeof value.byDate === 'object' ? value.byDate : {};
         const byDate = {};
@@ -187,34 +158,12 @@
         });
         return { byDate };
       }
-      function mergeNotes(remote, local) {
-        const merged = normalizeNotes(remote);
-        Object.entries(normalizeNotes(local).byDate).forEach(([date, count]) => {
-          merged.byDate[date] = Math.max(merged.byDate[date] || 0, count);
-        });
-        return merged;
-      }
-      function write(key, value) {
-        try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { return false; }
-        if (channel) channel.postMessage({ type:'changed', key });
-        return true;
-      }
       async function syncNotesFromServer() {
-        if (notesSyncRunning) return readNotes();
-        notesSyncRunning = true;
         try {
-          const remote = normalizeNotes(await Store.loadReadingNotesState());
-          const merged = mergeNotes(remote, readNotes());
-          const saved = JSON.stringify(merged) === JSON.stringify(remote)
-            ? merged
-            : normalizeNotes(await Store.saveReadingNotesState(merged));
-          write(NOTES_KEY, saved);
-          return saved;
+          return normalizeNotes(await Store.loadReadingNotesState());
         } catch (error) {
           console.warn('독서 기록을 동기화하지 못했습니다.', error);
-          return readNotes();
-        } finally {
-          notesSyncRunning = false;
+          return { byDate:{} };
         }
       }
       function uid(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -222,8 +171,8 @@
       function formatToday() {
         return new Intl.DateTimeFormat('ko-KR', { month:'long', day:'numeric', weekday:'long' }).format(new Date()).replaceAll(' ', ' ');
       }
-      function syncBooks() {
-        books = readLibrary().books;
+      function applyBooks(nextBooks) {
+        books = Array.isArray(nextBooks) ? nextBooks : [];
         const reading = books.filter(book => book.status === 'reading');
         if (!reading.some(book => book.id === selectedBookId)) selectedBookId = reading[0]?.id || '';
         renderBooks();
@@ -245,13 +194,13 @@
         if (input) input.addEventListener('keydown', event => { if (event.key === 'Enter') addBook(); if (event.key === 'Escape') { addingBook = false; renderBooks(); } });
         if (button) button.addEventListener('click', addBook);
       }
-      function addBook() {
+      async function addBook() {
         const title = document.getElementById('newBookTitle')?.value.trim();
         if (!title) return;
-        const book = { id:uid('book'), title, author:'', field:'미분류', status:'reading', star:0, one:'', cover:'', learned:'', applying:'', dropReason:'' };
-        const latest = readLibrary();
-        if (!latest.books.some(item => item.id === book.id)) latest.books.push(book);
-        if (write(LIBRARY_KEY, latest)) { selectedBookId = book.id; addingBook = false; syncBooks(); }
+        try {
+          const book = await Store.createReadingBook({ title, status:'reading', year:new Date().getFullYear() });
+          books.unshift(book); selectedBookId = book.id; addingBook = false; applyBooks(books);
+        } catch (error) { console.warn('책을 추가하지 못했습니다.', error); }
       }
       function pageLabel() { return String(els.to.value.trim() || els.from.value.trim() || ''); }
       function addDraft() {
@@ -284,28 +233,22 @@
       async function saveSession() {
         if (!draft.length) return;
         els.save.disabled = true;
-        const latestQuotes = readQuotes();
-        const existing = new Set(latestQuotes.quotes.map(item => item.id));
-        draft.forEach(item => { if (!existing.has(item.id)) latestQuotes.quotes.push(item); });
-        await notesReady;
-        const notes = normalizeNotes(readNotes());
+        const notes = await syncNotesFromServer();
         const before = mpValue(notes.byDate);
         const today = makeDate(0);
-        if (!write(QUOTES_KEY, latestQuotes)) {
-          renderDraft();
-          els.saveHint.textContent = '브라우저 기록을 저장하지 못했습니다 · 다시 시도해 주세요';
-          return;
-        }
         let savedNotes;
         try {
-          savedNotes = normalizeNotes(await Store.addReadingNotes(today, draft.length));
+          const result = await Store.createReadingQuotes(selectedBookId, draft, {
+            date:today,
+            pageRead:Number(els.to.value.trim() || els.from.value.trim()) || undefined,
+          });
+          savedNotes = normalizeNotes(result?.readingNotes || await Store.loadReadingNotesState());
         } catch (error) {
           console.warn('독서 기록을 저장하지 못했습니다.', error);
           renderDraft();
           els.saveHint.textContent = '서버에 저장하지 못했습니다 · 다시 시도해 주세요';
           return;
         }
-        write(NOTES_KEY, savedNotes);
         const after = mpValue(savedNotes.byDate);
         draft = []; sessionNumber += 1; els.session.textContent = `오늘 ${sessionNumber}번째 세션`;
         renderDraft(); showMp(Math.max(0, after - before));
@@ -317,9 +260,10 @@
         draft = []; els.quote.value = ''; els.reaction.value = ''; els.from.value = ''; els.to.value = '';
         sessionNumber += 1; els.session.textContent = `오늘 ${sessionNumber}번째 세션`; renderBooks(); renderDraft();
       }
-      function externalSync() {
-        syncBooks();
-        notesReady = syncNotesFromServer();
+      async function externalSync() {
+        const state = await Store.loadReadingLibrary();
+        applyBooks(state?.books);
+        await syncNotesFromServer();
       }
 
       els.today.textContent = formatToday();
@@ -327,12 +271,9 @@
       els.quote.addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); addDraft(); } });
       els.save.addEventListener('click', saveSession);
       els.fresh.addEventListener('click', startFreshSession);
-      window.addEventListener('storage', event => { if ([LIBRARY_KEY, QUOTES_KEY, NOTES_KEY].includes(event.key)) externalSync(); });
-      window.addEventListener('visibilitychange', () => { if (!document.hidden) externalSync(); });
-      window.addEventListener('focus', externalSync);
-      if (channel) channel.addEventListener('message', externalSync);
-      notesReady = syncNotesFromServer();
-      syncBooks(); renderDraft();
+      Store.watch(externalSync, 15000);
+      externalSync().catch(error => console.warn('독서 세션을 불러오지 못했습니다.', error));
+      renderBooks(); renderDraft();
     })();
   </script>
   <script src="../widget-frame.js"></script>
