@@ -89,6 +89,7 @@
           else {
             selectedIndex = next;
             content.querySelectorAll('[data-book-index]').forEach((cover, index) => cover.classList.toggle('is-selected', index === selectedIndex));
+            widgetMotion.pop(button);
             const book = DATA[selectedIndex];
             const panel = content.querySelector('.quote-panel');
             if (panel && book?.line) {

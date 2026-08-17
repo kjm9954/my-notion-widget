@@ -136,6 +136,7 @@
       let bannerIndex = 0;
       let activeId = '';
       let deleteArmed = false;
+      let lastThoughtId = '';
 
       function safeParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (_) { return fallback; } }
       function readCollection(key, field) {
@@ -179,8 +180,15 @@
         const item = waiting[bannerIndex]; const book = bookFor(item.bookId);
         els.banner.className = 'banner';
         els.banner.innerHTML = `<div class="banner-title">사유 대기 중 · ${age(item.created)}</div><button class="rotate" type="button" aria-label="다른 문장 보기">↻</button><div class="banner-quote">${escapeHtml(item.text)}</div><div class="banner-meta">${escapeHtml(book.title)} · 아직 파고들지 않았어요</div>`;
-        els.banner.querySelector('.rotate').addEventListener('click', event => { event.stopPropagation(); bannerIndex = (bannerIndex + 1) % waiting.length; renderBanner(); });
+        els.banner.querySelector('.rotate').addEventListener('click', event => { event.stopPropagation(); bannerIndex = (bannerIndex + 1) % waiting.length; renderBanner(); runMotion(els.banner, 'motion-swap'); });
         els.banner.addEventListener('click', () => openDetail(item.id));
+      }
+      function runMotion(element, className) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        element.addEventListener('animationend', () => element.classList.remove(className), { once:true });
       }
       function renderFilters() {
         const fieldCounts = quotes.reduce((counts, item) => {
@@ -218,11 +226,11 @@
         document.getElementById('prevQuote').addEventListener('click', () => { if (index > 0) openDetail(list[index - 1].id); });
         document.getElementById('nextQuote').addEventListener('click', () => { if (index >= 0 && index < list.length - 1) openDetail(list[index + 1].id); });
       }
-      function closeDetail() { activeId = ''; deleteArmed = false; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); }
+      function closeDetail() { const thoughtId=lastThoughtId;lastThoughtId='';activeId = ''; deleteArmed = false; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); if(thoughtId)widgetMotion.pop(els.list.querySelector(`[data-quote-id="${CSS.escape(thoughtId)}"] .state-dot.has-thought`)); }
       function saveThought(id, value) {
         const latest = readQuotes(); const item = latest.quotes.find(quote => quote.id === id); if (!item) return;
         item.thought = value; if (!writeQuotes(latest)) return;
-        const local = quotes.find(quote => quote.id === id); if (local) local.thought = value;
+        const local = quotes.find(quote => quote.id === id); if (local) { if(!String(local.thought || '').trim()&&String(value).trim())lastThoughtId=id;local.thought = value; }
         const label = document.getElementById('savedLabel'); if (label) label.textContent = '저장됨';
       }
       function deleteQuote(id) {

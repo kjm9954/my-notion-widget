@@ -196,7 +196,7 @@
         const box=card.querySelector(`[data-composer="${scope}"]`),input=box?.querySelector('[data-new-goal]');
         const title=input?.value.trim();if(!title){input?.focus();return;}
         const parent=box?.dataset.parentValue||null;
-        state.goals.push({id:id(),scope,t:title,done:false,parent,createdAt:Date.now(),completedAt:null});ui.composer='';ui.undo=null;save();render();
+        const goal={id:id(),scope,t:title,done:false,parent,createdAt:Date.now(),completedAt:null};state.goals.push(goal);ui.composer='';ui.undo=null;save();render();const rowNode=card.querySelector(`[data-row="${CSS.escape(goal.id)}"]`);if(rowNode){widgetMotion.popIn(rowNode);rowNode.classList.add('motion-new');setTimeout(()=>rowNode.classList.remove('motion-new'),900);}
       }
       function remove(mode){
         const goal=byId(ui.deleting);if(!goal)return;
@@ -210,7 +210,7 @@
         const parentToggle=target.closest('[data-parent-toggle]');if(parentToggle){const picker=parentToggle.closest('[data-parent-picker]'),options=picker?.querySelector('[data-parent-options]'),opening=parentToggle.getAttribute('aria-expanded')!=='true';parentToggle.setAttribute('aria-expanded',String(opening));if(options)options.hidden=!opening;return;}
         const parentOption=target.closest('[data-parent-option]');if(parentOption){const box=parentOption.closest('[data-composer]'),picker=parentOption.closest('[data-parent-picker]'),trigger=picker?.querySelector('[data-parent-toggle]'),label=picker?.querySelector('[data-parent-label]');if(box)box.dataset.parentValue=parentOption.dataset.parentOption||'';picker?.querySelectorAll('[data-parent-option]').forEach(option=>option.classList.toggle('is-selected',option===parentOption));if(label)label.textContent=parentOption.textContent.trim();if(trigger)trigger.setAttribute('aria-expanded','false');const options=picker?.querySelector('[data-parent-options]');if(options)options.hidden=true;trigger?.focus();return;}
         card.querySelectorAll('[data-parent-toggle][aria-expanded="true"]').forEach(trigger=>{trigger.setAttribute('aria-expanded','false');const options=trigger.closest('[data-parent-picker]')?.querySelector('[data-parent-options]');if(options)options.hidden=true;});
-        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:180;setTimeout(()=>render(),delay);}return;}
+        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();if(goal.done)widgetMotion.pop(toggle);const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;setTimeout(()=>render(),delay);}return;}
         const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';ui.deleting='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
         const del=target.closest('[data-delete-request]');if(del){ui.deleting=del.dataset.deleteRequest;ui.composer='';render();return;}

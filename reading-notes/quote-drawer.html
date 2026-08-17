@@ -127,6 +127,7 @@
       let chipsExpanded = false;
       let activeId = null;
       let editingId = null;
+      let entranceDone = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
 
       function filteredItems() {
@@ -192,6 +193,7 @@
           const saved = editingId === null;
           renderList(quoteList.scrollTop);
           if (saved) quoteList.querySelector(`[data-open="${id}"]`)?.closest('.quote-item')?.querySelector('.thought')?.classList.add('motion-swap');
+          if (saved) widgetMotion.pop(quoteList.querySelector(`[data-edit="${id}"]`));
           if (editingId === id) document.getElementById('thoughtInput')?.focus();
         }));
       }
@@ -205,6 +207,10 @@
         quoteList.innerHTML = result.map(item => `<article class="quote-item"><button class="quote-summary" type="button" data-open="${item.id}"><div class="quote-text">${escapeHtml(item.text)}</div><div class="quote-meta"><span class="quote-book">${escapeHtml(item.book)}</span><span class="quote-age">${escapeHtml(item.ago)}</span></div></button>${activeId === item.id ? renderDetail(item) : ''}</article>`).join('');
         quoteList.scrollTop = scrollTop;
         bindList();
+        if (!entranceDone) {
+          entranceDone = true;
+          requestAnimationFrame(() => window.widgetMotion?.cascade(quoteList.querySelectorAll('.quote-item')));
+        }
       }
 
       function renderEmpty() {

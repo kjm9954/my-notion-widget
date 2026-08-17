@@ -82,6 +82,7 @@
     (() => {
       const card = document.querySelector('.card');
       const content = document.getElementById('content');
+      let entranceDone = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
       const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
       const cover = book => book.cover
@@ -110,6 +111,10 @@
           ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${index === 0 ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${index === 0 ? ' · 올해' : ''}</span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
           ${recent.length ? `<section class="recent-section"><span class="recent-label">최근에 덮은 책</span><div class="recent-list">${recent.map(book => `<article class="book-item">${cover(book)}<div class="book-copy"><strong class="book-title">${escapeHtml(book.title)}</strong><span class="book-meta">${escapeHtml(book.author)} · ${escapeHtml(book.date)}</span></div></article>`).join('')}</div></section>` : ''}`;
         bindCoverFallbacks();
+        if (!entranceDone && recent.length) {
+          entranceDone = true;
+          requestAnimationFrame(() => window.widgetMotion?.cascade(content.querySelectorAll('.book-item')));
+        }
       }
 
       render();

@@ -178,6 +178,7 @@
       let projects = [];
       let midnightTimer = 0;
       let animationTimer = 0;
+      let entranceDone = false;
 
       function pad(value) { return String(value).padStart(2,'0'); }
 
@@ -397,8 +398,11 @@
           liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
           return;
         }
+        const firstRefresh = !entranceDone;
+        entranceDone = true;
         if (!changed && !dateChanged) return;
         render({ motion:mark ? 'motion-new' : '', announce:false });
+        if (firstRefresh) widgetMotion.cascade(taskList.querySelectorAll('.task-row'));
       }
 
       function scheduleMidnightRefresh() {
@@ -419,6 +423,7 @@
         selectedOffset = offset;
         renderedDateKey = '';
         render({ motion:'motion-swap', announce:true });
+        widgetMotion.pop(dayRail.querySelector('.day-chip.is-selected'));
       });
 
       document.addEventListener('visibilitychange', () => {

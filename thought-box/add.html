@@ -326,6 +326,7 @@
           button.addEventListener('click', () => {
             selectedCat = cat;
             renderCats();
+            widgetMotion.pop(categoryChips.querySelector('.chip.selected'));
           });
           categoryChips.appendChild(button);
         });
@@ -388,6 +389,7 @@
         detailToggle.setAttribute('aria-expanded', 'false');
         card.classList.remove('detail-open');
         renderCats();
+        widgetMotion.pop(form.querySelector('.add-button'));
         oneInput.focus();
       });
 

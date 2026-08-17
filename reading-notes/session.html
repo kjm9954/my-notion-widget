@@ -220,7 +220,7 @@
         const text = els.quote.value.trim();
         if (!text || !selectedBookId) return;
         draft.push({ id:uid('draft'), bookId:selectedBookId, text, page:pageLabel(), note:els.reaction.value.trim(), thought:'', created:new Date().toISOString() });
-        els.quote.value = ''; els.reaction.value = ''; renderDraft(); els.quote.focus();
+        els.quote.value = ''; els.reaction.value = ''; renderDraft(); const row=els.list.lastElementChild;if(row){widgetMotion.popIn(row);row.classList.add('motion-new');setTimeout(()=>row.classList.remove('motion-new'),900);}els.quote.focus();
       }
       function renderDraft() {
         els.count.textContent = String(draft.length);
@@ -240,6 +240,7 @@
       }
       function showMp(amount) {
         clearTimeout(pillTimer); els.mp.textContent = `MP +${amount}`; els.mp.classList.remove('hidden');
+        widgetMotion.popIn(els.mp);
         pillTimer = window.setTimeout(() => els.mp.classList.add('hidden'), 4000);
       }
       function saveSession() {

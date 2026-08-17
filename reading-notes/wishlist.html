@@ -112,6 +112,7 @@
       let expanded = false;
       let swapFeatured = false;
       let buying = false;
+      let entranceDone = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
       const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
 
@@ -185,6 +186,10 @@
         document.getElementById('showAll')?.addEventListener('click', () => { expanded = true; renderContent(); });
         content.querySelectorAll('[data-book-id]').forEach(button => button.addEventListener('click', () => { selectedId = Number(button.dataset.bookId); swapFeatured = true; renderContent(); }));
         bindCoverFallbacks();
+        if (!entranceDone) {
+          entranceDone = true;
+          requestAnimationFrame(() => window.widgetMotion?.cellPop(content.querySelectorAll('.grid-shell .grid-cover')));
+        }
         swapFeatured = false;
       }
 

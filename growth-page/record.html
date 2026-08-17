@@ -291,6 +291,7 @@
       let selectedKey = null;
       let settings = readSettings();
       let activity = { diary:{}, reading:{} };
+      let knownDiaryDates = null;
 
       function pad(value) { return String(value).padStart(2, '0'); }
       function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
@@ -413,12 +414,21 @@
         renderDetail();
       }
 
+      function runMotion(element, className) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        element.addEventListener('animationend', () => element.classList.remove(className), { once:true });
+      }
+
       document.getElementById('card').addEventListener('click', event => {
         const monthStep = event.target.closest('[data-month-step]');
         if (monthStep) {
           viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + Number(monthStep.dataset.monthStep), 1);
           selectedKey = null;
           render();
+          runMotion(calendarShell, 'motion-calendar-swap');
           return;
         }
         const dayButton = event.target.closest('[data-date]');
@@ -426,6 +436,7 @@
           selectedKey = selectedKey === dayButton.dataset.date ? null : dayButton.dataset.date;
           renderCalendar();
           renderDetail();
+          runMotion(detailRow, 'motion-swap');
           return;
         }
         if (event.target.closest('[data-close-detail]')) {
@@ -443,7 +454,7 @@
         if (event.key === SETTINGS_KEY) render();
       });
 
-      async function sync(){try{const dates=await Store.getWrittenDates();activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};render();}catch(_){header.innerHTML='<span class="month-summary">불러오기 실패</span>';}}
+      async function sync(){try{const loaded=await Store.getWrittenDates(),dates=Array.isArray(loaded)?loaded:[],nextDates=new Set(dates),added=knownDiaryDates?[...nextDates].filter(key=>!knownDiaryDates.has(key)):[];knownDiaryDates=nextDates;activity={diary:Object.fromEntries(dates.map(key=>[key,true])),reading:{}};render();added.forEach(key=>daysElement.querySelector(`[data-date="${CSS.escape(key)}"]`)?.classList.add('motion-new'));}catch(_){header.innerHTML='<span class="month-summary">불러오기 실패</span>';}}
       window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
     })();
   </script>

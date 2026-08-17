@@ -298,6 +298,7 @@
       let pendingWorklogState = null;
       let saveQueue = Promise.resolve();
       let deleteTimer = 0;
+      let lastSavedTaskId = '';
       let ui = freshUi();
 
       function freshUi() {
@@ -416,7 +417,9 @@
           updatedAt:now
         });
         if (!normalized) return false;
-        return writeMutation(byId => byId.set(normalized.id, normalized));
+        const saved = writeMutation(byId => byId.set(normalized.id, normalized));
+        if (saved) lastSavedTaskId = normalized.id;
+        return saved;
       }
 
       function deleteTask(id) {
@@ -516,6 +519,7 @@
       function openList(cell) {
         beginPopup('list', cell.dataset.date, cell);
         renderListPopup();
+        widgetMotion.popIn(popover);
       }
 
       function openAdd(cell) {
@@ -523,6 +527,7 @@
         beginPopup('add', date, cell);
         ui.draft = { id:'', title:'', proj:projects[0] || '', status:'wait', due:date, memo:'', createdAt:Date.now(), updatedAt:Date.now() };
         renderEditorPopup();
+        widgetMotion.popIn(popover);
         requestAnimationFrame(() => popover.querySelector('[data-title-input]')?.focus({ preventScroll:true }));
       }
 
@@ -854,7 +859,9 @@
 
       function closePopover({ save = true, revert = false } = {}) {
         syncDraftFromInputs();
+        lastSavedTaskId = '';
         if (!revert && save && (ui.mode === 'add' || ui.mode === 'edit')) saveDraft();
+        const savedTaskId = lastSavedTaskId;
         cancelDeleteConfirm();
         popover.querySelector('.due-picker')?.remove();
         card.querySelectorAll('.day.add-open').forEach(day => day.classList.remove('add-open'));
@@ -863,6 +870,14 @@
         ui = freshUi();
         applyPendingSync();
         renderMonth();
+        if (savedTaskId) {
+          const task = grid.querySelector(`[data-calendar-task="${CSS.escape(savedTaskId)}"]`);
+          if (task) {
+            widgetMotion.popIn(task);
+            task.classList.add('motion-new');
+            setTimeout(() => task.classList.remove('motion-new'), 900);
+          }
+        }
       }
 
       function cancelDeleteConfirm() {
@@ -953,6 +968,15 @@
         closePopover({ save:false });
         shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + delta, 1, 12);
         renderMonth();
+        runGridMotion();
+      }
+
+      function runGridMotion() {
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        grid.classList.remove('motion-calendar-swap');
+        void grid.offsetWidth;
+        grid.classList.add('motion-calendar-swap');
+        grid.addEventListener('animationend', () => grid.classList.remove('motion-calendar-swap'), { once:true });
       }
 
       document.getElementById('previousMonth').addEventListener('click', () => setShownMonth(-1));
@@ -961,6 +985,7 @@
         closePopover({ save:false });
         shownMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
         renderMonth();
+        runGridMotion();
       });
 
       grid.addEventListener('click', event => {

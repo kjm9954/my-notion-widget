@@ -134,26 +134,48 @@
       font-weight:600;
     }
 
-    .search {
+    .search-shell {
+      position:relative;
       width:100%;
       height:36px;
       flex:0 0 36px;
-      padding:0 11px;
-      color:var(--text);
       background:var(--surface);
       border:1px solid var(--border-input);
       border-radius:9px;
+      transition:border-color var(--t-color) var(--ease),outline-color var(--t-color) var(--ease);
+    }
+    .search-icon {
+      position:absolute;
+      left:10px;
+      top:0;
+      bottom:0;
+      display:flex;
+      align-items:center;
+      color:var(--secondary);
+      font-size:15px;
+      line-height:1;
+      pointer-events:none;
+    }
+    .search {
+      width:100%;
+      height:100%;
+      padding:0 11px 0 30px;
+      color:var(--text);
+      background:transparent;
+      border:0;
+      border-radius:inherit;
       outline:none;
       font-size:12px;
       font-weight:600;
-      transition:border-color var(--t-color) var(--ease),outline-color var(--t-color) var(--ease);
     }
     .search::placeholder { color:var(--faint); opacity:1; }
-    .search:focus {
+    .search-shell:focus-within {
       border-color:var(--action);
       outline:1px solid var(--action);
       outline-offset:-1px;
     }
+    .search-shell:focus-within .search-icon { animation:v2-pop var(--t-pop) var(--ease-pop) 1 both; }
+    .match { color:var(--action); font-weight:800; }
 
     .filter-block {
       position:relative;
@@ -556,7 +578,7 @@
   <main class="card" id="card" data-widget-card aria-label="생각 찾기 위젯">
     <section class="fixed" id="fixedArea" data-widget-fixed aria-label="검색과 필터">
       <div class="banner" id="banner" role="button" tabindex="0"></div>
-      <input class="search" id="searchInput" type="search" autocomplete="off" placeholder="한 줄 내용과 상세 내용에서 검색" aria-label="생각 검색">
+      <div class="search-shell"><span class="search-icon" aria-hidden="true">⌕</span><input class="search" id="searchInput" type="search" autocomplete="off" placeholder="한 줄 내용과 상세 내용에서 검색" aria-label="생각 검색"></div>
       <div class="filter-block">
         <div class="filter-row">
           <div class="filter-chips" id="filterChips" aria-label="카테고리 필터"></div>
@@ -910,6 +932,25 @@
           .sort((a, b) => b.created - a.created);
       }
 
+      function appendHighlighted(element, value) {
+        const text = String(value ?? '');
+        const needle = query.toLocaleLowerCase('ko');
+        if (!needle) { element.textContent = text; return; }
+        const lowered = text.toLocaleLowerCase('ko');
+        let cursor = 0;
+        while (cursor < text.length) {
+          const index = lowered.indexOf(needle, cursor);
+          if (index < 0) break;
+          if (index > cursor) element.appendChild(document.createTextNode(text.slice(cursor, index)));
+          const match = document.createElement('span');
+          match.className = 'match';
+          match.textContent = text.slice(index, index + needle.length);
+          element.appendChild(match);
+          cursor = index + needle.length;
+        }
+        if (cursor < text.length) element.appendChild(document.createTextNode(text.slice(cursor)));
+      }
+
       function renderList() {
         const scroll = openId ? savedListScroll : itemList.scrollTop;
         itemList.replaceChildren();
@@ -941,14 +982,14 @@
           }
           const title = document.createElement('span');
           title.className = 'item-one';
-          title.textContent = item.one;
+          appendHighlighted(title, item.one);
           titleRow.appendChild(title);
           card.appendChild(titleRow);
 
           if (item.detail.trim()) {
             const preview = document.createElement('div');
             preview.className = 'item-preview';
-            preview.textContent = `${item.detail.trim().slice(0, 64)}…`;
+            appendHighlighted(preview, `${item.detail.trim().slice(0, 64)}…`);
             card.appendChild(preview);
           }
 
@@ -1143,6 +1184,8 @@
       searchInput.addEventListener('input', () => {
         query = searchInput.value.trim();
         renderList();
+        widgetMotion.cascade(itemList.querySelectorAll('.item'));
+        if (query) setTimeout(() => widgetMotion.sweepMatches(itemList), 500);
       });
       manageButton.addEventListener('click', () => {
         managing = !managing;

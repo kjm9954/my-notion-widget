@@ -173,6 +173,7 @@
         widget.classList.add('is-open');
         overlay.hidden = false;
         render();
+        widgetMotion.popIn(panel);
         requestAnimationFrame(() => panel.querySelector('[data-search-input]')?.focus());
       }
 
@@ -293,6 +294,14 @@
         else if (state.step === 'done') renderDone();
       }
 
+      function runMotion(element, className) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        element.addEventListener('animationend', () => element.classList.remove(className), { once:true });
+      }
+
       function runSearch() {
         state.results = searchBooks(state.query);
         state.selected = 0;
@@ -311,6 +320,7 @@
         state.status = '완독';
         state.step = 'confirm';
         renderConfirm();
+        runMotion(panel.querySelector('.confirm-top'), 'motion-swap');
       }
 
       // 트리거·바깥판·Esc
@@ -371,6 +381,7 @@
         state.added = payload;
         state.step = 'done';
         renderDone();
+        widgetMotion.popIn(panel.querySelector('.done'));
         clearTimeout(doneTimer);
         doneTimer = setTimeout(close, 2000);
       }
