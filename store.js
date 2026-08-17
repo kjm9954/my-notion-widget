@@ -224,6 +224,23 @@ async function saveMoodWords(words) {
   return apiPost("/api/settings/mood-words", { words });
 }
 
+// ───────── 성장 스탯 · 독서 기록 ─────────
+async function loadStatsSettings() {
+  return (await apiGet("/api/stats/settings")).data;
+}
+async function saveStatsSettings(settings) {
+  return (await apiPost("/api/stats/settings", settings)).data;
+}
+async function loadReadingNotesState() {
+  return (await apiGet("/api/reading-notes/state")).data;
+}
+async function saveReadingNotesState(state) {
+  return (await apiPost("/api/reading-notes/state", state)).data;
+}
+async function addReadingNotes(date, count) {
+  return (await apiPost("/api/reading-notes/add", { date, count })).data;
+}
+
 // ───────── 생각 ─────────
 async function loadThoughtState() {
   return (await apiGet("/api/thoughts/state")).data;
@@ -405,6 +422,8 @@ window.Store = {
   createWidgetInstance, getWidgetInstanceId,
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,
   loadMoodWords, saveMoodWords,
+  loadStatsSettings, saveStatsSettings,
+  loadReadingNotesState, saveReadingNotesState, addReadingNotes,
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,
   loadIndexState, saveIndexScope, addIndexItem, updateIndexItem, deleteIndexItem,

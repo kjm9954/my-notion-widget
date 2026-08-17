@@ -19,7 +19,7 @@
     'mood.html': { selector:'.temperature-part.active', max:1, empty:'.history > .empty' },
     'achieve.html': { selector:'#content.list .row', kind:'dot', max:3, empty:'#content.empty' },
     'index.html': { selector:'.quadrant.is-selected', kind:'outline', max:1 },
-    'stats.html': { selector:'.meter-label', max:1 },
+    'stats.html': { selector:'.meter-fill', max:2 },
     'worklog.html': { selector:'.roll-banner:not([hidden]), [data-empty-add]', max:2 },
     'goals.html': { selector:'.goal-row:not(.done) .check', max:3, empty:'.goals-grid .empty' },
     'find.html': { empty:'.empty-list' },

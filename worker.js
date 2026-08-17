@@ -111,6 +111,43 @@ export default {
         return json({ ok: true, data: words });
       }
 
+      // ───────── 성장 스탯 ─────────
+      if (path === "/api/stats/settings" && request.method === "GET") {
+        const stored = await loadSetting(env, "growthStats", null);
+        return json({ ok: true, data: stored ? normalizeStatsSettings(stored) : null });
+      }
+
+      if (path === "/api/stats/settings" && request.method === "POST") {
+        const settings = normalizeStatsSettings(await request.json());
+        await saveSetting(env, "growthStats", settings);
+        return json({ ok: true, data: settings });
+      }
+
+      if (path === "/api/reading-notes/state" && request.method === "GET") {
+        const state = normalizeReadingNotesState(await loadSetting(env, "readingNotes", { byDate: {} }));
+        return json({ ok: true, data: state });
+      }
+
+      if (path === "/api/reading-notes/state" && request.method === "POST") {
+        const state = normalizeReadingNotesState(await request.json());
+        await saveSetting(env, "readingNotes", state);
+        return json({ ok: true, data: state });
+      }
+
+      if (path === "/api/reading-notes/add" && request.method === "POST") {
+        const body = await request.json();
+        if (!validDateKey(body?.date)) return json({ ok: false, error: "invalid date" }, 400);
+        const requestedCount = Math.floor(Number(body?.count));
+        if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+          return json({ ok: false, error: "count must be a positive number" }, 400);
+        }
+        const count = Math.min(10000, requestedCount);
+        const state = normalizeReadingNotesState(await loadSetting(env, "readingNotes", { byDate: {} }));
+        state.byDate[body.date] = Math.min(1000000, (state.byDate[body.date] || 0) + count);
+        await saveSetting(env, "readingNotes", state);
+        return json({ ok: true, data: state });
+      }
+
       // ───────── 생각 ─────────
       if (path === "/api/thoughts/state" && request.method === "GET") {
         return json({ ok: true, data: await loadThoughtState(env) });
@@ -855,6 +892,31 @@ function normalizeMoodWords(value) {
   return [...new Set((Array.isArray(value) ? value : [])
     .map(word => String(word).trim().slice(0, 20))
     .filter(Boolean))].slice(0, 16);
+}
+
+export function normalizeStatsSettings(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const urls = Array.isArray(source.urls)
+    ? source.urls.slice(0, 3).map(url => String(url ?? "").trim().slice(0, 2048))
+    : [];
+  while (urls.length < 3) urls.push("");
+  return {
+    start: validDateKey(source.start) ? source.start : seoulDateKey(),
+    urls,
+  };
+}
+
+export function normalizeReadingNotesState(value) {
+  const source = value && typeof value === "object" && value.byDate && typeof value.byDate === "object"
+    ? value.byDate
+    : {};
+  const byDate = {};
+  Object.entries(source).forEach(([date, rawCount]) => {
+    if (!validDateKey(date)) return;
+    const count = Math.max(0, Math.min(1000000, Math.floor(Number(rawCount) || 0)));
+    if (count > 0) byDate[date] = count;
+  });
+  return { byDate };
 }
 
 async function loadSetting(env, key, fallback) {

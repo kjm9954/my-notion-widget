@@ -325,6 +325,7 @@
   <script>
     (() => {
       const SETTINGS_KEY = 'growth-stats-v1';
+      const READING_KEY = 'reading-notes-v1';
       const card = document.getElementById('card');
       const shortcutMeta = [
         { glyph: '◲', label: '일기', placeholder: '일기 페이지 주소' },
@@ -336,9 +337,14 @@
       let settingsOpen = false;
       let statusExpanded = false;
       let activity = { diary:{}, reading:{} };
+      let activityLoaded = false;
       let serverHp = 20;
       let lastLevel = null;
       let previousAnomalies = null;
+      let settingsRevision = 0;
+      let settingsSaveTimer = 0;
+      let settingsSaving = false;
+      let syncRunning = false;
 
       function clone(value) { return JSON.parse(JSON.stringify(value)); }
       function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
@@ -368,9 +374,58 @@
         } catch (_) {}
         return clone(memorySettings);
       }
-      function saveSettings() {
+      function cacheSettings() {
         memorySettings = normalizeSettings(settings);
         try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(memorySettings)); } catch (_) {}
+      }
+      function saveSettings(immediate = false) {
+        cacheSettings();
+        settingsRevision += 1;
+        window.clearTimeout(settingsSaveTimer);
+        settingsSaveTimer = 0;
+        if (immediate) return persistSettings();
+        settingsSaveTimer = window.setTimeout(persistSettings, 320);
+      }
+      async function persistSettings() {
+        window.clearTimeout(settingsSaveTimer);
+        settingsSaveTimer = 0;
+        if (settingsSaving) return;
+        settingsSaving = true;
+        const revision = settingsRevision;
+        const snapshot = normalizeSettings(settings);
+        try {
+          settings = normalizeSettings(await Store.saveStatsSettings(snapshot));
+          cacheSettings();
+        } catch (error) {
+          console.warn('스탯 설정을 저장하지 못했습니다.', error);
+        } finally {
+          settingsSaving = false;
+          if (revision !== settingsRevision) persistSettings();
+        }
+      }
+      function normalizeReadingState(value) {
+        const source = value?.byDate && typeof value.byDate === 'object' ? value.byDate : {};
+        const byDate = {};
+        Object.entries(source).forEach(([date, rawCount]) => {
+          if (!parseKey(date)) return;
+          const count = Math.max(0, Math.floor(Number(rawCount) || 0));
+          if (count > 0) byDate[date] = count;
+        });
+        return { byDate };
+      }
+      function readLegacyReadingState() {
+        try { return normalizeReadingState(JSON.parse(localStorage.getItem(READING_KEY) || 'null')); }
+        catch (_) { return { byDate:{} }; }
+      }
+      function mergeReadingStates(remote, legacy) {
+        const merged = normalizeReadingState(remote);
+        Object.entries(normalizeReadingState(legacy).byDate).forEach(([date, count]) => {
+          merged.byDate[date] = Math.max(merged.byDate[date] || 0, count);
+        });
+        return merged;
+      }
+      function cacheReadingState(value) {
+        try { localStorage.setItem(READING_KEY, JSON.stringify(normalizeReadingState(value))); } catch (_) {}
       }
       function tenure() {
         const start = parseKey(settings.start) || localDay();
@@ -397,9 +452,12 @@
         const diaryGap = gapFromLast(diaryKeys);
         const readingGap = gapFromLast(readingKeys);
         const anomalies = [];
-        if (diaryGap === null && current.days >= 5) anomalies.push('일기 기록 없음');
-        else if (diaryGap >= 5) anomalies.push(`일기 공백 ${diaryGap}일`);
-        if (readingGap !== null && readingGap >= 7) anomalies.push(`독서 공백 ${readingGap}일`);
+        if (activityLoaded) {
+          if (diaryGap === null && current.days >= 5) anomalies.push('일기 기록 없음');
+          else if (diaryGap >= 5) anomalies.push(`일기 공백 ${diaryGap}일`);
+          if (readingGap === null && current.days >= 7) anomalies.push('독서 노트 기록 없음');
+          else if (readingGap >= 7) anomalies.push(`독서 공백 ${readingGap}일`);
+        }
         return {
           ...current,
           hp: serverHp,
@@ -427,11 +485,11 @@
       function runMainMotions(current, newAnomalies) {
         const level = card.querySelector('.level');
         if (lastLevel !== null && current.level > lastLevel) {
-          widgetMotion.pop(level);
-          widgetMotion.burst(level);
+          window.widgetMotion?.pop?.(level);
+          window.widgetMotion?.burst?.(level);
         }
         card.querySelectorAll('.status-pill').forEach(pill => {
-          if (newAnomalies.includes(pill.textContent)) widgetMotion.popIn(pill);
+          if (newAnomalies.includes(pill.textContent)) window.widgetMotion?.popIn?.(pill);
         });
         lastLevel = current.level;
         previousAnomalies = [...current.anomalies];
@@ -450,18 +508,20 @@
           const tenureText = card.querySelector('.tenure');
           const values = card.querySelectorAll('.meter-value');
           const fills = card.querySelectorAll('.meter-fill');
+          const shortcuts = card.querySelectorAll('[data-shortcut]');
           if (level) level.textContent = `Lv.${current.level}`;
           if (tenureText) tenureText.textContent = `D+${current.days}`;
           if (values[0]) values[0].textContent = current.hp;
           if (values[1]) values[1].textContent = current.mp;
+          shortcuts.forEach((shortcut, index) => shortcut.setAttribute('href', safeHref(settings.urls[index])));
           if (fills[0]) {
             const prev = parseFloat(fills[0].style.width) || 0;
-            if (current.hp > prev) widgetMotion.gaugeOvershoot(fills[0], current.hp);
+            if (current.hp > prev && window.widgetMotion?.gaugeOvershoot) window.widgetMotion.gaugeOvershoot(fills[0], current.hp);
             else fills[0].style.width = `${current.hp}%`;
           }
           if (fills[1]) {
             const prev = parseFloat(fills[1].style.width) || 0;
-            if (current.mp > prev) widgetMotion.gaugeOvershoot(fills[1], current.mp);
+            if (current.mp > prev && window.widgetMotion?.gaugeOvershoot) window.widgetMotion.gaugeOvershoot(fills[1], current.mp);
             else fills[1].style.width = `${current.mp}%`;
           }
           runMainMotions(current, newAnomalies);
@@ -527,6 +587,7 @@
         if (event.target.closest('[data-close-settings]')) {
           settingsOpen = false;
           statusExpanded = false;
+          saveSettings(true);
           render();
           return;
         }
@@ -558,8 +619,49 @@
         if (event.key === SETTINGS_KEY && !settingsOpen) renderMain();
       });
 
-      async function sync(){try{const [dates,hp]=await Promise.all([Store.getWrittenDates(),Store.getHP()]);activity={diary:Object.fromEntries((Array.isArray(dates)?dates:[]).map(key=>[key,true])),reading:{}};serverHp=Number(hp)||20;if(!settingsOpen)renderMain();}catch(_){if(!settingsOpen)renderMain();}}
-      window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
+      async function sync() {
+        if (syncRunning) return;
+        syncRunning = true;
+        try {
+          const [dates, hp, remoteReading, remoteSettings] = await Promise.all([
+            Store.getWrittenDates(),
+            Store.getHP(),
+            Store.loadReadingNotesState(),
+            Store.loadStatsSettings()
+          ]);
+          const normalizedRemoteReading = normalizeReadingState(remoteReading);
+          const mergedReading = mergeReadingStates(normalizedRemoteReading, readLegacyReadingState());
+          if (JSON.stringify(mergedReading) !== JSON.stringify(normalizedRemoteReading)) {
+            await Store.saveReadingNotesState(mergedReading);
+          }
+          cacheReadingState(mergedReading);
+          if (remoteSettings) {
+            if (!settingsOpen && !settingsSaving && !settingsSaveTimer) {
+              settings = normalizeSettings(remoteSettings);
+              cacheSettings();
+            }
+          } else {
+            settings = normalizeSettings(await Store.saveStatsSettings(settings));
+            cacheSettings();
+          }
+          activity = {
+            diary:Object.fromEntries((Array.isArray(dates) ? dates : []).map(key => [key,true])),
+            reading:mergedReading.byDate
+          };
+          activityLoaded = true;
+          serverHp = Number(hp) || 20;
+        } catch (error) {
+          console.warn('스탯 데이터를 불러오지 못했습니다.', error);
+        } finally {
+          syncRunning = false;
+          if (!settingsOpen) renderMain();
+        }
+      }
+      window.addEventListener('focus',sync);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+      Store.watch(sync,1500);
+      render();
+      sync();
     })();
   </script>
   <script src="../widget-frame.js"></script>
