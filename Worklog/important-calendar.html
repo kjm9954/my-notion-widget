@@ -90,12 +90,44 @@
     .project-dot {
       width:8px; height:8px; flex:0 0 8px; border:1px solid var(--project-color);
       border-radius:999px; background:var(--project-color);
+      transition:background-color .12s var(--ease), border-color .12s var(--ease), opacity .12s var(--ease);
     }
+    .event.wait .project-dot { background:transparent; border-color:var(--muted); }
+    .event.done .project-dot { opacity:.5; }
     .event-name {
       min-width:0; overflow:hidden; color:var(--fg); font-size:10px; font-weight:700;
       text-overflow:ellipsis; white-space:nowrap;
     }
     .event.done .event-name { color:var(--done); text-decoration:line-through; }
+    .strike-anim { position:relative; text-decoration:none !important; }
+    .strike-anim::after {
+      content:""; position:absolute; left:0; top:50%; height:1.5px; width:0;
+      border-radius:1px; background:var(--done); pointer-events:none;
+      animation:motion-strike 160ms var(--ease) forwards;
+    }
+    @keyframes motion-strike { to { width:100%; } }
+    .motion-done-settle { animation:motion-done-settle 240ms var(--ease); }
+    @keyframes motion-done-settle { 0%{transform:scale(1)} 40%{transform:scale(.96)} 100%{transform:scale(1)} }
+    .motion-wait-draw { position:relative; border-color:transparent !important; }
+    .motion-wait-draw::after {
+      content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+      background:
+        repeating-linear-gradient(90deg,var(--inactive) 0 4px,transparent 4px 8px) top/100% 1px no-repeat,
+        repeating-linear-gradient(90deg,var(--inactive) 0 4px,transparent 4px 8px) bottom/100% 1px no-repeat,
+        repeating-linear-gradient(0deg,var(--inactive) 0 4px,transparent 4px 8px) left/1px 100% no-repeat,
+        repeating-linear-gradient(0deg,var(--inactive) 0 4px,transparent 4px 8px) right/1px 100% no-repeat;
+      animation:motion-wait-march 240ms linear forwards;
+    }
+    @keyframes motion-wait-march {
+      from { background-position:0 0, 0 100%, 0 0, 100% 0; opacity:0; }
+      20% { opacity:1; }
+      to { background-position:16px 0, -16px 100%, 0 -16px, 100% 16px; opacity:1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .strike-anim { text-decoration:line-through !important; }
+      .strike-anim::after, .motion-done-settle, .motion-wait-draw::after { animation:none !important; }
+      .motion-wait-draw { border-color:var(--inactive) !important; }
+    }
     .day-add-zone { position:absolute; z-index:2; top:0; right:0; bottom:0; width:28px; }
     .day-add {
       position:absolute; top:4px; right:4px; width:24px; height:24px; display:grid; place-items:center;
@@ -430,6 +462,40 @@
       function makeId() {
         try { return crypto.randomUUID(); }
         catch (error) { return `important-${Date.now()}-${Math.random().toString(36).slice(2,9)}`; }
+      }
+
+      function removeMotionClassAfter(element, className, animationName, timeout) {
+        let timer = 0;
+        const cleanup = () => {
+          clearTimeout(timer);
+          element.classList.remove(className);
+          element.removeEventListener('animationend',onEnd);
+        };
+        const onEnd = event => {
+          if (event.target !== element || event.animationName !== animationName) return;
+          cleanup();
+        };
+        element.addEventListener('animationend',onEnd);
+        timer = window.setTimeout(cleanup,timeout);
+      }
+
+      function playStatusMotion(element, titleElement, status) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (status === 'done') {
+          element.classList.remove('motion-done-settle');
+          void element.offsetWidth;
+          element.classList.add('motion-done-settle');
+          removeMotionClassAfter(element,'motion-done-settle','motion-done-settle',400);
+          if (titleElement) {
+            titleElement.classList.add('strike-anim');
+            removeMotionClassAfter(titleElement,'strike-anim','motion-strike',320);
+          }
+        } else if (status === 'wait') {
+          element.classList.remove('motion-wait-draw');
+          void element.offsetWidth;
+          element.classList.add('motion-wait-draw');
+          removeMotionClassAfter(element,'motion-wait-draw','motion-wait-march',400);
+        }
       }
 
       function projectClass(project) {
@@ -859,8 +925,12 @@
 
       function closePopover({ save = true, revert = false } = {}) {
         syncDraftFromInputs();
+        const statusFrom = ui.mode === 'edit' ? ui.original?.status : '';
+        const statusTo = ui.draft?.status || '';
+        const statusTaskId = ui.taskId || '';
+        const addMode = ui.mode === 'add';
         lastSavedTaskId = '';
-        if (!revert && save && (ui.mode === 'add' || ui.mode === 'edit')) saveDraft();
+        const draftSaved = !revert && save && (ui.mode === 'add' || ui.mode === 'edit') ? saveDraft() : false;
         const savedTaskId = lastSavedTaskId;
         cancelDeleteConfirm();
         popover.querySelector('.due-picker')?.remove();
@@ -870,12 +940,19 @@
         ui = freshUi();
         applyPendingSync();
         renderMonth();
-        if (savedTaskId) {
+        if (savedTaskId && addMode) {
           const task = grid.querySelector(`[data-calendar-task="${CSS.escape(savedTaskId)}"]`);
           if (task) {
             widgetMotion.popIn(task);
             task.classList.add('motion-new');
             setTimeout(() => task.classList.remove('motion-new'), 900);
+          }
+        }
+        if (draftSaved && statusTaskId && statusFrom && statusTo !== statusFrom && (statusTo === 'done' || statusTo === 'wait')) {
+          const chip = grid.querySelector(`[data-calendar-task="${CSS.escape(statusTaskId)}"]`);
+          if (chip) {
+            if (matchMedia('(max-width:639px)').matches) widgetMotion.pop(chip.querySelector('.project-dot'));
+            else playStatusMotion(chip,chip.querySelector('.event-name'),statusTo);
           }
         }
       }

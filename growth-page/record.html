@@ -168,6 +168,7 @@
     }
     .diary-dot { background:var(--action); }
     .reading-dot { background:var(--surface); border:1.5px solid var(--action); }
+    .worklog-dot { border-radius:2px; background:var(--secondary-deep); }
 
     .legend {
       min-height:24px;
@@ -190,6 +191,7 @@
     }
     .legend-diary { background:var(--action); }
     .legend-reading { background:var(--surface); border:1.5px solid var(--action); }
+    .legend-worklog { border-radius:2px; background:var(--secondary-deep); }
     .legend-today {
       width:9px;
       height:9px;
@@ -269,6 +271,7 @@
       <div class="legend" aria-label="범례">
         <span class="legend-item"><span class="legend-dot legend-diary"></span>일기</span>
         <span class="legend-item"><span class="legend-dot legend-reading"></span>독서 노트</span>
+        <span class="legend-item"><span class="legend-dot legend-worklog"></span>업무일지</span>
         <span class="legend-item"><span class="legend-today"></span>오늘</span>
       </div>
       <section class="detail-row" id="detailRow" aria-live="polite"></section>
@@ -290,8 +293,9 @@
       let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
       let selectedKey = null;
       let settings = readSettings();
-      let activity = { diary:{}, reading:{} };
+      let activity = { diary:{}, reading:{}, worklog:{} };
       let knownDiaryDates = null;
+      let knownWorklogDates = null;
 
       function pad(value) { return String(value).padStart(2, '0'); }
       function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
@@ -313,14 +317,16 @@
       function countsFor(key) {
         return {
           diary: activity.diary[key] ? 1 : 0,
-          reading: Math.max(0, Number(activity.reading[key]) || 0)
+          reading: Math.max(0, Number(activity.reading[key]) || 0),
+          worklog: Math.max(0, Number(activity.worklog[key]) || 0)
         };
       }
       function monthCounts(year, month) {
         const prefix = `${year}-${pad(month + 1)}-`;
         const diary = Object.keys(activity.diary).filter(key => key.startsWith(prefix) && activity.diary[key]).length;
         const reading = Object.entries(activity.reading).filter(([key]) => key.startsWith(prefix)).reduce((sum, [, count]) => sum + Math.max(0, Number(count) || 0), 0);
-        return { diary, reading };
+        const worklog = Object.entries(activity.worklog).filter(([key]) => key.startsWith(prefix)).reduce((sum, [, count]) => sum + Math.max(0, Number(count) || 0), 0);
+        return { diary, reading, worklog };
       }
       function href(index) { return settings.urls[index]?.trim() || '#'; }
       function datedHref(index, key) {
@@ -343,7 +349,7 @@
             <span class="month-title">${year}년 ${month + 1}월</span>
             <button class="month-button" type="button" data-month-step="1" aria-label="다음 달">›</button>
           </div>
-          <span class="month-summary">일기 ${counts.diary} · 독서 ${counts.reading}</span>
+          <span class="month-summary">일기 ${counts.diary} · 독서 ${counts.reading} · 업무 ${counts.worklog}</span>
         `;
       }
 
@@ -361,7 +367,7 @@
           const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
           const key = localKey(date);
           const counts = countsFor(key);
-          const hasRecord = counts.diary > 0 || counts.reading > 0;
+          const hasRecord = counts.diary > 0 || counts.reading > 0 || counts.worklog > 0;
           const otherMonth = date.getMonth() !== month;
           const nextMonth = otherMonth && date > first;
           const future = date > today;
@@ -375,7 +381,7 @@
           cells.push(`
             <button class="${classes.join(' ')}" type="button" data-date="${key}" aria-label="${date.getMonth() + 1}월 ${date.getDate()}일${hasRecord ? ' 기록 있음' : ''}">
               <span class="day-number">${date.getDate()}</span>
-              <span class="marks">${counts.diary ? '<span class="dot diary-dot"></span>' : ''}${counts.reading ? '<span class="dot reading-dot"></span>' : ''}</span>
+              <span class="marks">${counts.diary ? '<span class="dot diary-dot"></span>' : ''}${counts.reading ? '<span class="dot reading-dot"></span>' : ''}${counts.worklog ? '<span class="dot worklog-dot"></span>' : ''}</span>
             </button>
           `);
         }
@@ -387,7 +393,7 @@
         const [year, month, day] = key.split('-').map(Number);
         const date = new Date(year, month - 1, day);
         const counts = countsFor(key);
-        const hasRecord = counts.diary > 0 || counts.reading > 0;
+        const hasRecord = counts.diary > 0 || counts.reading > 0 || counts.worklog > 0;
         const isToday = key === todayKey;
         const isFuture = date > today;
         let copy = '';
@@ -396,8 +402,8 @@
           copy = `${month}월 ${day}일 · 아직 오지 않음`;
           actions = '<button class="detail-close" type="button" data-close-detail>닫기</button>';
         } else if (hasRecord) {
-          copy = `${isToday ? '오늘' : `${month}월 ${day}일`} · 일기 ${counts.diary} · 독서 ${counts.reading}`;
-          actions = linkHtml('열기', counts.diary ? datedHref(0, key) : datedHref(1, key));
+          copy = `${isToday ? '오늘' : `${month}월 ${day}일`} · 일기 ${counts.diary} · 독서 ${counts.reading} · 업무일지 ${counts.worklog}건`;
+          actions = linkHtml('열기', counts.diary ? datedHref(0, key) : counts.reading ? datedHref(1, key) : datedHref(2, key));
         } else if (isToday) {
           copy = '오늘 아직 비어 있어요';
           actions = `${linkHtml('일기 쓰기', datedHref(0, key))}${linkHtml('독서 노트', datedHref(1, key))}`;
@@ -454,7 +460,43 @@
         if (event.key === SETTINGS_KEY) render();
       });
 
-      async function sync(){try{const loaded=await Store.getWrittenDates(),dates=Array.isArray(loaded)?loaded:[],nextDates=new Set(dates),added=knownDiaryDates?[...nextDates].filter(key=>!knownDiaryDates.has(key)):[];knownDiaryDates=nextDates;activity={diary:Object.fromEntries(dates.map(key=>[key,true])),reading:{}};render();added.forEach(key=>daysElement.querySelector(`[data-date="${CSS.escape(key)}"]`)?.classList.add('motion-new'));}catch(_){header.innerHTML='<span class="month-summary">불러오기 실패</span>';}}
+      async function sync() {
+        try {
+          const [loaded, worklog] = await Promise.all([
+            Store.getWrittenDates(),
+            Store.loadWorklogState().catch(() => null)
+          ]);
+          const dates = Array.isArray(loaded) ? loaded : [];
+          const nextDiaryDates = new Set(dates);
+          const addedDiaryDates = knownDiaryDates ? [...nextDiaryDates].filter(key => !knownDiaryDates.has(key)) : [];
+          const worklogCounts = {};
+          if (Array.isArray(worklog?.tasks)) {
+            worklog.tasks.forEach(task => {
+              const key = String(task?.date || '');
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+              worklogCounts[key] = (worklogCounts[key] || 0) + 1;
+            });
+          }
+          const nextWorklogDates = new Set(Object.keys(worklogCounts));
+          const addedWorklogDates = knownWorklogDates ? [...nextWorklogDates].filter(key => !knownWorklogDates.has(key)) : [];
+          knownDiaryDates = nextDiaryDates;
+          knownWorklogDates = nextWorklogDates;
+          activity = {
+            diary:Object.fromEntries(dates.map(key => [key,true])),
+            reading:{},
+            worklog:worklogCounts
+          };
+          render();
+          addedDiaryDates.forEach(key => daysElement.querySelector(`[data-date="${CSS.escape(key)}"]`)?.classList.add('motion-new'));
+          addedWorklogDates.forEach(key => {
+            const cell = daysElement.querySelector(`[data-date="${CSS.escape(key)}"]`);
+            cell?.classList.add('motion-new');
+            window.widgetMotion?.popIn?.(cell?.querySelector('.worklog-dot'));
+          });
+        } catch (_) {
+          header.innerHTML = '<span class="month-summary">불러오기 실패</span>';
+        }
+      }
       window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
     })();
   </script>

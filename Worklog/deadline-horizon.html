@@ -81,17 +81,51 @@
       border:0; border-radius:9px; background:var(--surface); box-shadow:var(--item-shadow);
     }
     .task-row.is-wait { border:1px dashed var(--inactive); box-shadow:none; }
-    .project-dot { width:8px; height:8px; border-radius:999px; background:var(--inactive); }
+    .project-dot {
+      width:8px; height:8px; border-radius:999px; background:var(--inactive);
+      transition:background-color .12s var(--ease), border-color .12s var(--ease), opacity .12s var(--ease);
+    }
     .project-dot.project-1 { background:var(--project-1); }
     .project-dot.project-2 { background:var(--project-2); }
     .project-dot.project-3 { background:var(--project-3); }
     .project-dot.project-4 { background:var(--project-4); }
+    .task-row.is-wait .project-dot { background:transparent; box-shadow:inset 0 0 0 1px var(--muted); }
+    .task-row.is-done .project-dot { opacity:.5; }
     .task-name {
       min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:700;
       line-height:1.3; text-overflow:ellipsis; white-space:nowrap;
     }
     .task-status { color:var(--secondary); font-size:9px; font-weight:800; line-height:1; white-space:nowrap; }
     .task-row.is-done .task-status { color:var(--done); }
+    .strike-anim { position:relative; text-decoration:none !important; }
+    .strike-anim::after {
+      content:""; position:absolute; left:0; top:50%; height:1.5px; width:0;
+      border-radius:1px; background:var(--done); pointer-events:none;
+      animation:motion-strike 160ms var(--ease) forwards;
+    }
+    @keyframes motion-strike { to { width:100%; } }
+    .motion-done-settle { animation:motion-done-settle 240ms var(--ease); }
+    @keyframes motion-done-settle { 0%{transform:scale(1)} 40%{transform:scale(.96)} 100%{transform:scale(1)} }
+    .motion-wait-draw { position:relative; border-color:transparent !important; }
+    .motion-wait-draw::after {
+      content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+      background:
+        repeating-linear-gradient(90deg,var(--inactive) 0 4px,transparent 4px 8px) top/100% 1px no-repeat,
+        repeating-linear-gradient(90deg,var(--inactive) 0 4px,transparent 4px 8px) bottom/100% 1px no-repeat,
+        repeating-linear-gradient(0deg,var(--inactive) 0 4px,transparent 4px 8px) left/1px 100% no-repeat,
+        repeating-linear-gradient(0deg,var(--inactive) 0 4px,transparent 4px 8px) right/1px 100% no-repeat;
+      animation:motion-wait-march 240ms linear forwards;
+    }
+    @keyframes motion-wait-march {
+      from { background-position:0 0, 0 100%, 0 0, 100% 0; opacity:0; }
+      20% { opacity:1; }
+      to { background-position:16px 0, -16px 100%, 0 -16px, 100% 16px; opacity:1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .strike-anim { text-decoration:line-through !important; }
+      .strike-anim::after, .motion-done-settle, .motion-wait-draw::after { animation:none !important; }
+      .motion-wait-draw { border-color:var(--inactive) !important; }
+    }
 
     .empty-state {
       min-width:0; min-height:88px; flex:1; padding:16px;
@@ -294,9 +328,44 @@
         return index >= 0 ? PROJECT_CLASSES[index] : '';
       }
 
+      function removeMotionClassAfter(element, className, animationName, timeout) {
+        let timer = 0;
+        const cleanup = () => {
+          clearTimeout(timer);
+          element.classList.remove(className);
+          element.removeEventListener('animationend',onEnd);
+        };
+        const onEnd = event => {
+          if (event.target !== element || event.animationName !== animationName) return;
+          cleanup();
+        };
+        element.addEventListener('animationend',onEnd);
+        timer = window.setTimeout(cleanup,timeout);
+      }
+
+      function playStatusMotion(element, titleElement, status) {
+        if (!element || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (status === 'done') {
+          element.classList.remove('motion-done-settle');
+          void element.offsetWidth;
+          element.classList.add('motion-done-settle');
+          removeMotionClassAfter(element,'motion-done-settle','motion-done-settle',400);
+          if (titleElement) {
+            titleElement.classList.add('strike-anim');
+            window.setTimeout(() => titleElement.classList.remove('strike-anim'),600);
+          }
+        } else if (status === 'wait') {
+          element.classList.remove('motion-wait-draw');
+          void element.offsetWidth;
+          element.classList.add('motion-wait-draw');
+          removeMotionClassAfter(element,'motion-wait-draw','motion-wait-march',400);
+        }
+      }
+
       function createTaskRow(task) {
         const row = document.createElement('div');
         row.className = `task-row is-${task.status}`;
+        row.dataset.taskId = task.id;
         row.setAttribute('role','listitem');
         row.setAttribute('aria-label', `${task.title}, ${STATUS_LABELS[task.status]}`);
 
@@ -376,6 +445,9 @@
         const nextToday = localNoon(new Date());
         const dateChanged = dateKey(nextToday) !== dateKey(today);
         if (dateChanged) today = nextToday;
+        const firstRefresh = !entranceDone;
+        const previousStatus = new Map(state.tasks.map(task => [task.id,task.status]));
+        let statusChanges = [];
         let changed = false;
         try {
           const [calendarState,worklogData] = await Promise.all([
@@ -386,6 +458,12 @@
             const nextCalendar = normalizeCalendar(calendarState);
             changed ||= JSON.stringify(nextCalendar) !== JSON.stringify(state);
             state = nextCalendar;
+            if (!firstRefresh) {
+              statusChanges = state.tasks
+                .filter(task => previousStatus.has(task.id) && previousStatus.get(task.id) !== task.status
+                  && (task.status === 'done' || task.status === 'wait'))
+                .map(task => ({ id:task.id, status:task.status }));
+            }
           }
           if (worklogData) {
             const previousProjects = projects;
@@ -398,11 +476,14 @@
           liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
           return;
         }
-        const firstRefresh = !entranceDone;
         entranceDone = true;
         if (!changed && !dateChanged) return;
         render({ motion:mark ? 'motion-new' : '', announce:false });
         if (firstRefresh) widgetMotion.cascade(taskList.querySelectorAll('.task-row'));
+        else statusChanges.forEach(({ id, status }) => {
+          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
+          if (row) playStatusMotion(row,row.querySelector('.task-name'),status);
+        });
       }
 
       function scheduleMidnightRefresh() {

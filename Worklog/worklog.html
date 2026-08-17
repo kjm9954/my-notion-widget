@@ -138,11 +138,13 @@
     .task-row {
       position:relative; height:40px; min-height:40px; flex:0 0 auto; padding:7px 10px; background:var(--surface); border-radius:9px;
       box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid transparent; outline-offset:-1px;
-      transition:outline-color .12s var(--ease); -webkit-touch-callout:none;
+      transition:outline-color .12s var(--ease); -webkit-touch-callout:none; -webkit-user-drag:none;
     }
+    .task-row:not(.quick-add-row) { user-select:none; }
+    .task-row input, .task-row textarea, .task-row select { user-select:text; }
     .task-row.has-roll { height:auto; min-height:50px; }
     @media (hover:hover) { .task-row:hover { outline-color:var(--border-soft); } }
-    .task-row.is-reordering { outline-color:var(--action); cursor:grabbing; }
+    .task-row.is-reordering { z-index:3; outline-color:var(--action); cursor:grabbing; pointer-events:none; }
     .task-row.is-drop-before::before, .task-row.is-drop-after::after {
       content:""; position:absolute; z-index:4; left:4px; right:4px; border-top:2px solid var(--action); pointer-events:none;
     }
@@ -1074,15 +1076,32 @@
         const drag = ui.rowDrag;
         if (!drag || drag.pointerId !== event.pointerId) return;
         event.preventDefault();
-        let target = document.elementFromPoint(event.clientX,event.clientY)?.closest?.('.task-row[data-task-id]:not(.quick-add-row)');
-        if (target === drag.row) target = null;
+        updateRowDropAt(drag,event.clientX,event.clientY);
+      }
+
+      function updateRowDropAt(drag, clientX, clientY) {
         clearRowDropTarget();
-        if (!target || !taskList.contains(target)) {
+        if (Math.hypot(clientX - drag.startX,clientY - drag.startY) < 8) {
+          drag.targetId = null;
+          return;
+        }
+        const rows = [...taskList.querySelectorAll('.task-row[data-task-id]:not(.quick-add-row)')].filter(row => row !== drag.row);
+        let target = document.elementFromPoint(clientX,clientY)?.closest?.('.task-row[data-task-id]:not(.quick-add-row)');
+        if (target === drag.row || !taskList.contains(target)) target = null;
+        const scrollRect = drag.row.closest('.rows-scroll')?.getBoundingClientRect();
+        if (!target && rows.length && scrollRect && clientX >= scrollRect.left && clientX <= scrollRect.right) {
+          target = rows.reduce((nearest,row) => {
+            const rect = row.getBoundingClientRect();
+            const distance = clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+            return !nearest || distance < nearest.distance ? { row, distance } : nearest;
+          },null)?.row || null;
+        }
+        if (!target) {
           drag.targetId = null;
           return;
         }
         const rect = target.getBoundingClientRect();
-        drag.before = event.clientY < rect.top + rect.height / 2;
+        drag.before = clientY < rect.top + rect.height / 2;
         drag.targetId = target.dataset.taskId;
         target.classList.add(drag.before ? 'is-drop-before' : 'is-drop-after');
       }
@@ -1106,15 +1125,10 @@
         if (distance > 18) cancelLongPress();
       }
 
-      function finishRowDrag(event, cancelled = false) {
-        const press = ui.longPress;
-        if (press?.pointerId === event.pointerId) cancelLongPress();
-        const drag = ui.rowDrag;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        event.preventDefault();
+      function completeRowDrag(drag, cancelled = false) {
         drag.row.classList.remove('is-reordering');
         drag.row.closest('.rows-scroll')?.classList.remove('is-reordering');
-        drag.row.releasePointerCapture?.(event.pointerId);
+        if (drag.row.hasPointerCapture?.(drag.pointerId)) drag.row.releasePointerCapture(drag.pointerId);
         clearRowDropTarget();
         ui.rowDrag = null;
         ui.suppressClickUntil = Date.now() + 350;
@@ -1131,6 +1145,20 @@
         const moved = taskList.querySelector(`[data-task-id="${CSS.escape(drag.taskId)}"]`);
         if (moved && window.widgetMotion?.pop) window.widgetMotion.pop(moved);
         announce('순서를 저장했습니다.');
+      }
+
+      function finishRowDrag(event, cancelled = false) {
+        const press = ui.longPress;
+        if (press?.pointerId === event.pointerId) cancelLongPress();
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        completeRowDrag(drag,cancelled);
+      }
+
+      function touchForDrag(event, drag) {
+        const touches = [...Array.from(event.changedTouches || []),...Array.from(event.touches || [])];
+        return touches.find(touch => drag.touchId == null || touch.identifier === drag.touchId) || null;
       }
 
       function durationOf(task) {
@@ -2050,9 +2078,30 @@
         if (handle) beginColumnResize(event,handle);
         else beginRowLongPress(event);
       });
+      taskList.addEventListener('touchstart', event => {
+        if (ui.longPress?.pointerType !== 'touch') return;
+        const touch = event.changedTouches?.[0];
+        if (touch) ui.longPress.touchId = touch.identifier;
+      },{ passive:true });
       taskList.addEventListener('touchmove', event => {
-        if (ui.rowDrag) event.preventDefault();
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerType !== 'touch') return;
+        const touch = touchForDrag(event,drag);
+        if (!touch) return;
+        event.preventDefault();
+        updateRowDropAt(drag,touch.clientX,touch.clientY);
       },{ passive:false });
+      taskList.addEventListener('touchend', event => {
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerType !== 'touch' || !touchForDrag(event,drag)) return;
+        event.preventDefault();
+        completeRowDrag(drag,false);
+      },{ passive:false });
+      taskList.addEventListener('touchcancel', event => {
+        const drag = ui.rowDrag;
+        if (!drag || drag.pointerType !== 'touch') return;
+        completeRowDrag(drag,true);
+      });
       taskList.addEventListener('contextmenu', event => {
         if (!event.target.closest('.task-row[data-task-id]:not(.quick-add-row)')) return;
         if (ui.longPress || ui.rowDrag) event.preventDefault();
@@ -2067,6 +2116,7 @@
       });
       document.addEventListener('pointercancel', event => {
         endColumnResize(event);
+        if (ui.rowDrag?.pointerType === 'touch' && ui.rowDrag.pointerId === event.pointerId) return;
         finishRowDrag(event,true);
       });
 
