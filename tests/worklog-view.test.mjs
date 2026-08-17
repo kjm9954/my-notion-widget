@@ -108,6 +108,12 @@ test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으�
   const html = await readFile(new URL("../Worklog/deadline-horizon.html", import.meta.url), "utf8");
   assert.match(html, /JSON\.stringify\(projects\) !== JSON\.stringify\(previousProjects\)/);
   assert.doesNotMatch(html, /JSON\.stringify\(worklogData\) !== JSON\.stringify\(worklogState\)/);
+  assert.match(html, /\.task-row\.is-done \{ box-shadow:none; opacity:\.82; \}/);
+  assert.match(html, /\.task-row\.is-done \.task-name \{ color:var\(--done\); text-decoration:line-through; \}/);
+  assert.match(html, /\.task-row\.is-done \.project-dot \{ filter:grayscale\(\.6\) opacity\(\.55\); \}/);
+  assert.match(html, /removeMotionClassAfter\(titleElement,'strike-anim','motion-strike',320\)/);
+  assert.doesNotMatch(html, /setTimeout\(\(\) => titleElement\.classList\.remove\('strike-anim'\)/);
+  assert.match(html, /window\.widgetMotion\?\.cascade\?\.\(taskList\.querySelectorAll\('\.task-row'\)\)/);
 });
 
 test("업무 관리용 위젯은 전체 크기 조절 프레임을 사용", async () => {
