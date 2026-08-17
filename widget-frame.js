@@ -19,8 +19,8 @@
     'mood.html': { selector:'.temperature-part.active', max:1, empty:'.history > .empty' },
     'achieve.html': { selector:'#content.list .row', kind:'dot', max:3, empty:'#content.empty' },
     'index.html': { selector:'.quadrant.is-selected', kind:'outline', max:1 },
-    'stats.html': { selector:'.meter-fill', max:2 },
-    'worklog.html': { selector:'.roll-banner:not([hidden]), [data-empty-add]', max:2 },
+    'stats.html': { selector:'.meter-fill', max:2, continuous:true },
+    'worklog.html': { selector:'.task-row:not(.quick-add-row):not(.is-done) .done-check', kind:'outline', max:3, empty:'.list-shell.is-empty' },
     'goals.html': { selector:'.goal-row:not(.done) .check', max:3, empty:'.goals-grid .empty' },
     'find.html': { empty:'.empty-list' },
     'drawer.html': { empty:'.quote-list > .empty' },
@@ -128,7 +128,8 @@
       target.classList.add('idle');
       target.classList.toggle('is-empty', Boolean(emptyTarget));
       target.classList.toggle('is-paused', document.visibilityState !== 'visible');
-      target.style.setProperty('--idle-delay', `${fileOffset + stagger}s`);
+      const delay = fileOffset + stagger;
+      target.style.setProperty('--idle-delay', `${config.continuous ? -delay : delay}s`);
       target.style.setProperty('--idle-dur', emptyTarget ? '10s' : '6s');
     });
     document.body.classList.toggle('has-widget-expanded', hasExpandedState());
@@ -245,15 +246,6 @@
       anchor.appendChild(s);
       setTimeout(() => s.remove(), 800);
     });
-  };
-
-  // 게이지 오버슛: fill의 width를 target보다 4%p 넘겼다가 되돌림 (값 상승 시에만 호출)
-  wm.gaugeOvershoot = (fill, targetPercent) => {
-    if (!fill) return;
-    const target = Math.max(0, Math.min(100, targetPercent));
-    if (reduced()) { fill.style.width = target + '%'; return; }
-    fill.style.width = Math.min(100, target + 4) + '%';
-    setTimeout(() => { fill.style.width = target + '%'; }, 400);
   };
 
   // 매칭 스윕: 컨테이너 안의 .match들에 20ms 간격 딜레이 스윕
@@ -391,7 +383,18 @@
     new ResizeObserver(() => { if (!drag) commit(); }).observe(card);
     const fixedObserver = new ResizeObserver(() => { if (!drag) commit(); });
     fixedParts.forEach(part => fixedObserver.observe(part));
-    window.addEventListener('resize', commit);
+    function settleFrame() {
+      commit();
+      [60, 250, 1000].forEach(delay => setTimeout(commit, delay));
+    }
+
+    window.addEventListener('resize', settleFrame);
+    window.visualViewport?.addEventListener('resize', settleFrame);
+    window.addEventListener('load', settleFrame, { once:true });
+    window.addEventListener('pageshow', settleFrame);
+    window.addEventListener('focus', settleFrame);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) settleFrame(); });
+    new ResizeObserver(settleFrame).observe(document.documentElement);
     window.addEventListener('storage', event => {
       if (event.key !== key) return;
       const next = readSize();
@@ -548,7 +551,7 @@
       /* Members can have different natural heights, so their height-limited
          scales may differ. Compensate with logical width so the outer widths
          still land on the same shared visual target. */
-      const target = clampAxisSize(sharedVisualWidth ?? designWidth, MINIMUM_CONTENT_WIDTH, window.innerWidth);
+      const target = Math.max(MINIMUM_CONTENT_WIDTH, number(sharedVisualWidth, designWidth));
       const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
       const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
         ? configuredMaximumScale
@@ -557,7 +560,7 @@
       return target / scaleWithoutWidth;
     }
     if (widthLocked) return contentWidth;
-    return clampAxisSize(designWidth, MINIMUM_CONTENT_WIDTH, maximumContentWidth(requestedScale));
+    return designWidth;
   }
 
   function scaleFromSaved(saved, fallback) {
@@ -686,7 +689,9 @@
   }
 
   function applyContentWidth(value, fromUser = false, scale = renderedScale || requestedScale || 1) {
-    const next = clampAxisSize(value, MINIMUM_CONTENT_WIDTH, maximumContentWidth(scale));
+    const next = fromUser
+      ? clampAxisSize(value, MINIMUM_CONTENT_WIDTH, maximumContentWidth(scale))
+      : Math.max(MINIMUM_CONTENT_WIDTH, number(value, designWidth));
     if (fromUser) widthLocked = true;
     if (Math.abs(next - contentWidth) < .5) return;
     contentWidth = next;
@@ -725,7 +730,9 @@
   }
 
   function applyFrameHeight(value, fromUser = false, scale = renderedScale || requestedScale || 1) {
-    const next = clampAxisSize(value, MINIMUM_FRAME_HEIGHT, maximumFrameHeight(scale));
+    const next = fromUser
+      ? clampAxisSize(value, MINIMUM_FRAME_HEIGHT, maximumFrameHeight(scale))
+      : Math.max(MINIMUM_FRAME_HEIGHT, number(value, naturalHeight));
     if (list) {
       applyListHeight(next - listOffset(), fromUser);
       heightLocked = listLocked;
@@ -896,15 +903,25 @@
     fixedParts.forEach(part => fixedObserver.observe(part));
   }
 
-  window.addEventListener('resize', () => {
+  function settleFrame() {
     if (!scaleLocked) requestedScale = 1;
     if (list && requestedListHeight !== null) applyListHeight(requestedListHeight);
-    else updateFrame();
-  });
+    commitFrame();
+    [60, 250, 1000].forEach(delay => setTimeout(commitFrame, delay));
+  }
+
+  window.addEventListener('resize', settleFrame);
+  window.visualViewport?.addEventListener('resize', settleFrame);
+  window.addEventListener('load', settleFrame, { once:true });
+  window.addEventListener('pageshow', settleFrame);
+  window.addEventListener('focus', settleFrame);
+  new ResizeObserver(settleFrame).observe(document.documentElement);
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') updateFrame();
+    if (document.visibilityState === 'visible') settleFrame();
   });
+
+  settleFrame();
 
   window.addEventListener('storage', event => {
     const localChanged = event.key === key;

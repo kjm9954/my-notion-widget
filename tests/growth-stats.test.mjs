@@ -9,8 +9,17 @@ const frame = await readFile(new URL("../widget-frame.js", import.meta.url), "ut
 const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
 
 test("스탯 유휴 모션은 HP·MP 텍스트가 아니라 게이지를 순회한다", () => {
-  assert.match(frame, /'stats\.html': \{ selector:'\.meter-fill', max:2 \}/);
+  assert.match(frame, /'stats\.html': \{ selector:'\.meter-fill', max:2, continuous:true \}/);
   assert.doesNotMatch(frame, /'stats\.html': \{ selector:'\.meter-label'/);
+  assert.match(frame, /config\.continuous \? -delay : delay/);
+});
+
+test("스탯 게이지 값은 오버슛 없이 400ms 단방향으로 바뀐다", () => {
+  assert.match(stats, /transition:width var\(--t-gauge\) var\(--ease\)/);
+  assert.match(stats, /if \(fills\[0\]\) fills\[0\]\.style\.width = `\$\{current\.hp\}%`/);
+  assert.match(stats, /if \(fills\[1\]\) fills\[1\]\.style\.width = `\$\{current\.mp\}%`/);
+  assert.doesNotMatch(stats, /gaugeOvershoot/);
+  assert.doesNotMatch(frame, /gaugeOvershoot/);
 });
 
 test("독서 기록이 전혀 없을 때도 시작 7일 후 상태이상을 표시한다", () => {

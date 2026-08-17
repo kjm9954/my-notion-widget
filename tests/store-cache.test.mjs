@@ -10,6 +10,12 @@ test("업무일지는 입력 포커스 중에도 외부 동기화를 허용할 �
   assert.match(source,/!allowWhileEditing && active/);
 });
 
+test("노션 페이지 캐시 복원 시 공통 감시를 유지하고 즉시 다시 조회한다", () => {
+  assert.match(source,/window\.addEventListener\("pageshow", run\)/);
+  assert.match(source,/if \(!event\.persisted\) stop\(\)/);
+  assert.match(source,/const initialTimer = setTimeout\(run, 0\)/);
+});
+
 function deferred() {
   let resolve;
   let reject;

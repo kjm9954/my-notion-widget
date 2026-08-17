@@ -78,7 +78,8 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /메모 \$\{memoCount\}건/);
   assert.match(html, /Store\.saveWorklogView\(view\)/);
   assert.match(html, /Store\.patchWorklogState\(patch\)/);
-  assert.match(html, /Store\.loadWorklogState\(\{ fresh:true \}\)/);
+  assert.match(html, /Store\.loadWorklogState\(\)/);
+  assert.doesNotMatch(html, /Store\.loadWorklogState\(\{ fresh:true \}\)/);
   assert.doesNotMatch(html, /Store\.saveWorklogState\(snapshot\)/);
   assert.match(html, /function renderWorkView\(\)/);
   assert.match(html, /requestRevision !== localRevision/);
@@ -87,6 +88,15 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /task\.date >= targetDay/);
   assert.match(html, /function applyExternalCompletionState\(loaded\)/);
   assert.match(html, /allowWhileEditing:true/);
+  assert.match(html, /\.task-title-button\.strike-anim/);
+  assert.match(html, /animation:worklog-strike var\(--t-close\) var\(--ease\) forwards/);
+  assert.match(html, /function animateTaskCompletion\(id, source\)/);
+  assert.match(html, /runOnce\(row\.querySelector\('\.task-title-button'\), 'strike-anim'\)/);
+  assert.match(html, /items\.length > 0 && items\.every\(item => item\.done\)/);
+  assert.match(html, /widgetMotion\?\.burst\?\.\(check\)/);
+  assert.match(html, /widgetMotion\?\.spark\?\.\(check,check\.offsetWidth \/ 2,check\.offsetHeight \/ 2\)/);
+  assert.match(html, /'상태를 바꿨습니다\.','status'/);
+  assert.match(html, /'완료 상태를 바꿨습니다\.','checkbox'/);
   assert.match(html, /class="due-cell"/);
   assert.match(html, /class="meta-rule"/);
   assert.match(html, /class="meta-label">메모/);

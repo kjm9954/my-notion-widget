@@ -514,16 +514,8 @@
           if (values[0]) values[0].textContent = current.hp;
           if (values[1]) values[1].textContent = current.mp;
           shortcuts.forEach((shortcut, index) => shortcut.setAttribute('href', safeHref(settings.urls[index])));
-          if (fills[0]) {
-            const prev = parseFloat(fills[0].style.width) || 0;
-            if (current.hp > prev && window.widgetMotion?.gaugeOvershoot) window.widgetMotion.gaugeOvershoot(fills[0], current.hp);
-            else fills[0].style.width = `${current.hp}%`;
-          }
-          if (fills[1]) {
-            const prev = parseFloat(fills[1].style.width) || 0;
-            if (current.mp > prev && window.widgetMotion?.gaugeOvershoot) window.widgetMotion.gaugeOvershoot(fills[1], current.mp);
-            else fills[1].style.width = `${current.mp}%`;
-          }
+          if (fills[0]) fills[0].style.width = `${current.hp}%`;
+          if (fills[1]) fills[1].style.width = `${current.mp}%`;
           runMainMotions(current, newAnomalies);
           return;
         }

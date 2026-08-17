@@ -225,6 +225,17 @@
     .done-check.is-done.mode-life { border-color:var(--mid); background:var(--mid); color:var(--action); }
     .task-row.is-done .task-title-button, .task-row.is-done .cell, .task-row.is-done .number-cell, .task-row.is-done .memo { color:var(--complete); }
     .task-row.is-done .task-title-button { text-decoration:line-through; }
+    .task-title-button.strike-anim { position:relative; text-decoration:none !important; }
+    .task-title-button.strike-anim::after {
+      content:""; position:absolute; left:6px; top:50%; width:0; height:1.5px;
+      border-radius:1px; background:var(--complete); pointer-events:none;
+      animation:worklog-strike var(--t-close) var(--ease) forwards;
+    }
+    @keyframes worklog-strike { to { width:calc(100% - 12px); } }
+    @media (prefers-reduced-motion:reduce) {
+      .task-title-button.strike-anim { text-decoration:line-through !important; }
+      .task-title-button.strike-anim::after { width:0; animation:none; }
+    }
     .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:center; user-select:none; }
     .time-cell .inline-cell-input { user-select:text; }
     .time-value { width:100%; height:24px; text-align:center; font-variant-numeric:tabular-nums; }
@@ -1868,7 +1879,22 @@
         return true;
       }
 
-      function updateTask(id, updater, announcement) {
+      function animateTaskCompletion(id, source) {
+        const task = taskById(id);
+        const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
+        if (!task?.done || !row) return;
+        runOnce(row.querySelector('.task-title-button'), 'strike-anim');
+        if (source !== 'checkbox') return;
+        const check = row.querySelector('[data-toggle-task]');
+        window.widgetMotion?.pop?.(check);
+        const items = tasksFor(state.mode,ui.selectedDate);
+        const allDone = items.length > 0 && items.every(item => item.done);
+        if (!allDone || !check) return;
+        window.widgetMotion?.burst?.(check);
+        window.widgetMotion?.spark?.(check,check.offsetWidth / 2,check.offsetHeight / 2);
+      }
+
+      function updateTask(id, updater, announcement, completionSource = '') {
         if (ui.draftTask?.id === id) {
           const next = { ...ui.draftTask };
           updater(next);
@@ -1878,16 +1904,21 @@
         }
         if (!drainPendingSync()) return false;
         let found = false;
+        let becameDone = false;
         const saved = mutate(fresh => {
           const index = fresh.tasks.findIndex(task => task.id === id);
           if (index < 0) return fresh;
           const next = { ...fresh.tasks[index] };
+          const wasDone = next.done === true || next.status === 'done';
           updater(next);
-          fresh.tasks[index] = normalizeTask(next);
+          const normalized = normalizeTask(next);
+          fresh.tasks[index] = normalized;
+          becameDone = !wasDone && normalized?.done === true;
           found = true;
           return fresh;
         });
         if (saved && found && announcement) announce(announcement);
+        if (saved && found && becameDone && completionSource) animateTaskCompletion(id,completionSource);
         if (saved && !found) announce('다른 창에서 삭제된 항목입니다.');
         return saved && found;
       }
@@ -2279,20 +2310,17 @@
               const next = task.status === 'wait' ? 'doing' : task.status === 'doing' ? 'done' : 'wait';
               task.status = next;
               task.done = next === 'done';
-            }, '상태를 바꿨습니다.');
+            }, '상태를 바꿨습니다.','status');
             return;
           }
         }
         const toggleButton = event.target.closest('[data-toggle-task]');
         if (toggleButton) {
           const id = toggleButton.dataset.toggleTask;
-          const updated = updateTask(id, task => {
+          updateTask(id, task => {
             task.done = !task.done;
             task.status = task.done ? 'done' : 'doing';
-          }, '완료 상태를 바꿨습니다.');
-          if (updated && taskById(id)?.done) {
-            window.widgetMotion?.pop?.(taskList.querySelector(`[data-task-id="${CSS.escape(id)}"] [data-toggle-task]`));
-          }
+          }, '완료 상태를 바꿨습니다.','checkbox');
           return;
         }
         const rowDelete = event.target.closest('[data-row-delete], [data-delete-task]');
@@ -2425,7 +2453,7 @@
         let loaded;
         try {
           await saveQueue;
-          loaded = normalizeState(await Store.loadWorklogState({ fresh:true }));
+          loaded = normalizeState(await Store.loadWorklogState());
         } catch (error) {
           console.warn('업무일지 데이터를 불러오지 못했습니다.', error);
           liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';

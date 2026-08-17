@@ -42,7 +42,6 @@
     .goal-name::after { content:""; position:absolute; left:0; top:50%; width:0; height:1px; background:var(--done); transition:width var(--t-open) var(--ease); }
     .goal-row.done .goal-name { color:var(--done); }
     .goal-row.done .goal-name::after { width:100%; }
-    .goal-meta { max-width:34%; overflow:hidden; color:var(--done); font-size:8px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
     .goal-link { width:100%; overflow:hidden; color:var(--muted); font-size:9px; font-weight:700; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
     .edit-input { min-width:0; height:29px; flex:1 1 auto; padding:0 8px; border:1px solid #CFE2EA; border-radius:8px; outline:0; background:#F7FBFD; font-size:11px; font-weight:650; }
     .text-action { min-height:28px; padding:0 3px; border:0; background:transparent; color:var(--muted); font-size:9px; font-weight:750; cursor:pointer; }
@@ -147,12 +146,6 @@
         if(scope==='month')return goalsFor(currentHalf);
         return [];
       }
-      function meta(goal){
-        if(goal.scope==='year')return `구간 ${state.goals.filter(item=>(item.scope==='h1'||item.scope==='h2')&&item.parent===goal.id).length}`;
-        const parent=byId(goal.parent);
-        if(goal.scope==='h1'||goal.scope==='h2')return parent?.t||'연간 연결 없음';
-        return parent?.t||'구간 연결 없음';
-      }
       function linkMeta(goal){
         const parent=byId(goal.parent);
         if(goal.scope==='h1'||goal.scope==='h2')return parent?`연간 · ${parent.t}`:'연간 연결 없음';
@@ -164,7 +157,7 @@
       }
       function row(goal){
         if(ui.editing===goal.id)return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><input class="edit-input" data-edit-input="${esc(goal.id)}" value="${esc(goal.t)}"><button class="text-action danger" type="button" data-delete-request="${esc(goal.id)}">삭제</button><button class="text-action" type="button" data-edit-done>완료</button></div>`;
-        if(goal.scope==='year')return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button><span class="goal-meta">${esc(meta(goal))}</span></div>`;
+        if(goal.scope==='year')return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button></div>`;
         return `<div class="goal-row has-link${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><div class="goal-copy"><button class="goal-name" type="button" data-edit="${esc(goal.id)}">${esc(goal.t)}</button><span class="goal-link">${esc(linkMeta(goal))}</span></div></div>`;
       }
       function composer(scope){

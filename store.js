@@ -55,16 +55,24 @@ function watch(callback, interval = 3000, options = {}) {
   };
   storeListeners.add(run);
   const timer = setInterval(run, Math.max(1000, Number(interval) || 3000));
+  const initialTimer = setTimeout(run, 0);
   const onVisible = () => { if (!document.hidden) run(); };
+  const onPageHide = event => { if (!event.persisted) stop(); };
   window.addEventListener("focus", run);
+  window.addEventListener("online", run);
+  window.addEventListener("pageshow", run);
+  window.addEventListener("pagehide", onPageHide);
   document.addEventListener("visibilitychange", onVisible);
   const stop = () => {
     clearInterval(timer);
+    clearTimeout(initialTimer);
     storeListeners.delete(run);
     window.removeEventListener("focus", run);
+    window.removeEventListener("online", run);
+    window.removeEventListener("pageshow", run);
+    window.removeEventListener("pagehide", onPageHide);
     document.removeEventListener("visibilitychange", onVisible);
   };
-  window.addEventListener("pagehide", stop, { once: true });
   return stop;
 }
 
