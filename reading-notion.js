@@ -1,9 +1,10 @@
 import { NOTION_API_VERSION } from "./schedule-core.js";
 
 const LIBRARY_CACHE_KEY = "reading:notion:library:v2";
-const NESTED_QUOTES_CACHE_KEY = "reading:notion:nested-quotes:v1";
+const NESTED_QUOTES_CACHE_KEY = "reading:notion:nested-quotes:v2";
 const LIBRARY_CACHE_MS = 15_000;
-const NESTED_QUOTES_CACHE_MS = 60_000;
+const NESTED_QUOTES_REFRESH_MS = 60_000;
+const NESTED_BOOK_BATCH_SIZE = 2;
 const LIFE_CYCLE_STATUSES = new Set(["구입 전", "읽는 중", "재독", "중도포기", "완독", "정리 완료"]);
 const KEEP_STATUSES = new Set(["소장", "구독서비스", "인생책"]);
 const STATUS_TO_NOTION = Object.freeze({
@@ -358,38 +359,54 @@ async function kvDelete(env, key) {
 }
 
 async function loadNestedQuotes(env, config, books, fresh) {
+  const signature = books.map(book => book.id).join(":");
   const cached = await kvGet(env, NESTED_QUOTES_CACHE_KEY);
-  if (!fresh && cached?.fetchedAt && Date.now() - cached.fetchedAt < NESTED_QUOTES_CACHE_MS && Array.isArray(cached.quotes)) {
-    return cached.quotes;
+  const state = cached?.signature === signature && cached?.quotesByBook && cached?.dataSourceIdsByBook
+    ? cached
+    : { signature, nextIndex:0, completedAt:0, quotesByBook:{}, dataSourceIdsByBook:{} };
+  const complete = books.every(book => Object.hasOwn(state.quotesByBook, book.id));
+  if (!fresh && complete && state.completedAt && Date.now() - state.completedAt < NESTED_QUOTES_REFRESH_MS) {
+    return books.flatMap(book => state.quotesByBook[book.id] || []);
   }
 
-  const bookBlocks = await mapInBatches(books, async book => ({
+  const start = Math.max(0, Math.min(books.length - 1, Number(state.nextIndex) || 0));
+  const batch = books.slice(start, start + NESTED_BOOK_BATCH_SIZE);
+  const unresolved = batch.filter(book => !Array.isArray(state.dataSourceIdsByBook[book.id]) || !state.dataSourceIdsByBook[book.id].length);
+  const bookBlocks = await mapInBatches(unresolved, async book => ({
     book,
     blocks: await listBlockChildren(config, book.id),
   }));
   const nestedDatabases = bookBlocks.flatMap(({ book, blocks }) => blocks
     .filter(block => block?.type === "child_database" && /필사/.test(String(block?.child_database?.title || "")))
     .map(block => ({ book, databaseId: block.id })));
-
-  const dataSources = (await mapInBatches(nestedDatabases, async entry => {
+  const discovered = await mapInBatches(nestedDatabases, async entry => {
     const database = await notionRequest(config, `/databases/${encodeURIComponent(entry.databaseId)}`);
-    return (Array.isArray(database?.data_sources) ? database.data_sources : [])
-      .map(source => ({ book: entry.book, dataSourceId: source?.id }))
-      .filter(entry => entry.dataSourceId);
-  })).flat();
+    return {
+      bookId:entry.book.id,
+      ids:(Array.isArray(database?.data_sources) ? database.data_sources : []).map(source => source?.id).filter(Boolean),
+    };
+  });
+  unresolved.forEach(book => { state.dataSourceIdsByBook[book.id] = []; });
+  discovered.forEach(entry => { state.dataSourceIdsByBook[entry.bookId] = entry.ids; });
 
+  const dataSources = batch.flatMap(book => (state.dataSourceIdsByBook[book.id] || [])
+    .map(dataSourceId => ({ book, dataSourceId })));
   const notePages = (await mapInBatches(dataSources, async entry => {
     const pages = await queryDataSource(config, entry.dataSourceId);
     return pages.map(page => ({ book: entry.book, page }));
   })).flat();
+  const scanned = (await mapInBatches(notePages, async entry => ({
+    bookId:entry.book.id,
+    quote:normalizeNestedQuotePage(entry.page, entry.book.id, await listBlockChildren(config, entry.page.id)),
+  }))).filter(entry => entry.quote);
+  batch.forEach(book => { state.quotesByBook[book.id] = []; });
+  scanned.forEach(entry => { state.quotesByBook[entry.bookId].push(entry.quote); });
 
-  const quotes = (await mapInBatches(notePages, async entry => normalizeNestedQuotePage(
-    entry.page,
-    entry.book.id,
-    await listBlockChildren(config, entry.page.id),
-  ))).filter(Boolean);
-  await kvPut(env, NESTED_QUOTES_CACHE_KEY, { fetchedAt: Date.now(), quotes });
-  return quotes;
+  const nextIndex = start + batch.length;
+  state.nextIndex = nextIndex >= books.length ? 0 : nextIndex;
+  if (state.nextIndex === 0) state.completedAt = Date.now();
+  await kvPut(env, NESTED_QUOTES_CACHE_KEY, state);
+  return books.flatMap(book => state.quotesByBook[book.id] || []);
 }
 
 export function mergeReadingQuotes(structured, nested) {
