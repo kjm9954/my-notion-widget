@@ -242,7 +242,7 @@
       }
 
       function renderList(scrollTop = quoteList.scrollTop) {
-        const result = filteredItems().slice(0, isWide ? 8 : 5);
+        const result = filteredItems();
         if (!result.length) {
           quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
           return;

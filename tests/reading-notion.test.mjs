@@ -23,6 +23,17 @@ test("reading count excludes only dropped books while recent books stay complete
   assert.match(html, /recent:finished\.slice\(\)/);
 });
 
+test("quote drawers render the full filtered list inside their scroll areas", async () => {
+  const [largeDrawer, compactDrawer] = await Promise.all([
+    readFile(new URL("../reading-notes/quote-drawer.html", import.meta.url), "utf8"),
+    readFile(new URL("../reading-notes/drawer.html", import.meta.url), "utf8"),
+  ]);
+  assert.match(largeDrawer, /const result = filteredItems\(\);/);
+  assert.doesNotMatch(largeDrawer, /filteredItems\(\)\.slice/);
+  assert.match(compactDrawer, /function visibleQuotes\(\) \{ return filteredQuotes\(\); \}/);
+  assert.doesNotMatch(compactDrawer, /filteredQuotes\(\)\.slice/);
+});
+
 test("does not count the keep-only 인생책 tag as a completed book", () => {
   const book = normalizeReadingBookPage({
     id:"book-life",
