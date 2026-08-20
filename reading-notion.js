@@ -296,7 +296,8 @@ function nestedQuotePageLabel(value) {
 function nestedQuoteText(blocks) {
   const callouts = (Array.isArray(blocks) ? blocks : []).filter(block => block?.type === "callout");
   const preferred = callouts.find(block => /^summary(?:\s|$)/i.test(blockText(block))) || callouts[0];
-  return blockText(preferred).replace(/^summary\s*/i, "").trim();
+  const text = blockText(preferred).replace(/^summary\s*/i, "").trim();
+  return /^생각\s*한\s*줄$/i.test(text) ? "" : text;
 }
 
 export function normalizeNestedQuotePage(page, bookId, blocks = []) {

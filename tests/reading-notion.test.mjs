@@ -55,6 +55,17 @@ test("normalizes the summary callout in a per-book quote database", () => {
   assert.equal(quote.source, "nested-database");
 });
 
+test("ignores the untouched 생각 한 줄 template placeholder", () => {
+  const quote = normalizeNestedQuotePage({
+    id:"note-placeholder",
+    properties:{ "이름":{ type:"title", title:richText("[P. 1] 메모") } },
+  }, "book-1", [{
+    type:"callout",
+    callout:{ rich_text:richText("summary\n생각 한 줄") },
+  }]);
+  assert.equal(quote, null);
+});
+
 test("includes each book's one-line property and removes exact per-book duplicates", () => {
   const oneLine = normalizeBookOneLine({
     id:"book-1",
