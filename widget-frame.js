@@ -7,10 +7,10 @@
   const card = document.querySelector('[data-widget-card]');
   const file = decodeURIComponent(location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const targets = {
-    'quote-drawer.html': { selector:'.quote-item', kind:'dot', max:3, empty:'.empty-state' },
+    'quote-drawer.html': { empty:'.empty-state' },
     'thoughts.html': { selector:'.item', kind:'dot', max:3, filter:'aged', empty:'.empty-list' },
     'life-books.html': { selector:'.cover-button.is-selected', kind:'outline', max:1, empty:'.empty-state' },
-    'reading-count.html': { selector:'.year-row', kind:'dot', max:3, empty:'.empty-state' },
+    'reading-count.html': { empty:'.empty-state' },
     'wishlist.html': { selector:'.grid-cover', kind:'outline', max:3, empty:'.all-empty, .filter-empty' },
     'today.html': { empty:'.empty-block' },
     'calendar.html': { selector:'.today-ring', max:1 },
@@ -261,6 +261,67 @@
 (() => {
   'use strict';
 
+  const REFLOW_MAX = 639;
+  const sizeQuery = new URLSearchParams(location.search);
+
+  function viewportWidth() {
+    return Math.max(1, Math.min(
+      window.innerWidth || Infinity,
+      document.documentElement.clientWidth || Infinity,
+      window.visualViewport?.width || Infinity
+    ));
+  }
+
+  function viewportHeight() {
+    return Math.max(1, Math.min(
+      window.innerHeight || Infinity,
+      document.documentElement.clientHeight || Infinity,
+      window.visualViewport?.height || Infinity
+    ));
+  }
+
+  function positiveQuery(name) {
+    const value = Number(sizeQuery.get(name));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  const querySize = {
+    contentW:positiveQuery('w'),
+    frameH:positiveQuery('h'),
+    scale:positiveQuery('s'),
+    listH:positiveQuery('list')
+  };
+
+  function withQuerySize(saved, includeHeight = true) {
+    const value = { ...(saved || {}) };
+    if (querySize.contentW !== null) { value.contentW = querySize.contentW; value.widthLocked = true; }
+    if (querySize.scale !== null) { value.scale = querySize.scale; value.scaleLocked = true; }
+    if (includeHeight && querySize.frameH !== null) { value.frameH = querySize.frameH; value.heightLocked = true; }
+    if (includeHeight && querySize.listH !== null) { value.listH = querySize.listH; value.listLocked = true; }
+    return value;
+  }
+
+  function clampToCard(element) {
+    if (!element) return element;
+    element.style.removeProperty('translate');
+    if (document.body.classList.contains('is-widget-reflow')) return element;
+    const card = element.closest('[data-widget-card]') || document.querySelector('[data-widget-card]');
+    if (!card || element.hidden || !element.getClientRects().length) return element;
+    const margin = 8;
+    const cardRect = card.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    let x = 0;
+    let y = 0;
+    if (rect.right > cardRect.right - margin) x -= rect.right - (cardRect.right - margin);
+    if (rect.left + x < cardRect.left + margin) x += cardRect.left + margin - (rect.left + x);
+    if (rect.bottom > cardRect.bottom - margin) y -= rect.bottom - (cardRect.bottom - margin);
+    if (rect.top + y < cardRect.top + margin) y += cardRect.top + margin - (rect.top + y);
+    if (x || y) element.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
+    return element;
+  }
+
+  window.widgetFrame = Object.assign(window.widgetFrame || {}, { clampToCard, viewportWidth, viewportHeight });
+
   function setupListOnlyFrame(host, card) {
     const list = card?.querySelector('[data-widget-list]');
     const listHandle = card?.querySelector('[data-widget-list-handle]');
@@ -271,6 +332,7 @@
     const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
     const defaultListHeight = Number(list.dataset.widgetListHeight) || list.offsetHeight || 160;
     const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+    const isReflow = () => sizeQuery.get('mobile') !== 'off' && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
     let requestedListHeight = defaultListHeight;
     let renderedListHeight = defaultListHeight;
     let listLocked = false;
@@ -284,9 +346,9 @@
     function readSize() {
       try {
         const parsed = JSON.parse(localStorage.getItem(key));
-        return parsed && typeof parsed === 'object' ? parsed : {};
+        return withQuerySize(parsed && typeof parsed === 'object' ? parsed : {});
       } catch (_) {
-        return {};
+        return withQuerySize({});
       }
     }
 
@@ -314,9 +376,11 @@
     }
 
     function commit() {
-      const visualWidth = Math.max(1, Math.min(designWidth, window.innerWidth));
+      const reflow = isReflow();
+      document.body.classList.toggle('is-widget-reflow', reflow);
+      const visualWidth = reflow ? viewportWidth() : Math.max(1, Math.min(designWidth, viewportWidth()));
       const offset = listOffset();
-      const maximum = Math.max(120, window.innerHeight - offset);
+      const maximum = Math.max(120, viewportHeight() - offset);
       if (!listLocked) requestedListHeight = Math.max(120, declaredHeight - offset);
       renderedListHeight = Math.max(Math.min(160, maximum), Math.min(maximum, requestedListHeight));
       const frameHeight = offset + renderedListHeight;
@@ -335,7 +399,7 @@
       listHandle.setAttribute('aria-valuemax', String(Math.round(maximum)));
       listHandle.setAttribute('aria-valuenow', String(Math.round(renderedListHeight)));
       host.dataset.widgetSizeReady = 'true';
-      document.body.classList.toggle('is-widget-overflowing', frameHeight > window.innerHeight + .5);
+      document.body.classList.toggle('is-widget-overflowing', frameHeight > viewportHeight() + .5);
     }
 
     function applyListHeight(value, fromUser = false) {
@@ -460,12 +524,14 @@
   const ABSOLUTE_MINIMUM_SCALE = .08;
   const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
   const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
+  const isReflow = () => sizeQuery.get('mobile') !== 'off' && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
 
   let contentWidth = designWidth;
   host.style.setProperty('--widget-content-width', `${contentWidth}px`);
   card.style.setProperty('--widget-content-width', `${contentWidth}px`);
 
   let naturalHeight = Math.max(1, card.offsetHeight || declaredHeight);
+  let requestedFrameHeight = declaredHeight;
   let requestedScale = 1;
   let renderedScale = 1;
   let scaleLocked = false;
@@ -474,6 +540,7 @@
   let heightLocked = false;
   let requestedListHeight = null;
   let renderedListHeight = null;
+  let reflowListHeight = defaultListHeight;
   let listLocked = false;
   let sizeDrag = null;
   let listDrag = null;
@@ -495,11 +562,11 @@
   }
 
   function readSize() {
-    return readStoredSize(key);
+    return withQuerySize(readStoredSize(key));
   }
 
   function readWidthSize() {
-    return widthKey ? readStoredSize(widthKey) : {};
+    return withQuerySize(widthKey ? readStoredSize(widthKey) : {}, false);
   }
 
   function saveSize() {
@@ -533,8 +600,8 @@
   /* The widget never letterboxes: the white frame is always exactly the scaled
      card, so a wide or short embed can never leave an empty band around it. */
   function maximumScale() {
-    const byWidth = Math.max(1, window.innerWidth) / contentWidth;
-    const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
+    const byWidth = viewportWidth() / contentWidth;
+    const byHeight = viewportHeight() / naturalHeight;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
       ? configuredMaximumScale
       : Number.POSITIVE_INFINITY;
@@ -547,12 +614,13 @@
 
   function measureContentWidth() {
     if (sizeDrag) return contentWidth;
+    if (isReflow()) return viewportWidth();
     if (widthKey) {
       /* Members can have different natural heights, so their height-limited
          scales may differ. Compensate with logical width so the outer widths
          still land on the same shared visual target. */
       const target = Math.max(MINIMUM_CONTENT_WIDTH, number(sharedVisualWidth, designWidth));
-      const byHeight = Math.max(1, window.innerHeight) / naturalHeight;
+      const byHeight = viewportHeight() / naturalHeight;
       const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
         ? configuredMaximumScale
         : Number.POSITIVE_INFINITY;
@@ -580,12 +648,43 @@
     frameRequest = 0;
     frameTimer = 0;
 
+    const reflow = isReflow();
+    document.body.classList.toggle('is-widget-reflow', reflow);
+    if (reflow) {
+      const reflowWidth = viewportWidth();
+      renderedScale = 1;
+      host.style.setProperty('--widget-content-width', `${reflowWidth}px`);
+      host.style.setProperty('--widget-base-width', `${reflowWidth}px`);
+      host.style.setProperty('--widget-visual-width', `${reflowWidth}px`);
+      host.style.setProperty('--widget-content-scale', '1');
+      card.style.setProperty('--widget-content-width', `${reflowWidth}px`);
+      card.style.setProperty('--widget-content-scale', '1');
+      card.style.removeProperty('height');
+      if (list) {
+        const offset = listOffset();
+        const maximum = Math.max(40, viewportHeight() - offset);
+        const desired = number(reflowListHeight, defaultListHeight || list.offsetHeight || maximum);
+        renderedListHeight = Math.max(40, Math.min(maximum, desired));
+        list.style.flex = `0 0 ${renderedListHeight}px`;
+        list.style.height = `${renderedListHeight}px`;
+      }
+      const reflowHeight = Math.max(1, card.offsetHeight, card.scrollHeight);
+      host.style.setProperty('--widget-base-height', `${reflowHeight}px`);
+      host.style.setProperty('--widget-visual-height', `${reflowHeight}px`);
+      host.dataset.widgetSizeReady = 'true';
+      sizeLabel.textContent = `${Math.round(reflowWidth)}×${Math.round(reflowHeight)}`;
+      document.body.classList.toggle('is-widget-overflowing', reflowHeight > viewportHeight() + .5);
+      return;
+    }
+
+    if (heightLocked && !list) card.style.height = `${naturalHeight}px`;
+
     const nextContentWidth = measureContentWidth();
     if (nextContentWidth !== contentWidth) {
       contentWidth = nextContentWidth;
-      host.style.setProperty('--widget-content-width', `${contentWidth}px`);
-      card.style.setProperty('--widget-content-width', `${contentWidth}px`);
     }
+    host.style.setProperty('--widget-content-width', `${contentWidth}px`);
+    card.style.setProperty('--widget-content-width', `${contentWidth}px`);
 
     /* Height tracks the card's content on every commit, not only on a
        ResizeObserver tick — so widgets that grow/shrink (e.g. an overlay that
@@ -613,12 +712,12 @@
       const axis = handle.dataset.widgetScaleAxis || 'both';
       if (axis === 'horizontal') {
         handle.setAttribute('aria-valuemin', String(Math.round(MINIMUM_CONTENT_WIDTH * renderedScale)));
-        handle.setAttribute('aria-valuemax', String(Math.round(window.innerWidth)));
+        handle.setAttribute('aria-valuemax', String(Math.round(viewportWidth())));
         handle.setAttribute('aria-valuenow', String(Math.round(visualWidth)));
         handle.setAttribute('aria-valuetext', `가로 ${Math.round(visualWidth)}픽셀`);
       } else if (axis === 'vertical') {
         handle.setAttribute('aria-valuemin', String(Math.round(MINIMUM_FRAME_HEIGHT * renderedScale)));
-        handle.setAttribute('aria-valuemax', String(Math.round(window.innerHeight)));
+        handle.setAttribute('aria-valuemax', String(Math.round(viewportHeight())));
         handle.setAttribute('aria-valuenow', String(Math.round(visualHeight)));
         handle.setAttribute('aria-valuetext', `세로 ${Math.round(visualHeight)}픽셀`);
       } else {
@@ -629,30 +728,32 @@
       }
     });
 
-    document.body.classList.toggle('is-widget-overflowing', visualHeight > window.innerHeight + .5);
+    document.body.classList.toggle('is-widget-overflowing', visualHeight > viewportHeight() + .5);
     const rect = host.getBoundingClientRect();
-    topLeftHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.left + 6))}px`;
-    topLeftHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.top + 6))}px`;
-    scaleHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 20, rect.right - 20))}px`;
-    scaleHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 20, rect.bottom - 20))}px`;
+    const viewportW = viewportWidth();
+    const viewportH = viewportHeight();
+    topLeftHandle.style.left = `${Math.max(6, Math.min(viewportW - 20, rect.left + 6))}px`;
+    topLeftHandle.style.top = `${Math.max(6, Math.min(viewportH - 20, rect.top + 6))}px`;
+    scaleHandle.style.left = `${Math.max(6, Math.min(viewportW - 20, rect.right - 20))}px`;
+    scaleHandle.style.top = `${Math.max(6, Math.min(viewportH - 20, rect.bottom - 20))}px`;
 
     const visibleTop = Math.max(6, rect.top);
-    const visibleBottom = Math.min(window.innerHeight - 6, rect.bottom);
-    const visibleMiddle = visibleBottom > visibleTop ? (visibleTop + visibleBottom) / 2 : window.innerHeight / 2;
-    const widthHandleTop = Math.max(6, Math.min(window.innerHeight - 52, visibleMiddle - 23));
-    leftWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.left + 6))}px`;
-    rightWidthHandle.style.left = `${Math.max(6, Math.min(window.innerWidth - 10, rect.right - 10))}px`;
+    const visibleBottom = Math.min(viewportH - 6, rect.bottom);
+    const visibleMiddle = visibleBottom > visibleTop ? (visibleTop + visibleBottom) / 2 : viewportH / 2;
+    const widthHandleTop = Math.max(6, Math.min(viewportH - 52, visibleMiddle - 23));
+    leftWidthHandle.style.left = `${Math.max(6, Math.min(viewportW - 10, rect.left + 6))}px`;
+    rightWidthHandle.style.left = `${Math.max(6, Math.min(viewportW - 10, rect.right - 10))}px`;
     leftWidthHandle.style.top = `${widthHandleTop}px`;
     rightWidthHandle.style.top = `${widthHandleTop}px`;
 
     const visibleLeft = Math.max(6, rect.left);
-    const visibleRight = Math.min(window.innerWidth - 6, rect.right);
-    const visibleHorizontalMiddle = visibleRight > visibleLeft ? (visibleLeft + visibleRight) / 2 : window.innerWidth / 2;
-    const heightHandleLeft = Math.max(6, Math.min(window.innerWidth - 52, visibleHorizontalMiddle - 23));
+    const visibleRight = Math.min(viewportW - 6, rect.right);
+    const visibleHorizontalMiddle = visibleRight > visibleLeft ? (visibleLeft + visibleRight) / 2 : viewportW / 2;
+    const heightHandleLeft = Math.max(6, Math.min(viewportW - 52, visibleHorizontalMiddle - 23));
     topHeightHandle.style.left = `${heightHandleLeft}px`;
     bottomHeightHandle.style.left = `${heightHandleLeft}px`;
-    topHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.top + 6))}px`;
-    bottomHeightHandle.style.top = `${Math.max(6, Math.min(window.innerHeight - 10, rect.bottom - 10))}px`;
+    topHeightHandle.style.top = `${Math.max(6, Math.min(viewportH - 10, rect.top + 6))}px`;
+    bottomHeightHandle.style.top = `${Math.max(6, Math.min(viewportH - 10, rect.bottom - 10))}px`;
   }
 
   /* A hidden or off-screen embed never gets an animation frame, so the timer
@@ -676,11 +777,11 @@
   }
 
   function maximumContentWidth(scale = renderedScale || requestedScale || 1) {
-    return Math.max(1, window.innerWidth) / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
+    return viewportWidth() / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
   }
 
   function maximumFrameHeight(scale = renderedScale || requestedScale || 1) {
-    return Math.max(1, window.innerHeight) / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
+    return viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, scale);
   }
 
   function clampAxisSize(value, minimum, maximum) {
@@ -716,7 +817,7 @@
     if (!list) return;
     if (fromUser) listLocked = true;
     const offset = listOffset();
-    const maximum = Math.max(40, (window.innerHeight / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
+    const maximum = Math.max(40, (isReflow() ? viewportHeight() : viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
     const desired = number(value, requestedListHeight ?? list.offsetHeight);
     requestedListHeight = fromUser ? Math.max(Math.min(160, maximum), Math.min(maximum, desired)) : Math.max(40, desired);
     renderedListHeight = Math.max(40, Math.min(maximum, requestedListHeight));
@@ -725,6 +826,7 @@
     const nextCardHeight = Math.max(listLocked ? 1 : declaredHeight, offset + renderedListHeight);
     card.style.height = `${nextCardHeight}px`;
     naturalHeight = nextCardHeight;
+    requestedFrameHeight = nextCardHeight;
     listHandle?.setAttribute('aria-valuenow', String(Math.round(requestedListHeight)));
     updateFrame();
   }
@@ -739,6 +841,7 @@
       return;
     }
     if (fromUser) heightLocked = true;
+    requestedFrameHeight = next;
     naturalHeight = next;
     card.style.height = `${naturalHeight}px`;
     updateFrame();
@@ -873,17 +976,22 @@
   requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(horizontalSaved, 1));
   widthLocked = horizontalSaved.widthLocked === true || (!hasHorizontal('widthLocked') && hasHorizontal('contentW'));
   if (widthKey) {
+    const queryVisualWidth = querySize.contentW !== null ? querySize.contentW * requestedScale : null;
     const storedVisualWidth = Number(horizontalSaved.visualW);
-    sharedVisualWidth = Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null;
+    sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null);
   } else {
     applyContentWidth(number(horizontalSaved.contentW, designWidth), false, requestedScale);
   }
   const hasOwn = property => Object.prototype.hasOwnProperty.call(saved, property);
   heightLocked = saved.heightLocked === true || (!hasOwn('heightLocked') && hasOwn('frameH'));
   listLocked = saved.listLocked === true || (Object.prototype.hasOwnProperty.call(saved, 'listH') && !Object.prototype.hasOwnProperty.call(saved, 'listLocked'));
-  if (list && heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
-  else if (list) applyListHeight(number(saved.listH, defaultListHeight));
-  else if (heightLocked) applyFrameHeight(number(saved.frameH, naturalHeight), false, requestedScale);
+  reflowListHeight = Math.max(40, number(saved.listH, defaultListHeight));
+  requestedFrameHeight = Math.max(MINIMUM_FRAME_HEIGHT, number(saved.frameH, naturalHeight));
+  if (!isReflow()) {
+    if (list && heightLocked) applyFrameHeight(requestedFrameHeight, false, requestedScale);
+    else if (list) applyListHeight(number(saved.listH, defaultListHeight));
+    else if (heightLocked) applyFrameHeight(requestedFrameHeight, false, requestedScale);
+  }
   commitFrame();
 
   new ResizeObserver(() => {
@@ -897,6 +1005,7 @@
   if (fixedParts.length) {
     const fixedObserver = new ResizeObserver(() => {
       if (listDrag) return;
+      if (isReflow()) { updateFrame(); return; }
       if (heightLocked) applyFrameHeight(naturalHeight);
       else applyListHeight(requestedListHeight ?? list.offsetHeight);
     });
@@ -905,7 +1014,11 @@
 
   function settleFrame() {
     if (!scaleLocked) requestedScale = 1;
-    if (list && requestedListHeight !== null) applyListHeight(requestedListHeight);
+    if (!isReflow()) {
+      if (list && heightLocked) applyFrameHeight(requestedFrameHeight, false, requestedScale);
+      else if (list && requestedListHeight !== null) applyListHeight(requestedListHeight);
+      else if (heightLocked) applyFrameHeight(requestedFrameHeight, false, requestedScale);
+    }
     commitFrame();
     [60, 250, 1000].forEach(delay => setTimeout(commitFrame, delay));
   }
@@ -934,8 +1047,9 @@
       requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(nextHorizontal, 1));
       widthLocked = nextHorizontal.widthLocked === true || (!ownsHorizontal('widthLocked') && ownsHorizontal('contentW'));
       if (widthKey) {
+        const queryVisualWidth = querySize.contentW !== null ? querySize.contentW * requestedScale : null;
         const storedVisualWidth = Number(nextHorizontal.visualW);
-        sharedVisualWidth = Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null;
+        sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null);
       } else {
         applyContentWidth(number(nextHorizontal.contentW, designWidth), false, requestedScale);
       }
@@ -945,9 +1059,13 @@
       const owns = property => Object.prototype.hasOwnProperty.call(next, property);
       heightLocked = next.heightLocked === true || (!owns('heightLocked') && owns('frameH'));
       listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
-      if (list && heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
-      else if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
-      else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+      reflowListHeight = Math.max(40, number(next.listH, defaultListHeight));
+      requestedFrameHeight = Math.max(MINIMUM_FRAME_HEIGHT, number(next.frameH, requestedFrameHeight));
+      if (!isReflow()) {
+        if (list && heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+        else if (list) applyListHeight(number(next.listH, requestedListHeight ?? list.offsetHeight));
+        else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
+      }
     }
     updateFrame();
   });

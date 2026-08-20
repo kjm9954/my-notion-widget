@@ -118,16 +118,14 @@
     .empty-choice strong { color:var(--title); font-size:11px; font-weight:800; }
     .empty-choice span { color:var(--muted); font-size:9px; font-weight:600; line-height:1.5; }
     .empty-choice.primary strong,.empty-choice.primary span { color:var(--bg); }
-    @media (max-width:480px) {
+    @media (max-width:639px) {
       .management-widget { padding:12px; }
       .management-head { align-items:flex-start; }
       .management-list { padding-inline:8px; }
       .empty-actions { flex-direction:column; }
       .empty-choice { width:100%; }
-    }
-    @media (max-width:380px) {
-      .management-button,.type-segment button,.item-action,.quiet-link,.preset,.part-control { min-height:40px; }
-      .management-head { min-height:40px; }
+      .management-button,.type-segment button,.item-action,.quiet-link,.preset,.part-control { min-height:44px; }
+      .management-head { min-height:44px; }
       .head-actions { gap:4px; }
       .management-button { padding-inline:7px; }
       .editor-head,.editor-foot { align-items:stretch; flex-direction:column; }
@@ -140,6 +138,7 @@
       .name-line { align-items:flex-start; flex-direction:column; }
       .editor-foot .head-actions { width:100%; }
       .editor-foot .management-button { flex:1; }
+      .management-input { min-height:44px; }
     }
   </style>
   <script src="../store.js"></script>

@@ -574,6 +574,7 @@
         dayOverlay.hidden = false;
         widgetMotion.popIn(modalPanel);
         document.body.classList.add('has-widget-expanded');
+        requestAnimationFrame(() => window.widgetFrame?.clampToCard(modalPanel));
         modalClose.focus({ preventScroll:true });
       }
 

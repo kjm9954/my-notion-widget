@@ -106,10 +106,12 @@
     .locked span { color:var(--muted); font-size:8px; font-weight:600; }
     .drop-input { width:100%; height:34px; padding:0 10px; border:1px solid var(--danger-border); border-radius:9px; background:#fff; color:var(--danger); font-size:9px; font-weight:600; outline:none; }
     .hidden { display:none !important; }
-    @media (max-width:520px) {
+    @media (max-width:639px) {
       .card { padding:16px; gap:12px; }
       .head { height:auto; flex-wrap:wrap; }
       .search { order:3; width:calc(100% - 90px); margin-left:0; }
+      .shelf, .shelf.is-adding { height:auto; min-height:103px; }
+      .book-grid { height:auto; min-height:84px; flex-wrap:wrap; overflow:visible; }
       .detail-grid { grid-template-columns:1fr; }
       .detail-side { display:grid; grid-template-columns:100px 1fr; gap:12px; }
       .detail-cover { width:100px; height:150px; }
@@ -117,7 +119,7 @@
       .detail-controls { height:auto; flex-wrap:wrap; }
       .status-panel.done { grid-template-columns:1fr; }
     }
-    @media (max-width:480px) {
+    @media (max-width:639px) {
       .card { padding:14px; }
       .add-form { width:100%; margin-left:0; }
       .add-form input { min-width:0; flex:1; }

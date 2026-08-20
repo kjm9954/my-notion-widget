@@ -1690,6 +1690,7 @@
         const above = (anchorRect.top - cardRect.top) / scale - height - 6;
         cellPopover.style.left = `${Math.max(12, Math.min(card.offsetWidth - width - 12, anchorLeft))}px`;
         cellPopover.style.top = `${below + height <= card.offsetHeight - 12 ? below : Math.max(12, above)}px`;
+        window.widgetFrame?.clampToCard(cellPopover);
       }
 
       function renderAll() {

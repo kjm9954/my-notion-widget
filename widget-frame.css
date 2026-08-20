@@ -471,6 +471,82 @@ body.is-widget-list-resizing {
   }
 }
 
+/* Mobile reflow keeps the widget at readable 1:1 scale and lets each existing
+   narrow layout rearrange against the same width its media queries see. */
+body.widget-page.is-widget-reflow {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-items: flex-start !important;
+}
+
+body.is-widget-reflow .widget-host {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  overflow: visible;
+}
+
+body.is-widget-reflow [data-widget-card] {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  overflow: visible !important;
+}
+
+body.is-widget-reflow [data-widget-card] * {
+  min-width: 0;
+}
+
+body.is-widget-reflow [data-widget-list] {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.is-widget-reflow .widget-size-handle,
+body.is-widget-reflow .widget-width-handle,
+body.is-widget-reflow .widget-height-handle,
+body.is-widget-reflow .widget-list-resize-handle,
+body.is-widget-reflow .widget-size-label {
+  display: none !important;
+}
+
+body.is-widget-reflow .cell-popover,
+body.is-widget-reflow #calendarPopover,
+body.is-widget-reflow #overlay,
+body.is-widget-reflow #detailOverlay,
+body.is-widget-reflow #dayOverlay .modal-panel {
+  position: absolute !important;
+  top: auto !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  left: 8px !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: 70% !important;
+  overflow: auto !important;
+}
+
+body.is-widget-reflow .cell-popover button,
+body.is-widget-reflow #calendarPopover button,
+body.is-widget-reflow #overlay button,
+body.is-widget-reflow #detailOverlay button,
+body.is-widget-reflow #dayOverlay .modal-panel button {
+  min-height: 44px;
+}
+
+@media (max-width: 639px) {
+  body.widget-page button:not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle),
+  body.widget-page [role="button"] {
+    min-height: 44px;
+  }
+}
+
 /* ── 활기 모션 v2 ─────────────────────────── */
 
 /* 완료 팝 — 체크박스·링·점·배지에 1회 부착 */

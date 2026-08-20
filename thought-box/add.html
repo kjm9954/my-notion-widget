@@ -184,9 +184,10 @@
       line-height:1.55;
     }
 
-    @media (max-width:0px) {
-      .card { width:320px; }
-      .chip, .detail-toggle { min-height:40px; padding-top:6px; padding-bottom:6px; }
+    @media (max-width:639px) {
+      .card { width:100%; }
+      .entry-row, .one-input, .add-button { min-height:44px; }
+      .chip, .detail-toggle { min-height:44px; padding-top:6px; padding-bottom:6px; }
       .card.cats-open { height:130px; }
       .card.detail-open, .card.cats-open.detail-open { height:226px; }
       .card.cats-open .chips { flex-wrap:nowrap; overflow-x:auto; }

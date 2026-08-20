@@ -37,6 +37,7 @@
     .year-row.is-current .year-label { color:var(--action); font-weight:700; }
     .year-row.is-current .year-count { color:var(--action); font-size:16px; }
     .year-row.is-old .year-label, .year-row.is-old .year-count { color:var(--muted); }
+    .year-bar, .wide-divider { display:none; }
     .recent-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:7px; }
     .recent-list { min-height:0; flex:1; display:flex; flex-direction:column; gap:5px; }
     .book-item { min-height:66px; display:flex; align-items:center; gap:11px; }
@@ -46,7 +47,6 @@
     }
     .cover.has-image { padding:0; background:#F1F5F7; border:1px solid var(--border); }
     .cover img { width:100%; height:100%; display:block; object-fit:cover; }
-    .cover-initial { color:var(--inactive); font-size:18px; font-weight:800; line-height:1; }
     .cover-name { position:absolute; right:6px; bottom:6px; left:6px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--muted); font-size:9px; font-weight:800; line-height:1.15; }
     .book-copy { min-width:0; display:flex; flex-direction:column; gap:5px; }
     .book-title {
@@ -60,14 +60,50 @@
     }
     .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
+    .card.is-wide:not(.is-empty) {
+      height:440px; padding:26px; display:grid; grid-template-columns:260px 1px minmax(0, 1fr);
+      grid-template-rows:auto auto minmax(0, 1fr); column-gap:26px; row-gap:0;
+    }
+    .card.is-wide .card-title { grid-column:1; grid-row:1; font-size:13px; }
+    .card.is-wide .total-block { grid-column:1; grid-row:2; margin-top:28px; gap:10px; }
+    .card.is-wide .eyebrow, .card.is-wide .recent-label { font-size:11px; }
+    .card.is-wide .total { gap:8px; }
+    .card.is-wide .total-number { font-size:72px; }
+    .card.is-wide .total-unit { font-size:16px; }
+    .card.is-wide .years {
+      grid-column:1; grid-row:3; align-self:end; padding:0; gap:12px;
+      background:transparent; border:0; border-radius:0;
+    }
+    .card.is-wide .year-row { align-items:center; gap:10px; }
+    .card.is-wide .year-label { width:64px; flex:0 0 64px; font-size:12px; }
+    .card.is-wide .year-count { width:22px; flex:0 0 22px; font-size:14px; text-align:right; }
+    .card.is-wide .year-row.is-current .year-count { font-size:14px; }
+    .card.is-wide .year-bar {
+      height:6px; flex:1; overflow:hidden; display:block; background:var(--border-soft); border-radius:3px;
+    }
+    .card.is-wide .year-bar-fill { width:var(--year-ratio); height:100%; display:block; background:var(--inactive); border-radius:3px; }
+    .card.is-wide .year-row.is-current .year-bar-fill { background:var(--action); }
+    .card.is-wide .year-row.is-old .year-bar-fill { background:var(--border-soft); }
+    .card.is-wide .wide-divider {
+      grid-column:2; grid-row:1 / 4; width:1px; height:100%; display:block; background:var(--border-soft);
+    }
+    .card.is-wide .recent-section { grid-column:3; grid-row:1 / 4; gap:10px; }
+    .card.is-wide .recent-list { gap:8px; }
+    .card.is-wide .book-item {
+      min-height:0; padding:10px 12px; gap:14px; background:var(--surface-soft);
+      border:1px solid var(--border-soft); border-radius:12px;
+    }
+    .card.is-wide .cover { width:52px; height:78px; aspect-ratio:auto; }
+    .card.is-wide .book-title { font-size:14px; }
+    .card.is-wide .book-meta { font-size:11px; }
     @media (max-width:639px) {
-      .total-number { font-size:40px; }
+      .card:not(.is-wide) .total-number { font-size:40px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-count.html" data-widget-max-width="340" data-widget-height="640" data-widget-max-scale="4" style="--widget-max-width:340px;--widget-base-width:340px;--widget-base-height:640px;--widget-visual-height:640px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-reading-count.html" data-widget-max-width="760" data-widget-height="440" data-widget-max-scale="4" style="--widget-max-width:760px;--widget-base-width:760px;--widget-base-height:440px;--widget-visual-height:440px">
     <main class="card" data-widget-card aria-label="책 현황 위젯">
       <h1 class="card-title">책 현황</h1>
       <div id="content"></div>
@@ -84,9 +120,12 @@
       const card = document.querySelector('.card');
       const content = document.getElementById('content');
       const currentYear = new Date().getFullYear();
+      let isWide = card.offsetWidth >= 560;
+      card.classList.toggle('is-wide', isWide);
+      let recentLimit = isWide ? (card.offsetHeight >= 500 ? 4 : 3) : 5;
       let entranceDone = false;
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
-      const placeholderMarkup = book => `<span class="cover-initial" aria-hidden="true">${escapeHtml(book.title.trim().charAt(0) || '책')}</span><span class="cover-name">${escapeHtml(book.title)}</span>`;
+      const placeholderMarkup = book => `<span class="cover-name">${escapeHtml(book.title)}</span>`;
       const cover = book => book.cover
         ? `<div class="cover has-image"><img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)} 표지"></div>`
         : `<div class="cover">${placeholderMarkup(book)}</div>`;
@@ -107,11 +146,13 @@
         }
         card.classList.remove('is-empty');
         const years = DATA.years.filter(item => Number.isFinite(item.n) && item.n > 0).slice(0, 3);
-        const recent = DATA.recent.slice(0, 5);
+        const maxYearCount = Math.max(1, ...years.map(item => item.n));
+        const recent = DATA.recent.slice(0, recentLimit);
         content.style.display = 'contents';
         content.innerHTML = `
           <section class="total-block"><span class="eyebrow">지금까지</span><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권</span></div></section>
-          ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${item.y === currentYear ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${item.y === currentYear ? ' · 올해' : ''}</span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
+          ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${item.y === currentYear ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${item.y === currentYear ? ' · 올해' : ''}</span><span class="year-bar" aria-hidden="true"><span class="year-bar-fill" style="--year-ratio:${Math.max(0, Math.min(100, item.n / maxYearCount * 100))}%"></span></span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
+          <span class="wide-divider" aria-hidden="true"></span>
           ${recent.length ? `<section class="recent-section"><span class="recent-label">최근에 덮은 책</span><div class="recent-list">${recent.map(book => `<article class="book-item">${cover(book)}<div class="book-copy"><strong class="book-title">${escapeHtml(book.title)}</strong><span class="book-meta">${escapeHtml(book.author)} · ${escapeHtml(book.date)}</span></div></article>`).join('')}</div></section>` : ''}`;
         bindCoverFallbacks();
         if (!entranceDone && recent.length) {
@@ -143,6 +184,15 @@
       }
 
       render();
+      new ResizeObserver(entries => {
+        const nextWide = entries[0].contentRect.width >= 560;
+        const nextLimit = nextWide ? (entries[0].contentRect.height >= 500 ? 4 : 3) : 5;
+        if (nextWide === isWide && nextLimit === recentLimit) return;
+        isWide = nextWide;
+        recentLimit = nextLimit;
+        card.classList.toggle('is-wide', isWide);
+        render();
+      }).observe(card);
       Store.watch(sync, 15000);
       sync().catch(error => console.warn('독서 현황을 불러오지 못했습니다.', error));
     })();

@@ -245,15 +245,21 @@
       .card { width:min(720px, calc(100vw - 32px)); }
     }
 
-    @media (max-width:0px) {
-      .shell { place-items:start center; padding:10px 8px; }
-      .card { width:min(380px, calc(100vw - 16px)); min-height:660px; padding:22px; }
+    @media (max-width:639px) {
+      .shell { place-items:start center; padding:0; }
+      .card { width:100%; min-height:660px; padding:18px 12px; }
       .month-button { width:44px; height:44px; flex-basis:44px; }
       .header { min-height:44px; }
-      .day { padding:5px; }
-      .day-number { font-size:8px; }
+      .month-summary { white-space:normal; text-align:right; }
+      .calendar-shell { gap:5px; }
+      .weekdays, .days { gap:3px; }
+      .weekday { padding-inline:2px; text-align:center; }
+      .day { height:44px; min-height:44px; padding:4px; }
       .dot, .legend-dot { width:5px; height:5px; flex-basis:5px; }
-      .detail-link, .detail-close { min-height:40px; }
+      .legend { flex-wrap:wrap; white-space:normal; }
+      .detail-row { height:auto; min-height:44px; flex-wrap:wrap; padding-block:6px; }
+      .detail-copy { text-overflow:clip; white-space:normal; }
+      .detail-link, .detail-close { min-height:44px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">

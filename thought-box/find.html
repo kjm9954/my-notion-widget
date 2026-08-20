@@ -558,17 +558,20 @@
     }
     .open-detail:focus { border-color:var(--action); }
 
-    @media (max-width:0px) {
-      .card { width:320px; height:920px; }
-      .chip, .manage-button, .banner-refresh { min-height:40px; padding-top:6px; padding-bottom:6px; }
-      .filter-row { height:40px; }
-      .filter-block { height:48px; min-height:48px; flex-basis:48px; }
-      .filter-caption { top:41px; }
-      .fixed { height:166px; flex-basis:166px; }
+    @media (max-width:639px) {
+      .card { width:100%; height:920px; }
+      body.widget-page .card .chip, body.widget-page .card .manage-button,
+      body.widget-page .card .banner-refresh, body.widget-page .card .manage-delete,
+      body.widget-page .card .done-button, body.widget-page .card .text-button,
+      body.widget-page .card .danger-button, body.widget-page .card .confirm-delete,
+      body.widget-page .card .cancel-delete, body.widget-page .card .item { min-height:45px !important; }
+      .chip, .manage-button, .banner-refresh { padding-top:6px; padding-bottom:6px; }
+      .filter-row { height:44px; }
+      .filter-block { height:52px; min-height:52px; flex-basis:52px; }
+      .filter-caption { top:45px; }
+      .fixed { height:174px; flex-basis:174px; }
       .fixed.managing { height:auto; flex-basis:auto; }
-      .manage-delete, .done-button, .text-button, .danger-button, .confirm-delete, .cancel-delete { min-height:40px; }
-      .item { min-height:40px; }
-      .overlay { left:12px; right:12px; }
+      .overlay { inset:8px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
@@ -1154,6 +1157,7 @@
           });
           overlay.appendChild(detail);
         }
+        window.widgetFrame?.clampToCard(overlay);
       }
 
       function confirmDelete() {

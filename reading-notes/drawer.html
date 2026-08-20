@@ -206,6 +206,7 @@
         document.getElementById('thoughtInput').addEventListener('input', event => saveThought(item.id, event.target.value));
         document.getElementById('prevQuote').addEventListener('click', () => { if (index > 0) openDetail(list[index - 1].id); });
         document.getElementById('nextQuote').addEventListener('click', () => { if (index >= 0 && index < list.length - 1) openDetail(list[index + 1].id); });
+        window.widgetFrame?.clampToCard(els.overlay);
       }
       function closeDetail() { const thoughtId=lastThoughtId;lastThoughtId='';activeId = ''; deleteArmed = false; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); if(thoughtId)widgetMotion.pop(els.list.querySelector(`[data-quote-id="${CSS.escape(thoughtId)}"] .state-dot.has-thought`)); }
       function saveThought(id, value) {

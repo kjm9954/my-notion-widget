@@ -32,7 +32,8 @@ test("스탯 설정과 독서 기록은 서버 저장소 API를 사용한다", (
   assert.match(stats, /Store\.saveStatsSettings\(snapshot\)/);
   assert.match(store, /async function loadStatsSettings\(\)/);
   assert.match(store, /async function saveReadingNotesState\(state\)/);
-  assert.match(session, /Store\.addReadingNotes\(today, draft\.length\)/);
+  assert.match(session, /Store\.createReadingQuotes\(selectedBookId, draft, \{/);
+  assert.match(session, /result\?\.readingNotes \|\| await Store\.loadReadingNotesState\(\)/);
 });
 
 test("서버는 스탯 설정과 독서 날짜 기록을 정규화한다", () => {

@@ -145,9 +145,11 @@
     @media (hover:hover) {
       .day-chip:hover { border-color:#CFE2EA; }
     }
-    @media (max-width:390px) {
+    @media (max-width:639px) {
+      .deadline-card { min-height:430px; }
+      .day-rail { flex-basis:100px; grid-template-columns:repeat(4,minmax(0,1fr)); }
       .day-chip { padding-left:1px; padding-right:1px; }
-      .day-label { font-size:8px; letter-spacing:0; }
+      .day-label { letter-spacing:0; }
       .focus-panel { padding-left:10px; padding-right:10px; }
     }
   </style>

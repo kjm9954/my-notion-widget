@@ -881,6 +881,7 @@
         popover.style.left = `${clamp(left,inset,card.clientWidth - inset - width)}px`;
         popover.style.top = `${clamp(top,inset,card.clientHeight - inset - height)}px`;
         positionDuePicker();
+        window.widgetFrame?.clampToCard(popover);
       }
 
       function positionDuePicker() {

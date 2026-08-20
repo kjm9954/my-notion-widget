@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("../widget-frame.js", import.meta.url), "utf8");
+const css = await readFile(new URL("../widget-frame.css", import.meta.url), "utf8");
 
 test("저장 크기는 임시로 작은 임베드 뷰포트에 맞춰 덮어쓰지 않는다", () => {
   assert.match(source, /const next = fromUser\s*\? clampAxisSize\(value, MINIMUM_CONTENT_WIDTH, maximumContentWidth\(scale\)\)\s*:\s*Math\.max\(MINIMUM_CONTENT_WIDTH, number\(value, designWidth\)\)/);
@@ -21,4 +22,28 @@ test("업무일지는 체크 외곽선을 덧그리지 않고 빈 목록만 유�
   assert.match(source, /'worklog\.html': \{ empty:'\.list-shell\.is-empty' \}/);
   assert.doesNotMatch(source, /'worklog\.html': \{[^\n]*done-check/);
   assert.doesNotMatch(source, /\[data-empty-add\]/);
+});
+
+test("639px 이하의 넓은 위젯은 축소 대신 1:1 재배치한다", () => {
+  assert.match(source, /const REFLOW_MAX = 639/);
+  assert.match(source, /viewportWidth\(\) <= REFLOW_MAX && designWidth > viewportWidth\(\)/);
+  assert.match(source, /const reflowWidth = viewportWidth\(\);\s*renderedScale = 1;/);
+  assert.match(source, /--widget-content-width', `\$\{reflowWidth\}px`/);
+  assert.match(source, /card\.style\.removeProperty\('height'\)/);
+  assert.match(css, /body\.widget-page\.is-widget-reflow[\s\S]*?overflow-y: auto !important/);
+  assert.match(css, /body\.is-widget-reflow \[data-widget-card\][\s\S]*?transform: none !important/);
+});
+
+test("URL 크기 지정은 저장 크기보다 우선하고 모바일 재배치 탈출구를 제공한다", () => {
+  assert.match(source, /contentW:positiveQuery\('w'\)/);
+  assert.match(source, /frameH:positiveQuery\('h'\)/);
+  assert.match(source, /scale:positiveQuery\('s'\)/);
+  assert.match(source, /listH:positiveQuery\('list'\)/);
+  assert.match(source, /sizeQuery\.get\('mobile'\) !== 'off'/);
+});
+
+test("팝오버는 카드 안으로 보정되고 모바일에서는 하단 시트가 된다", () => {
+  assert.match(source, /function clampToCard\(element\)/);
+  assert.match(source, /window\.widgetFrame = Object\.assign\([\s\S]*clampToCard/);
+  assert.match(css, /body\.is-widget-reflow \.cell-popover[\s\S]*?bottom: 8px !important/);
 });

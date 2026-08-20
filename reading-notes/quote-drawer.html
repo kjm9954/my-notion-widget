@@ -21,11 +21,12 @@
     button, input, textarea { font:inherit; color:inherit; }
     button { cursor:pointer; }
     .card {
-      width:100%; max-width:920px; height:640px; margin:0 auto; padding:20px; overflow:hidden;
+      width:100%; max-width:1060px; height:640px; margin:0 auto; padding:20px; overflow:hidden;
       display:flex; flex-direction:column; gap:13px; background:var(--surface); border-radius:18px;
       box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
     .card.is-empty { height:300px; }
+    .widget-layout { min-height:0; flex:1; display:flex; flex-direction:column; gap:13px; }
     .fixed { flex:0 0 auto; display:flex; flex-direction:column; gap:13px; }
     .header { min-height:40px; display:flex; align-items:center; }
     .title { color:var(--title); font-size:12px; font-weight:800; }
@@ -33,6 +34,7 @@
     .refresh.is-turning { animation:refresh-turn var(--t-swap) var(--ease); }
     .today-quote { position:relative; padding:3px 0 3px 14px; }
     .today-quote .quote-rule { position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--quote); }
+    .today-label, .today-mark { display:none; }
     .today-text { max-width:760px; color:var(--text); font-size:15px; font-weight:600; line-height:1.7; }
     .today-source { margin-top:6px; color:var(--faint); font-size:9px; font-weight:700; }
     .search {
@@ -80,28 +82,55 @@
     .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
     .hidden { display:none !important; }
+    .card.is-wide:not(.is-empty) { height:560px; padding:24px; }
+    .card.is-wide:not(.is-empty) .widget-layout {
+      display:grid; grid-template-columns:340px minmax(0, 1fr); gap:22px;
+    }
+    .card.is-wide .fixed { min-height:0; gap:16px; }
+    .card.is-wide .title { font-size:13px; }
+    .card.is-wide .today-quote {
+      min-height:0; flex:1; padding:22px 20px; display:flex; flex-direction:column;
+      background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:14px;
+    }
+    .card.is-wide .today-quote .quote-rule { display:none; }
+    .card.is-wide .today-label {
+      display:block; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em;
+    }
+    .card.is-wide .today-mark {
+      height:38px; margin-top:14px; display:block; color:var(--quote); font-size:34px; font-weight:800; line-height:1;
+    }
+    .card.is-wide .today-text { max-width:none; color:var(--text); font-size:19px; font-weight:700; line-height:1.65; text-wrap:pretty; }
+    .card.is-wide .today-source { margin-top:auto; padding-top:16px; font-size:11px; }
+    .card.is-wide .filters { flex-wrap:wrap; }
+    .card.is-wide .list-shell { min-height:0; height:100%; }
+    .card.is-wide .quote-item { border-radius:10px; }
+    .card.is-wide .quote-summary { padding:14px 16px; }
+    .card.is-wide .quote-text { font-size:13px; }
+    .card.is-empty .widget-layout { display:block; }
     @keyframes refresh-turn { to { transform:rotate(360deg); } }
     @keyframes detail-open { from { max-height:0; padding-top:0; padding-bottom:0; opacity:0; } to { max-height:220px; opacity:1; } }
     @media (max-width:639px) {
-      .today-text { font-size:14px; }
-      .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
-      .chip { min-height:40px; flex:0 0 auto; }
-      .quote-summary { min-height:40px; padding:11px 12px; }
-      .edit-button { min-height:40px; }
+      .card:not(.is-wide) .today-text { font-size:14px; }
+      .card:not(.is-wide) .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
+      .card:not(.is-wide) .chip { min-height:40px; flex:0 0 auto; }
+      .card:not(.is-wide) .quote-summary { min-height:40px; padding:11px 12px; }
+      .card:not(.is-wide) .edit-button { min-height:40px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-quote-drawer.html" data-widget-max-width="920" data-widget-height="640" data-widget-max-scale="4" style="--widget-max-width:920px;--widget-base-width:920px;--widget-base-height:640px;--widget-visual-height:640px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-quote-drawer.html" data-widget-max-width="1060" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:1060px;--widget-base-width:1060px;--widget-base-height:560px;--widget-visual-height:560px">
     <main class="card" data-widget-card aria-label="문장 서랍 위젯">
-      <div class="fixed" data-widget-fixed id="fixedArea">
-        <header class="header"><span class="title">문장 서랍</span><button class="refresh" id="refresh" type="button" aria-label="오늘의 문장 다시 뽑기">↻</button></header>
-        <section class="today-quote" id="todayQuote"></section>
-        <input class="search" id="search" type="search" placeholder="⌕ 검색" aria-label="문장 또는 책 이름 검색">
-        <nav class="filters" id="filters" aria-label="책 필터"></nav>
+      <div class="widget-layout" data-widget-list data-widget-list-height="512">
+        <div class="fixed" id="fixedArea">
+          <header class="header"><span class="title">문장 서랍</span><button class="refresh" id="refresh" type="button" aria-label="오늘의 문장 다시 뽑기">↻</button></header>
+          <section class="today-quote" id="todayQuote"></section>
+          <input class="search" id="search" type="search" placeholder="⌕ 검색" aria-label="문장 또는 책 이름 검색">
+          <nav class="filters" id="filters" aria-label="책 필터"></nav>
+        </div>
+        <section class="list-shell" id="quoteList" aria-label="필사 문장 목록"></section>
       </div>
-      <section class="list-shell" data-widget-list id="quoteList" aria-label="필사 문장 목록"></section>
       <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="문장 목록 세로 크기 조절"></button>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
@@ -121,6 +150,8 @@
       const filters = document.getElementById('filters');
       const quoteList = document.getElementById('quoteList');
       const listHandle = document.querySelector('[data-widget-list-handle]');
+      let isWide = card.offsetWidth >= 720;
+      card.classList.toggle('is-wide', isWide);
       let items = DATA.map(item => ({ ...item }));
       let books = [...new Set(items.map(item => item.book))];
       let todayIndex = items.length ? Math.floor(Math.random() * items.length) : 0;
@@ -139,7 +170,7 @@
       function renderToday() {
         if (!items.length) return;
         const item = items[todayIndex % items.length];
-        todayQuote.innerHTML = `<span class="quote-rule" aria-hidden="true"></span><div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
+        todayQuote.innerHTML = `<span class="quote-rule" aria-hidden="true"></span><span class="today-label">오늘의 문장</span><span class="today-mark" aria-hidden="true">“</span><div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
         todayQuote.classList.remove('motion-swap');
         void todayQuote.offsetWidth;
         todayQuote.classList.add('motion-swap');
@@ -210,7 +241,7 @@
       }
 
       function renderList(scrollTop = quoteList.scrollTop) {
-        const result = filteredItems().slice(0, 5);
+        const result = filteredItems().slice(0, isWide ? 8 : 5);
         if (!result.length) {
           quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
           return;
@@ -262,6 +293,24 @@
       }
       if (!items.length) renderEmpty();
       else { renderToday(); renderFilters(); renderList(); }
+      new ResizeObserver(entries => {
+        const nextWide = entries[0].contentRect.width >= 720;
+        if (nextWide === isWide) return;
+        isWide = nextWide;
+        card.classList.toggle('is-wide', isWide);
+        if (items.length) renderList();
+      }).observe(card);
+      try {
+        const sizeKey = 'widget-size-quote-drawer.html';
+        const savedSize = JSON.parse(localStorage.getItem(sizeKey));
+        if (savedSize && typeof savedSize === 'object' && savedSize.quoteDrawerLayoutVersion !== 2) {
+          const savedFrameHeight = Number(savedSize.frameH);
+          const frameHeight = Number.isFinite(savedFrameHeight) && savedFrameHeight > 0 ? savedFrameHeight : (isWide ? 560 : 640);
+          savedSize.listH = Math.max(160, frameHeight - (isWide ? 48 : 40));
+          savedSize.quoteDrawerLayoutVersion = 2;
+          localStorage.setItem(sizeKey, JSON.stringify(savedSize));
+        }
+      } catch (_) {}
       Store.watch(sync, 15000);
       sync().catch(error => console.warn('문장 서랍을 불러오지 못했습니다.', error));
     })();

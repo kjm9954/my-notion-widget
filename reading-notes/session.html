@@ -83,9 +83,20 @@
     .save-hint { min-width:0; color:var(--muted); font-size:9px; font-weight:600; }
     .new-session { margin-left:auto; padding:5px 0; border:0; background:transparent; color:var(--deep); font-size:9px; font-weight:700; }
     .hidden { display:none !important; }
-    @media (max-width:520px) {
+    @media (max-width:639px) {
+      .card { height:auto; min-height:430px; }
+      .book-row { height:auto; min-height:44px; flex-wrap:wrap; }
       .books { overflow-x:auto; scrollbar-width:none; }
-      .capture-hint { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .book-chip, .add-book-trigger, .book-add input, .book-add button, .page-input,
+      .reaction-input, .capture-button, .save, .new-session, .remove { min-height:44px; }
+      .page-row { width:100%; height:auto; margin-left:0; }
+      .capture { height:auto; min-height:0; grid-template-columns:1fr; }
+      .quote-input, .capture-hint { grid-column:1; }
+      .capture-hint { white-space:normal; }
+      .draft-list { display:grid; grid-template-columns:1fr; }
+      .draft-item + .draft-item { margin-top:0; }
+      .draft-item { margin-bottom:6px; }
+      .foot { height:auto; min-height:44px; flex-wrap:wrap; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">

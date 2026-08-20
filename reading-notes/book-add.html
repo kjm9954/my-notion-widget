@@ -102,9 +102,15 @@
     .again { padding:6px 4px; color:var(--secondary); background:transparent; border:0; font-size:10px; font-weight:700; }
 
     @media (max-width:639px) {
+      .widget { min-height:62px; overflow:visible; }
+      .trigger, .close, .back, .add, .again, .manual-entry, .status-pill { min-height:44px; }
       .ba-overlay { align-items:flex-end; }
-      .ba-panel { max-width:none; border-radius:14px 14px 0 0; }
-      .grid { grid-template-columns:repeat(3,1fr); }
+      .ba-panel { max-width:none; max-height:calc(100vh - 16px); overflow:auto; border-radius:14px 14px 0 0; }
+      .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .action-row { align-items:stretch; flex-direction:column; }
+      .year, .action-right { width:100%; }
+      .action-right { margin-left:0; }
+      .action-right > * { flex:1; }
     }
     @media (prefers-reduced-motion: reduce) {
       .cell .cover, .status-pill, .add, .back { transition:none !important; }
