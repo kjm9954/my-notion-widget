@@ -199,10 +199,11 @@
 
       function renderDetail(item) {
         const editing = editingId === item.id;
+        const editable = item.raw?.readOnly !== true;
         return `<div class="detail"><div class="detail-label">이 문장에 대한 생각</div>${editing
           ? `<textarea class="thought-input" id="thoughtInput" aria-label="이 문장에 대한 생각">${escapeHtml(item.note)}</textarea>`
           : `<div class="thought ${item.note ? '' : 'is-empty'}">${escapeHtml(item.note || '적어둔 생각이 없어요')}</div>`}
-          <div class="detail-foot"><button class="edit-button" type="button" data-edit="${item.id}">${editing ? '저장' : item.note ? '수정' : '생각 적기'}</button><span class="page">${escapeHtml(item.page)}</span></div></div>`;
+          <div class="detail-foot">${editable ? `<button class="edit-button" type="button" data-edit="${item.id}">${editing ? '저장' : item.note ? '수정' : '생각 적기'}</button>` : ''}<span class="page">${escapeHtml(item.page)}</span></div></div>`;
       }
 
       function bindList() {
@@ -275,7 +276,7 @@
         const byId = new Map((state?.books || []).map(book => [book.id, book]));
         DATA = (state?.quotes || []).map(quote => ({
           id:quote.id, text:quote.text, book:byId.get(quote.bookId)?.title || '알 수 없는 책',
-          page:quote.page ? `${quote.page}p` : '페이지 없음', ago:ageLabel(quote.created),
+          page:quote.source === 'book-one-line' ? '이 책의 한 줄' : quote.page ? `${quote.page}p` : '페이지 없음', ago:ageLabel(quote.created),
           note:quote.thought || '', raw:quote
         }));
         items = DATA.map(item => ({ ...item }));

@@ -1,9 +1,9 @@
 import { NOTION_API_VERSION } from "./schedule-core.js";
 
 const LIBRARY_CACHE_KEY = "reading:notion:library:v2";
-const LEGACY_CACHE_KEY = "reading:notion:legacy-quotes:v2";
+const NESTED_QUOTES_CACHE_KEY = "reading:notion:nested-quotes:v1";
 const LIBRARY_CACHE_MS = 15_000;
-const LEGACY_CACHE_MS = 60_000;
+const NESTED_QUOTES_CACHE_MS = 60_000;
 const LIFE_CYCLE_STATUSES = new Set(["구입 전", "읽는 중", "재독", "중도포기", "완독", "정리 완료"]);
 const KEEP_STATUSES = new Set(["소장", "구독서비스", "인생책"]);
 const STATUS_TO_NOTION = Object.freeze({
@@ -148,7 +148,7 @@ function localDateKey(value = new Date()) {
 
 function normalizedStatus(statuses) {
   if (statuses.includes("읽는 중") || statuses.includes("재독")) return "reading";
-  if (statuses.includes("완독") || statuses.includes("정리 완료") || statuses.includes("인생책")) return "done";
+  if (statuses.includes("완독") || statuses.includes("정리 완료")) return "done";
   if (statuses.includes("중도포기")) return "dropped";
   if (statuses.includes("구입 전")) return "wishlist";
   if (statuses.includes("소장") || statuses.includes("구독서비스")) return "owned";
@@ -283,6 +283,68 @@ function blockText(block) {
   return Array.isArray(rich) ? rich.map(value => value?.plain_text || "").join("").trim() : "";
 }
 
+function nestedQuotePageLabel(value) {
+  const title = textValue(value, 300);
+  const match = title.match(/^\[\s*p\.?\s*([^\]]+)\]\s*/i);
+  return {
+    page: match?.[1]?.trim() || "",
+    title: match ? title.slice(match[0].length).trim() : title,
+  };
+}
+
+function nestedQuoteText(blocks) {
+  const callouts = (Array.isArray(blocks) ? blocks : []).filter(block => block?.type === "callout");
+  const preferred = callouts.find(block => /^summary(?:\s|$)/i.test(blockText(block))) || callouts[0];
+  return blockText(preferred).replace(/^summary\s*/i, "").trim();
+}
+
+export function normalizeNestedQuotePage(page, bookId, blocks = []) {
+  const properties = page?.properties || {};
+  const label = nestedQuotePageLabel(propertyPlainText(properties["이름"]));
+  const text = nestedQuoteText(blocks);
+  if (!bookId || !text) return null;
+  return {
+    id: `nested:${String(page?.id || "")}`,
+    bookId: String(bookId),
+    text,
+    page: label.page,
+    note: label.title,
+    thought: "",
+    created: validDate(page?.created_time) || new Date().toISOString(),
+    sourceBlockId: "",
+    legacy: false,
+    readOnly: true,
+    source: "nested-database",
+  };
+}
+
+export function normalizeBookOneLine(book) {
+  const text = textValue(book?.one, 4000, false).trim();
+  if (!book?.id || !text) return null;
+  return {
+    id: `book-line:${String(book.id)}`,
+    bookId: String(book.id),
+    text,
+    page: "",
+    note: "이 책의 한 줄",
+    thought: "",
+    created: validDate(book.edited || book.created) || new Date().toISOString(),
+    sourceBlockId: "",
+    legacy: false,
+    readOnly: true,
+    source: "book-one-line",
+  };
+}
+
+async function mapInBatches(items, mapper, batchSize = 3) {
+  const results = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    results.push(...await Promise.all(items.slice(index, index + batchSize).map(mapper)));
+    if (index + batchSize < items.length) await wait(350);
+  }
+  return results;
+}
+
 async function kvGet(env, key) {
   try { return env.KV ? await env.KV.get(key, "json") : null; } catch (_) { return null; }
 }
@@ -295,42 +357,51 @@ async function kvDelete(env, key) {
   try { if (env.KV) await env.KV.delete(key); } catch (_) {}
 }
 
-async function loadLegacyQuotes(env, config, books, fresh) {
-  const cached = await kvGet(env, LEGACY_CACHE_KEY);
-  if (!fresh && cached?.fetchedAt && Date.now() - cached.fetchedAt < LEGACY_CACHE_MS && Array.isArray(cached.quotes)) {
+async function loadNestedQuotes(env, config, books, fresh) {
+  const cached = await kvGet(env, NESTED_QUOTES_CACHE_KEY);
+  if (!fresh && cached?.fetchedAt && Date.now() - cached.fetchedAt < NESTED_QUOTES_CACHE_MS && Array.isArray(cached.quotes)) {
     return cached.quotes;
   }
-  const quotes = [];
-  for (let index = 0; index < books.length; index += 3) {
-    const group = books.slice(index, index + 3);
-    const blocksByBook = await Promise.all(group.map(async book => ({ book, blocks: await listBlockChildren(config, book.id) })));
-    blocksByBook.forEach(({ book, blocks }) => {
-      blocks.forEach(block => {
-        if (block?.type !== "callout") return;
-        const text = blockText(block);
-        if (!text) return;
-        quotes.push({
-          id: `legacy:${block.id}`,
-          bookId: book.id,
-          text,
-          page: "",
-          note: "",
-          thought: "",
-          created: validDate(block.created_time) || book.created || new Date().toISOString(),
-          sourceBlockId: block.id,
-          legacy: true,
-        });
-      });
-    });
-    if (index + 3 < books.length) await wait(350);
-  }
-  await kvPut(env, LEGACY_CACHE_KEY, { fetchedAt: Date.now(), quotes });
+
+  const bookBlocks = await mapInBatches(books, async book => ({
+    book,
+    blocks: await listBlockChildren(config, book.id),
+  }));
+  const nestedDatabases = bookBlocks.flatMap(({ book, blocks }) => blocks
+    .filter(block => block?.type === "child_database" && /필사/.test(String(block?.child_database?.title || "")))
+    .map(block => ({ book, databaseId: block.id })));
+
+  const dataSources = (await mapInBatches(nestedDatabases, async entry => {
+    const database = await notionRequest(config, `/databases/${encodeURIComponent(entry.databaseId)}`);
+    return (Array.isArray(database?.data_sources) ? database.data_sources : [])
+      .map(source => ({ book: entry.book, dataSourceId: source?.id }))
+      .filter(entry => entry.dataSourceId);
+  })).flat();
+
+  const notePages = (await mapInBatches(dataSources, async entry => {
+    const pages = await queryDataSource(config, entry.dataSourceId);
+    return pages.map(page => ({ book: entry.book, page }));
+  })).flat();
+
+  const quotes = (await mapInBatches(notePages, async entry => normalizeNestedQuotePage(
+    entry.page,
+    entry.book.id,
+    await listBlockChildren(config, entry.page.id),
+  ))).filter(Boolean);
+  await kvPut(env, NESTED_QUOTES_CACHE_KEY, { fetchedAt: Date.now(), quotes });
   return quotes;
 }
 
-export function mergeReadingQuotes(structured, legacy) {
+export function mergeReadingQuotes(structured, nested) {
   const migrated = new Set(structured.map(quote => quote.sourceBlockId).filter(Boolean));
-  return [...structured, ...legacy.filter(quote => !migrated.has(quote.sourceBlockId))]
+  const seen = new Set();
+  return [...structured, ...nested.filter(quote => !migrated.has(quote.sourceBlockId))]
+    .filter(quote => {
+      const key = `${quote.bookId}\u0000${String(quote.text || "").trim().replace(/\s+/g, " ")}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((a, b) => String(b.created).localeCompare(String(a.created)));
 }
 
@@ -351,8 +422,9 @@ async function fetchReadingLibrary(env, fresh) {
   const { byId: yearsById } = await loadYears(config, bookPages);
   const books = sortBooks(bookPages.map(page => normalizeReadingBookPage(page, yearsById)).filter(book => book.id));
   const structured = quotePages.map(normalizeStructuredQuotePage).filter(Boolean);
-  const legacy = await loadLegacyQuotes(env, config, books, fresh);
-  const data = { books, quotes: mergeReadingQuotes(structured, legacy), fetchedAt: new Date().toISOString() };
+  const nested = await loadNestedQuotes(env, config, books, fresh);
+  const bookLines = books.map(normalizeBookOneLine).filter(Boolean);
+  const data = { books, quotes: mergeReadingQuotes(structured, [...nested, ...bookLines]), fetchedAt: new Date().toISOString() };
   await kvPut(env, LIBRARY_CACHE_KEY, { fetchedAt: Date.now(), data });
   return data;
 }
@@ -372,7 +444,7 @@ export async function loadReadingLibrary(env, options = {}) {
 export async function invalidateReadingLibrary(env, options = {}) {
   libraryInFlight = null;
   await kvDelete(env, LIBRARY_CACHE_KEY);
-  if (options?.legacy === true) await kvDelete(env, LEGACY_CACHE_KEY);
+  if (options?.nested === true) await kvDelete(env, NESTED_QUOTES_CACHE_KEY);
 }
 
 async function findOrCreateYear(config, year) {
@@ -584,7 +656,7 @@ export async function deleteReadingQuote(env, id, original = {}) {
       method: "PATCH",
       body: JSON.stringify({ in_trash: true }),
     });
-    await invalidateReadingLibrary(env, { legacy: true });
+    await invalidateReadingLibrary(env);
     return;
   }
   await notionRequest(config, `/pages/${encodeURIComponent(quoteId)}`, {
@@ -597,7 +669,7 @@ export async function deleteReadingQuote(env, id, original = {}) {
       body: JSON.stringify({ in_trash: true }),
     });
   }
-  await invalidateReadingLibrary(env, { legacy: Boolean(sourceBlockId) });
+  await invalidateReadingLibrary(env);
 }
 
 export function readingDateKey(value) {

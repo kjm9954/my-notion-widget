@@ -170,13 +170,14 @@
 
       async function sync() {
         const state = await Store.loadReadingLibrary();
-        const done = (state?.books || []).filter(book => book.status === 'done');
+        const counted = (state?.books || []).filter(book => book.status !== 'dropped');
+        const finished = counted.filter(book => book.status === 'done');
         const counts = new Map();
-        done.forEach(book => { if (book.year) counts.set(book.year, (counts.get(book.year) || 0) + 1); });
+        counted.forEach(book => { if (book.year) counts.set(book.year, (counts.get(book.year) || 0) + 1); });
         DATA = {
-          total:done.length,
+          total:counted.length,
           years:[...counts].map(([y, n]) => ({ y:Number(y), n })).sort((a, b) => b.y - a.y),
-          recent:done.slice().sort((a, b) => String(b.endDate || b.startDate || b.created).localeCompare(String(a.endDate || a.startDate || a.created))).slice(0, 5).map(book => ({
+          recent:finished.slice().sort((a, b) => String(b.endDate || b.startDate || b.created).localeCompare(String(a.endDate || a.startDate || a.created))).slice(0, 5).map(book => ({
             title:book.title, author:book.author || '저자 미입력', cover:book.cover || '', date:dateLabel(book)
           }))
         };
