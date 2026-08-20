@@ -91,7 +91,7 @@ test("Notion 설정 누락은 명확한 configuration error", () => {
   assert.equal(config.projectType, "select");
 });
 
-test("D1 중복 방지와 instance 범위 계약", async () => {
+test("D1 중복 방지와 기본·개별 instance 범위 계약", async () => {
   const migration = await readFile(new URL("../migrations/0003_schedule.sql", import.meta.url), "utf8");
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.match(migration, /UNIQUE \(instance_id, schedule_id, occurrence_key\)/);
@@ -99,5 +99,6 @@ test("D1 중복 방지와 instance 범위 계약", async () => {
   assert.match(worker, /findNotionPageByMarker/);
   assert.match(worker, /SET last_occurrence_key = skipped_occurrence_key, skipped_occurrence_key = NULL/);
   assert.match(worker, /WHERE id = \? AND instance_id = \?/);
-  assert.match(worker, /if \(!env\.__instanceId\)/);
+  assert.match(worker, /if \(!env\.__instanceId\) env = instanceEnv\(env, "legacy"\)/);
+  assert.doesNotMatch(worker, /위젯 고유 주소의 w 값이 필요합니다/);
 });

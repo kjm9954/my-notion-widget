@@ -92,6 +92,45 @@ test("includes each book's one-line property and removes exact per-book duplicat
   assert.equal(merged.length, 1);
 });
 
+test("returns stale reading data immediately and refreshes it in the worker background", async () => {
+  const originalFetch = globalThis.fetch;
+  let releaseFetch;
+  const fetchGate = new Promise(resolve => { releaseFetch = resolve; });
+  globalThis.fetch = async () => {
+    await fetchGate;
+    return new Response(JSON.stringify({ results:[], has_more:false }), {
+      status:200,
+      headers:{ "content-type":"application/json" },
+    });
+  };
+
+  const stale = { books:[{ id:"cached-book", title:"캐시된 책" }], quotes:[], fetchedAt:"old" };
+  const background = [];
+  const env = {
+    NOTION_TOKEN:"secret",
+    NOTION_READING_BOOKS_DATA_SOURCE_ID:"books",
+    NOTION_READING_QUOTES_DATA_SOURCE_ID:"quotes",
+    NOTION_READING_YEARS_DATA_SOURCE_ID:"years",
+    KV:{
+      get:async key => key === "reading:notion:library:v2"
+        ? { fetchedAt:Date.now() - 120_000, data:stale }
+        : null,
+      put:async () => {},
+    },
+  };
+
+  try {
+    const result = await loadReadingLibrary(env, { waitUntil:task => background.push(task) });
+    assert.equal(result, stale);
+    assert.equal(background.length, 1);
+    releaseFetch();
+    await background[0];
+  } finally {
+    releaseFetch();
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("loads quotes from each book's nested quote database instead of top-level callouts", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];

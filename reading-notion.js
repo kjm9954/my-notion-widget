@@ -2,7 +2,7 @@ import { NOTION_API_VERSION } from "./schedule-core.js";
 
 const LIBRARY_CACHE_KEY = "reading:notion:library:v2";
 const NESTED_QUOTES_CACHE_KEY = "reading:notion:nested-quotes:v2";
-const LIBRARY_CACHE_MS = 15_000;
+const LIBRARY_CACHE_MS = 60_000;
 const NESTED_QUOTES_REFRESH_MS = 60_000;
 const NESTED_BOOK_BATCH_SIZE = 2;
 const LIFE_CYCLE_STATUSES = new Set(["구입 전", "읽는 중", "재독", "중도포기", "완독", "정리 완료"]);
@@ -451,11 +451,17 @@ export async function loadReadingLibrary(env, options = {}) {
   const fresh = options?.fresh === true;
   const cached = await kvGet(env, LIBRARY_CACHE_KEY);
   if (!fresh && cached?.fetchedAt && Date.now() - cached.fetchedAt < LIBRARY_CACHE_MS && cached?.data) return cached.data;
-  if (!fresh && libraryInFlight) return libraryInFlight;
-  const pending = fetchReadingLibrary(env, fresh).finally(() => {
-    if (libraryInFlight === pending) libraryInFlight = null;
-  });
-  if (!fresh) libraryInFlight = pending;
+  let pending = !fresh ? libraryInFlight : null;
+  if (!pending) {
+    pending = fetchReadingLibrary(env, fresh).finally(() => {
+      if (libraryInFlight === pending) libraryInFlight = null;
+    });
+    if (!fresh) libraryInFlight = pending;
+  }
+  if (!fresh && cached?.data && typeof options?.waitUntil === "function") {
+    options.waitUntil(pending.catch(() => {}));
+    return cached.data;
+  }
   return pending;
 }
 

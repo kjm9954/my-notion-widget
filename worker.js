@@ -21,7 +21,7 @@ import {
 } from "./reading-notion.js";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, context) {
     const url = new URL(request.url);
     const path = url.pathname;
     const cors = {
@@ -160,7 +160,10 @@ export default {
       // ───────── 노션 독서 DB ─────────
       if (path === "/api/reading/library" && request.method === "GET") {
         const fresh = url.searchParams.get("fresh") === "1";
-        return json({ ok: true, data: await loadReadingLibrary(env, { fresh }) });
+        return json({ ok: true, data: await loadReadingLibrary(env, {
+          fresh,
+          waitUntil: typeof context?.waitUntil === "function" ? task => context.waitUntil(task) : undefined,
+        }) });
       }
 
       if (path === "/api/reading/books/create" && request.method === "POST") {
@@ -459,7 +462,7 @@ export default {
 
       // ───────── 업무 관리 예약 ─────────
       if (path.startsWith("/api/schedules/")) {
-        if (!env.__instanceId) return json({ ok: false, error: "위젯 고유 주소의 w 값이 필요합니다." }, 400);
+        if (!env.__instanceId) env = instanceEnv(env, "legacy");
 
         if (path === "/api/schedules/list" && request.method === "GET") {
           const now = Date.now();
