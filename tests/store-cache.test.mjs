@@ -141,6 +141,25 @@ test("성장 기록은 Worklog 전용 키만 이어 쓰고 다른 데이터 인�
   assert.equal(new URL(requestedUrls[1]).searchParams.has("w"), false);
 });
 
+test("성장 기록의 worklog_w는 업무 API에만 적용된다", async () => {
+  const instanceId = "w_abcdefghijklmnopqrstuvwxyz123456";
+  const requestedUrls = [];
+  const store = createStore(async url => {
+    requestedUrls.push(String(url));
+    return Response.json({ ok:true, data:{ revision:12, tasks:[] } });
+  }, new Map(), {
+    search:`?worklog_w=${instanceId}`,
+    href:`https://kjm9954.github.io/my-notion-widget/growth-page/record.html?worklog_w=${instanceId}`,
+    instanceStorage:new Map(),
+  });
+
+  assert.equal((await store.loadWorklogState()).revision, 12);
+  await store.loadReadingNotesState();
+  assert.equal(store.getWidgetInstanceId(), null);
+  assert.equal(new URL(requestedUrls[0]).searchParams.get("w"), instanceId);
+  assert.equal(new URL(requestedUrls[1]).searchParams.has("w"), false);
+});
+
 test("저장소가 막혀도 같은 페이지의 위젯끼리 개인 인스턴스를 전달한다", () => {
   const listeners = new Map();
   class SharedBroadcastChannel {
