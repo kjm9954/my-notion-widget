@@ -85,6 +85,15 @@
       white-space:nowrap;
     }
     button.status-pill { cursor:pointer; }
+    button.status-more {
+      width:22px;
+      height:22px;
+      min-width:22px;
+      min-height:22px !important;
+      flex:0 0 22px;
+      justify-content:center;
+      padding:0;
+    }
     .status-none {
       color:var(--done);
       font-size:9px;
@@ -442,7 +451,7 @@
         if (anomalies.length) {
           const visible = statusExpanded ? anomalies : anomalies.slice(0, 1);
           content = visible.map(text => `<span class="status-pill">${text}</span>`).join('');
-          if (!statusExpanded && anomalies.length > 1) content += `<button class="status-pill" type="button" data-expand-status>+${anomalies.length - 1}</button>`;
+          if (!statusExpanded && anomalies.length > 1) content += `<button class="status-pill status-more" type="button" data-expand-status aria-label="추가 상태 이상 ${anomalies.length - 1}개 보기">+${anomalies.length - 1}</button>`;
         }
         return `
           <div class="status-row">

@@ -9,9 +9,14 @@ const frame = await readFile(new URL("../widget-frame.js", import.meta.url), "ut
 const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
 
 test("스탯 유휴 모션은 HP·MP 텍스트가 아니라 게이지를 순회한다", () => {
-  assert.match(frame, /'stats\.html': \{ selector:'\.meter-fill', max:2, continuous:true \}/);
+  assert.match(frame, /'stats\.html': \{ selector:'\.meter-track', max:2, continuous:true \}/);
   assert.doesNotMatch(frame, /'stats\.html': \{ selector:'\.meter-label'/);
   assert.match(frame, /config\.continuous \? -delay : delay/);
+});
+
+test("상태 이상 더보기는 모바일 버튼 높이에 늘어나지 않고 원형을 유지한다", () => {
+  assert.match(stats, /button\.status-more\s*\{[\s\S]*?width:22px;[\s\S]*?height:22px;[\s\S]*?min-height:22px !important;/);
+  assert.match(stats, /class="status-pill status-more"/);
 });
 
 test("스탯 게이지 값은 오버슛 없이 400ms 단방향으로 바뀐다", () => {
