@@ -632,6 +632,7 @@
       let saveTimer = 0;
       let revision = 0;
       let saving = false;
+      let syncSignature = '';
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -711,7 +712,12 @@
       async function sync() {
         if (saving || saveTimer) return;
         const currentScroll = itemList.scrollTop;
-        try { store = normalize(await Store.loadThoughtState()); } catch (_) { return; }
+        let nextStore;
+        try { nextStore = normalize(await Store.loadThoughtState()); } catch (_) { return; }
+        const nextSignature = JSON.stringify(nextStore);
+        if (nextSignature === syncSignature) return;
+        syncSignature = nextSignature;
+        store = nextStore;
         if (selectedCat && !store.cats.includes(selectedCat)) selectedCat = '';
         if (openId && !itemById(openId)) {
           openId = '';

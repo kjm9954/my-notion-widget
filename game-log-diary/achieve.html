@@ -42,12 +42,12 @@
     (()=>{
       'use strict';
       const content=document.getElementById('content'),count=document.getElementById('count'),title=document.getElementById('title');
-      let limit=10,achievements=[],knownIds=null;
+      let limit=10,achievements=[],knownIds=null,syncSignature='';
       function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
       function dateLabel(key){const [,month,day]=key.split('-').map(Number);return `${month}.${day}`;}
       function render(){const all=achievements,shown=all.slice(0,Math.min(limit,30)),currentIds=new Set(all.map(item=>item.id)),added=knownIds?new Set(all.filter(item=>!knownIds.has(item.id)).map(item=>item.id)):new Set();knownIds=currentIds;count.textContent=`${all.length}`;if(!all.length){content.className='empty';content.innerHTML='<div class="empty-title">첫 업적을 기다리고 있어요</div><div class="empty-copy">일기에서 작성한 업적 또는 목표가 표시됩니다</div>';return;}content.className='list';content.innerHTML=`${shown.map(item=>`<a class="row${added.has(item.id)?' motion-new':''}" href="${item.source==='goal'?'../growth-page/goals.html':`today.html?date=${item.date}`}" target="_blank" rel="noopener"><span class="row-text">${escapeHtml(item.text)}</span><span class="date">${dateLabel(item.date)}</span></a>`).join('')}${limit<Math.min(all.length,30)?'<button class="more" type="button" data-more>더보기</button>':''}`;content.querySelectorAll('.row.motion-new').forEach(row=>widgetMotion.popIn(row));}
       content.addEventListener('click',event=>{if(!event.target.closest('[data-more]'))return;limit=Math.min(30,limit+10);render();});
-      async function sync(){try{achievements=await Store.getAchievements();render();}catch(_){content.className='empty';content.innerHTML='<div class="empty-title">불러오기 실패</div><div class="empty-copy">잠시 후 다시 열어주세요</div>';}}
+      async function sync(){try{const next=await Store.getAchievements(),nextSignature=JSON.stringify(next);if(nextSignature===syncSignature)return;syncSignature=nextSignature;achievements=next;render();}catch(_){content.className='empty';content.innerHTML='<div class="empty-title">불러오기 실패</div><div class="empty-copy">잠시 후 다시 열어주세요</div>';}}
       window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);sync();
     })();
   </script>

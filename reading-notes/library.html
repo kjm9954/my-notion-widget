@@ -254,8 +254,7 @@
         } catch (error) { console.warn('우선순위로 보내지 못했습니다.', error); }
       }
       function render() { renderHeader(); renderGallery(); renderDetail(); }
-      async function sync() {
-        const state = await Store.loadReadingLibrary();
+      function sync(state) {
         books = Array.isArray(state?.books) ? state.books : [];
         quotes = Array.isArray(state?.quotes) ? state.quotes : [];
         if (selectedBookId && !books.some(book => book.id === selectedBookId)) selectedBookId = '';
@@ -263,8 +262,7 @@
       }
 
       els.search.addEventListener('input', render);
-      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
-      sync().catch(error => console.warn('서재를 불러오지 못했습니다.', error));
+      Store.watchReadingLibrary(sync, { onError:error => console.warn('서재를 불러오지 못했습니다.', error) });
     })();
   </script>
   <script src="../widget-frame.js"></script>

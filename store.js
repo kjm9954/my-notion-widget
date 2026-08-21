@@ -24,6 +24,47 @@ const storeListeners = new Set();
 const memoryCache = new Map();
 const inFlightGets = new Map();
 let storeChannel = null;
+let errorIndicatorTimer = 0;
+
+function showStoreError(error) {
+  if (typeof document === "undefined" || !document.body) return;
+  let indicator = document.querySelector("[data-store-error-indicator]");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.dataset.storeErrorIndicator = "";
+    indicator.setAttribute("role", "status");
+    indicator.setAttribute("aria-live", "polite");
+    Object.assign(indicator.style, {
+      position: "fixed",
+      left: "50%",
+      bottom: "8px",
+      zIndex: "2147483647",
+      maxWidth: "calc(100% - 24px)",
+      transform: "translateX(-50%)",
+      padding: "5px 9px",
+      border: "1px solid #d9e6ec",
+      borderRadius: "999px",
+      background: "rgba(255,255,255,.96)",
+      color: "#607984",
+      boxShadow: "0 4px 14px rgba(29,56,68,.10)",
+      font: "700 10px/1.35 system-ui, sans-serif",
+      whiteSpace: "nowrap",
+      pointerEvents: "none",
+    });
+    document.body.appendChild(indicator);
+  }
+  const detail = String(error?.message || error || "");
+  indicator.textContent = /인스턴스/.test(detail) ? detail : "서버 연결 실패 · 다시 시도 중";
+  clearTimeout(errorIndicatorTimer);
+  errorIndicatorTimer = setTimeout(() => indicator?.remove(), 5000);
+}
+
+function clearStoreError() {
+  if (typeof document === "undefined" || typeof document.querySelector !== "function") return;
+  clearTimeout(errorIndicatorTimer);
+  errorIndicatorTimer = 0;
+  document.querySelector("[data-store-error-indicator]")?.remove();
+}
 
 function notifyStoreListeners() {
   storeListeners.forEach(listener => listener());
@@ -133,6 +174,19 @@ function writeCached(url, data, serialized = JSON.stringify(data)) {
   }))).catch(() => {});
 }
 
+function comparablePayload(path, serialized) {
+  if (!path.startsWith("/api/reading/library")) return serialized;
+  try {
+    const response = JSON.parse(serialized);
+    return JSON.stringify([
+      Array.isArray(response?.data?.books) ? response.data.books : [],
+      Array.isArray(response?.data?.quotes) ? response.data.quotes : [],
+    ]);
+  } catch (_) {
+    return serialized;
+  }
+}
+
 async function deleteCachedUrl(url) {
   memoryCache.delete(url);
   inFlightGets.delete(url);
@@ -152,10 +206,14 @@ function requestFresh(path, url, cachedPromise) {
     if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
     const serialized = JSON.stringify(data);
     const cached = await cachedPromise;
-    const changed = Boolean(cached && cached.serialized !== serialized);
+    const changed = Boolean(cached && comparablePayload(path, cached.serialized) !== comparablePayload(path, serialized));
     writeCached(url, data, serialized);
+    clearStoreError();
     if (changed) announceChange(path);
     return data;
+  }).catch(error => {
+    showStoreError(error);
+    throw error;
   }).finally(() => {
     inFlightGets.delete(url);
   });
@@ -187,22 +245,28 @@ async function apiGetFresh(path) {
 }
 async function apiPost(path, body, includeInstance = true) {
   const url = apiUrl(path, includeInstance);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
-  if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
-  if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
-    await Promise.all([
-      invalidateApiGet("/api/reading/library"),
-      invalidateApiGet("/api/reading/library?fresh=1"),
-    ]);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
+    if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
+    if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
+      await Promise.all([
+        invalidateApiGet("/api/reading/library"),
+        invalidateApiGet("/api/reading/library?fresh=1"),
+      ]);
+    }
+    clearStoreError();
+    announceChange(path);
+    return data;
+  } catch (error) {
+    showStoreError(error);
+    throw error;
   }
-  announceChange(path);
-  return data;
 }
 
 async function createWidgetInstance() {
@@ -215,10 +279,14 @@ function getWidgetInstanceId() {
 
 // ───────── 하루 경계 (자정 기준) ─────────
 function todayStr(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 function isToday(iso) {
   if (!iso) return false;
@@ -269,6 +337,30 @@ async function addReadingNotes(date, count) {
 async function loadReadingLibrary(options = {}) {
   const path = options?.fresh === true ? "/api/reading/library?fresh=1" : "/api/reading/library";
   return (await apiGet(path)).data;
+}
+function readingLibrarySignature(state) {
+  return JSON.stringify([
+    Array.isArray(state?.books) ? state.books : [],
+    Array.isArray(state?.quotes) ? state.quotes : [],
+  ]);
+}
+function watchReadingLibrary(callback, options = {}) {
+  let renderedSignature = null;
+  const onError = typeof options?.onError === "function" ? options.onError : null;
+  return watch(async () => {
+    try {
+      const state = await loadReadingLibrary();
+      const nextSignature = readingLibrarySignature(state);
+      if (nextSignature === renderedSignature) return;
+      await callback(state);
+      renderedSignature = nextSignature;
+    } catch (error) {
+      if (onError) onError(error);
+      else throw error;
+    }
+  }, options?.interval ?? READING_SYNC_INTERVAL_MS, {
+    allowWhileEditing: options?.allowWhileEditing === true,
+  });
 }
 async function createReadingBook(book) {
   return (await apiPost("/api/reading/books/create", book)).data;
@@ -426,11 +518,10 @@ async function getHP() {
   const set = new Set(dates);
   let count = 0;
   for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
+    const d = new Date(Date.now() - i * 86400000);
     if (set.has(todayStr(d))) count++;
   }
-  return Math.min(100, 20 + Math.round((count / 7) * 80));
+  return Math.max(20, Math.round((count / 7) * 100));
 }
 async function getTodayAchievements() {
   const today = todayStr();
@@ -475,7 +566,7 @@ window.Store = {
   loadMoodWords, saveMoodWords,
   loadStatsSettings, saveStatsSettings,
   loadReadingNotesState, saveReadingNotesState, addReadingNotes,
-  loadReadingLibrary, createReadingBook, updateReadingBook,
+  loadReadingLibrary, watchReadingLibrary, createReadingBook, updateReadingBook,
   createReadingQuotes, updateReadingQuote, deleteReadingQuote,
   loadThoughtState, saveThoughtState, addThought, loadThoughts, updateThought, deleteThought,
   loadGoalState, saveGoalState, addGoal, loadGoals, updateGoal, toggleGoalDone, deleteGoal,

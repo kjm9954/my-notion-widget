@@ -160,6 +160,7 @@
       let activeId = null;
       let editingId = null;
       let entranceDone = false;
+      let renderedTodayKey = '';
       const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
 
       function filteredItems() {
@@ -167,9 +168,12 @@
         return items.filter(item => (selectedBook === '전체' || item.book === selectedBook) && (!query || item.text.toLocaleLowerCase('ko').includes(query) || item.book.toLocaleLowerCase('ko').includes(query)));
       }
 
-      function renderToday() {
+      function renderToday(force = false) {
         if (!items.length) return;
         const item = items[todayIndex % items.length];
+        const nextKey = JSON.stringify([item.id, item.text, item.book, item.page]);
+        if (!force && nextKey === renderedTodayKey) return;
+        renderedTodayKey = nextKey;
         todayQuote.innerHTML = `<span class="quote-rule" aria-hidden="true"></span><span class="today-label">오늘의 문장</span><span class="today-mark" aria-hidden="true">“</span><div class="today-text">${escapeHtml(item.text)}</div><div class="today-source">${escapeHtml(item.book)} · ${escapeHtml(item.page)}</div>`;
         todayQuote.classList.remove('motion-swap');
         void todayQuote.offsetWidth;
@@ -257,13 +261,14 @@
       }
 
       function renderEmpty() {
+        renderedTodayKey = '';
         card.classList.add('is-empty');
         fixedArea.classList.add('hidden');
         listHandle.classList.add('hidden');
         quoteList.innerHTML = `<section class="empty-state"><strong>아직 옮겨둔 문장이 없어요</strong><span>책 페이지에서 문장을 적어두면 이 서랍에 모입니다</span></section>`;
       }
 
-      refresh.addEventListener('click', () => { if (items.length > 1) todayIndex = (todayIndex + 1) % items.length; refresh.classList.remove('is-turning'); void refresh.offsetWidth; refresh.classList.add('is-turning'); renderToday(); });
+      refresh.addEventListener('click', () => { if (items.length > 1) todayIndex = (todayIndex + 1) % items.length; refresh.classList.remove('is-turning'); void refresh.offsetWidth; refresh.classList.add('is-turning'); renderToday(true); });
       search.addEventListener('input', () => { activeId = null; editingId = null; renderList(); });
       function ageLabel(value) {
         const created = new Date(value);
@@ -271,8 +276,7 @@
         const days = Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000));
         return days === 0 ? '오늘' : `${days}일 전`;
       }
-      async function sync() {
-        const state = await Store.loadReadingLibrary();
+      function sync(state) {
         const byId = new Map((state?.books || []).map(book => [book.id, book]));
         DATA = (state?.quotes || []).map(quote => ({
           id:quote.id, text:quote.text, book:byId.get(quote.bookId)?.title || '알 수 없는 책',
@@ -312,8 +316,7 @@
           localStorage.setItem(sizeKey, JSON.stringify(savedSize));
         }
       } catch (_) {}
-      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
-      sync().catch(error => console.warn('문장 서랍을 불러오지 못했습니다.', error));
+      Store.watchReadingLibrary(sync, { onError:error => console.warn('문장 서랍을 불러오지 못했습니다.', error) });
     })();
   </script>
   <script src="../widget-frame.js"></script>

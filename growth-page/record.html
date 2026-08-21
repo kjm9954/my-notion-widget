@@ -289,7 +289,6 @@
   <script src="../store.js"></script>
   <script>
     (() => {
-      const SETTINGS_KEY = 'growth-stats-v1';
       const header = document.getElementById('header');
       const calendarShell = document.getElementById('calendarShell');
       const daysElement = document.getElementById('days');
@@ -298,25 +297,19 @@
       const todayKey = localKey(today);
       let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
       let selectedKey = null;
-      let settings = readSettings();
+      let settings = { urls:['', '', ''] };
       let activity = { diary:{}, reading:{}, worklog:{} };
       let knownDiaryDates = null;
       let knownWorklogDates = null;
+      let syncSignature = '';
 
       function pad(value) { return String(value).padStart(2, '0'); }
       function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
       function localKey(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
       function keyDaysAgo(days) { const date = localDay(); date.setDate(date.getDate() - days); return localKey(date); }
       function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
-      function safeRead(key) {
-        try {
-          const raw = localStorage.getItem(key);
-          return raw === null ? { found: false, value: null } : { found: true, value: JSON.parse(raw) };
-        } catch (_) { return { found: false, value: null }; }
-      }
-      function readSettings() {
-        const source = safeRead(SETTINGS_KEY);
-        const urls = source.found && Array.isArray(source.value?.urls) ? source.value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
+      function normalizeSettings(value) {
+        const urls = Array.isArray(value?.urls) ? value.urls.slice(0, 3).map(url => String(url ?? '')) : [];
         while (urls.length < 3) urls.push('');
         return { urls };
       }
@@ -461,18 +454,17 @@
         if (link?.getAttribute('href') === '#') event.preventDefault();
       });
 
-      window.addEventListener('storage', event => {
-        if (event.key === SETTINGS_KEY) settings = readSettings();
-        if (event.key === SETTINGS_KEY) render();
-      });
-
       async function sync() {
         try {
-          const [loaded, worklog] = await Promise.all([
+          const [loaded, reading, worklog, remoteSettings] = await Promise.all([
             Store.getWrittenDates(),
-            Store.loadWorklogState().catch(() => null)
+            Store.loadReadingNotesState(),
+            Store.loadWorklogState(),
+            Store.loadStatsSettings()
           ]);
           const dates = Array.isArray(loaded) ? loaded : [];
+          const readingCounts = reading?.byDate && typeof reading.byDate === 'object' ? reading.byDate : {};
+          settings = normalizeSettings(remoteSettings);
           const nextDiaryDates = new Set(dates);
           const addedDiaryDates = knownDiaryDates ? [...nextDiaryDates].filter(key => !knownDiaryDates.has(key)) : [];
           const worklogCounts = {};
@@ -485,13 +477,17 @@
           }
           const nextWorklogDates = new Set(Object.keys(worklogCounts));
           const addedWorklogDates = knownWorklogDates ? [...nextWorklogDates].filter(key => !knownWorklogDates.has(key)) : [];
-          knownDiaryDates = nextDiaryDates;
-          knownWorklogDates = nextWorklogDates;
-          activity = {
+          const nextActivity = {
             diary:Object.fromEntries(dates.map(key => [key,true])),
-            reading:{},
+            reading:readingCounts,
             worklog:worklogCounts
           };
+          const nextSignature = JSON.stringify([nextActivity, settings]);
+          if (nextSignature === syncSignature) return;
+          syncSignature = nextSignature;
+          knownDiaryDates = nextDiaryDates;
+          knownWorklogDates = nextWorklogDates;
+          activity = nextActivity;
           render();
           addedDiaryDates.forEach(key => daysElement.querySelector(`[data-date="${CSS.escape(key)}"]`)?.classList.add('motion-new'));
           addedWorklogDates.forEach(key => {

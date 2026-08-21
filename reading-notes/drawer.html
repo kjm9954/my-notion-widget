@@ -238,8 +238,7 @@
           quotes = quotes.filter(quote => quote.id !== id); closeDetail(); renderFilters();
         } catch (error) { console.warn('문장을 삭제하지 못했습니다.', error); }
       }
-      async function sync() {
-        const state = await Store.loadReadingLibrary();
+      function sync(state) {
         books = Array.isArray(state?.books) ? state.books : [];
         quotes = Array.isArray(state?.quotes) ? state.quotes : [];
         const fields = new Set(books.flatMap(book => book.fields || [book.field]).filter(Boolean));
@@ -249,8 +248,7 @@
       }
 
       els.search.addEventListener('input', renderList);
-      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
-      sync().catch(error => console.warn('문장 서랍을 불러오지 못했습니다.', error));
+      Store.watchReadingLibrary(sync, { onError:error => console.warn('문장 서랍을 불러오지 못했습니다.', error) });
     })();
   </script>
   <script src="../widget-frame.js"></script>

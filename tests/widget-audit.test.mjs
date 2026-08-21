@@ -47,3 +47,26 @@ test("every local HTML asset reference resolves to a file", async () => {
   }
   assert.deepEqual(missing, []);
 });
+
+test("polled widgets do not rebuild unchanged server content", async () => {
+  const guarded = [
+    "game-log-diary/achieve.html",
+    "game-log-diary/calendar.html",
+    "game-log-diary/empty.html",
+    "game-log-diary/material.html",
+    "game-log-diary/mood.html",
+    "growth-page/goals.html",
+    "growth-page/record.html",
+    "thought-box/add.html",
+    "thought-box/find.html",
+    "thought-box/thoughts.html",
+  ];
+  for (const relative of guarded) {
+    const html = await readFile(resolve(root, relative), "utf8");
+    assert.match(html, /syncSignature/);
+    assert.match(html, /nextSignature\s*===\s*syncSignature/);
+  }
+  const stats = await readFile(resolve(root, "growth-page/stats.html"), "utf8");
+  assert.match(stats, /shouldRender\s*=\s*nextSignature\s*!==\s*syncSignature/);
+  assert.match(stats, /if \(!settingsOpen && shouldRender\) renderMain\(\)/);
+});

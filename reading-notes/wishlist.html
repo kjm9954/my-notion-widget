@@ -214,8 +214,7 @@
         return days === 0 ? '오늘' : `${days}일 전`;
       }
 
-      async function sync() {
-        const state = await Store.loadReadingLibrary();
+      function sync(state) {
         DATA = (state?.books || []).filter(book => book.status === 'wishlist').map(book => ({
           id:book.id, title:book.title, author:book.author || '저자 미입력', cover:book.cover || '',
           cat:book.field || '미분류', addedAgo:ageLabel(book.created)
@@ -228,8 +227,7 @@
       }
 
       render();
-      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
-      sync().catch(error => console.warn('구매 예정 책을 불러오지 못했습니다.', error));
+      Store.watchReadingLibrary(sync, { onError:error => console.warn('구매 예정 책을 불러오지 못했습니다.', error) });
     })();
   </script>
   <script src="../widget-frame.js"></script>

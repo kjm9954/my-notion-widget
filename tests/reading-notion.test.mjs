@@ -34,16 +34,26 @@ test("quote drawers render the full filtered list inside their scroll areas", as
   assert.doesNotMatch(compactDrawer, /filteredQuotes\(\)\.slice/);
 });
 
-test("all reading widgets use the shared fast synchronization interval", async () => {
+test("all reading widgets use distinct fast synchronization without rerendering unchanged data", async () => {
   const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
   const names = ["drawer", "library", "life-books", "quote-drawer", "reading-count", "session", "wishlist"];
   const widgets = await Promise.all(names.map(name => readFile(new URL(`../reading-notes/${name}.html`, import.meta.url), "utf8")));
   assert.match(store, /const READING_SYNC_INTERVAL_MS = 5000/);
-  assert.match(store, /window\.Store = \{\s*READING_SYNC_INTERVAL_MS,/);
+  assert.match(store, /function readingLibrarySignature\(state\)/);
+  assert.match(store, /if \(nextSignature === renderedSignature\) return/);
+  assert.match(store, /loadReadingLibrary, watchReadingLibrary,/);
   widgets.forEach(widget => {
-    assert.match(widget, /Store\.watch\([^;]+, Store\.READING_SYNC_INTERVAL_MS, \{ initial:false \}\)/);
+    assert.match(widget, /Store\.watchReadingLibrary\(/);
+    assert.doesNotMatch(widget, /Store\.watch\([^;]+, Store\.READING_SYNC_INTERVAL_MS/);
     assert.doesNotMatch(widget, /Store\.watch\([^;]+, 15000\)/);
   });
+});
+
+test("today quote animation only restarts for a changed or manually refreshed quote", async () => {
+  const widget = await readFile(new URL("../reading-notes/quote-drawer.html", import.meta.url), "utf8");
+  assert.match(widget, /let renderedTodayKey = ''/);
+  assert.match(widget, /if \(!force && nextKey === renderedTodayKey\) return/);
+  assert.match(widget, /renderToday\(true\)/);
 });
 
 test("does not count the keep-only 인생책 tag as a completed book", () => {

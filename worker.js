@@ -209,7 +209,14 @@ export default {
 
       if (path === "/api/thoughts/state" && request.method === "POST") {
         const state = normalizeThoughtState(await request.json());
-        await saveSetting(env, "thoughtBox", state);
+        const index = await loadIndexSettings(env);
+        const activeThoughtIds = new Set(state.items
+          .filter(item => item.cat === "방향성")
+          .map(item => `thought:${item.id}`));
+        const removed = Object.keys(index.items)
+          .filter(id => id.startsWith("thought:") && !activeThoughtIds.has(id));
+        removeIndexItems(index, removed);
+        await Promise.all([saveSetting(env, "thoughtBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true, data: state });
       }
 
@@ -259,15 +266,20 @@ export default {
         const nextCat = t.cat ?? t.category;
         if (nextCat !== undefined) item.cat = cleanCategory(nextCat, state.cats);
         if (Number(t.opened) > 0) item.opened = Number(t.opened);
-        await saveSetting(env, "thoughtBox", state);
+        const index = await loadIndexSettings(env);
+        if (item.cat !== "방향성") removeIndexItems(index, [`thought:${item.id}`]);
+        await Promise.all([saveSetting(env, "thoughtBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true, data: item });
       }
 
       if (path === "/api/thoughts/delete" && request.method === "POST") {
         const { id } = await request.json();
         const state = await loadThoughtState(env);
-        state.items = state.items.filter(item => item.id !== String(id || ""));
-        await saveSetting(env, "thoughtBox", state);
+        const sourceId = String(id || "");
+        state.items = state.items.filter(item => item.id !== sourceId);
+        const index = await loadIndexSettings(env);
+        removeIndexItems(index, [`thought:${sourceId}`]);
+        await Promise.all([saveSetting(env, "thoughtBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true });
       }
 
@@ -280,9 +292,9 @@ export default {
         const state = normalizeGoalState(await request.json());
         const index = await loadIndexSettings(env);
         const activeGoalIds = new Set(state.goals.map(goal => `goal:${goal.id}`));
-        Object.keys(index.items).forEach(id => {
-          if (id.startsWith("goal:") && !activeGoalIds.has(id)) delete index.items[id];
-        });
+        const removed = Object.keys(index.items)
+          .filter(id => id.startsWith("goal:") && !activeGoalIds.has(id));
+        removeIndexItems(index, removed);
         state.goals.forEach(goal => {
           const id = `goal:${goal.id}`;
           if (!index.items[id]) index.items[id] = { scope: index.scope, q: null, st: goal.done ? "done" : "todo", p: null };
@@ -367,7 +379,9 @@ export default {
           state.goals.forEach(goal => { if (goal.parent === targetId) goal.parent = null; });
         }
         state.goals = state.goals.filter(goal => !removing.has(goal.id));
-        await saveSetting(env, "goalBox", state);
+        const index = await loadIndexSettings(env);
+        removeIndexItems(index, [...removing].map(goalId => `goal:${goalId}`));
+        await Promise.all([saveSetting(env, "goalBox", state), saveSetting(env, "indexSettings", index)]);
         return json({ ok: true });
       }
 
@@ -928,10 +942,11 @@ function validDiaryRangeKey(value) {
 }
 
 function parseDiary(row, env) {
+  const numericMood = row.mood === null || row.mood === "" ? null : Number(row.mood);
   return {
     date: diaryPublicDate(env, row.date),
     mode: row.mode,
-    mood: row.mood,
+    mood: Number.isFinite(numericMood) ? numericMood : row.mood,
     achievements: safeParse(row.achievements, []),
     images: safeParse(row.images, []),
     quest: safeParse(row.quest, null),
@@ -1096,6 +1111,14 @@ function normalizeIndexSettings(raw) {
 
 async function loadIndexSettings(env) {
   return normalizeIndexSettings(await loadSetting(env, "indexSettings", { scope: "week", items: {} }));
+}
+
+function removeIndexItems(index, ids) {
+  const removed = new Set((Array.isArray(ids) ? ids : []).map(id => String(id || "")).filter(Boolean));
+  removed.forEach(id => delete index.items[id]);
+  Object.values(index.items).forEach(meta => {
+    if (meta.p && removed.has(meta.p)) meta.p = null;
+  });
 }
 
 function parseIndexId(value) {

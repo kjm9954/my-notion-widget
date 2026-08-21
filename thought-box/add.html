@@ -238,6 +238,7 @@
       let saveTimer = 0;
       let revision = 0;
       let saving = false;
+      let syncSignature = '';
 
       function emptyStore() {
         return { items: [], cats: DEFAULT_CATS.slice(), catOpened: {} };
@@ -308,7 +309,11 @@
       async function sync() {
         if (saving || saveTimer) return;
         try {
-          store = normalize(await Store.loadThoughtState());
+          const nextStore = normalize(await Store.loadThoughtState());
+          const nextSignature = JSON.stringify(nextStore);
+          if (nextSignature === syncSignature) return;
+          syncSignature = nextSignature;
+          store = nextStore;
           if (!store.cats.includes(selectedCat)) selectedCat = store.cats[0];
           renderCats();
         } catch (_) {}

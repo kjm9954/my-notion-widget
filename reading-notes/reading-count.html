@@ -168,8 +168,7 @@
         return Number.isNaN(date.getTime()) ? String(raw) : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
       }
 
-      async function sync() {
-        const state = await Store.loadReadingLibrary();
+      function sync(state) {
         const counted = (state?.books || []).filter(book => book.status !== 'dropped');
         const finished = counted.filter(book => book.status === 'done');
         const counts = new Map();
@@ -194,8 +193,7 @@
         card.classList.toggle('is-wide', isWide);
         render();
       }).observe(card);
-      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
-      sync().catch(error => console.warn('독서 현황을 불러오지 못했습니다.', error));
+      Store.watchReadingLibrary(sync, { onError:error => console.warn('독서 현황을 불러오지 못했습니다.', error) });
     })();
   </script>
   <script src="../widget-frame.js"></script>

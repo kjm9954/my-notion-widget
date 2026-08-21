@@ -324,16 +324,13 @@
   <script src="../store.js"></script>
   <script>
     (() => {
-      const SETTINGS_KEY = 'growth-stats-v1';
-      const READING_KEY = 'reading-notes-v1';
       const card = document.getElementById('card');
       const shortcutMeta = [
         { glyph: '◲', label: '일기', placeholder: '일기 페이지 주소' },
         { glyph: '▤', label: '독서 노트', placeholder: '독서 노트 페이지 주소' },
         { glyph: '◇', label: '업무', placeholder: '업무 페이지 주소' }
       ];
-      let memorySettings = { start: localKey(new Date()), urls: ['', '', ''] };
-      let settings = readSettings();
+      let settings = normalizeSettings({ start: localKey(new Date()), urls: ['', '', ''] });
       let settingsOpen = false;
       let statusExpanded = false;
       let activity = { diary:{}, reading:{} };
@@ -345,8 +342,8 @@
       let settingsSaveTimer = 0;
       let settingsSaving = false;
       let syncRunning = false;
+      let syncSignature = '';
 
-      function clone(value) { return JSON.parse(JSON.stringify(value)); }
       function escapeAttr(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
       function pad(value) { return String(value).padStart(2, '0'); }
       function localKey(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
@@ -367,19 +364,7 @@
           urls
         };
       }
-      function readSettings() {
-        try {
-          const raw = localStorage.getItem(SETTINGS_KEY);
-          memorySettings = raw ? normalizeSettings(JSON.parse(raw)) : normalizeSettings(memorySettings);
-        } catch (_) {}
-        return clone(memorySettings);
-      }
-      function cacheSettings() {
-        memorySettings = normalizeSettings(settings);
-        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(memorySettings)); } catch (_) {}
-      }
       function saveSettings(immediate = false) {
-        cacheSettings();
         settingsRevision += 1;
         window.clearTimeout(settingsSaveTimer);
         settingsSaveTimer = 0;
@@ -395,7 +380,6 @@
         const snapshot = normalizeSettings(settings);
         try {
           settings = normalizeSettings(await Store.saveStatsSettings(snapshot));
-          cacheSettings();
         } catch (error) {
           console.warn('스탯 설정을 저장하지 못했습니다.', error);
         } finally {
@@ -412,20 +396,6 @@
           if (count > 0) byDate[date] = count;
         });
         return { byDate };
-      }
-      function readLegacyReadingState() {
-        try { return normalizeReadingState(JSON.parse(localStorage.getItem(READING_KEY) || 'null')); }
-        catch (_) { return { byDate:{} }; }
-      }
-      function mergeReadingStates(remote, legacy) {
-        const merged = normalizeReadingState(remote);
-        Object.entries(normalizeReadingState(legacy).byDate).forEach(([date, count]) => {
-          merged.byDate[date] = Math.max(merged.byDate[date] || 0, count);
-        });
-        return merged;
-      }
-      function cacheReadingState(value) {
-        try { localStorage.setItem(READING_KEY, JSON.stringify(normalizeReadingState(value))); } catch (_) {}
       }
       function tenure() {
         const start = parseKey(settings.start) || localDay();
@@ -606,14 +576,10 @@
         }
       });
 
-      window.addEventListener('storage', event => {
-        if (event.key === SETTINGS_KEY) settings = readSettings();
-        if (event.key === SETTINGS_KEY && !settingsOpen) renderMain();
-      });
-
       async function sync() {
         if (syncRunning) return;
         syncRunning = true;
+        let shouldRender = false;
         try {
           const [dates, hp, remoteReading, remoteSettings] = await Promise.all([
             Store.getWrittenDates(),
@@ -622,31 +588,27 @@
             Store.loadStatsSettings()
           ]);
           const normalizedRemoteReading = normalizeReadingState(remoteReading);
-          const mergedReading = mergeReadingStates(normalizedRemoteReading, readLegacyReadingState());
-          if (JSON.stringify(mergedReading) !== JSON.stringify(normalizedRemoteReading)) {
-            await Store.saveReadingNotesState(mergedReading);
-          }
-          cacheReadingState(mergedReading);
           if (remoteSettings) {
             if (!settingsOpen && !settingsSaving && !settingsSaveTimer) {
               settings = normalizeSettings(remoteSettings);
-              cacheSettings();
             }
           } else {
             settings = normalizeSettings(await Store.saveStatsSettings(settings));
-            cacheSettings();
           }
           activity = {
             diary:Object.fromEntries((Array.isArray(dates) ? dates : []).map(key => [key,true])),
-            reading:mergedReading.byDate
+            reading:normalizedRemoteReading.byDate
           };
           activityLoaded = true;
           serverHp = Number(hp) || 20;
+          const nextSignature = JSON.stringify([settings, activity, serverHp]);
+          shouldRender = nextSignature !== syncSignature;
+          syncSignature = nextSignature;
         } catch (error) {
           console.warn('스탯 데이터를 불러오지 못했습니다.', error);
         } finally {
           syncRunning = false;
-          if (!settingsOpen) renderMain();
+          if (!settingsOpen && shouldRender) renderMain();
         }
       }
       window.addEventListener('focus',sync);
