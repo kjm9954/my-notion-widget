@@ -8,10 +8,12 @@ const session = await readFile(new URL("../reading-notes/session.html", import.m
 const frame = await readFile(new URL("../widget-frame.js", import.meta.url), "utf8");
 const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
 
-test("스탯 유휴 모션은 HP·MP 텍스트가 아니라 게이지를 순회한다", () => {
-  assert.match(frame, /'stats\.html': \{ selector:'\.meter-track', max:2, continuous:true \}/);
-  assert.doesNotMatch(frame, /'stats\.html': \{ selector:'\.meter-label'/);
-  assert.match(frame, /config\.continuous \? -delay : delay/);
+test("스탯은 진입 후 레벨 글씨만 움직이고 유휴 도형을 만들지 않는다", () => {
+  assert.match(frame, /'stats\.html': \{ disabled:true \}/);
+  assert.match(stats, /if \(!activityLoaded\) return;/);
+  assert.match(stats, /lastLevel === null \|\| current\.level > lastLevel/);
+  assert.match(stats, /window\.widgetMotion\?\.pop\?\.\(level\)/);
+  assert.doesNotMatch(stats, /window\.widgetMotion\?\.burst\?\.\(level\)/);
 });
 
 test("상태 이상 더보기는 모바일 버튼 높이에 늘어나지 않고 원형을 유지한다", () => {

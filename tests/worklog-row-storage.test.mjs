@@ -24,7 +24,7 @@ test("Worker는 항목 패치 API와 안전한 구버전 병합을 제공", () =
 
 test("웹 저장소와 데스크톱 앱은 전체 state 저장 대신 patch를 사용", () => {
   assert.match(store,/async function patchWorklogState\(patch\)/);
-  assert.match(store,/async function apiGetFresh\(path\)/);
+  assert.match(store,/async function apiGetFresh\(path, instanceId = WIDGET_INSTANCE_ID\)/);
   assert.match(desktopClient,/BuildUrl\("\/api\/worklog\/patch"\)/);
   assert.doesNotMatch(desktopClient,/BuildUrl\("\/api\/worklog\/state"\), content/);
 });
