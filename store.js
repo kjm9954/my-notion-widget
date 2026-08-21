@@ -5,6 +5,7 @@ const API = "https://notion-widget.wldnjsdkk.workers.dev";
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
 const INSTANCE_STORAGE_KEY = "notion-widget-instance-v1";
 const INSTANCE_DISCOVERY_CHANNEL = "notion-widget-instance-discovery-v1";
+const WORKLOG_INSTANCE_CACHE_PATH = "/__notion-widget-worklog-instance-v1__";
 
 function readWidgetInstanceId() {
   try {
@@ -44,7 +45,47 @@ let storeChannel = null;
 let instanceDiscoveryChannel = null;
 let errorIndicatorTimer = 0;
 
-if (INSTANCE_RE.test(URL_INSTANCE_ID)) rememberWidgetInstanceId(URL_INSTANCE_ID);
+function isWorklogWidgetPath() {
+  try { return /\/Worklog\//i.test(new URL(window.location.href).pathname); }
+  catch (_) { return false; }
+}
+
+function worklogInstanceCacheUrl() {
+  try { return new URL(WORKLOG_INSTANCE_CACHE_PATH, window.location.href).toString(); }
+  catch (_) { return `${API}${WORKLOG_INSTANCE_CACHE_PATH}`; }
+}
+
+async function readCachedWorklogInstanceId() {
+  if (!("caches" in window)) return "";
+  try {
+    const response = await (await caches.open(STORE_CACHE)).match(worklogInstanceCacheUrl());
+    const value = response ? await response.text() : "";
+    return INSTANCE_RE.test(value) ? value : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function rememberCachedWorklogInstanceId(value) {
+  const instanceId = String(value || "");
+  if (!INSTANCE_RE.test(instanceId) || !("caches" in window)) return;
+  void caches.open(STORE_CACHE).then(cache => cache.put(worklogInstanceCacheUrl(), new Response(instanceId, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  }))).catch(() => {});
+}
+
+if (INSTANCE_RE.test(URL_INSTANCE_ID)) {
+  if (isWorklogWidgetPath()) {
+    rememberCachedWorklogInstanceId(URL_INSTANCE_ID);
+    try {
+      if (window.localStorage?.getItem(INSTANCE_STORAGE_KEY) === URL_INSTANCE_ID) {
+        window.localStorage.removeItem(INSTANCE_STORAGE_KEY);
+      }
+    } catch (_) {}
+  } else {
+    rememberWidgetInstanceId(URL_INSTANCE_ID);
+  }
+}
 
 function instanceContextKey() {
   try {
@@ -70,7 +111,7 @@ function adoptDiscoveredInstance(value) {
 }
 
 function announceWidgetInstance(type = "instance") {
-  if (!instanceDiscoveryChannel) return;
+  if (!instanceDiscoveryChannel || isWorklogWidgetPath()) return;
   const context = instanceContextKey();
   if (!context) return;
   try {
@@ -192,10 +233,11 @@ function watch(callback, interval = 3000, options = {}) {
 }
 
 // 공통 요청 헬퍼
-function apiUrl(path, includeInstance = true) {
+function apiUrl(path, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
   if (RAW_INSTANCE_ID && !WIDGET_INSTANCE_ID) throw new Error("올바르지 않은 위젯 인스턴스 주소입니다.");
+  if (instanceId && !INSTANCE_RE.test(instanceId)) throw new Error("올바르지 않은 위젯 인스턴스 주소입니다.");
   const url = new URL(API + path);
-  if (includeInstance && WIDGET_INSTANCE_ID) url.searchParams.set("w", WIDGET_INSTANCE_ID);
+  if (includeInstance && instanceId) url.searchParams.set("w", instanceId);
   return url.toString();
 }
 
@@ -295,8 +337,8 @@ function requestFresh(path, url, cachedPromise) {
   return request;
 }
 
-async function apiGet(path) {
-  const url = apiUrl(path);
+async function apiGet(path, instanceId = WIDGET_INSTANCE_ID) {
+  const url = apiUrl(path, true, instanceId);
   const cachedPromise = readCached(url);
   const freshPromise = requestFresh(path, url, cachedPromise);
   const cached = await cachedPromise;
@@ -311,13 +353,13 @@ async function apiGet(path) {
   if (result.type === "fresh") return cloneData(result.data);
   return cloneData(cached.data);
 }
-async function apiGetFresh(path) {
-  const url = apiUrl(path);
+async function apiGetFresh(path, instanceId = WIDGET_INSTANCE_ID) {
+  const url = apiUrl(path, true, instanceId);
   const cachedPromise = readCached(url);
   return cloneData(await requestFresh(path, url, cachedPromise));
 }
-async function apiPost(path, body, includeInstance = true) {
-  const url = apiUrl(path, includeInstance);
+async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
+  const url = apiUrl(path, includeInstance, instanceId);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -523,25 +565,33 @@ async function deleteIndexItem(id) {
 }
 
 // ───────── 업무일지 ─────────
+async function resolveWorklogInstanceId() {
+  return await readCachedWorklogInstanceId();
+}
 async function loadWorklogState(options = {}) {
+  const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
   const response = options?.fresh === true
-    ? await apiGetFresh("/api/worklog/state")
-    : await apiGet("/api/worklog/state");
+    ? await apiGetFresh("/api/worklog/state", instanceId)
+    : await apiGet("/api/worklog/state", instanceId);
   return response.data;
 }
 async function saveWorklogState(state) {
-  return (await apiPost("/api/worklog/state", state)).data;
+  const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
+  return (await apiPost("/api/worklog/state", state, true, instanceId)).data;
 }
 async function patchWorklogState(patch) {
-  const data = (await apiPost("/api/worklog/patch", patch)).data;
-  writeCached(apiUrl("/api/worklog/state"), { ok: true, data });
+  const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
+  const data = (await apiPost("/api/worklog/patch", patch, true, instanceId)).data;
+  writeCached(apiUrl("/api/worklog/state", true, instanceId), { ok: true, data });
   return data;
 }
 async function saveWorklogView(view) {
-  return (await apiPost("/api/worklog/view", { view })).data;
+  const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
+  return (await apiPost("/api/worklog/view", { view }, true, instanceId)).data;
 }
 async function saveWorklogColumnSplit(mode, value) {
-  return (await apiPost("/api/worklog/column-split", { mode, value })).data;
+  const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
+  return (await apiPost("/api/worklog/column-split", { mode, value }, true, instanceId)).data;
 }
 
 // ───────── 중요 업무 ─────────

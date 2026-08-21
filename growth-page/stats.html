@@ -462,14 +462,16 @@
       }
 
       function runMainMotions(current, newAnomalies) {
+        if (!activityLoaded) return;
         const level = card.querySelector('.level');
-        if (lastLevel !== null && current.level > lastLevel) {
+        if (lastLevel === null || current.level > lastLevel) {
           window.widgetMotion?.pop?.(level);
-          window.widgetMotion?.burst?.(level);
         }
-        card.querySelectorAll('.status-pill').forEach(pill => {
-          if (newAnomalies.includes(pill.textContent)) window.widgetMotion?.popIn?.(pill);
-        });
+        if (previousAnomalies !== null) {
+          card.querySelectorAll('.status-pill').forEach(pill => {
+            if (newAnomalies.includes(pill.textContent)) window.widgetMotion?.popIn?.(pill);
+          });
+        }
         lastLevel = current.level;
         previousAnomalies = [...current.anomalies];
       }

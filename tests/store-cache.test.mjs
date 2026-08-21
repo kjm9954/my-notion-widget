@@ -51,13 +51,14 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
     location: {
       search: options.search ?? "?w=w_abcdefghijklmnopqrstuvwx",
       hash: "",
-      href: "https://kjm9954.github.io/my-notion-widget/growth-page/record.html",
+      href: options.href ?? "https://kjm9954.github.io/my-notion-widget/growth-page/record.html",
       replace(url) { options.onReplace?.(String(url)); },
       reload() {},
     },
     localStorage: {
       getItem(key) { return instanceStorage.has(key) ? instanceStorage.get(key) : null; },
       setItem(key, value) { instanceStorage.set(key, String(value)); },
+      removeItem(key) { instanceStorage.delete(key); },
     },
     caches: cacheApi,
     addEventListener() {},
@@ -112,6 +113,32 @@ test("같은 노션 페이지의 기존 무키 위젯도 저장된 개인 인스
   assert.equal(inherited.getWidgetInstanceId(), instanceId);
   assert.equal((await inherited.loadWorklogState()).revision, 7);
   assert.equal(new URL(requestedUrl).searchParams.get("w"), instanceId);
+});
+
+test("성장 기록은 Worklog 전용 키만 이어 쓰고 다른 데이터 인스턴스는 바꾸지 않는다", async () => {
+  const persisted = new Map();
+  const instanceId = "w_abcdefghijklmnopqrstuvwxyz123456";
+  createStore(async () => Response.json({ ok:true, data:{} }), persisted, {
+    search:`?w=${instanceId}`,
+    href:`https://kjm9954.github.io/my-notion-widget/Worklog/worklog.html?w=${instanceId}`,
+    instanceStorage:new Map(),
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  const requestedUrls = [];
+  const inherited = createStore(async url => {
+    requestedUrls.push(String(url));
+    return Response.json({ ok:true, data:{ revision:11, tasks:[] } });
+  }, persisted, {
+    search:"",
+    instanceStorage:new Map(),
+  });
+
+  assert.equal((await inherited.loadWorklogState()).revision, 11);
+  await inherited.loadStatsSettings();
+  assert.equal(inherited.getWidgetInstanceId(), null);
+  assert.equal(new URL(requestedUrls[0]).searchParams.get("w"), instanceId);
+  assert.equal(new URL(requestedUrls[1]).searchParams.has("w"), false);
 });
 
 test("저장소가 막혀도 같은 페이지의 위젯끼리 개인 인스턴스를 전달한다", () => {
