@@ -2,7 +2,7 @@ import { NOTION_API_VERSION } from "./schedule-core.js";
 
 const LIBRARY_CACHE_KEY = "reading:notion:library:v2";
 const NESTED_QUOTES_CACHE_KEY = "reading:notion:nested-quotes:v2";
-const LIBRARY_CACHE_MS = 60_000;
+const LIBRARY_CACHE_MS = 5_000;
 const NESTED_QUOTES_REFRESH_MS = 60_000;
 const NESTED_BOOK_BATCH_SIZE = 2;
 const LIFE_CYCLE_STATUSES = new Set(["구입 전", "읽는 중", "재독", "중도포기", "완독", "정리 완료"]);
@@ -16,6 +16,7 @@ const STATUS_TO_NOTION = Object.freeze({
 });
 
 let libraryInFlight = null;
+let nestedQuotesInFlight = null;
 
 export function notionReadingConfig(env) {
   const config = {
@@ -431,7 +432,31 @@ function sortBooks(books) {
   });
 }
 
-async function fetchReadingLibrary(env, fresh) {
+async function cachedNestedQuotes(env, books) {
+  const cached = await kvGet(env, NESTED_QUOTES_CACHE_KEY);
+  if (!cached?.quotesByBook) return null;
+  return books.flatMap(book => cached.quotesByBook[book.id] || []);
+}
+
+function readingLibraryData(books, structured, nested) {
+  const bookLines = books.map(normalizeBookOneLine).filter(Boolean);
+  return {
+    books,
+    quotes:mergeReadingQuotes(structured, [...nested, ...bookLines]),
+    fetchedAt:new Date().toISOString(),
+  };
+}
+
+function refreshNestedQuotes(env, config, books) {
+  if (nestedQuotesInFlight) return nestedQuotesInFlight;
+  const pending = loadNestedQuotes(env, config, books, false).finally(() => {
+    if (nestedQuotesInFlight === pending) nestedQuotesInFlight = null;
+  });
+  nestedQuotesInFlight = pending;
+  return pending;
+}
+
+async function fetchReadingLibrary(env, fresh, options = {}) {
   const config = notionReadingConfig(env);
   const [bookPages, quotePages] = await Promise.all([
     queryDataSource(config, config.booksDataSourceId),
@@ -440,9 +465,17 @@ async function fetchReadingLibrary(env, fresh) {
   const { byId: yearsById } = await loadYears(config, bookPages);
   const books = sortBooks(bookPages.map(page => normalizeReadingBookPage(page, yearsById)).filter(book => book.id));
   const structured = quotePages.map(normalizeStructuredQuotePage).filter(Boolean);
+  if (!fresh && typeof options?.waitUntil === "function") {
+    const cachedNested = await cachedNestedQuotes(env, books);
+    if (cachedNested) {
+      const data = readingLibraryData(books, structured, cachedNested);
+      await kvPut(env, LIBRARY_CACHE_KEY, { fetchedAt:Date.now(), data });
+      options.waitUntil(refreshNestedQuotes(env, config, books).catch(() => {}));
+      return data;
+    }
+  }
   const nested = await loadNestedQuotes(env, config, books, fresh);
-  const bookLines = books.map(normalizeBookOneLine).filter(Boolean);
-  const data = { books, quotes: mergeReadingQuotes(structured, [...nested, ...bookLines]), fetchedAt: new Date().toISOString() };
+  const data = readingLibraryData(books, structured, nested);
   await kvPut(env, LIBRARY_CACHE_KEY, { fetchedAt: Date.now(), data });
   return data;
 }
@@ -453,7 +486,7 @@ export async function loadReadingLibrary(env, options = {}) {
   if (!fresh && cached?.fetchedAt && Date.now() - cached.fetchedAt < LIBRARY_CACHE_MS && cached?.data) return cached.data;
   let pending = !fresh ? libraryInFlight : null;
   if (!pending) {
-    pending = fetchReadingLibrary(env, fresh).finally(() => {
+    pending = fetchReadingLibrary(env, fresh, options).finally(() => {
       if (libraryInFlight === pending) libraryInFlight = null;
     });
     if (!fresh) libraryInFlight = pending;

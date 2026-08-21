@@ -312,7 +312,7 @@
           localStorage.setItem(sizeKey, JSON.stringify(savedSize));
         }
       } catch (_) {}
-      Store.watch(sync, 15000);
+      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
       sync().catch(error => console.warn('문장 서랍을 불러오지 못했습니다.', error));
     })();
   </script>

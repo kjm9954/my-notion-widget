@@ -152,7 +152,7 @@
     .task-row.is-drop-after::after { bottom:-4px; }
     .rows-scroll.is-reordering { user-select:none; }
     .project-pill {
-      min-width:0; padding:3px 5px; overflow:hidden; border-radius:999px; background:var(--pill); color:var(--secondary);
+      width:100%; min-width:0; padding:3px 5px; overflow:hidden; display:block; border-radius:999px; background:var(--pill); color:var(--secondary);
       font-size:10px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
     }
     .cell-button {
@@ -208,7 +208,7 @@
     .memo { color:var(--deep); font-size:11px; font-weight:600; }
     .memo.is-missing { color:var(--complete); }
     .status-pill {
-      min-width:0; padding:3px 4px; border-radius:999px; overflow:hidden;
+      width:100%; min-width:0; padding:3px 4px; display:block; border-radius:999px; overflow:hidden;
       font-size:9px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
     }
     .status-button { width:100%; }
@@ -374,8 +374,8 @@
       .task-row.work > :not(.task-main):not(.check-wrap):not(.delete-wrap):not(.mobile-work-meta) { display:none; }
       .task-row.work .task-main { grid-column:1; grid-row:1; }
       .task-row.work .task-title-button { font-size:13px; }
-      .task-row.work .check-wrap { width:44px; height:44px; grid-column:2; grid-row:1 / span 3; }
-      .task-row.work .delete-wrap { width:40px; height:44px; grid-column:3; grid-row:1 / span 3; }
+      .task-row.work .check-wrap { width:44px; height:44px; grid-column:2; grid-row:1; }
+      .task-row.work .delete-wrap { width:40px; height:44px; grid-column:3; grid-row:1; }
       .task-row.work .done-check {
         position:relative; width:44px; height:44px; border:0; background:transparent; color:transparent;
       }
@@ -391,13 +391,18 @@
         line-height:1; transform:translate(-50%,-50%);
       }
       .task-row.work .mobile-work-meta { min-width:0; display:flex; align-items:center; gap:6px; }
-      .task-row.work .mobile-work-meta.pills { grid-column:1; grid-row:2; }
-      .task-row.work .mobile-work-meta.pills .due-cell {
-        margin-left:auto; display:inline-flex; align-items:center; gap:3px; white-space:nowrap;
+      .task-row.work .mobile-work-meta.pills {
+        grid-column:1 / -1; grid-row:2; display:grid; grid-template-columns:minmax(0,1fr) 44px 64px; gap:4px;
+      }
+      .task-row.work .mobile-work-meta.pills .project-button { width:100%; max-width:none; min-height:44px; }
+      .task-row.work .mobile-work-meta.pills .q-button { width:44px; min-height:44px; }
+      .task-row.work .mobile-work-meta.pills .status-button { width:64px; min-height:44px; }
+      .task-row.work .mobile-work-meta.due {
+        min-height:40px; grid-column:1 / -1; grid-row:3; justify-content:flex-start; gap:6px;
         color:var(--muted); font-size:11px; font-weight:600;
       }
       .task-row.work .mobile-work-meta.times {
-        grid-column:1; grid-row:3; flex-wrap:nowrap; align-items:center; gap:8px;
+        grid-column:1 / -1; grid-row:4; flex-wrap:nowrap; align-items:center; gap:8px;
         color:var(--deep); font-variant-numeric:tabular-nums;
       }
       .task-row.work .mobile-work-meta.times > * { flex:0 0 auto; white-space:nowrap; }
@@ -405,7 +410,7 @@
       .task-row.work .mobile-work-meta.times .progress-span { display:inline-flex; align-items:center; gap:3px; }
       .task-row.work .mobile-work-meta.times .time-span { color:var(--text); font-size:12.5px; font-weight:700; }
       .task-row.work .mobile-work-meta.times .meta-rule { width:1px; height:11px; background:var(--border-soft); }
-      .task-row.work .mobile-work-meta.times .meta-label { color:var(--faint); font-size:10.5px; font-weight:700; }
+      .task-row.work .mobile-work-meta .meta-label { color:var(--faint); font-size:10.5px; font-weight:700; }
       .task-row.work .mobile-work-meta.times .meta-value { color:var(--deep); font-size:12px; font-weight:600; }
       .task-row.work .mobile-work-meta.times .time-cell,
       .task-row.work .mobile-work-meta.times .time-value { width:auto; height:auto; min-height:0; }
@@ -421,7 +426,6 @@
       .task-row.work.view-memo .mobile-work-meta.times .memo-button.is-empty { color:var(--faint); }
       .task-row.work .mobile-work-meta .cell-button { width:auto; color:inherit; font-size:inherit; font-weight:inherit; }
       .task-row.work .mobile-work-meta .date-cell { width:auto; }
-      .task-row.work .mobile-work-meta .project-button { max-width:110px; }
       .column-head.life { display:none; }
       .task-row.life { height:auto; min-height:0; padding:9px 10px; grid-template-columns:62px 22px minmax(0,1fr) 44px 40px; grid-template-rows:40px 32px; gap:6px; }
       .task-row.life .project-button { grid-column:1; grid-row:1; }
@@ -1355,7 +1359,7 @@
 
       function projectButton(task) {
         const project = task.proj || '미분류';
-        return `<button class="cell-button project-pill project-button ${cellActive(task.id,'project')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="project" aria-label="구분 변경, 현재 ${escapeHtml(project)}">${escapeHtml(project)}</button>`;
+        return `<button class="cell-button project-button ${cellActive(task.id,'project')}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="project" aria-label="구분 변경, 현재 ${escapeHtml(project)}"><span class="project-pill">${escapeHtml(project)}</span></button>`;
       }
 
       function dueCell(task) {
@@ -1380,7 +1384,7 @@
       }
 
       function statusButton(task, status) {
-        return `<button class="cell-button status-pill status-button ${status.className}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="status" aria-label="상태 변경, 현재 ${status.label}">${status.label}</button>`;
+        return `<button class="cell-button status-button" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="status" aria-label="상태 변경, 현재 ${status.label}"><span class="status-pill ${status.className}">${status.label}</span></button>`;
       }
 
       function titleCell(task, draft) {
@@ -1409,14 +1413,14 @@
       }
 
       function mobileWorkMeta(task, status, progress, estimate) {
-        const due = `<span class="due-cell"><span>목표</span>${dueCell(task)}</span>`;
+        const due = `<span class="mobile-work-meta due"><span class="meta-label">목표</span>${dueCell(task)}</span>`;
         if (state.workView === 'memo') {
           const memo = ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === 'memo'
             ? memoCell(task)
             : `<span class="cell memo"><button class="memo-button ${task.memo ? '' : 'is-empty'}" type="button" data-inline-start="memo" data-task-id="${escapeHtml(task.id)}" aria-label="메모 ${task.memo ? '편집' : '추가'}">${task.memo ? escapeHtml(task.memo) : '메모 추가'}</button></span>`;
-          return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}${due}</span><span class="mobile-work-meta times memo-view"><span class="meta-label">메모</span>${memo}</span>`;
+          return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span>${due}<span class="mobile-work-meta times memo-view"><span class="meta-label">메모</span>${memo}</span>`;
         }
-        return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}${due}</span>
+        return `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}</span>${due}
           <span class="mobile-work-meta times"><span class="time-span">${timeCell(task, 'start')}<span>–</span>${timeCell(task, 'end')}</span><span class="meta-rule" aria-hidden="true"></span><span class="progress-span"><span class="meta-label">진행</span><span class="meta-value">${hourButton(task, 'progress', progress)}</span><span class="meta-value">/</span><span class="meta-value">${hourButton(task, 'est', estimate)}</span></span></span>`;
       }
 
@@ -1565,9 +1569,9 @@
           }
           const status = statusMeta(task);
           row.querySelectorAll('[data-cell-field="status"]').forEach(button => {
-            button.className = `cell-button status-pill status-button ${status.className}`;
+            button.className = 'cell-button status-button';
             button.setAttribute('aria-label',`상태 변경, 현재 ${status.label}`);
-            button.textContent = status.label;
+            button.innerHTML = `<span class="status-pill ${status.className}">${status.label}</span>`;
           });
         });
         renderHeader(tasksFor(state.mode,ui.selectedDate));

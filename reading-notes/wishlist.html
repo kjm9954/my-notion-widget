@@ -228,7 +228,7 @@
       }
 
       render();
-      Store.watch(sync, 15000);
+      Store.watch(sync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
       sync().catch(error => console.warn('구매 예정 책을 불러오지 못했습니다.', error));
     })();
   </script>

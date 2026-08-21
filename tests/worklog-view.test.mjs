@@ -97,11 +97,17 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /widgetMotion\?\.spark\?\.\(check,check\.offsetWidth \/ 2,check\.offsetHeight \/ 2\)/);
   assert.match(html, /'상태를 바꿨습니다\.','status'/);
   assert.match(html, /'완료 상태를 바꿨습니다\.','checkbox'/);
-  assert.match(html, /class="due-cell"/);
+  assert.match(html, /class="mobile-work-meta due"/);
   assert.match(html, /class="meta-rule"/);
   assert.match(html, /class="meta-label">메모/);
   assert.match(html, /-webkit-line-clamp:2/);
   assert.match(html, /\.task-row\.work\.view-memo \{ grid-template-columns:minmax\(0,1fr\) 44px 40px; \}/);
+  assert.match(html, /\.mobile-work-meta\.pills \{[\s\S]*?grid-column:1 \/ -1; grid-row:2;[\s\S]*?grid-template-columns:minmax\(0,1fr\) 44px 64px/);
+  assert.match(html, /\.mobile-work-meta\.due \{[\s\S]*?grid-column:1 \/ -1; grid-row:3/);
+  assert.match(html, /\.mobile-work-meta\.times \{[\s\S]*?grid-column:1 \/ -1; grid-row:4/);
+  assert.match(html, /\.check-wrap \{ width:44px; height:44px; grid-column:2; grid-row:1; \}/);
+  assert.match(html, /<span class="project-pill">/);
+  assert.match(html, /<span class="status-pill \$\{status\.className\}">/);
 });
 
 test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으로 오인하지 않음", async () => {

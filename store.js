@@ -19,6 +19,7 @@ const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID :
 const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
 const STORE_CACHE = "notion-widget-store-cache-v1";
 const CACHE_WAIT_MS = 180;
+const READING_SYNC_INTERVAL_MS = 5000;
 const storeListeners = new Set();
 const memoryCache = new Map();
 const inFlightGets = new Map();
@@ -55,7 +56,7 @@ function watch(callback, interval = 3000, options = {}) {
   };
   storeListeners.add(run);
   const timer = setInterval(run, Math.max(1000, Number(interval) || 3000));
-  const initialTimer = setTimeout(run, 0);
+  const initialTimer = options?.initial === false ? null : setTimeout(run, 0);
   const onVisible = () => { if (!document.hidden) run(); };
   const onPageHide = event => { if (!event.persisted) stop(); };
   window.addEventListener("focus", run);
@@ -468,6 +469,7 @@ async function getMoodOfDate(date) {
 
 // 위젯에서 window.Store.saveDiary(...)처럼 씀
 window.Store = {
+  READING_SYNC_INTERVAL_MS,
   createWidgetInstance, getWidgetInstanceId,
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,
   loadMoodWords, saveMoodWords,

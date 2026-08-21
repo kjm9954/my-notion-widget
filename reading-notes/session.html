@@ -282,7 +282,7 @@
       els.quote.addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); addDraft(); } });
       els.save.addEventListener('click', saveSession);
       els.fresh.addEventListener('click', startFreshSession);
-      Store.watch(externalSync, 15000);
+      Store.watch(externalSync, Store.READING_SYNC_INTERVAL_MS, { initial:false });
       externalSync().catch(error => console.warn('독서 세션을 불러오지 못했습니다.', error));
       renderBooks(); renderDraft();
     })();

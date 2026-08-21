@@ -34,6 +34,18 @@ test("quote drawers render the full filtered list inside their scroll areas", as
   assert.doesNotMatch(compactDrawer, /filteredQuotes\(\)\.slice/);
 });
 
+test("all reading widgets use the shared fast synchronization interval", async () => {
+  const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
+  const names = ["drawer", "library", "life-books", "quote-drawer", "reading-count", "session", "wishlist"];
+  const widgets = await Promise.all(names.map(name => readFile(new URL(`../reading-notes/${name}.html`, import.meta.url), "utf8")));
+  assert.match(store, /const READING_SYNC_INTERVAL_MS = 5000/);
+  assert.match(store, /window\.Store = \{\s*READING_SYNC_INTERVAL_MS,/);
+  widgets.forEach(widget => {
+    assert.match(widget, /Store\.watch\([^;]+, Store\.READING_SYNC_INTERVAL_MS, \{ initial:false \}\)/);
+    assert.doesNotMatch(widget, /Store\.watch\([^;]+, 15000\)/);
+  });
+});
+
 test("does not count the keep-only 인생책 tag as a completed book", () => {
   const book = normalizeReadingBookPage({
     id:"book-life",
@@ -127,6 +139,62 @@ test("returns stale reading data immediately and refreshes it in the worker back
     await background[0];
   } finally {
     releaseFetch();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("refreshes book tags without waiting for the slower nested quote scan", async () => {
+  const originalFetch = globalThis.fetch;
+  let releaseNested;
+  const nestedGate = new Promise(resolve => { releaseNested = resolve; });
+  globalThis.fetch = async url => {
+    const path = new URL(url).pathname;
+    if (path === "/v1/data_sources/books/query") {
+      return Response.json({ results:[{
+        id:"book-life",
+        properties:{
+          "제목":{ type:"title", title:richText("원씽") },
+          "상태":{ type:"multi_select", multi_select:[{ name:"완독" }, { name:"인생책" }] },
+          "분야":{ type:"multi_select", multi_select:[] },
+        },
+      }], has_more:false });
+    }
+    if (path === "/v1/data_sources/nested-source/query") await nestedGate;
+    return Response.json({ results:[], has_more:false });
+  };
+
+  const stale = { books:[{ id:"book-life", title:"원씽", isLifeBook:false }], quotes:[] };
+  const writes = new Map();
+  const background = [];
+  const env = {
+    NOTION_TOKEN:"secret",
+    NOTION_READING_BOOKS_DATA_SOURCE_ID:"books",
+    NOTION_READING_QUOTES_DATA_SOURCE_ID:"quotes",
+    NOTION_READING_YEARS_DATA_SOURCE_ID:"years",
+    KV:{
+      get:async key => {
+        if (key === "reading:notion:library:v2") return { fetchedAt:Date.now() - 60_000, data:stale };
+        if (key === "reading:notion:nested-quotes:v2") return {
+          signature:"book-life", nextIndex:0, completedAt:0,
+          quotesByBook:{ "book-life":[] }, dataSourceIdsByBook:{ "book-life":["nested-source"] },
+        };
+        return null;
+      },
+      put:async (key, value) => { writes.set(key, JSON.parse(value)); },
+    },
+  };
+
+  try {
+    const immediate = await loadReadingLibrary(env, { waitUntil:task => background.push(task) });
+    assert.equal(immediate, stale);
+    await background[0];
+    const refreshed = writes.get("reading:notion:library:v2")?.data;
+    assert.equal(refreshed?.books[0]?.isLifeBook, true);
+    assert.equal(background.length, 2);
+    releaseNested();
+    await background[1];
+  } finally {
+    releaseNested();
     globalThis.fetch = originalFetch;
   }
 });
