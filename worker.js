@@ -20,6 +20,19 @@ import {
   updateReadingQuote,
 } from "./reading-notion.js";
 
+const PUBLIC_WIDGET_BASE_URL = "https://kjm9954.github.io/my-notion-widget";
+const OAUTH_STATE_TTL_SECONDS = 600;
+const OAUTH_INSTANCE_PLACEHOLDERS = new Set([
+  "NOTION_WIDGET_INSTANCE_ID",
+  "__NOTION_WIDGET_INSTANCE_ID__",
+  "WORKLOG_INSTANCE_ID",
+  "__WORKLOG_INSTANCE_ID__",
+  "INSTANCE_ID",
+  "template",
+  "TEMPLATE",
+]);
+const PUBLIC_WIDGET_PATH_RE = /^(?:index\.html|(?:game-log-diary|growth-page|reading-notes|thought-box|Worklog)\/[A-Za-z0-9._-]+\.html|public-connect\.html)$/;
+
 export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
@@ -35,6 +48,16 @@ export default {
       new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
     try {
+      if (path === "/auth/notion/start" && request.method === "GET") {
+        return startNotionInstall(request, env);
+      }
+      if (path === "/auth/notion/callback" && request.method === "GET") {
+        return finishNotionInstall(request, env);
+      }
+      if (path === "/install/success" && request.method === "GET") {
+        return notionInstallSuccess(request, env);
+      }
+
       if (path === "/api/instance/create" && request.method === "POST") {
         const instanceId = `w_${crypto.randomUUID().replaceAll("-", "")}`;
         const meta = { id: instanceId, createdAt: new Date().toISOString() };
@@ -911,6 +934,242 @@ async function createNotionSchedulePage(config, schedule, occurrence, marker) {
 
 function safeScheduleError(error) {
   return cleanText(error?.message || error || "예약 실행 실패", 360, false);
+}
+
+async function startNotionInstall(request, env) {
+  requireNotionInstallEnv(env, ["KV", "NOTION_CLIENT_ID", "NOTION_REDIRECT_URI"]);
+  const state = randomUrlSafeId(32);
+  const requestUrl = new URL(request.url);
+  await env.KV.put(`oauth-state:${state}`, JSON.stringify({
+    createdAt: Date.now(),
+    returnTo: requestUrl.searchParams.get("return_to") || "",
+  }), { expirationTtl: OAUTH_STATE_TTL_SECONDS });
+
+  const authUrl = new URL(env.NOTION_AUTH_URL || "https://api.notion.com/v1/oauth/authorize");
+  authUrl.searchParams.set("owner", "user");
+  authUrl.searchParams.set("client_id", env.NOTION_CLIENT_ID);
+  authUrl.searchParams.set("redirect_uri", env.NOTION_REDIRECT_URI);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("state", state);
+  return Response.redirect(authUrl.toString(), 302);
+}
+
+async function finishNotionInstall(request, env) {
+  requireNotionInstallEnv(env, ["KV", "DB", "NOTION_CLIENT_ID", "NOTION_CLIENT_SECRET", "NOTION_REDIRECT_URI"]);
+  const url = new URL(request.url);
+  if (url.searchParams.get("error")) {
+    return notionInstallPage("설치가 취소됐어요", "<p>Notion 권한 허용이 완료되지 않았습니다.</p>");
+  }
+
+  const code = url.searchParams.get("code") || "";
+  const state = url.searchParams.get("state") || "";
+  if (!code || !state) {
+    return notionInstallPage("설치 실패", "<p>OAuth 인증 정보가 없습니다. 연결을 다시 시작해주세요.</p>", 400);
+  }
+
+  const stateKey = `oauth-state:${state}`;
+  const stateRaw = await env.KV.get(stateKey);
+  if (!stateRaw) {
+    return notionInstallPage("설치 실패", "<p>연결 요청이 만료됐습니다. 위젯에서 다시 시작해주세요.</p>", 400);
+  }
+  await env.KV.delete(stateKey);
+
+  const token = await exchangeNotionInstallCode(env, code);
+  const instanceId = `w_${randomUrlSafeId(40)}`;
+  const patchResult = token.duplicated_template_id
+    ? await patchNotionTemplateEmbeds(env, token.access_token, token.duplicated_template_id, instanceId)
+    : { scanned: 0, updated: 0, errors: 0, skipped: true, reason: "duplicated_template_id 없음" };
+
+  await saveRawSetting(env, instanceMetaKey(instanceId), {
+    id: instanceId,
+    createdAt: new Date().toISOString(),
+    workspaceId: cleanText(token.workspace_id, 160),
+    workspaceName: cleanText(token.workspace_name, 240),
+    duplicatedTemplateId: cleanText(token.duplicated_template_id, 160),
+    botId: cleanText(token.bot_id, 160),
+    patchResult,
+  });
+
+  return Response.redirect(new URL(`/install/success?w=${encodeURIComponent(instanceId)}`, url.origin).toString(), 302);
+}
+
+async function notionInstallSuccess(request, env) {
+  const url = new URL(request.url);
+  const instanceId = url.searchParams.get("w") || "";
+  if (!isValidInstanceId(instanceId)) {
+    return notionInstallPage("설치 확인 실패", "<p>위젯 인스턴스 주소가 올바르지 않습니다.</p>", 400);
+  }
+  const meta = await loadRawSetting(env, instanceMetaKey(instanceId), null);
+  if (!meta) {
+    return notionInstallPage("설치 확인 실패", "<p>생성된 위젯 인스턴스를 찾을 수 없습니다.</p>", 404);
+  }
+
+  const patch = meta.patchResult || {};
+  const connected = Number(patch.updated) > 0;
+  const detail = connected
+    ? `<p>템플릿 안의 위젯 ${Number(patch.updated)}개가 개인 서버 저장소에 자동 연결됐습니다. 이 창은 닫아도 됩니다.</p>`
+    : "<p>개인 서버 저장소는 생성됐지만 자동으로 바뀐 임베드가 없습니다. Notion 연결 설정에서 템플릿 복제를 활성화했는지 확인해주세요.</p>";
+  const warning = Number(patch.errors) > 0
+    ? `<p>확인하지 못한 블록이 ${Number(patch.errors)}개 있습니다. 복제된 페이지에서 위젯 표시를 확인해주세요.</p>`
+    : "";
+  return notionInstallPage(connected ? "위젯 연결 완료" : "위젯 저장소 생성 완료", detail + warning);
+}
+
+async function exchangeNotionInstallCode(env, code) {
+  const auth = btoa(`${env.NOTION_CLIENT_ID}:${env.NOTION_CLIENT_SECRET}`);
+  const response = await fetch("https://api.notion.com/v1/oauth/token", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Basic ${auth}`,
+    },
+    body: JSON.stringify({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: env.NOTION_REDIRECT_URI,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.access_token) {
+    throw new Error(`Notion token exchange failed: ${response.status} ${cleanText(payload?.error || payload?.message, 280)}`);
+  }
+  return payload;
+}
+
+async function notionInstallFetch(accessToken, path, init = {}, retry = 0) {
+  const response = await fetch(`https://api.notion.com/v1${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Notion-Version": NOTION_API_VERSION,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  if (response.status === 429 && retry < 3) {
+    const retryAfter = Math.max(1, Math.min(5, Number(response.headers.get("Retry-After")) || 1));
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+    return notionInstallFetch(accessToken, path, init, retry + 1);
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Notion API ${response.status}: ${cleanText(payload?.message, 280) || "요청 실패"}`);
+  }
+  return payload;
+}
+
+async function loadNotionBlockChildren(accessToken, blockId) {
+  const results = [];
+  let cursor = "";
+  do {
+    const query = new URLSearchParams({ page_size: "100" });
+    if (cursor) query.set("start_cursor", cursor);
+    const payload = await notionInstallFetch(accessToken, `/blocks/${encodeURIComponent(blockId)}/children?${query}`);
+    results.push(...(Array.isArray(payload?.results) ? payload.results : []));
+    cursor = payload?.has_more && payload?.next_cursor ? payload.next_cursor : "";
+  } while (cursor);
+  return results;
+}
+
+async function patchNotionTemplateEmbeds(env, accessToken, pageId, instanceId) {
+  const result = { scanned: 0, updated: 0, errors: 0, skipped: false };
+  const queue = [{ id: pageId, depth: 0 }];
+  const appBase = env.APP_BASE_URL || PUBLIC_WIDGET_BASE_URL;
+  const maxDepth = 10;
+  const maxBlocks = 2500;
+
+  while (queue.length && result.scanned < maxBlocks) {
+    const current = queue.shift();
+    let blocks = [];
+    try {
+      blocks = await loadNotionBlockChildren(accessToken, current.id);
+    } catch (_) {
+      result.errors++;
+      continue;
+    }
+    for (const block of blocks) {
+      if (result.scanned >= maxBlocks) break;
+      result.scanned++;
+      if (block?.type === "embed" && block.embed?.url) {
+        const nextUrl = publicWidgetInstanceUrl(block.embed.url, instanceId, appBase);
+        if (nextUrl !== block.embed.url) {
+          try {
+            await notionInstallFetch(accessToken, `/blocks/${encodeURIComponent(block.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ embed: { url: nextUrl } }),
+            });
+            result.updated++;
+          } catch (_) {
+            result.errors++;
+          }
+        }
+      }
+      if (block?.has_children && current.depth < maxDepth) {
+        queue.push({ id: block.id, depth: current.depth + 1 });
+      }
+    }
+  }
+  return result;
+}
+
+export function publicWidgetInstanceUrl(rawUrl, instanceId, appBase = PUBLIC_WIDGET_BASE_URL) {
+  if (!isValidInstanceId(instanceId)) return rawUrl;
+  let source;
+  let base;
+  try {
+    source = new URL(String(rawUrl || ""));
+    base = new URL(String(appBase || PUBLIC_WIDGET_BASE_URL));
+  } catch (_) {
+    return rawUrl;
+  }
+  const basePath = `${base.pathname.replace(/\/+$/, "")}/`;
+  if (source.origin !== base.origin || !source.pathname.startsWith(basePath)) return rawUrl;
+  const relativePath = decodeURIComponent(source.pathname.slice(basePath.length)) || "index.html";
+  if (!PUBLIC_WIDGET_PATH_RE.test(relativePath)) return rawUrl;
+
+  const queryValue = source.searchParams.get("w");
+  const hashParams = new URLSearchParams((source.hash || "").replace(/^#/, ""));
+  const hashValue = hashParams.get("w");
+  if (hashValue && (OAUTH_INSTANCE_PLACEHOLDERS.has(hashValue) || isValidInstanceId(hashValue))) {
+    hashParams.set("w", instanceId);
+    source.hash = hashParams.toString();
+  } else {
+    if (queryValue && !OAUTH_INSTANCE_PLACEHOLDERS.has(queryValue) && !isValidInstanceId(queryValue)) return rawUrl;
+    source.searchParams.set("w", instanceId);
+  }
+  return source.toString();
+}
+
+function randomUrlSafeId(byteLength) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  let value = "";
+  for (const byte of bytes) value += String.fromCharCode(byte);
+  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function requireNotionInstallEnv(env, names) {
+  for (const name of names) {
+    if (!env?.[name]) throw new Error(`missing env binding: ${name}`);
+  }
+}
+
+function notionInstallPage(title, body, status = 200) {
+  const safeTitle = escapeInstallHtml(title);
+  return new Response(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><style>*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#FAFCFD;color:#12303C;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}body{display:grid;place-items:center;padding:24px}main{width:min(100%,520px);padding:22px;border:1px solid #E1EAEE;border-radius:18px;background:#fff;box-shadow:0 1px 2px rgba(18,48,60,.04),0 6px 18px rgba(18,48,60,.06)}h1{margin:0 0 10px;font-size:18px}p{margin:8px 0;color:#6B8794;font-size:13px;line-height:1.65}</style></head><body><main><h1>${safeTitle}</h1>${body}</main></body></html>`, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
+function escapeInstallHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;

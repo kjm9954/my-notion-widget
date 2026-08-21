@@ -5,6 +5,9 @@ workers_dev = true
 keep_vars = true
 
 [vars]
+NOTION_CLIENT_ID = "3a9d872b-594c-814d-9f97-0037a740ff14"
+NOTION_REDIRECT_URI = "https://notion-widget.wldnjsdkk.workers.dev/auth/notion/callback"
+APP_BASE_URL = "https://kjm9954.github.io/my-notion-widget"
 NOTION_READING_BOOKS_DATA_SOURCE_ID = "519b993c-8a61-8222-b574-073c2e3ab536"
 NOTION_READING_QUOTES_DATA_SOURCE_ID = "98cb993c-8a61-8282-a92c-873a237dda11"
 NOTION_READING_YEARS_DATA_SOURCE_ID = "854b993c-8a61-8333-a37c-07c186deda8e"

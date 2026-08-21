@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>위젯 Notion 연결</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <script>
+    (function () {
+      'use strict';
+      const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
+      const PLACEHOLDER_RE = /^(?:NOTION_WIDGET_INSTANCE_ID|__NOTION_WIDGET_INSTANCE_ID__|WORKLOG_INSTANCE_ID|__WORKLOG_INSTANCE_ID__|INSTANCE_ID|template|TEMPLATE)$/;
+      const TARGET_RE = /^(?:index\.html|(?:game-log-diary|growth-page|reading-notes|thought-box|Worklog)\/[A-Za-z0-9._-]+\.html)$/;
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        const instanceId = params.get('w') || '';
+        const target = params.get('from') || '';
+        if (INSTANCE_RE.test(instanceId) && !PLACEHOLDER_RE.test(instanceId) && TARGET_RE.test(target)) {
+          const next = new URL(target, window.location.href);
+          params.forEach((value, key) => {
+            if (key !== 'from') next.searchParams.set(key, value);
+          });
+          window.location.replace(next.toString() + (window.location.hash || ''));
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --action: #0E5C7A;
+      --text: #12303C;
+      --secondary: #6B8794;
+      --border: #E1EAEE;
+      --surface: #FAFCFD;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: transparent;
+      color: var(--text);
+      font-family: "Pretendard Variable", -apple-system, "Helvetica Neue", sans-serif;
+    }
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+    .card {
+      width: min(100%, 420px);
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #FFFFFF;
+      box-shadow: 0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+    }
+    h1 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+    p {
+      margin: 0 0 16px;
+      color: var(--secondary);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.65;
+    }
+    a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      width: 100%;
+      padding: 0 14px;
+      border: 1px solid var(--action);
+      border-radius: 9px;
+      background: var(--action);
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    a:active { transform: scale(.985); }
+    .hint {
+      margin-top: 10px;
+      color: #93A5AD;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: center;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>내 위젯 저장소 연결</h1>
+    <p>처음 한 번만 Notion 권한을 허용하면 템플릿이 복제되고, 안의 위젯들이 개인 서버 저장소에 자동으로 연결됩니다.</p>
+    <a id="connectLink" href="https://notion-widget.wldnjsdkk.workers.dev/auth/notion/start" target="_blank" rel="noopener">Notion으로 연결하기</a>
+    <div class="hint">연결 후에는 주소를 직접 바꾸지 않아도 휴대폰·태블릿·컴퓨터에서 같은 데이터가 보입니다.</div>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+      const link = document.getElementById('connectLink');
+      if (!link) return;
+      try {
+        const url = new URL(link.href);
+        url.searchParams.set('return_to', window.location.href);
+        link.href = url.toString();
+      } catch (_) {}
+    })();
+  </script>
+</body>
+</html>
