@@ -29,8 +29,9 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function createStore(fetchImpl, persisted = new Map()) {
+function createStore(fetchImpl, persisted = new Map(), options = {}) {
   const intervalCallbacks = [];
+  const instanceStorage = options.instanceStorage || new Map();
   const cacheApi = {
     async open() {
       return {
@@ -47,21 +48,32 @@ function createStore(fetchImpl, persisted = new Map()) {
     },
   };
   const window = {
-    location: { search: "?w=w_abcdefghijklmnopqrstuvwx", hash: "" },
+    location: {
+      search: options.search ?? "?w=w_abcdefghijklmnopqrstuvwx",
+      hash: "",
+      href: "https://kjm9954.github.io/my-notion-widget/growth-page/record.html",
+      replace(url) { options.onReplace?.(String(url)); },
+      reload() {},
+    },
+    localStorage: {
+      getItem(key) { return instanceStorage.has(key) ? instanceStorage.get(key) : null; },
+      setItem(key, value) { instanceStorage.set(key, String(value)); },
+    },
     caches: cacheApi,
     addEventListener() {},
     removeEventListener() {},
   };
   const document = {
+    referrer: "https://www.notion.so/work-log-page",
     hidden: false,
     activeElement: null,
     addEventListener() {},
     removeEventListener() {},
   };
-  class BroadcastChannel {
+  const BroadcastChannel = options.BroadcastChannel || class {
     addEventListener() {}
     postMessage() {}
-  }
+  };
   const context = {
     window,
     document,
@@ -75,11 +87,65 @@ function createStore(fetchImpl, persisted = new Map()) {
     setInterval: callback => { intervalCallbacks.push(callback); return intervalCallbacks.length; },
     clearInterval() {},
     setTimeout,
+    clearTimeout,
   };
   vm.runInNewContext(source, context);
   window.Store.__runIntervals = () => intervalCallbacks.forEach(callback => callback());
   return window.Store;
 }
+
+test("같은 노션 페이지의 기존 무키 위젯도 저장된 개인 인스턴스를 이어 쓴다", async () => {
+  const instanceStorage = new Map();
+  const instanceId = "w_abcdefghijklmnopqrstuvwxyz123456";
+  const seeded = createStore(async () => Response.json({ ok:true, data:{} }), new Map(), {
+    search:`?w=${instanceId}`,
+    instanceStorage,
+  });
+  assert.equal(seeded.getWidgetInstanceId(), instanceId);
+  assert.equal(instanceStorage.get("notion-widget-instance-v1"), instanceId);
+
+  let requestedUrl = "";
+  const inherited = createStore(async url => {
+    requestedUrl = String(url);
+    return Response.json({ ok:true, data:{ revision:7, tasks:[] } });
+  }, new Map(), { search:"", instanceStorage });
+  assert.equal(inherited.getWidgetInstanceId(), instanceId);
+  assert.equal((await inherited.loadWorklogState()).revision, 7);
+  assert.equal(new URL(requestedUrl).searchParams.get("w"), instanceId);
+});
+
+test("저장소가 막혀도 같은 페이지의 위젯끼리 개인 인스턴스를 전달한다", () => {
+  const listeners = new Map();
+  class SharedBroadcastChannel {
+    constructor(name) {
+      this.name = name;
+      if (!listeners.has(name)) listeners.set(name, new Set());
+      listeners.get(name).add(this);
+    }
+    addEventListener(type, callback) {
+      if (type === "message") this.callback = callback;
+    }
+    postMessage(data) {
+      listeners.get(this.name)?.forEach(channel => {
+        if (channel !== this) channel.callback?.({ data });
+      });
+    }
+  }
+
+  const instanceId = "w_abcdefghijklmnopqrstuvwxyz123456";
+  let replacedUrl = "";
+  createStore(async () => Response.json({ ok:true, data:{} }), new Map(), {
+    search:"",
+    BroadcastChannel:SharedBroadcastChannel,
+    onReplace:url => { replacedUrl = url; },
+  });
+  createStore(async () => Response.json({ ok:true, data:{} }), new Map(), {
+    search:`?w=${instanceId}`,
+    BroadcastChannel:SharedBroadcastChannel,
+  });
+
+  assert.equal(new URL(replacedUrl).searchParams.get("w"), instanceId);
+});
 
 test("독서 감시는 내용이 달라질 때만 위젯 렌더를 호출한다", async () => {
   let title = "원씽";

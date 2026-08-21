@@ -3,6 +3,8 @@
 
 const API = "https://notion-widget.wldnjsdkk.workers.dev";
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
+const INSTANCE_STORAGE_KEY = "notion-widget-instance-v1";
+const INSTANCE_DISCOVERY_CHANNEL = "notion-widget-instance-discovery-v1";
 
 function readWidgetInstanceId() {
   try {
@@ -14,7 +16,22 @@ function readWidgetInstanceId() {
   }
 }
 
-const RAW_INSTANCE_ID = readWidgetInstanceId();
+function readStoredWidgetInstanceId() {
+  try {
+    const value = window.localStorage?.getItem(INSTANCE_STORAGE_KEY) || "";
+    return INSTANCE_RE.test(value) ? value : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function rememberWidgetInstanceId(value) {
+  if (!INSTANCE_RE.test(String(value || ""))) return;
+  try { window.localStorage?.setItem(INSTANCE_STORAGE_KEY, value); } catch (_) {}
+}
+
+const URL_INSTANCE_ID = readWidgetInstanceId();
+const RAW_INSTANCE_ID = URL_INSTANCE_ID || readStoredWidgetInstanceId();
 const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID : "";
 const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
 const STORE_CACHE = "notion-widget-store-cache-v1";
@@ -24,7 +41,63 @@ const storeListeners = new Set();
 const memoryCache = new Map();
 const inFlightGets = new Map();
 let storeChannel = null;
+let instanceDiscoveryChannel = null;
 let errorIndicatorTimer = 0;
+
+if (INSTANCE_RE.test(URL_INSTANCE_ID)) rememberWidgetInstanceId(URL_INSTANCE_ID);
+
+function instanceContextKey() {
+  try {
+    if (!document.referrer) return "";
+    const referrer = new URL(document.referrer);
+    return `${referrer.origin}${referrer.pathname}${referrer.search}`;
+  } catch (_) {
+    return "";
+  }
+}
+
+function adoptDiscoveredInstance(value) {
+  const instanceId = String(value || "");
+  if (URL_INSTANCE_ID || WIDGET_INSTANCE_ID || !INSTANCE_RE.test(instanceId)) return;
+  rememberWidgetInstanceId(instanceId);
+  try {
+    const next = new URL(window.location.href);
+    next.searchParams.set("w", instanceId);
+    window.location.replace(next.toString());
+  } catch (_) {
+    try { window.location.reload(); } catch (_) {}
+  }
+}
+
+function announceWidgetInstance(type = "instance") {
+  if (!instanceDiscoveryChannel) return;
+  const context = instanceContextKey();
+  if (!context) return;
+  try {
+    instanceDiscoveryChannel.postMessage({ type, context, instanceId: WIDGET_INSTANCE_ID || "" });
+  } catch (_) {}
+}
+
+try {
+  instanceDiscoveryChannel = new BroadcastChannel(INSTANCE_DISCOVERY_CHANNEL);
+  instanceDiscoveryChannel.addEventListener("message", event => {
+    const message = event?.data || {};
+    const context = instanceContextKey();
+    if (!context || message.context !== context) return;
+    if (message.type === "request-instance") {
+      if (WIDGET_INSTANCE_ID) announceWidgetInstance();
+      return;
+    }
+    if (message.type === "instance") adoptDiscoveredInstance(message.instanceId);
+  });
+  if (WIDGET_INSTANCE_ID) announceWidgetInstance();
+  else announceWidgetInstance("request-instance");
+} catch (_) {}
+
+window.addEventListener("storage", event => {
+  if (event.key !== INSTANCE_STORAGE_KEY) return;
+  adoptDiscoveredInstance(event.newValue);
+});
 
 function showStoreError(error) {
   if (typeof document === "undefined" || !document.body) return;
