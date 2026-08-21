@@ -17,6 +17,16 @@ function readWidgetInstanceId() {
   }
 }
 
+function readWorklogInstanceId() {
+  try {
+    const search = new URLSearchParams(window.location.search || "");
+    const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    return search.get("worklog_w") || hash.get("worklog_w") || "";
+  } catch (_) {
+    return "";
+  }
+}
+
 function readStoredWidgetInstanceId() {
   try {
     const value = window.localStorage?.getItem(INSTANCE_STORAGE_KEY) || "";
@@ -32,6 +42,7 @@ function rememberWidgetInstanceId(value) {
 }
 
 const URL_INSTANCE_ID = readWidgetInstanceId();
+const URL_WORKLOG_INSTANCE_ID = readWorklogInstanceId();
 const RAW_INSTANCE_ID = URL_INSTANCE_ID || readStoredWidgetInstanceId();
 const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID : "";
 const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
@@ -86,6 +97,7 @@ if (INSTANCE_RE.test(URL_INSTANCE_ID)) {
     rememberWidgetInstanceId(URL_INSTANCE_ID);
   }
 }
+if (INSTANCE_RE.test(URL_WORKLOG_INSTANCE_ID)) rememberCachedWorklogInstanceId(URL_WORKLOG_INSTANCE_ID);
 
 function instanceContextKey() {
   try {
@@ -566,6 +578,10 @@ async function deleteIndexItem(id) {
 
 // ───────── 업무일지 ─────────
 async function resolveWorklogInstanceId() {
+  if (URL_WORKLOG_INSTANCE_ID) {
+    if (!INSTANCE_RE.test(URL_WORKLOG_INSTANCE_ID)) throw new Error("올바르지 않은 업무일지 연결 주소입니다.");
+    return URL_WORKLOG_INSTANCE_ID;
+  }
   return await readCachedWorklogInstanceId();
 }
 async function loadWorklogState(options = {}) {
