@@ -47,14 +47,23 @@ const RAW_INSTANCE_ID = URL_INSTANCE_ID || readStoredWidgetInstanceId();
 const WIDGET_INSTANCE_ID = INSTANCE_RE.test(RAW_INSTANCE_ID) ? RAW_INSTANCE_ID : "";
 const STORE_CHANNEL = `notion-widget-store-v1:${WIDGET_INSTANCE_ID || "legacy"}`;
 const STORE_CACHE = "notion-widget-store-cache-v1";
+const SERVER_STATUS_CHANNEL = "notion-widget-server-status-v1";
+const SERVER_BACKOFF_CACHE_PATH = "/__notion-widget-server-backoff-v1__";
 const CACHE_WAIT_MS = 180;
-const READING_SYNC_INTERVAL_MS = 5000;
+const MIN_WATCH_INTERVAL_MS = 60000;
+const READING_SYNC_INTERVAL_MS = 60000;
 const storeListeners = new Set();
 const memoryCache = new Map();
 const inFlightGets = new Map();
 let storeChannel = null;
 let instanceDiscoveryChannel = null;
+let serverStatusChannel = null;
+let serverBackoffUntil = 0;
+let serverBackoffDaily = false;
+let serverBackoffLoaded = false;
 let errorIndicatorTimer = 0;
+let lastStoreErrorAt = 0;
+let lastStoreErrorText = "";
 
 function isWorklogWidgetPath() {
   try { return /\/Worklog\//i.test(new URL(window.location.href).pathname); }
@@ -64,6 +73,117 @@ function isWorklogWidgetPath() {
 function worklogInstanceCacheUrl() {
   try { return new URL(WORKLOG_INSTANCE_CACHE_PATH, window.location.href).toString(); }
   catch (_) { return `${API}${WORKLOG_INSTANCE_CACHE_PATH}`; }
+}
+
+function serverBackoffCacheUrl() {
+  try { return new URL(SERVER_BACKOFF_CACHE_PATH, window.location.href).toString(); }
+  catch (_) { return `${API}${SERVER_BACKOFF_CACHE_PATH}`; }
+}
+
+function nextWorkerQuotaResetAt(now = Date.now()) {
+  const current = new Date(now);
+  return Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, 0, 0, 5);
+}
+
+function createServerBackoffError(until, dailyLimit = false) {
+  const error = new Error(dailyLimit
+    ? "서버 요청 한도 초과 · 오전 9시 자동 재시도"
+    : "서버 요청이 많아 잠시 후 자동 재시도");
+  error.serverBackoff = true;
+  error.dailyLimit = dailyLimit;
+  error.retryAt = until;
+  return error;
+}
+
+async function readServerBackoff() {
+  if (serverBackoffUntil > Date.now()) return serverBackoffUntil;
+  if (serverBackoffLoaded || !("caches" in window)) return 0;
+  serverBackoffLoaded = true;
+  try {
+    const response = await (await caches.open(STORE_CACHE)).match(serverBackoffCacheUrl());
+    const raw = response ? await response.text() : "";
+    let saved = null;
+    try { saved = JSON.parse(raw); } catch (_) { saved = { until:Number(raw), dailyLimit:false }; }
+    const until = Number(saved?.until) || 0;
+    if (until > Date.now()) {
+      serverBackoffUntil = until;
+      serverBackoffDaily = saved?.dailyLimit === true;
+      return until;
+    }
+  } catch (_) {}
+  return 0;
+}
+
+function persistServerBackoff(until, dailyLimit = false) {
+  if (!("caches" in window)) return;
+  const url = serverBackoffCacheUrl();
+  void caches.open(STORE_CACHE).then(cache => {
+    if (until > Date.now()) {
+      return cache.put(url, new Response(JSON.stringify({ until, dailyLimit }), {
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }));
+    }
+    return cache.delete(url);
+  }).catch(() => {});
+}
+
+function rememberServerBackoff(until, options = {}) {
+  const next = Number(until) || 0;
+  if (next <= Date.now()) return;
+  serverBackoffUntil = Math.max(serverBackoffUntil, next);
+  serverBackoffDaily = serverBackoffDaily || options.dailyLimit === true;
+  serverBackoffLoaded = true;
+  persistServerBackoff(serverBackoffUntil, serverBackoffDaily);
+  if (options.announce !== false) {
+    try { serverStatusChannel?.postMessage({ type:"backoff", until:serverBackoffUntil, dailyLimit:serverBackoffDaily }); } catch (_) {}
+  }
+}
+
+function clearServerBackoff(options = {}) {
+  if (!serverBackoffUntil && serverBackoffLoaded) return;
+  serverBackoffUntil = 0;
+  serverBackoffDaily = false;
+  serverBackoffLoaded = true;
+  persistServerBackoff(0);
+  if (options.announce !== false) {
+    try { serverStatusChannel?.postMessage({ type:"backoff-clear" }); } catch (_) {}
+  }
+}
+
+function retryAfterAt(response) {
+  const raw = response?.headers?.get?.("Retry-After") || "";
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) return Date.now() + seconds * 1000;
+  const absolute = Date.parse(raw);
+  return Number.isFinite(absolute) ? absolute : 0;
+}
+
+async function parseApiResponse(response) {
+  const raw = await response.text();
+  let data = null;
+  try { data = JSON.parse(raw); } catch (_) {}
+  if (!response.ok || !data?.ok) {
+    const error = new Error(data?.error || raw.trim() || `요청 실패 (${response.status})`);
+    error.status = response.status;
+    error.responseText = raw;
+    error.retryAfter = retryAfterAt(response);
+    throw error;
+  }
+  return data;
+}
+
+function applyServerBackoff(error) {
+  const detail = `${error?.message || ""} ${error?.responseText || ""}`;
+  if (error?.status !== 429 && !/\b1027\b/.test(detail)) return false;
+  const dailyLimit = /\b1027\b/.test(detail);
+  const until = dailyLimit
+    ? nextWorkerQuotaResetAt()
+    : Math.max(Number(error?.retryAfter) || 0, Date.now() + MIN_WATCH_INTERVAL_MS);
+  error.serverBackoff = true;
+  error.dailyLimit = dailyLimit;
+  error.retryAt = until;
+  rememberServerBackoff(until, { dailyLimit });
+  return true;
 }
 
 async function readCachedWorklogInstanceId() {
@@ -154,6 +274,18 @@ window.addEventListener("storage", event => {
 
 function showStoreError(error) {
   if (typeof document === "undefined" || !document.body) return;
+  const detail = String(error?.message || error || "");
+  const message = error?.dailyLimit
+    ? "서버 요청 한도 초과 · 오전 9시 자동 재시도"
+    : error?.serverBackoff
+      ? "서버 요청이 많아 잠시 후 자동 재시도"
+      : /인스턴스/.test(detail)
+        ? detail
+        : "서버 연결 실패 · 다시 시도 중";
+  const now = Date.now();
+  if (message === lastStoreErrorText && now - lastStoreErrorAt < MIN_WATCH_INTERVAL_MS) return;
+  lastStoreErrorText = message;
+  lastStoreErrorAt = now;
   let indicator = document.querySelector("[data-store-error-indicator]");
   if (!indicator) {
     indicator = document.createElement("div");
@@ -179,8 +311,7 @@ function showStoreError(error) {
     });
     document.body.appendChild(indicator);
   }
-  const detail = String(error?.message || error || "");
-  indicator.textContent = /인스턴스/.test(detail) ? detail : "서버 연결 실패 · 다시 시도 중";
+  indicator.textContent = message;
   clearTimeout(errorIndicatorTimer);
   errorIndicatorTimer = setTimeout(() => indicator?.remove(), 5000);
 }
@@ -201,12 +332,21 @@ try {
   storeChannel.addEventListener("message", notifyStoreListeners);
 } catch (_) {}
 
+try {
+  serverStatusChannel = new BroadcastChannel(SERVER_STATUS_CHANNEL);
+  serverStatusChannel.addEventListener("message", event => {
+    const message = event?.data || {};
+    if (message.type === "backoff") rememberServerBackoff(message.until, { announce:false, dailyLimit:message.dailyLimit === true });
+    if (message.type === "backoff-clear") clearServerBackoff({ announce:false });
+  });
+} catch (_) {}
+
 function announceChange(path) {
   notifyStoreListeners();
   try { storeChannel?.postMessage({ type: "changed", path, at: Date.now() }); } catch (_) {}
 }
 
-function watch(callback, interval = 3000, options = {}) {
+function watch(callback, interval = MIN_WATCH_INTERVAL_MS, options = {}) {
   const allowWhileEditing = options?.allowWhileEditing === true;
   let running = false;
   let queued = false;
@@ -222,7 +362,7 @@ function watch(callback, interval = 3000, options = {}) {
     });
   };
   storeListeners.add(run);
-  const timer = setInterval(run, Math.max(1000, Number(interval) || 3000));
+  const timer = setInterval(run, Math.max(MIN_WATCH_INTERVAL_MS, Number(interval) || MIN_WATCH_INTERVAL_MS));
   const initialTimer = options?.initial === false ? null : setTimeout(run, 0);
   const onVisible = () => { if (!document.hidden) run(); };
   const onPageHide = event => { if (!event.persisted) stop(); };
@@ -328,18 +468,27 @@ function invalidateApiGet(path) {
 function requestFresh(path, url, cachedPromise) {
   if (inFlightGets.has(url)) return inFlightGets.get(url);
 
-  const request = fetch(url, { cache: "no-store" }).then(async res => {
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
+  const request = readServerBackoff().then(until => {
+    if (until > Date.now()) {
+      const error = createServerBackoffError(until, serverBackoffDaily);
+      error.silent = true;
+      throw error;
+    }
+    return fetch(url, { cache: "no-store" });
+  }).then(parseApiResponse).then(async data => {
     const serialized = JSON.stringify(data);
     const cached = await cachedPromise;
     const changed = Boolean(cached && comparablePayload(path, cached.serialized) !== comparablePayload(path, serialized));
     writeCached(url, data, serialized);
+    clearServerBackoff();
     clearStoreError();
     if (changed) announceChange(path);
     return data;
   }).catch(error => {
-    showStoreError(error);
+    if (!error?.silent) {
+      applyServerBackoff(error);
+      showStoreError(error);
+    }
     throw error;
   }).finally(() => {
     inFlightGets.delete(url);
@@ -373,13 +522,17 @@ async function apiGetFresh(path, instanceId = WIDGET_INSTANCE_ID) {
 async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
   const url = apiUrl(path, includeInstance, instanceId);
   try {
+    const until = await readServerBackoff();
+    if (until > Date.now()) {
+      throw createServerBackoffError(until, serverBackoffDaily);
+    }
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "요청 실패");
+    const data = await parseApiResponse(res);
+    clearServerBackoff();
     if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
     if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
       await Promise.all([
@@ -391,6 +544,7 @@ async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_I
     announceChange(path);
     return data;
   } catch (error) {
+    applyServerBackoff(error);
     showStoreError(error);
     throw error;
   }
@@ -699,7 +853,7 @@ async function getMoodOfDate(date) {
 
 // 위젯에서 window.Store.saveDiary(...)처럼 씀
 window.Store = {
-  READING_SYNC_INTERVAL_MS,
+  READING_SYNC_INTERVAL_MS, MIN_WATCH_INTERVAL_MS,
   createWidgetInstance, getWidgetInstanceId,
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,
   loadMoodWords, saveMoodWords,

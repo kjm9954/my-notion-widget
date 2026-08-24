@@ -21,21 +21,22 @@
     .card {
       width:100%; max-width:340px; height:640px; margin:0 auto; padding:22px; overflow:hidden;
       display:flex; flex-direction:column; gap:18px; background:var(--surface); border-radius:18px;
-      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+      box-shadow:0 1px 3px rgba(18,48,60,.05);
     }
     .card.is-empty { height:auto; min-height:230px; }
     .card-title { margin:0; color:var(--title); font-size:12px; font-weight:800; line-height:1.4; }
     .total-block { display:flex; flex-direction:column; gap:8px; }
     .eyebrow, .recent-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .total { display:flex; align-items:baseline; gap:7px; }
-    .total-number { color:var(--text); font-size:46px; font-weight:800; line-height:1; letter-spacing:-.02em; }
-    .total-unit { color:var(--secondary); font-size:12px; font-weight:800; }
-    .years { padding:15px 16px; display:flex; flex-direction:column; gap:11px; background:var(--surface-soft); border:1px solid var(--border-soft); border-radius:12px; }
-    .year-row { display:flex; align-items:baseline; justify-content:space-between; }
+    .total-number { color:var(--text); font-size:34px; font-weight:800; line-height:1; letter-spacing:-.02em; }
+    .total-unit { color:var(--muted); font-size:11px; font-weight:700; }
+    .years { padding:0; display:flex; flex-direction:column; gap:0; background:transparent; border:0; border-radius:0; }
+    .year-row { padding:7px 0; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-soft); }
+    .year-row:last-child { border-bottom:0; }
     .year-label { color:var(--secondary); font-size:11px; font-weight:600; }
-    .year-count { color:var(--deep); font-size:13px; font-weight:800; }
+    .year-count { color:var(--deep); font-size:12px; font-weight:700; }
     .year-row.is-current .year-label { color:var(--action); font-weight:700; }
-    .year-row.is-current .year-count { color:var(--action); font-size:16px; }
+    .year-row.is-current .year-count { color:var(--action); font-size:12px; font-weight:800; }
     .year-row.is-old .year-label, .year-row.is-old .year-count { color:var(--muted); }
     .year-bar, .wide-divider { display:none; }
     .recent-section { min-height:0; flex:1; display:flex; flex-direction:column; gap:7px; }
@@ -68,19 +69,18 @@
     .card.is-wide .total-block { grid-column:1; grid-row:2; margin-top:28px; gap:10px; }
     .card.is-wide .eyebrow, .card.is-wide .recent-label { font-size:11px; }
     .card.is-wide .total { gap:8px; }
-    .card.is-wide .total-number { font-size:72px; }
-    .card.is-wide .total-unit { font-size:16px; }
+    .card.is-wide .total-number { font-size:34px; }
+    .card.is-wide .total-unit { font-size:11px; }
     .card.is-wide .years {
-      grid-column:1; grid-row:3; align-self:end; padding:0; gap:12px;
+      grid-column:1; grid-row:3; align-self:end; padding:0; gap:0;
       background:transparent; border:0; border-radius:0;
     }
-    .card.is-wide .year-row { align-items:center; gap:10px; }
+    .card.is-wide .year-row { padding:7px 0; align-items:center; gap:10px; border-bottom:1px solid var(--border-soft); }
+    .card.is-wide .year-row:last-child { border-bottom:0; }
     .card.is-wide .year-label { width:64px; flex:0 0 64px; font-size:12px; }
-    .card.is-wide .year-count { width:22px; flex:0 0 22px; font-size:14px; text-align:right; }
-    .card.is-wide .year-row.is-current .year-count { font-size:14px; }
-    .card.is-wide .year-bar {
-      height:6px; flex:1; overflow:hidden; display:block; background:var(--border-soft); border-radius:3px;
-    }
+    .card.is-wide .year-count { width:22px; flex:0 0 22px; font-size:12px; text-align:right; }
+    .card.is-wide .year-row.is-current .year-count { font-size:12px; }
+    .card.is-wide .year-bar { display:none; }
     .card.is-wide .year-bar-fill { width:var(--year-ratio); height:100%; display:block; background:var(--inactive); border-radius:3px; }
     .card.is-wide .year-row.is-current .year-bar-fill { background:var(--action); }
     .card.is-wide .year-row.is-old .year-bar-fill { background:var(--border-soft); }
@@ -97,7 +97,7 @@
     .card.is-wide .book-title { font-size:14px; }
     .card.is-wide .book-meta { font-size:11px; }
     @media (max-width:639px) {
-      .card:not(.is-wide) .total-number { font-size:40px; }
+      .card:not(.is-wide) .total-number { font-size:30px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
@@ -150,7 +150,7 @@
         const recent = DATA.recent.slice(0, recentLimit);
         content.style.display = 'contents';
         content.innerHTML = `
-          <section class="total-block"><span class="eyebrow">지금까지</span><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권</span></div></section>
+          <section class="total-block"><div class="total"><strong class="total-number">${escapeHtml(DATA.total)}</strong><span class="total-unit">권 지금까지</span></div></section>
           ${years.length ? `<section class="years">${years.map((item, index) => `<div class="year-row ${item.y === currentYear ? 'is-current' : index === 2 ? 'is-old' : ''}"><span class="year-label">${escapeHtml(item.y)}${item.y === currentYear ? ' · 올해' : ''}</span><span class="year-bar" aria-hidden="true"><span class="year-bar-fill" style="--year-ratio:${Math.max(0, Math.min(100, item.n / maxYearCount * 100))}%"></span></span><strong class="year-count">${escapeHtml(item.n)}</strong></div>`).join('')}</section>` : ''}
           <span class="wide-divider" aria-hidden="true"></span>
           ${recent.length ? `<section class="recent-section"><span class="recent-label">최근에 덮은 책</span><div class="recent-list">${recent.map(book => `<article class="book-item">${cover(book)}<div class="book-copy"><strong class="book-title">${escapeHtml(book.title)}</strong><span class="book-meta">${escapeHtml(book.author)} · ${escapeHtml(book.date)}</span></div></article>`).join('')}</div></section>` : ''}`;

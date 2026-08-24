@@ -6,7 +6,8 @@ import vm from "node:vm";
 const source = await readFile(new URL("../store.js", import.meta.url), "utf8");
 
 test("업무일지는 입력 포커스 중에도 외부 동기화를 허용할 수 있다", () => {
-  assert.match(source,/function watch\(callback, interval = 3000, options = \{\}\)/);
+  assert.match(source,/function watch\(callback, interval = MIN_WATCH_INTERVAL_MS, options = \{\}\)/);
+  assert.match(source,/Math\.max\(MIN_WATCH_INTERVAL_MS, Number\(interval\)/);
   assert.match(source,/!allowWhileEditing && active/);
 });
 
@@ -243,10 +244,27 @@ test("동시에 들어온 동일 조회는 서버 요청 한 번으로 합친다
 
   const first = store.loadWorklogState();
   const second = store.loadWorklogState();
+  await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(requests, 1);
 
   response.resolve(Response.json({ ok: true, data: { revision: 3 } }));
   const [a, b] = await Promise.all([first, second]);
   assert.equal(a.revision, 3);
   assert.equal(b.revision, 3);
+});
+
+test("무료 요청 한도 초과 뒤에는 다음 초기화 전까지 서버를 다시 호출하지 않는다", async () => {
+  const persisted = new Map();
+  let requests = 0;
+  const store = createStore(async () => {
+    requests += 1;
+    return new Response("error code: 1027", { status:429 });
+  }, persisted);
+
+  await assert.rejects(store.loadWorklogState(), /1027/);
+  await assert.rejects(store.loadWorklogState(), /오전 9시 자동 재시도/);
+  assert.equal(requests, 1);
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal([...persisted.keys()].some(key => key.endsWith("/__notion-widget-server-backoff-v1__")), true);
 });

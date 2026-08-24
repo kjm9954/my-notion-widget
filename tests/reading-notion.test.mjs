@@ -34,11 +34,34 @@ test("quote drawers render the full filtered list inside their scroll areas", as
   assert.doesNotMatch(compactDrawer, /filteredQuotes\(\)\.slice/);
 });
 
-test("all reading widgets use distinct fast synchronization without rerendering unchanged data", async () => {
+test("quote drawer uses a compact divider list and expands the full quote in place", async () => {
+  const html = await readFile(new URL("../reading-notes/quote-drawer.html", import.meta.url), "utf8");
+  assert.match(html, /height:470px/);
+  assert.match(html, /\.list-shell \{[\s\S]*?background:transparent;[\s\S]*?border:0;/);
+  assert.match(html, /\.quote-item \{[^}]*border-bottom:1px solid var\(--border-faint\)/);
+  assert.match(html, /-webkit-line-clamp:2/);
+  assert.match(html, /\.quote-item\.is-open \.quote-text \{[^}]*-webkit-line-clamp:none/);
+  assert.match(html, /class="quote-item \$\{activeId === item\.id \? 'is-open' : ''\}"/);
+  assert.match(html, /\.card\.is-wide \.today-mark \{ display:none; \}/);
+  assert.match(html, /\.card\.is-wide \.today-text \{[^}]*font-size:16px; font-weight:600/);
+});
+
+test("reading count presents totals and years without heavy boxes or bars", async () => {
+  const html = await readFile(new URL("../reading-notes/reading-count.html", import.meta.url), "utf8");
+  assert.match(html, /\.total-number \{[^}]*font-size:34px/);
+  assert.match(html, /<span class="total-unit">권 지금까지<\/span>/);
+  assert.match(html, /\.years \{[^}]*background:transparent; border:0;/);
+  assert.match(html, /\.year-row \{[^}]*border-bottom:1px solid var\(--border-soft\)/);
+  assert.match(html, /\.card\.is-wide \.year-bar \{ display:none; \}/);
+  assert.match(html, /\.card:not\(\.is-wide\) \.total-number \{ font-size:30px; \}/);
+});
+
+test("all reading widgets use quota-safe synchronization without rerendering unchanged data", async () => {
   const store = await readFile(new URL("../store.js", import.meta.url), "utf8");
   const names = ["drawer", "library", "life-books", "quote-drawer", "reading-count", "session", "wishlist"];
   const widgets = await Promise.all(names.map(name => readFile(new URL(`../reading-notes/${name}.html`, import.meta.url), "utf8")));
-  assert.match(store, /const READING_SYNC_INTERVAL_MS = 5000/);
+  assert.match(store, /const MIN_WATCH_INTERVAL_MS = 60000/);
+  assert.match(store, /const READING_SYNC_INTERVAL_MS = 60000/);
   assert.match(store, /function readingLibrarySignature\(state\)/);
   assert.match(store, /if \(nextSignature === renderedSignature\) return/);
   assert.match(store, /loadReadingLibrary, watchReadingLibrary,/);

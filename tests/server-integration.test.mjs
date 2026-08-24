@@ -42,9 +42,15 @@ test("생각·목표 삭제와 전체 저장은 에너지 나침반 연결 메�
   assert.match(worker, /if \(meta\.p && removed\.has\(meta\.p\)\) meta\.p = null/);
 });
 
-test("저장 계층은 네트워크 실패를 위젯 안에 표시하고 재시도를 유지한다", () => {
+test("저장 계층은 네트워크 실패를 표시하고 무료 한도 초과 시 재시도를 멈춘다", () => {
   assert.match(store, /function showStoreError\(error\)/);
   assert.match(store, /서버 연결 실패 · 다시 시도 중/);
+  assert.match(store, /서버 요청 한도 초과 · 오전 9시 자동 재시도/);
+  assert.match(store, /function nextWorkerQuotaResetAt\(now = Date\.now\(\)\)/);
+  assert.match(store, /function applyServerBackoff\(error\)/);
+  assert.match(store, /\/\\b1027\\b\/\.test\(detail\)/);
+  assert.match(store, /readServerBackoff\(\)\.then\(until =>/);
+  assert.match(store, /Math\.max\(MIN_WATCH_INTERVAL_MS, Number\(interval\)/);
   assert.match(store, /window\.addEventListener\("online", run\)/);
   assert.match(store, /setInterval\(run/);
 });

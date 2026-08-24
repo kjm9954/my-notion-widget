@@ -21,9 +21,9 @@
     button, input, textarea { font:inherit; color:inherit; }
     button { cursor:pointer; }
     .card {
-      width:100%; max-width:1060px; height:640px; margin:0 auto; padding:20px; overflow:hidden;
+      width:100%; max-width:1060px; height:470px; margin:0 auto; padding:20px; overflow:hidden;
       display:flex; flex-direction:column; gap:13px; background:var(--surface); border-radius:18px;
-      box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
+      box-shadow:0 1px 3px rgba(18,48,60,.05);
     }
     .card.is-empty { height:300px; }
     .widget-layout { min-height:0; flex:1; display:flex; flex-direction:column; gap:13px; }
@@ -50,17 +50,22 @@
     .chip.is-selected { color:#FFFFFF; background:var(--action); }
     .chip.more { border:1px dashed var(--inactive); background:#FFFFFF; color:var(--muted); }
     .list-shell {
-      min-height:160px; flex:1; padding:10px; overflow-y:auto; background:var(--surface-soft);
-      border:1px solid var(--border-faint); border-radius:12px; scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
+      min-height:160px; flex:1; padding:0 2px; overflow-y:auto; background:transparent;
+      border:0; border-radius:0; scrollbar-width:thin; scrollbar-color:var(--inactive) transparent;
     }
-    .quote-item { overflow:hidden; background:#FFFFFF; border-radius:9px; box-shadow:0 1px 2px rgba(18,48,60,.05); }
-    .quote-item + .quote-item { margin-top:6px; }
-    .quote-summary { width:100%; padding:12px 13px; text-align:left; border:0; background:#FFFFFF; }
-    .quote-text { max-width:760px; color:var(--text); font-size:12px; font-weight:600; line-height:1.7; white-space:normal; }
-    .quote-meta { margin-top:7px; display:flex; align-items:center; gap:10px; }
+    .quote-item { overflow:hidden; background:transparent; border-radius:0; box-shadow:none; border-bottom:1px solid var(--border-faint); }
+    .quote-item + .quote-item { margin-top:0; }
+    .quote-item:last-child { border-bottom:0; }
+    .quote-summary { width:100%; padding:13px 2px; text-align:left; border:0; background:transparent; }
+    .quote-text {
+      max-width:620px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      color:var(--title); font-size:12.5px; font-weight:500; line-height:1.75; text-wrap:pretty;
+    }
+    .quote-item.is-open .quote-text { display:block; -webkit-line-clamp:none; overflow:visible; }
+    .quote-meta { margin-top:6px; display:flex; align-items:center; gap:10px; }
     .quote-book { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font-size:9px; font-weight:700; }
     .quote-age { flex:0 0 auto; color:var(--inactive); font-size:9px; font-weight:700; }
-    .detail { max-height:220px; margin:0 13px; padding:12px 0 13px; overflow:hidden; border-top:1px solid var(--border-faint); animation:detail-open var(--t-open) var(--ease); }
+    .detail { max-height:220px; margin:0; padding:12px 0 13px; overflow:hidden; border-top:1px solid var(--border-faint); animation:detail-open var(--t-open) var(--ease); }
     .detail.is-closing { max-height:0; padding-top:0; padding-bottom:0; opacity:0; transition:max-height var(--t-open) var(--ease), padding var(--t-open) var(--ease), opacity var(--t-open) var(--ease); }
     .detail-label { color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .thought { margin-top:8px; color:var(--deep); font-size:12px; font-weight:600; line-height:1.7; white-space:pre-wrap; }
@@ -82,30 +87,28 @@
     .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
     .hidden { display:none !important; }
-    .card.is-wide:not(.is-empty) { height:560px; padding:24px; }
+    .card.is-wide:not(.is-empty) { height:470px; padding:24px; }
     .card.is-wide:not(.is-empty) .widget-layout {
       display:grid; grid-template-columns:340px minmax(0, 1fr); gap:22px;
     }
     .card.is-wide .fixed { min-height:0; gap:16px; }
     .card.is-wide .title { font-size:13px; }
     .card.is-wide .today-quote {
-      min-height:0; flex:1; padding:22px 20px; display:flex; flex-direction:column;
-      background:var(--surface-soft); border:1px solid var(--border-faint); border-radius:14px;
+      min-height:0; flex:1; padding:3px 0 3px 14px; display:flex; flex-direction:column;
+      background:transparent; border:0; border-radius:0;
     }
-    .card.is-wide .today-quote .quote-rule { display:none; }
+    .card.is-wide .today-quote .quote-rule { display:block; }
     .card.is-wide .today-label {
       display:block; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em;
     }
-    .card.is-wide .today-mark {
-      height:38px; margin-top:14px; display:block; color:var(--quote); font-size:34px; font-weight:800; line-height:1;
-    }
-    .card.is-wide .today-text { max-width:none; color:var(--text); font-size:19px; font-weight:700; line-height:1.65; text-wrap:pretty; }
+    .card.is-wide .today-mark { display:none; }
+    .card.is-wide .today-text { max-width:none; color:var(--text); font-size:16px; font-weight:600; line-height:1.7; text-wrap:pretty; }
     .card.is-wide .today-source { margin-top:auto; padding-top:16px; font-size:11px; }
     .card.is-wide .filters { flex-wrap:wrap; }
     .card.is-wide .list-shell { min-height:0; height:100%; }
-    .card.is-wide .quote-item { border-radius:10px; }
-    .card.is-wide .quote-summary { padding:14px 16px; }
-    .card.is-wide .quote-text { font-size:13px; }
+    .card.is-wide .quote-item { border-radius:0; }
+    .card.is-wide .quote-summary { padding:13px 2px; }
+    .card.is-wide .quote-text { font-size:12.5px; }
     .card.is-empty .widget-layout { display:block; }
     @keyframes refresh-turn { to { transform:rotate(360deg); } }
     @keyframes detail-open { from { max-height:0; padding-top:0; padding-bottom:0; opacity:0; } to { max-height:220px; opacity:1; } }
@@ -113,16 +116,16 @@
       .card:not(.is-wide) .today-text { font-size:14px; }
       .card:not(.is-wide) .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
       .card:not(.is-wide) .chip { min-height:40px; flex:0 0 auto; }
-      .card:not(.is-wide) .quote-summary { min-height:40px; padding:11px 12px; }
+      .card:not(.is-wide) .quote-summary { min-height:44px; padding:13px 2px; }
       .card:not(.is-wide) .edit-button { min-height:40px; }
     }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-quote-drawer.html" data-widget-max-width="1060" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:1060px;--widget-base-width:1060px;--widget-base-height:560px;--widget-visual-height:560px">
+  <div class="widget-host" data-widget-host data-widget-key="widget-size-quote-drawer.html" data-widget-max-width="1060" data-widget-height="470" data-widget-max-scale="4" style="--widget-max-width:1060px;--widget-base-width:1060px;--widget-base-height:470px;--widget-visual-height:470px">
     <main class="card" data-widget-card aria-label="문장 서랍 위젯">
-      <div class="widget-layout" data-widget-list data-widget-list-height="512">
+      <div class="widget-layout" data-widget-list data-widget-list-height="422">
         <div class="fixed" id="fixedArea">
           <header class="header"><span class="title">문장 서랍</span><button class="refresh" id="refresh" type="button" aria-label="오늘의 문장 다시 뽑기">↻</button></header>
           <section class="today-quote" id="todayQuote"></section>
@@ -251,7 +254,7 @@
           quoteList.innerHTML = `<section class="empty-state"><strong>찾는 문장이 없어요</strong><span>다른 단어로 찾아보세요</span></section>`;
           return;
         }
-        quoteList.innerHTML = result.map(item => `<article class="quote-item"><button class="quote-summary" type="button" data-open="${item.id}"><div class="quote-text">${escapeHtml(item.text)}</div><div class="quote-meta"><span class="quote-book">${escapeHtml(item.book)}</span><span class="quote-age">${escapeHtml(item.ago)}</span></div></button>${activeId === item.id ? renderDetail(item) : ''}</article>`).join('');
+        quoteList.innerHTML = result.map(item => `<article class="quote-item ${activeId === item.id ? 'is-open' : ''}"><button class="quote-summary" type="button" data-open="${item.id}"><div class="quote-text">${escapeHtml(item.text)}</div><div class="quote-meta"><span class="quote-book">${escapeHtml(item.book)}</span><span class="quote-age">${escapeHtml(item.ago)}</span></div></button>${activeId === item.id ? renderDetail(item) : ''}</article>`).join('');
         quoteList.scrollTop = scrollTop;
         bindList();
         if (!entranceDone) {
