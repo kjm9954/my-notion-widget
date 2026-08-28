@@ -243,10 +243,10 @@
     }
     .skeleton-list { display: flex; flex-direction: column; gap: 5px; }
     .skeleton-row { height: 72px; border-radius: 9px; background: #F1F5F7; }
-    @media (max-width: 639px) {
+    @media (any-pointer: coarse) and (max-width: 639px) {
       .history-card { max-width: none; }
     }
-    @media (max-width: 399px) {
+    @media (any-pointer: coarse) and (max-width: 399px) {
       .result-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
       .location-pill { max-width: 100%; }
       .result-row { min-height: 72px; }

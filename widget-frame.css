@@ -540,7 +540,7 @@ body.is-widget-reflow #dayOverlay .modal-panel button {
   min-height: 44px;
 }
 
-@media (max-width: 639px) {
+@media (any-pointer: coarse) and (max-width: 639px) {
   body.widget-page button:not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle),
   body.widget-page [role="button"] {
     min-height: 44px;

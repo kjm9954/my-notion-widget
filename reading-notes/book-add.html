@@ -101,7 +101,7 @@
     .done-note { color:var(--action); font-size:10px; font-weight:700; }
     .again { padding:6px 4px; color:var(--secondary); background:transparent; border:0; font-size:10px; font-weight:700; }
 
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .widget { min-height:62px; overflow:visible; }
       .trigger, .close, .back, .add, .again, .manual-entry, .status-pill { min-height:44px; }
       .ba-overlay { align-items:flex-end; }

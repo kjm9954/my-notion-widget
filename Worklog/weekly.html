@@ -178,13 +178,13 @@
       .week-arrow:hover, .expand-button:hover { border-color:var(--mid); }
       .day-heading:hover { border-color:var(--mid); }
     }
-    @media (max-width:999px) and (min-width:640px) {
+    @media (any-pointer: coarse) and (max-width:999px) and (min-width:640px) {
       .card { padding-left:18px; padding-right:18px; }
       .day-date, .task-progress { display:none; }
       .task-title { font-size:10px; }
       .week-grid, .week-grid.mode-life { gap:8px; }
     }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .card { padding:14px; gap:10px; }
       .weekly-top { gap:9px; }
       .week-header { min-height:84px; flex-wrap:wrap; gap:7px; }

@@ -24,9 +24,12 @@ test("업무일지는 체크 외곽선을 덧그리지 않고 빈 목록만 유�
   assert.doesNotMatch(source, /\[data-empty-add\]/);
 });
 
-test("639px 이하의 넓은 위젯은 축소 대신 1:1 재배치한다", () => {
+test("모바일·태블릿의 639px 이하 넓은 위젯만 축소 대신 1:1 재배치한다", () => {
   assert.match(source, /const REFLOW_MAX = 639/);
-  assert.match(source, /viewportWidth\(\) <= REFLOW_MAX && designWidth > viewportWidth\(\)/);
+  assert.match(source, /function isMobileTabletDevice\(\)/);
+  assert.match(source, /matchMedia\?\.\('\(any-pointer: coarse\)'\)\.matches === true/);
+  assert.match(source, /isMobileTabletDevice\(\) && viewportWidth\(\) <= REFLOW_MAX && designWidth > viewportWidth\(\)/);
+  assert.match(source, /const viewportLimit = isMobileTabletDevice\(\) \? Math\.min\(byWidth, byHeight\) : Number\.POSITIVE_INFINITY/);
   assert.match(source, /const reflowWidth = viewportWidth\(\);\s*renderedScale = 1;/);
   assert.match(source, /--widget-content-width', `\$\{reflowWidth\}px`/);
   assert.match(source, /card\.style\.removeProperty\('height'\)/);
@@ -34,12 +37,18 @@ test("639px 이하의 넓은 위젯은 축소 대신 1:1 재배치한다", () =>
   assert.match(css, /body\.is-widget-reflow \[data-widget-card\][\s\S]*?transform: none !important/);
 });
 
-test("URL 크기 지정은 저장 크기보다 우선하고 모바일 재배치 탈출구를 제공한다", () => {
+test("URL 크기 지정은 저장 크기보다 우선하고 기기 재배치 강제·해제를 제공한다", () => {
   assert.match(source, /contentW:positiveQuery\('w'\)/);
   assert.match(source, /frameH:positiveQuery\('h'\)/);
   assert.match(source, /scale:positiveQuery\('s'\)/);
   assert.match(source, /listH:positiveQuery\('list'\)/);
-  assert.match(source, /sizeQuery\.get\('mobile'\) !== 'off'/);
+  assert.match(source, /if \(override === 'on'\) return true/);
+  assert.match(source, /if \(override === 'off'\) return false/);
+});
+
+test("폭 기반 반응형 CSS는 모바일·태블릿 포인터에서만 적용한다", async () => {
+  assert.doesNotMatch(css, /@media\s*\(max-width:/);
+  assert.match(css, /@media \(any-pointer: coarse\) and \(max-width: 639px\)/);
 });
 
 test("팝오버는 카드 안으로 보정되고 모바일에서는 하단 시트가 된다", () => {

@@ -264,6 +264,15 @@
   const REFLOW_MAX = 639;
   const sizeQuery = new URLSearchParams(location.search);
 
+  function isMobileTabletDevice() {
+    const override = sizeQuery.get('mobile');
+    if (override === 'on') return true;
+    if (override === 'off') return false;
+    return window.matchMedia?.('(any-pointer: coarse)').matches === true;
+  }
+
+  document.body.classList.toggle('is-mobile-tablet-device', isMobileTabletDevice());
+
   function viewportWidth() {
     return Math.max(1, Math.min(
       window.innerWidth || Infinity,
@@ -332,7 +341,7 @@
     const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
     const defaultListHeight = Number(list.dataset.widgetListHeight) || list.offsetHeight || 160;
     const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
-    const isReflow = () => sizeQuery.get('mobile') !== 'off' && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
+    const isReflow = () => isMobileTabletDevice() && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
     let requestedListHeight = defaultListHeight;
     let renderedListHeight = defaultListHeight;
     let listLocked = false;
@@ -378,7 +387,9 @@
     function commit() {
       const reflow = isReflow();
       document.body.classList.toggle('is-widget-reflow', reflow);
-      const visualWidth = reflow ? viewportWidth() : Math.max(1, Math.min(designWidth, viewportWidth()));
+      const visualWidth = isMobileTabletDevice()
+        ? (reflow ? viewportWidth() : Math.max(1, Math.min(designWidth, viewportWidth())))
+        : designWidth;
       const offset = listOffset();
       const maximum = Math.max(120, viewportHeight() - offset);
       if (!listLocked) requestedListHeight = Math.max(120, declaredHeight - offset);
@@ -524,7 +535,7 @@
   const ABSOLUTE_MINIMUM_SCALE = .08;
   const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
   const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
-  const isReflow = () => sizeQuery.get('mobile') !== 'off' && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
+  const isReflow = () => isMobileTabletDevice() && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
 
   let contentWidth = designWidth;
   host.style.setProperty('--widget-content-width', `${contentWidth}px`);
@@ -602,10 +613,11 @@
   function maximumScale() {
     const byWidth = viewportWidth() / contentWidth;
     const byHeight = viewportHeight() / naturalHeight;
+    const viewportLimit = isMobileTabletDevice() ? Math.min(byWidth, byHeight) : Number.POSITIVE_INFINITY;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
       ? configuredMaximumScale
       : Number.POSITIVE_INFINITY;
-    return Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, byWidth, byHeight));
+    return Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, viewportLimit));
   }
 
   function minimumScale() {
@@ -620,7 +632,7 @@
          scales may differ. Compensate with logical width so the outer widths
          still land on the same shared visual target. */
       const target = Math.max(MINIMUM_CONTENT_WIDTH, number(sharedVisualWidth, designWidth));
-      const byHeight = viewportHeight() / naturalHeight;
+      const byHeight = isMobileTabletDevice() ? viewportHeight() / naturalHeight : Number.POSITIVE_INFINITY;
       const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
         ? configuredMaximumScale
         : Number.POSITIVE_INFINITY;

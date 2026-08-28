@@ -83,7 +83,7 @@
     .record-nav { justify-content:flex-end; gap:5px; margin-top:auto; }
     .record-button { width:32px; height:32px; padding:0; color:var(--secondary); background:#FFFFFF; border:1px solid #DCE7ED; border-radius:8px; cursor:pointer; }
     .record-button:disabled { color:var(--done); cursor:default; }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .widget { padding:14px; }
       .detail-grid { display:flex; flex-direction:column; }
       .detail-visual { min-height:120px; flex:0 0 120px; }

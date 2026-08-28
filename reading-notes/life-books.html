@@ -48,7 +48,7 @@
     }
     .empty-state strong { color:var(--title); font-size:12px; font-weight:800; }
     .empty-state span { color:var(--muted); font-size:10px; font-weight:600; }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .card { min-height:0; align-items:stretch; flex-direction:column; }
       .cover-row { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,96px)); justify-content:center; gap:11px; overflow:visible; }
       .cover-button { width:100%; min-height:144px; }

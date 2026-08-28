@@ -74,8 +74,8 @@
     .past-toggle { display:none; padding:0; border:0; background:transparent; color:var(--muted); font-size:10px; font-weight:750; cursor:pointer; }
     .undo { margin-left:auto; color:var(--done); font-size:9px; font-weight:700; }
     .undo button { padding:0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:750; cursor:pointer; }
-    @media (max-width:1199px) { .goals-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media (max-width:699px) {
+    @media (any-pointer: coarse) and (max-width:1199px) { .goals-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (any-pointer: coarse) and (max-width:699px) {
       .card { min-height:540px; padding:14px; }
       .goals-grid { grid-template-columns:1fr; }
       .goal-column.mobile-secondary { display:none; }

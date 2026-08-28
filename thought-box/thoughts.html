@@ -68,7 +68,7 @@
     .confirm-line { display:flex; align-items:center; gap:7px; color:var(--danger); font-size:10px; font-weight:700; }
     .confirm-line button { min-height:28px; padding:0 7px; border:1px solid #E4D5D5; border-radius:8px; background:white; color:var(--secondary); font-size:9px; font-weight:700; cursor:pointer; }
     .confirm-line .confirm-delete { border-color:var(--danger); background:var(--danger); color:white; }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .card { min-height:720px; }
       .entry-row, .one-input, .add-button, .search { min-height:44px; }
       .chip-row, .filter-row { height:auto; min-height:44px; }

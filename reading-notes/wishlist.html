@@ -74,7 +74,7 @@
     .all-empty { width:100%; flex:1; }
     .filter-empty strong, .all-empty strong { color:var(--title); font-size:12px; font-weight:800; }
     .filter-empty span, .all-empty span { color:var(--muted); font-size:10px; font-weight:600; line-height:1.5; }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .card { min-height:0; }
       .header { align-items:flex-start; flex-wrap:wrap; }
       .chips { width:100%; margin-left:0; overflow-x:auto; scrollbar-width:none; }

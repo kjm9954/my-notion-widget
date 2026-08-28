@@ -91,7 +91,7 @@
     .pager button:disabled { cursor:not-allowed; color:var(--disabled); }
     .pager span { text-align:center; color:var(--muted); font-size:9px; font-weight:700; }
     .hidden { display:none !important; }
-    @media (max-width:340px) {
+    @media (any-pointer: coarse) and (max-width:340px) {
       .card { padding:11px; gap:9px; }
       .banner { height:100px; }
       .quote-list { padding-inline:6px; }

@@ -129,7 +129,7 @@
     .photo-slots .add-photo:only-child { width:100%; height:96px; }
     .add-photo span:first-child { color:var(--muted); font-size:18px; line-height:1; }
     .add-photo input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .widget { padding:14px; }
       .word-grid.photo { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .button-row { flex-wrap:wrap; }

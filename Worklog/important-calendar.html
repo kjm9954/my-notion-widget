@@ -242,7 +242,7 @@
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
     }
-    @media (max-width:999px) {
+    @media (any-pointer: coarse) and (max-width:999px) {
       .calendar-card { padding:12px; }
       .weekdays, .month-grid { gap:3px; }
       .day { padding:4px; }
@@ -251,7 +251,7 @@
       .popover { width:min(300px,calc(100% - 24px)); }
       .editor-popover { width:min(340px,calc(100% - 24px)); }
     }
-    @media (max-width:639px) {
+    @media (any-pointer: coarse) and (max-width:639px) {
       .widget-head { min-height:44px; margin-bottom:6px; }
       .nav-button, .month-button, .close-button { min-width:44px; min-height:44px; }
       .month-nav { gap:0; }
