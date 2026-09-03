@@ -65,7 +65,7 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
     addEventListener() {},
     removeEventListener() {},
   };
-  const document = {
+  const document = options.document || {
     referrer: "https://www.notion.so/work-log-page",
     hidden: false,
     activeElement: null,
@@ -94,6 +94,31 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
   vm.runInNewContext(source, context);
   window.Store.__runIntervals = () => intervalCallbacks.forEach(callback => callback());
   return window.Store;
+}
+
+function createTrackedDocument(indicators) {
+  return {
+    referrer: "https://www.notion.so/work-log-page",
+    hidden: false,
+    activeElement: null,
+    body: {
+      appendChild(element) { indicators.push(element); },
+    },
+    addEventListener() {},
+    removeEventListener() {},
+    querySelector(selector) {
+      if (selector !== "[data-store-error-indicator]") return null;
+      return indicators.find(element => !element.removed) || null;
+    },
+    createElement() {
+      return {
+        dataset: {},
+        style: {},
+        setAttribute() {},
+        remove() { this.removed = true; },
+      };
+    },
+  };
 }
 
 test("같은 노션 페이지의 기존 무키 위젯도 저장된 개인 인스턴스를 이어 쓴다", async () => {
@@ -232,6 +257,31 @@ test("저장된 응답은 다음 위젯 진입에서 느린 서버보다 먼저 
 
   slow.resolve(Response.json({ ok: true, data: { revision: 2 } }));
   await new Promise(resolve => setTimeout(resolve, 0));
+});
+
+test("캐시가 있으면 일시적인 백그라운드 조회 실패를 사용자에게 표시하지 않는다", async () => {
+  const persisted = new Map();
+  const seeded = createStore(async () => Response.json({ ok: true, data: { revision: 1 } }), persisted);
+  await seeded.loadWorklogState();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  const indicators = [];
+  const cached = createStore(async () => { throw new Error("temporary offline"); }, persisted, {
+    document: createTrackedDocument(indicators),
+  });
+  assert.equal((await cached.loadWorklogState()).revision, 1);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(indicators.length, 0);
+});
+
+test("캐시가 없어서 실제 데이터를 불러올 수 없을 때는 연결 실패를 표시한다", async () => {
+  const indicators = [];
+  const store = createStore(async () => { throw new Error("offline"); }, new Map(), {
+    document: createTrackedDocument(indicators),
+  });
+  await assert.rejects(store.loadWorklogState(), /offline/);
+  assert.equal(indicators.length, 1);
+  assert.equal(indicators[0].textContent, "서버 연결 실패 · 다시 시도 중");
 });
 
 test("동시에 들어온 동일 조회는 서버 요청 한 번으로 합친다", async () => {

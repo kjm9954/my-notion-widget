@@ -484,10 +484,11 @@ function requestFresh(path, url, cachedPromise) {
     clearStoreError();
     if (changed) announceChange(path);
     return data;
-  }).catch(error => {
+  }).catch(async error => {
     if (!error?.silent) {
       applyServerBackoff(error);
-      showStoreError(error);
+      const cached = await cachedPromise;
+      if (!cached) showStoreError(error);
     }
     throw error;
   }).finally(() => {
