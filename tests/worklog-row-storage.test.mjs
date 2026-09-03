@@ -18,6 +18,9 @@ test("업무 데이터는 인스턴스별 행과 삭제 표식으로 저장", ()
 test("Worker는 항목 패치 API와 안전한 구버전 병합을 제공", () => {
   assert.match(worker,/path === "\/api\/worklog\/revision"/);
   assert.match(worker,/async function loadWorklogRevision/);
+  assert.match(worker,/async function worklogReadFallback/);
+  assert.match(worker,/worklog-snapshot:\$\{instanceId/);
+  assert.match(worker,/exceeded D1's free tier daily row read limit/);
   assert.match(worker,/path === "\/api\/worklog\/patch"/);
   assert.match(worker,/async function patchWorklogState/);
   assert.match(worker,/async function mergeLegacyWorklogState/);

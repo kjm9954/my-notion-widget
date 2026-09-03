@@ -70,7 +70,14 @@ export default {
         return json({ ok: false, error: "invalid widget instance" }, 400);
       }
       if (rawInstanceId) {
-        const meta = await loadRawSetting(env, instanceMetaKey(rawInstanceId), null);
+        let meta;
+        try {
+          meta = await loadRawSetting(env, instanceMetaKey(rawInstanceId), null);
+        } catch (error) {
+          const fallback = await worklogReadFallback(json, path, request.method, env, rawInstanceId, error);
+          if (fallback) return fallback;
+          throw error;
+        }
         if (!meta) return json({ ok: false, error: "unknown widget instance" }, 404);
         env = instanceEnv(env, rawInstanceId);
       }
@@ -608,19 +615,37 @@ export default {
 
       // ───────── 업무일지 ─────────
       if (path === "/api/worklog/revision" && request.method === "GET") {
-        return json({ ok: true, data: {
-          revision: await loadWorklogRevision(env),
-          day: seoulDateKey(Date.now() - 6 * 60 * 60 * 1000),
-        } });
+        try {
+          return json({ ok: true, data: {
+            revision: await loadWorklogRevision(env),
+            day: seoulDateKey(Date.now() - 6 * 60 * 60 * 1000),
+          } });
+        } catch (error) {
+          const fallback = await worklogReadFallback(json, path, request.method, env, worklogInstanceId(env), error);
+          if (fallback) return fallback;
+          throw error;
+        }
       }
 
       if (path === "/api/worklog/state" && request.method === "GET") {
-        return json({ ok: true, data: await loadWorklogState(env) });
+        try {
+          const state = await loadWorklogState(env);
+          if (typeof context?.waitUntil === "function") context.waitUntil(cacheWorklogSnapshot(env, state));
+          else await cacheWorklogSnapshot(env, state);
+          return json({ ok: true, data: state });
+        } catch (error) {
+          const fallback = await worklogReadFallback(json, path, request.method, env, worklogInstanceId(env), error);
+          if (fallback) return fallback;
+          throw error;
+        }
       }
 
       if (path === "/api/worklog/patch" && request.method === "POST") {
         const patch = await request.json();
-        return json({ ok: true, data: await patchWorklogState(env, patch) });
+        const state = await patchWorklogState(env, patch);
+        if (typeof context?.waitUntil === "function") context.waitUntil(cacheWorklogSnapshot(env, state));
+        else await cacheWorklogSnapshot(env, state);
+        return json({ ok: true, data: state });
       }
 
       if (path === "/api/worklog/state" && request.method === "POST") {
@@ -1572,6 +1597,42 @@ export function rollWorklogState(raw, now = Date.now()) {
 
 function worklogInstanceId(env) {
   return env.__instanceId || "legacy";
+}
+
+function worklogSnapshotCacheKey(instanceId) {
+  return `worklog-snapshot:${instanceId || "legacy"}`;
+}
+
+function isD1DailyReadLimit(error) {
+  return /exceeded D1's free tier daily row read limit/i.test(String(error?.message || error || ""));
+}
+
+async function cacheWorklogSnapshot(env, state, instanceId = worklogInstanceId(env)) {
+  if (!env.KV) return;
+  await env.KV.put(worklogSnapshotCacheKey(instanceId), JSON.stringify(normalizeWorklogState(state)));
+}
+
+async function loadCachedWorklogSnapshot(env, instanceId) {
+  if (!env.KV) return null;
+  const raw = await env.KV.get(worklogSnapshotCacheKey(instanceId || "legacy"));
+  if (!raw) return null;
+  const state = normalizeWorklogState(safeParse(raw, null));
+  return rollWorklogState(state).state;
+}
+
+async function worklogReadFallback(json, path, method, env, instanceId, error) {
+  if (method !== "GET" || !isD1DailyReadLimit(error)) return null;
+  if (path !== "/api/worklog/state" && path !== "/api/worklog/revision") return null;
+  const state = await loadCachedWorklogSnapshot(env, instanceId);
+  if (!state) return null;
+  if (path === "/api/worklog/revision") {
+    return json({ ok: true, data: {
+      revision: Number(state.revision) || 0,
+      day: seoulDateKey(Date.now() - 6 * 60 * 60 * 1000),
+      cached: true,
+    } });
+  }
+  return json({ ok: true, data: state, cached: true });
 }
 
 function worklogMeta(raw) {
