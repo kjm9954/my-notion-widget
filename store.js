@@ -465,7 +465,7 @@ function invalidateApiGet(path) {
   return deleteCachedUrl(apiUrl(path));
 }
 
-function requestFresh(path, url, cachedPromise) {
+function requestFresh(path, url, cachedPromise, options = {}) {
   if (inFlightGets.has(url)) return inFlightGets.get(url);
 
   const request = readServerBackoff().then(until => {
@@ -488,7 +488,7 @@ function requestFresh(path, url, cachedPromise) {
     if (!error?.silent) {
       applyServerBackoff(error);
       const cached = await cachedPromise;
-      if (!cached) showStoreError(error);
+      if (!cached && options.reportError !== false) showStoreError(error);
     }
     throw error;
   }).finally(() => {
@@ -515,10 +515,10 @@ async function apiGet(path, instanceId = WIDGET_INSTANCE_ID) {
   if (result.type === "fresh") return cloneData(result.data);
   return cloneData(cached.data);
 }
-async function apiGetFresh(path, instanceId = WIDGET_INSTANCE_ID) {
+async function apiGetFresh(path, instanceId = WIDGET_INSTANCE_ID, options = {}) {
   const url = apiUrl(path, true, instanceId);
   const cachedPromise = readCached(url);
-  return cloneData(await requestFresh(path, url, cachedPromise));
+  return cloneData(await requestFresh(path, url, cachedPromise, options));
 }
 async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
   const url = apiUrl(path, includeInstance, instanceId);
@@ -741,10 +741,25 @@ async function resolveWorklogInstanceId() {
 }
 async function loadWorklogState(options = {}) {
   const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
-  const response = options?.fresh === true
-    ? await apiGetFresh("/api/worklog/state", instanceId)
-    : await apiGet("/api/worklog/state", instanceId);
-  return response.data;
+  const statePath = "/api/worklog/state";
+  if (options?.fresh === true) return (await apiGetFresh(statePath, instanceId)).data;
+
+  const stateUrl = apiUrl(statePath, true, instanceId);
+  const cached = await readCached(stateUrl);
+  if (!cached) return (await apiGet(statePath, instanceId)).data;
+
+  void refreshWorklogStateIfChanged(instanceId, cached.data?.data).catch(() => {});
+  return cloneData(cached.data?.data);
+}
+
+async function refreshWorklogStateIfChanged(instanceId, cachedState) {
+  const revisionResponse = await apiGetFresh("/api/worklog/revision", instanceId, { reportError:false });
+  const serverRevision = Number(revisionResponse?.data?.revision) || 0;
+  const serverDay = String(revisionResponse?.data?.day || "");
+  const cachedRevision = Number(cachedState?.revision) || 0;
+  const cachedDay = String(cachedState?.lastRollDay || "");
+  if (serverRevision === cachedRevision && serverDay && serverDay === cachedDay) return;
+  await apiGetFresh("/api/worklog/state", instanceId, { reportError:false });
 }
 async function saveWorklogState(state) {
   const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();

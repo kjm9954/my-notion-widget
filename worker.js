@@ -607,6 +607,13 @@ export default {
       }
 
       // ───────── 업무일지 ─────────
+      if (path === "/api/worklog/revision" && request.method === "GET") {
+        return json({ ok: true, data: {
+          revision: await loadWorklogRevision(env),
+          day: seoulDateKey(Date.now() - 6 * 60 * 60 * 1000),
+        } });
+      }
+
       if (path === "/api/worklog/state" && request.method === "GET") {
         return json({ ok: true, data: await loadWorklogState(env) });
       }
@@ -1643,6 +1650,14 @@ async function readWorklogRows(env) {
     tasks,
     revision: Number(sync?.revision) || 0,
   });
+}
+
+async function loadWorklogRevision(env) {
+  await ensureWorklogRows(env);
+  const row = await env.DB.prepare(
+    `SELECT revision FROM worklog_sync WHERE instance_id = ?`
+  ).bind(worklogInstanceId(env)).first();
+  return Number(row?.revision) || 0;
 }
 
 async function bumpWorklogRevisionStatement(env, instanceId, now) {
