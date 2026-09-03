@@ -24,17 +24,19 @@ test("업무일지는 체크 외곽선을 덧그리지 않고 빈 목록만 유�
   assert.doesNotMatch(source, /\[data-empty-add\]/);
 });
 
-test("모바일·태블릿의 639px 이하 넓은 위젯만 축소 대신 1:1 재배치한다", () => {
-  assert.match(source, /const REFLOW_MAX = 639/);
+test("저장 폭과 기기 유형으로 축소·아이폰 배치·일반 재배치를 구분한다", () => {
   assert.match(source, /function isMobileTabletDevice\(\)/);
   assert.match(source, /matchMedia\?\.\('\(any-pointer: coarse\)'\)\.matches === true/);
-  assert.match(source, /isMobileTabletDevice\(\) && viewportWidth\(\) <= REFLOW_MAX && designWidth > viewportWidth\(\)/);
-  assert.match(source, /const viewportLimit = isMobileTabletDevice\(\) \? Math\.min\(byWidth, byHeight\) : Number\.POSITIVE_INFINITY/);
+  assert.match(source, /if \(!isMobileTabletDevice\(\)\) return 'desktop'/);
+  assert.match(source, /if \(width >= 640 \|\| savedWidth <= width \* 2\) return 'scale'/);
+  assert.match(source, /host\?\.hasAttribute\('data-widget-mobile'\) \? 'mobile' : 'reflow'/);
+  assert.match(source, /const viewportLimit = isMobileTabletDevice\(\) \? byWidth : Number\.POSITIVE_INFINITY/);
   assert.match(source, /const reflowWidth = viewportWidth\(\);\s*renderedScale = 1;/);
   assert.match(source, /--widget-content-width', `\$\{reflowWidth\}px`/);
   assert.match(source, /card\.style\.removeProperty\('height'\)/);
-  assert.match(css, /body\.widget-page\.is-widget-reflow[\s\S]*?overflow-y: auto !important/);
-  assert.match(css, /body\.is-widget-reflow \[data-widget-card\][\s\S]*?transform: none !important/);
+  assert.match(css, /body\.widget-page\.is-widget-reflow,\s*body\.widget-page\.is-widget-mobile[\s\S]*?overflow-y: auto !important/);
+  assert.match(css, /body\.is-widget-mobile \[data-widget-card\][\s\S]*?transform: none !important/);
+  assert.match(source, /function saveSize\(\) \{\s*if \(isMobileTabletDevice\(\)\) return;/);
 });
 
 test("URL 크기 지정은 저장 크기보다 우선하고 기기 재배치 강제·해제를 제공한다", () => {
@@ -54,5 +56,5 @@ test("폭 기반 반응형 CSS는 모바일·태블릿 포인터에서만 적용
 test("팝오버는 카드 안으로 보정되고 모바일에서는 하단 시트가 된다", () => {
   assert.match(source, /function clampToCard\(element\)/);
   assert.match(source, /window\.widgetFrame = Object\.assign\([\s\S]*clampToCard/);
-  assert.match(css, /body\.is-widget-reflow \.cell-popover[\s\S]*?bottom: 8px !important/);
+  assert.match(css, /body\.is-widget-mobile \.cell-popover[\s\S]*?bottom: 8px !important/);
 });

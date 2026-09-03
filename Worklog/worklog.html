@@ -62,15 +62,18 @@
       font-size:8px; font-weight:800; line-height:1.2; font-variant-numeric:tabular-nums;
     }
     .roll-banner {
-      flex:0 0 auto; padding:11px 12px; display:flex; flex-direction:column; gap:4px;
+      position:relative; flex:0 0 auto; padding:11px 48px 11px 12px; display:grid; grid-template-columns:1fr auto; gap:4px 8px;
       background:var(--action-soft); border-radius:12px;
     }
     .roll-banner[hidden] { display:none; }
+    .banner-kicker, .banner-copy { grid-column:1; }
     .banner-kicker { color:var(--action); font-size:9px; font-weight:800; letter-spacing:.06em; }
     .banner-copy { color:var(--text); font-size:11px; font-weight:700; }
     .banner-dismiss {
-      align-self:flex-end; padding:0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:800;
+      position:absolute; right:10px; top:10px; width:28px; height:28px; padding:0; border:0; border-radius:8px;
+      background:transparent; color:var(--secondary); font-size:12px; font-weight:800;
     }
+    @media (hover:hover) { .banner-dismiss:hover { color:var(--text); background:var(--pill); } }
     .card-header {
       min-height:39px; padding-top:12px; border-top:1px solid var(--border-faint);
       display:flex; align-items:center; justify-content:space-between; gap:14px;
@@ -107,13 +110,13 @@
     .empty-copy { color:var(--muted); font-size:10px; font-weight:600; }
     .column-head, .task-row { display:grid; align-items:center; gap:10px; }
     .column-head.work, .task-row.work {
-      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
+      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 28px;
     }
     .column-head.work.view-memo, .task-row.work.view-memo {
-      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(120px,4.5fr) minmax(40px,1.24fr) 24px 24px;
+      grid-template-columns:62px 22px minmax(120px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(120px,4.5fr) minmax(40px,1.24fr) 24px 28px;
     }
     .column-head.life, .task-row.life {
-      grid-template-columns:62px 22px minmax(100px,var(--life-title-track,1.2fr)) 52px minmax(100px,1fr) 24px 24px;
+      grid-template-columns:62px 22px minmax(100px,var(--life-title-track,1.2fr)) 52px minmax(100px,1fr) 24px 28px;
     }
     .column-head {
       position:relative; flex:0 0 auto; padding:0 10px 8px; border-bottom:1px solid var(--border-faint);
@@ -243,15 +246,14 @@
     .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:2px; background:var(--surface); }
     .time-action { width:20px; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:700; }
     @media (hover:hover) { .time-cell.has-value:hover .time-actions { display:flex; } }
-    .delete-wrap { width:24px; height:24px; display:grid; place-items:center; }
+    .delete-wrap { width:28px; height:28px; display:grid; place-items:center; align-self:center; }
     .row-delete {
-      width:24px; height:24px; padding:0; border:0; border-radius:8px; background:transparent;
-      color:var(--border-soft); font-size:11px; font-weight:700; line-height:1;
-      transition:color .12s var(--ease);
+      width:28px; height:28px; padding:0; border:0; border-radius:8px; background:transparent;
+      color:var(--inactive); font-size:11px; font-weight:700; line-height:1; opacity:0; pointer-events:none;
+      transition:color .12s var(--ease), opacity .12s var(--ease);
     }
-    @media (hover:hover) { .row-delete:hover { color:var(--muted); } }
-    .task-row.is-delete-confirm { outline-color:var(--danger-border); }
-    .task-row.is-delete-confirm .row-delete { color:var(--danger); font-size:12px; font-weight:800; }
+    @media (hover:hover) { .task-row:hover .row-delete { opacity:1; pointer-events:auto; } .row-delete:hover { color:var(--secondary); } }
+    @media (hover:none) { .row-delete { width:44px; height:44px; opacity:1; pointer-events:auto; } }
     .mobile-work-meta { display:none; }
     .inline-editor {
       flex:0 0 auto; padding:10px; background:var(--surface); border-radius:9px;
@@ -273,7 +275,6 @@
     }
     .editor-button.primary { border-color:var(--action); background:var(--action); color:#FFFFFF; }
     .editor-button.danger { margin-right:auto; border-color:var(--danger-border); color:var(--danger); }
-    .editor-button.confirm-danger { margin-right:auto; border-color:var(--danger); background:var(--danger); color:#FFFFFF; }
     .add-row {
       width:100%; min-height:40px; flex:0 0 auto; padding:7px 10px; border:1px dashed var(--inactive); border-radius:9px;
       display:flex; align-items:center; justify-content:center; gap:6px; background:var(--surface); color:var(--muted);
@@ -518,12 +519,55 @@
       .summary-divider { display:none; }
       .task-row.life { grid-template-columns:44px 18px minmax(0,1fr) 40px 40px; gap:4px; }
     }
+    body.is-widget-mobile .card { min-height:520px; height:auto; padding:12px; gap:10px; }
+    body.is-widget-mobile .worklog-top { gap:10px; }
+    body.is-widget-mobile .day-nav { order:1; grid-template-columns:44px minmax(0,1fr) 44px; gap:0; }
+    body.is-widget-mobile .nav-arrow { width:44px; height:56px; border:0; background:transparent; color:var(--secondary); font-size:18px; }
+    body.is-widget-mobile .nav-arrow::before { display:none; }
+    body.is-widget-mobile .day-track { padding:0; display:block; overflow:visible; background:transparent; }
+    body.is-widget-mobile .mobile-nav-copy { height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    body.is-widget-mobile .mobile-nav-title { color:var(--title); font-size:15px; font-weight:800; }
+    body.is-widget-mobile .mobile-nav-summary { color:var(--muted); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .mode-row { order:2; width:max-content; min-height:34px; margin:0 auto; padding:3px; gap:2px; justify-content:center; border-radius:999px; background:var(--pill); }
+    body.is-widget-mobile .mode-pill { position:relative; min-width:64px; min-height:44px; height:44px; margin:-5px 0; padding:0 13px; border:0; background:transparent; color:var(--secondary); isolation:isolate; }
+    body.is-widget-mobile .mode-pill::before { content:""; position:absolute; z-index:-1; inset:8px 0; display:block; border:0; border-radius:999px; background:transparent; }
+    body.is-widget-mobile .mode-pill.is-selected[data-mode] { border:0; background:transparent; color:var(--action); box-shadow:none; }
+    body.is-widget-mobile .mode-pill.is-selected[data-mode]::before { background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    body.is-widget-mobile .roll-banner { order:3; }
+    body.is-widget-mobile .banner-dismiss { width:44px; height:44px; right:2px; top:2px; border-radius:12px; }
+    body.is-widget-mobile .card-header { display:none; }
+    body.is-widget-mobile .list-shell { min-height:300px; flex:1 1 300px; padding:4px; overflow:hidden; background:var(--surface-soft); border:1px solid var(--border-pale); border-radius:12px; }
+    body.is-widget-mobile .rows-scroll { gap:4px; }
+    body.is-widget-mobile .column-head { display:none; }
+    body.is-widget-mobile .task-row.work,
+    body.is-widget-mobile .task-row.work.view-memo,
+    body.is-widget-mobile .task-row.life { height:48px; min-height:48px; padding:0; display:grid; grid-template-columns:44px minmax(0,1fr); grid-template-rows:48px; gap:0; align-items:center; border:0; background:var(--surface); box-shadow:none; outline:0; }
+    body.is-widget-mobile .task-row.work > *,
+    body.is-widget-mobile .task-row.life > * { display:none !important; }
+    body.is-widget-mobile .task-row .check-wrap { position:relative; grid-column:1; grid-row:1; width:44px; height:48px; display:grid !important; place-items:center; }
+    body.is-widget-mobile .task-row .done-check { position:relative; left:auto; top:auto; width:44px; height:48px; border:0; background:transparent; color:transparent; transform:none; }
+    body.is-widget-mobile .task-row .done-check::before { content:""; position:absolute; left:50%; top:50%; width:24px; height:24px; border:1.5px solid var(--inactive); border-radius:7px; background:var(--surface); transform:translate(-50%,-50%); }
+    body.is-widget-mobile .task-row .done-check.is-done::before { border-color:var(--action); background:var(--action); }
+    body.is-widget-mobile .task-row .done-check.is-done::after { content:"✓"; position:absolute; left:50%; top:50%; color:#FFFFFF; font-size:11px; font-weight:800; transform:translate(-50%,-50%); }
+    body.is-widget-mobile .task-row .task-main { grid-column:2; grid-row:1; width:100%; display:flex !important; justify-content:center; min-width:0; }
+    body.is-widget-mobile .task-row .task-title-button,
+    body.is-widget-mobile .task-row .inline-cell-input { width:100%; height:48px; min-height:48px !important; padding:0 8px 0 0; overflow:hidden; border:0; outline:0; background:transparent; color:var(--text); font-size:15px; font-weight:600; line-height:48px; text-align:left; text-overflow:ellipsis; white-space:nowrap; }
+    body.is-widget-mobile .task-row.is-done .task-title-button { color:var(--done); text-decoration:line-through; }
+    body.is-widget-mobile .task-row .roll-caption,
+    body.is-widget-mobile .task-row .delete-wrap,
+    body.is-widget-mobile .task-row .mobile-work-meta { display:none !important; }
+    body.is-widget-mobile .worklog-bottom { flex:0 0 auto; }
+    body.is-widget-mobile .mobile-add-form { height:48px; display:grid; grid-template-columns:44px minmax(0,1fr); align-items:center; border:1px dashed var(--inactive); border-radius:12px; }
+    body.is-widget-mobile .mobile-add-plus { color:var(--muted); font-size:16px; font-weight:700; text-align:center; }
+    body.is-widget-mobile .mobile-add-input { width:100%; height:46px; padding:0 10px 0 0; border:0; outline:0; background:transparent; color:var(--text); font-size:16px; font-weight:600; }
+    body.is-widget-mobile .mobile-add-input::placeholder { color:var(--muted); }
+    body.is-widget-mobile .cell-popover { display:none !important; }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
   <script src="../store.js?v=20260903-worklog-revision"></script>
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-worklog.html" data-widget-max-width="1350" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:1350px;--widget-base-width:1350px;--widget-base-height:595px;--widget-visual-height:595px">
+  <div class="widget-host" data-widget-host data-widget-mobile data-widget-key="widget-size-worklog.html" data-widget-max-width="1350" data-widget-height="595" data-widget-max-scale="4" style="--widget-max-width:1350px;--widget-base-width:1350px;--widget-base-height:595px;--widget-visual-height:595px">
     <main class="card" data-widget-card aria-label="업무일지 위젯">
       <div class="worklog-top" data-widget-fixed>
         <div class="mode-row" id="modeRow" aria-label="기록 모드">
@@ -572,9 +616,10 @@
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
       const narrowQuery = window.matchMedia('(max-width: 320px)');
+      const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
       const ui = {
         selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
-        confirmDeleteId:null, deleteTimer:null, newId:null, popover:null, projectAdding:false,
+        newId:null, popover:null, projectAdding:false,
         projectChoiceTimer:null, dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0,
         timeClick:null
       };
@@ -1144,7 +1189,17 @@
           pointerId:event.pointerId, pointerType:event.pointerType || 'mouse', row, taskId:row.dataset.taskId,
           startX:event.clientX, startY:event.clientY, timer:0
         };
-        press.timer = window.setTimeout(() => activateRowDrag(press),420);
+        const editsMobileTitle = isMobileLayout() && Boolean(event.target.closest('.task-title-button'));
+        press.timer = window.setTimeout(() => {
+          if (editsMobileTitle) {
+            if (ui.longPress !== press) return;
+            ui.longPress = null;
+            ui.suppressClickUntil = Date.now() + 500;
+            beginInlineEdit(press.taskId,'title');
+            return;
+          }
+          activateRowDrag(press);
+        },editsMobileTitle ? 500 : 420);
         ui.longPress = press;
       }
 
@@ -1336,6 +1391,14 @@
 
       function renderDays() {
         const todayKey = localDateKey(todayDate());
+        if (isMobileLayout()) {
+          const date = parseDate(ui.selectedDate) || todayDate();
+          const items = tasksFor(state.mode, ui.selectedDate);
+          const done = items.filter(task => task.done).length;
+          dayTrack.innerHTML = `<div class="mobile-nav-copy"><span class="mobile-nav-title">${date.getMonth() + 1}월 ${date.getDate()}일 ${SHORT_DAYS[date.getDay()]}</span><span class="mobile-nav-summary">${done} / ${items.length} 완료</span></div>`;
+          dayTrack.scrollLeft = 0;
+          return;
+        }
         const keys = modeDateKeys(state.mode, parseDate(ui.selectedDate) || todayDate());
         dayTrack.innerHTML = keys.map(key => {
           const date = parseDate(key);
@@ -1372,7 +1435,7 @@
         }
         rollBanner.innerHTML = `<span class="banner-kicker">새 하루가 시작됐습니다</span>
           <span class="banner-copy">미완료 ${state.lastRollCount}건을 오늘로 옮겼습니다</span>
-          <button class="banner-dismiss" type="button" data-dismiss-banner data-roll-dismiss>확인 ✕</button>`;
+          <button class="banner-dismiss" type="button" data-dismiss-banner data-roll-dismiss aria-label="닫기">✕</button>`;
         if (!rollBannerEntranceDone) {
           rollBannerEntranceDone = true;
           window.widgetMotion?.popIn?.(rollBanner);
@@ -1472,8 +1535,7 @@
       }
 
       function deleteButton(task) {
-        const confirming = ui.confirmDeleteId === task.id;
-        return `<span class="delete-wrap"><button class="row-delete" type="button" data-row-delete="${escapeHtml(task.id)}" aria-label="${confirming ? '한 번 더 누르면 삭제' : '삭제'}">✕</button></span>`;
+        return `<span class="delete-wrap"><button class="row-delete" type="button" data-row-delete="${escapeHtml(task.id)}" aria-label="삭제">✕</button></span>`;
       }
 
       function mobileWorkMeta(task, status, progress, estimate) {
@@ -1494,7 +1556,7 @@
         const memoView = state.workView === 'memo';
         const tag = draft ? 'form' : 'article';
         const draftAttr = draft ? ' data-quick-add-form' : '';
-        return `<${tag} class="task-row work ${memoView ? 'view-memo' : 'view-time'} ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+        return `<${tag} class="task-row work ${memoView ? 'view-memo' : 'view-time'} ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
@@ -1512,7 +1574,7 @@
       function lifeRow(task, draft = false) {
         const tag = draft ? 'form' : 'article';
         const draftAttr = draft ? ' data-quick-add-form' : '';
-        return `<${tag} class="task-row life ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''} ${ui.confirmDeleteId === task.id ? 'is-delete-confirm' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
+        return `<${tag} class="task-row life ${draft ? 'quick-add-row' : ''} ${task.rolledFrom && !draft ? 'has-roll' : ''} ${task.done ? 'is-done' : ''} ${ui.newId === task.id ? 'motion-new' : ''}" data-task-id="${escapeHtml(task.id)}"${draftAttr}>
           ${projectButton(task)}
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
@@ -1564,15 +1626,14 @@
         } else {
           fields.push(field('메모','memo',task?.memo || '',{wide:true,placeholder:'메모'}));
         }
-        const deleteClass = ui.confirmDeleteId === task?.id ? 'confirm-danger' : 'danger';
-        const deleteLabel = ui.confirmDeleteId === task?.id ? '정말 삭제' : '삭제';
         return `<form class="inline-editor ${kind === 'add' ? 'add-editor' : ''}" data-task-form data-kind="${kind}" data-task-id="${editing ? escapeHtml(task.id) : ''}" data-mode="${mode}">
           <div class="editor-fields">${fields.join('')}</div>
-          <div class="editor-actions">${editing ? `<button class="editor-button ${deleteClass}" type="button" data-delete-task="${escapeHtml(task.id)}">${deleteLabel}</button>` : ''}<button class="editor-button" type="button" data-cancel-editor>취소</button><button class="editor-button primary" type="submit">저장</button></div>
+          <div class="editor-actions">${editing ? `<button class="editor-button danger" type="button" data-delete-task="${escapeHtml(task.id)}">삭제</button>` : ''}<button class="editor-button" type="button" data-cancel-editor>취소</button><button class="editor-button primary" type="submit">저장</button></div>
         </form>`;
       }
 
       function renderList(items) {
+        if (isMobileLayout()) items = [...items].sort((a,b) => Number(a.done) - Number(b.done) || a.order - b.order);
         const hasQuickRow = ui.adding && ui.draftTask;
         taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId && !hasQuickRow);
         if (!items.length && !ui.editingId && !hasQuickRow) {
@@ -1586,6 +1647,11 @@
       }
 
       function renderAdd(items) {
+        if (isMobileLayout()) {
+          card.classList.remove('is-adding');
+          addArea.innerHTML = `<form class="mobile-add-form" data-mobile-add-form><span class="mobile-add-plus" aria-hidden="true">＋</span><input class="mobile-add-input" name="title" autocomplete="off" placeholder="할 일 추가 후 엔터" aria-label="${state.mode === 'work' ? '업무' : '할 일'} 추가"></form>`;
+          return;
+        }
         card.classList.toggle('is-adding', ui.adding);
         addArea.innerHTML = `<button class="add-row" type="button" data-add-task data-add-row><span class="add-plus" ${items.length === 0 ? 'data-empty-add' : ''}>＋</span><span>${state.mode === 'work' ? '업무' : '할 일'} 추가</span></button>`;
       }
@@ -1766,7 +1832,6 @@
         const items = tasksFor(state.mode, ui.selectedDate);
         if (ui.editingId && !items.some(task => task.id === ui.editingId)) {
           ui.editingId = null;
-          ui.confirmDeleteId = null;
         }
         if (ui.inlineEdit && !taskById(ui.inlineEdit.taskId)) ui.inlineEdit = null;
         renderModes();
@@ -1845,18 +1910,15 @@
       }
 
       function resetTransient() {
-        if (ui.deleteTimer) window.clearTimeout(ui.deleteTimer);
         if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
         cancelLongPress();
         clearRowDropTarget();
         taskList.querySelectorAll('.is-reordering').forEach(element => element.classList.remove('is-reordering'));
-        ui.deleteTimer = null;
         ui.projectChoiceTimer = null;
         ui.adding = false;
         ui.draftTask = null;
         ui.editingId = null;
         ui.inlineEdit = null;
-        ui.confirmDeleteId = null;
         ui.popover = null;
         ui.projectAdding = false;
         ui.rowDrag = null;
@@ -2012,7 +2074,7 @@
           return;
         }
         const previousDate = ui.selectedDate;
-        const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, confirmDeleteId:ui.confirmDeleteId, popover:ui.popover, dirtyFields:ui.dirtyFields };
+        const previousUi = { adding:ui.adding, draftTask:ui.draftTask, editingId:ui.editingId, popover:ui.popover, dirtyFields:ui.dirtyFields };
         if (!drainPendingSync()) return;
         resetTransient();
         const followsClampedWorkToday = state.mode === 'work' && nextMode === 'life'
@@ -2073,43 +2135,20 @@
         dayTrack.querySelector('[data-day][aria-pressed="true"]')?.focus();
       });
 
-      function clearDeleteConfirm(shouldRender = true) {
-        if (!ui.confirmDeleteId) return;
-        const id = ui.confirmDeleteId;
-        if (ui.deleteTimer) window.clearTimeout(ui.deleteTimer);
-        ui.deleteTimer = null;
-        ui.confirmDeleteId = null;
-        if (shouldRender) renderAll();
-        else {
-          taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.classList.remove('is-delete-confirm');
-          const button = taskList.querySelector(`[data-row-delete="${CSS.escape(id)}"]`);
-          button?.setAttribute('aria-label','삭제');
-        }
-      }
-
-      function armDelete(id) {
-        if (ui.confirmDeleteId === id) {
-          const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
-          const remove = () => {
-            if (ui.draftTask?.id === id) {
-              cancelQuickAdd();
-              return;
-            }
-            if (!drainPendingSync()) return;
-            clearDeleteConfirm(false);
-            ui.editingId = null;
-            const saved = mutate(fresh => { fresh.tasks = fresh.tasks.filter(task => task.id !== id); return fresh; });
-            if (saved) announce('삭제했습니다.');
-          };
-          if (window.widgetMotion?.close && row) window.widgetMotion.close(row, remove);
-          else remove();
-          return;
-        }
-        clearDeleteConfirm(false);
-        ui.confirmDeleteId = id;
-        ui.deleteTimer = window.setTimeout(() => clearDeleteConfirm(), 3000);
-        renderAll();
-        taskList.querySelector(`[data-row-delete="${CSS.escape(id)}"]`)?.focus({ preventScroll:true });
+      function deleteTaskNow(id) {
+        const row = taskList.querySelector(`[data-task-id="${CSS.escape(id)}"]`);
+        const remove = () => {
+          if (ui.draftTask?.id === id) {
+            cancelQuickAdd();
+            return;
+          }
+          if (!drainPendingSync()) return;
+          ui.editingId = null;
+          const saved = mutate(fresh => { fresh.tasks = fresh.tasks.filter(task => task.id !== id); return fresh; });
+          if (saved) announce('삭제했습니다.');
+        };
+        if (window.widgetMotion?.close && row) window.widgetMotion.close(row, remove);
+        else remove();
       }
 
       function beginInlineEdit(id, field) {
@@ -2347,6 +2386,7 @@
         }
         const inlineStart = event.target.closest('[data-inline-start]');
         if (inlineStart) {
+          if (isMobileLayout() && inlineStart.dataset.inlineStart === 'title') return;
           if (event.shiftKey) {
             resetTransient();
             ui.editingId = inlineStart.dataset.taskId;
@@ -2394,7 +2434,7 @@
         }
         const rowDelete = event.target.closest('[data-row-delete], [data-delete-task]');
         if (rowDelete) {
-          armDelete(rowDelete.dataset.rowDelete || rowDelete.dataset.deleteTask);
+          deleteTaskNow(rowDelete.dataset.rowDelete || rowDelete.dataset.deleteTask);
           return;
         }
         if (event.target.closest('[data-cancel-editor]')) {
@@ -2404,6 +2444,21 @@
       });
 
       card.addEventListener('submit', event => {
+        const mobileAdd = event.target.closest('[data-mobile-add-form]');
+        if (mobileAdd) {
+          event.preventDefault();
+          const title = String(new FormData(mobileAdd).get('title') || '').trim();
+          if (!title || !drainPendingSync()) return;
+          const task = { ...createQuickDraft(state.mode), title, proj:'', q:null, due:null, status:'wait', done:false, start:null, end:null, progress:null, est:null, memo:'' };
+          const saved = mutate(fresh => { fresh.tasks.push(task); return fresh; });
+          if (saved) {
+            ui.newId = task.id;
+            renderAll();
+            window.setTimeout(() => { ui.newId = null; },900);
+            addArea.querySelector('.mobile-add-input')?.focus({ preventScroll:true });
+          }
+          return;
+        }
         const newProjectForm = event.target.closest('[data-project-new-form]');
         if (newProjectForm && ui.popover) {
           event.preventDefault();
@@ -2475,7 +2530,6 @@
 
       document.addEventListener('pointerdown', event => {
         if (ui.popover && !event.target.closest('#cellPopover, [data-cell-task][data-cell-field]')) closeCellPopover();
-        if (ui.confirmDeleteId && !event.target.closest('[data-row-delete], [data-delete-task]')) clearDeleteConfirm(false);
       });
 
       document.addEventListener('keydown', event => {
@@ -2499,10 +2553,6 @@
         if (ui.popover && (event.key === 'Enter' || event.key === 'Escape')) {
           event.preventDefault();
           closeCellPopover();
-          return;
-        }
-        if (event.key === 'Escape' && ui.confirmDeleteId) {
-          clearDeleteConfirm();
           return;
         }
         if (event.key === 'Escape' && (ui.adding || ui.editingId)) {
@@ -2567,6 +2617,9 @@
       });
       narrowQuery.addEventListener?.('change', () => {
         if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderDays();
+      });
+      window.addEventListener('widgetlayoutchange', () => {
+        if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderAll();
       });
 
       async function bootstrap() {

@@ -278,12 +278,45 @@
       .day-add { opacity:.45; visibility:visible; pointer-events:auto; }
       .day-add-zone { width:44px; height:44px; bottom:auto; }
     }
+    .mobile-day-detail { display:none; }
+    body.is-widget-mobile .calendar-card { height:auto; min-height:500px; padding:12px; gap:10px; }
+    body.is-widget-mobile .widget-head { min-height:78px; margin:0; display:grid; grid-template-columns:44px minmax(0,1fr) 44px; grid-template-rows:44px 24px; gap:2px 0; }
+    body.is-widget-mobile .month-nav { display:contents; }
+    body.is-widget-mobile .nav-button { width:44px; height:44px; border:0; background:transparent; color:var(--secondary); font-size:18px; }
+    body.is-widget-mobile .month-button { width:100%; height:44px; padding:0; font-size:15px; font-weight:800; }
+    body.is-widget-mobile .remain { grid-column:2; grid-row:2; max-width:none; font-size:11px; font-weight:700; letter-spacing:0; text-align:center; white-space:nowrap; }
+    body.is-widget-mobile .weekdays { gap:4px; padding:0; }
+    body.is-widget-mobile .weekday { height:24px; min-height:24px; font-size:10px; font-weight:800; }
+    body.is-widget-mobile .month-grid { min-height:auto; flex:0 0 auto; grid-auto-rows:44px; gap:4px; padding:0; border:0; background:transparent; }
+    body.is-widget-mobile .day { height:44px; min-height:44px; padding:4px; border:1px solid var(--edge); background:var(--bg); }
+    body.is-widget-mobile .day.selected { background:#E2F0F6; color:var(--action); }
+    body.is-widget-mobile .day.future { opacity:.6; }
+    body.is-widget-mobile .date { min-height:18px; color:var(--secondary); font-family:inherit; font-size:13px; font-weight:700; text-align:left; }
+    body.is-widget-mobile .events { min-height:4px; display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:3px; }
+    body.is-widget-mobile .event { width:4px; height:4px; min-height:4px !important; padding:0; border:0; border-radius:999px; background:transparent; box-shadow:none; pointer-events:none; }
+    body.is-widget-mobile .event .project-dot { width:4px; height:4px; border:0; border-radius:999px; background:var(--action); }
+    body.is-widget-mobile .event.done .project-dot { background:var(--inactive); opacity:1; }
+    body.is-widget-mobile .event-name,
+    body.is-widget-mobile .day-add-zone,
+    body.is-widget-mobile .popover { display:none !important; }
+    body.is-widget-mobile .mobile-day-detail { min-height:110px; display:flex; flex-direction:column; gap:4px; }
+    body.is-widget-mobile .mobile-detail-head { height:32px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    body.is-widget-mobile .mobile-detail-title { color:var(--title); font-size:13px; font-weight:800; }
+    body.is-widget-mobile .mobile-detail-count { color:var(--secondary); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .mobile-detail-list { padding:4px; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--track); border-radius:12px; }
+    body.is-widget-mobile .mobile-detail-row { height:48px; display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:8px; padding:0 8px; }
+    body.is-widget-mobile .mobile-detail-dot { width:8px; height:8px; border-radius:999px; background:var(--action); }
+    body.is-widget-mobile .mobile-detail-row.is-done .mobile-detail-dot { background:var(--inactive); }
+    body.is-widget-mobile .mobile-detail-name { overflow:hidden; color:var(--fg); font-size:15px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+    body.is-widget-mobile .mobile-detail-row.is-done .mobile-detail-name { color:var(--done); text-decoration:line-through; }
+    body.is-widget-mobile .mobile-detail-meta { color:var(--secondary); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .mobile-detail-empty { height:72px; display:grid; place-items:center; color:var(--muted); font-size:11px; font-weight:700; }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
   <script src="../store.js?v=20260903-worklog-revision"></script>
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-important-calendar.html" data-widget-max-width="1335" data-widget-height="854" data-widget-max-scale="4" style="--widget-max-width:1335px;--widget-base-width:1335px;--widget-base-height:854px;--widget-visual-height:854px">
+  <div class="widget-host" data-widget-host data-widget-mobile data-widget-key="widget-size-important-calendar.html" data-widget-max-width="1335" data-widget-height="854" data-widget-max-scale="4" style="--widget-max-width:1335px;--widget-base-width:1335px;--widget-base-height:854px;--widget-visual-height:854px">
     <main class="calendar-card" data-widget-card data-od-id="important-calendar-card" aria-label="중요 업무 캘린더">
       <header class="widget-head">
         <nav class="month-nav" data-od-id="important-calendar-month-navigation" aria-label="월 이동">
@@ -298,6 +331,7 @@
         <span class="weekday">목</span><span class="weekday">금</span><span class="weekday">토</span><span class="weekday">일</span>
       </div>
       <section class="month-grid" id="monthGrid" data-od-id="important-calendar-month-grid" aria-label="월간 중요 업무"></section>
+      <section class="mobile-day-detail" id="mobileDayDetail" aria-live="polite"></section>
       <aside class="popover" id="calendarPopover" hidden data-od-id="important-calendar-list-popup"></aside>
       <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
       <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
@@ -316,11 +350,14 @@
       const grid = document.getElementById('monthGrid');
       const monthButton = document.getElementById('monthButton');
       const remainCount = document.getElementById('remainCount');
+      const mobileDayDetail = document.getElementById('mobileDayDetail');
       const popover = document.getElementById('calendarPopover');
       const liveRegion = document.getElementById('liveRegion');
       const today = localNoon(new Date());
       const todayKey = dateKey(today);
+      const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
       let shownMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
+      let mobileSelectedDate = todayKey;
       let state = { tasks:[] };
       let worklogState = { tasks:[], projects:[], lastUsed:{} };
       let projects = [];
@@ -329,12 +366,11 @@
       let pendingCalendarState = null;
       let pendingWorklogState = null;
       let saveQueue = Promise.resolve();
-      let deleteTimer = 0;
       let lastSavedTaskId = '';
       let ui = freshUi();
 
       function freshUi() {
-        return { mode:'', date:'', taskId:'', anchor:null, column:0, original:null, draft:null, deleteArmed:false, dueMonth:null };
+        return { mode:'', date:'', taskId:'', anchor:null, column:0, original:null, draft:null, dueMonth:null };
       }
 
       function localNoon(value) {
@@ -343,6 +379,7 @@
       }
 
       function pad(value) { return String(value).padStart(2,'0'); }
+      function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character])); }
 
       function dateKey(date) {
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -522,8 +559,9 @@
         grid.replaceChildren(...Array.from({ length:cellCount }, (_, index) => createDay(start, index, month)));
         const prefix = `${year}-${pad(month + 1)}-`;
         const remaining = state.tasks.filter(task => task.due.startsWith(prefix) && task.status !== 'done').length;
-        remainCount.hidden = remaining === 0;
+        remainCount.hidden = remaining === 0 && !isMobileLayout();
         remainCount.textContent = `이번 달 ${remaining}개 남음`;
+        renderMobileDayDetail();
         if (ui.mode) {
           ui.anchor = grid.querySelector(`[data-date="${ui.date}"]`);
           if (!ui.anchor) closePopover({ save:false });
@@ -538,7 +576,7 @@
         const current = date.getMonth() === currentMonth;
         const dayTasks = tasksForDate(key);
         const cell = document.createElement('div');
-        cell.className = `day${current ? '' : ' other'}${date > today ? ' future' : ''}${key === todayKey ? ' today' : ''}`;
+        cell.className = `day${current ? '' : ' other'}${date > today ? ' future' : ''}${key === todayKey ? ' today' : ''}${key === mobileSelectedDate ? ' selected' : ''}`;
         cell.dataset.date = key;
         cell.dataset.column = String(index % 7);
         cell.tabIndex = 0;
@@ -582,6 +620,17 @@
         return cell;
       }
 
+      function renderMobileDayDetail() {
+        if (!isMobileLayout()) {
+          mobileDayDetail.replaceChildren();
+          return;
+        }
+        const selected = parseDate(mobileSelectedDate) || today;
+        const items = tasksForDate(mobileSelectedDate);
+        const rows = items.length ? items.map(task => `<div class="mobile-detail-row ${task.status === 'done' ? 'is-done' : ''}"><span class="mobile-detail-dot" aria-hidden="true"></span><span class="mobile-detail-name">${escapeHtml(task.title)}</span><span class="mobile-detail-meta">${task.status === 'done' ? '완료' : `${selected.getMonth() + 1}/${selected.getDate()}`}</span></div>`).join('') : '<div class="mobile-detail-empty">중요 업무 없음</div>';
+        mobileDayDetail.innerHTML = `<div class="mobile-detail-head"><span class="mobile-detail-title">${selected.getMonth() + 1}월 ${selected.getDate()}일</span><span class="mobile-detail-count">${items.length}개</span></div><div class="mobile-detail-list">${rows}</div>`;
+      }
+
       function openList(cell) {
         beginPopup('list', cell.dataset.date, cell);
         renderListPopup();
@@ -604,12 +653,10 @@
         ui.taskId = id;
         ui.original = { ...task };
         ui.draft = { ...task };
-        ui.deleteArmed = false;
         renderEditorPopup();
       }
 
       function beginPopup(mode, key, cell) {
-        cancelDeleteConfirm();
         popover.querySelector('.due-picker')?.remove();
         card.querySelectorAll('.day.add-open').forEach(day => day.classList.remove('add-open'));
         ui = { ...freshUi(), mode, date:key, anchor:cell, column:Number(cell.dataset.column) || 0 };
@@ -723,7 +770,7 @@
           const hint = document.createElement('span');
           hint.className = 'editor-save-hint';
           hint.textContent = 'Enter · 바깥 클릭 시 저장';
-          const remove = actionButton(ui.deleteArmed ? '지울까요' : '✕ 삭제', ui.deleteArmed ? 'danger-button' : 'text-button', 'deleteTask');
+          const remove = actionButton('삭제','text-button','deleteTask');
           footer.append(hint,remove);
           popover.appendChild(footer);
         }
@@ -933,7 +980,6 @@
         lastSavedTaskId = '';
         const draftSaved = !revert && save && (ui.mode === 'add' || ui.mode === 'edit') ? saveDraft() : false;
         const savedTaskId = lastSavedTaskId;
-        cancelDeleteConfirm();
         popover.querySelector('.due-picker')?.remove();
         card.querySelectorAll('.day.add-open').forEach(day => day.classList.remove('add-open'));
         popover.hidden = true;
@@ -958,29 +1004,10 @@
         }
       }
 
-      function cancelDeleteConfirm() {
-        clearTimeout(deleteTimer);
-        deleteTimer = 0;
-        if (!ui.deleteArmed) return;
-        ui.deleteArmed = false;
-        if (ui.mode === 'edit' && !popover.hidden) renderEditorPopup();
-      }
-
-      function armDelete() {
-        if (ui.deleteArmed) {
-          const id = ui.taskId;
-          ui.deleteArmed = false;
-          deleteTask(id);
-          closePopover({ save:false });
-          return;
-        }
-        ui.deleteArmed = true;
-        renderEditorPopup();
-        clearTimeout(deleteTimer);
-        deleteTimer = window.setTimeout(() => {
-          ui.deleteArmed = false;
-          if (ui.mode === 'edit' && !popover.hidden) renderEditorPopup();
-        },3000);
+      function deleteOpenTask() {
+        const id = ui.taskId;
+        deleteTask(id);
+        closePopover({ save:false });
       }
 
       function applyPendingSync() {
@@ -1045,6 +1072,7 @@
       function setShownMonth(delta) {
         closePopover({ save:false });
         shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + delta, 1, 12);
+        if (isMobileLayout()) mobileSelectedDate = dateKey(shownMonth);
         renderMonth();
         runGridMotion();
       }
@@ -1062,11 +1090,19 @@
       monthButton.addEventListener('click', () => {
         closePopover({ save:false });
         shownMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
+        if (isMobileLayout()) mobileSelectedDate = todayKey;
         renderMonth();
         runGridMotion();
       });
 
       grid.addEventListener('click', event => {
+        if (isMobileLayout()) {
+          const cell = event.target.closest('.day');
+          if (!cell) return;
+          mobileSelectedDate = cell.dataset.date;
+          renderMonth();
+          return;
+        }
         const add = event.target.closest('[data-add-date]');
         if (add) {
           event.stopPropagation();
@@ -1080,6 +1116,11 @@
       grid.addEventListener('keydown', event => {
         if (!event.target.matches('.day') || !['Enter',' '].includes(event.key)) return;
         event.preventDefault();
+        if (isMobileLayout()) {
+          mobileSelectedDate = event.target.dataset.date;
+          renderMonth();
+          return;
+        }
         openList(event.target);
       });
 
@@ -1141,7 +1182,7 @@
           } else renderEditorPopup();
           return;
         }
-        if (event.target.closest('[data-delete-task]')) { armDelete(); return; }
+        if (event.target.closest('[data-delete-task]')) { deleteOpenTask(); return; }
         if (event.target.closest('[data-submit-add]')) { closePopover({ save:true }); return; }
         if (event.target.closest('[data-close-popup]')) { closePopover({ save:ui.mode === 'edit' }); }
       });
@@ -1154,15 +1195,13 @@
 
       document.addEventListener('pointerdown', event => {
         if (popover.hidden || popover.contains(event.target)) return;
-        if (ui.deleteArmed) cancelDeleteConfirm();
         closePopover({ save:true });
       });
 
       document.addEventListener('keydown', event => {
         if (event.key !== 'Escape' || popover.hidden) return;
         event.preventDefault();
-        if (ui.deleteArmed) cancelDeleteConfirm();
-        else closePopover({ save:false, revert:true });
+        closePopover({ save:false, revert:true });
       });
 
       window.addEventListener('focus', () => { syncCalendar(); syncProjects(); });
@@ -1170,6 +1209,7 @@
         if (!document.hidden) { syncCalendar(); syncProjects(); }
       });
       window.addEventListener('resize', () => requestAnimationFrame(positionPopover));
+      window.addEventListener('widgetlayoutchange', renderMonth);
 
       renderMonth();
       Promise.all([syncCalendar(),syncProjects()]);

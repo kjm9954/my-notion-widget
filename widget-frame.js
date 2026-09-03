@@ -261,7 +261,6 @@
 (() => {
   'use strict';
 
-  const REFLOW_MAX = 639;
   const sizeQuery = new URLSearchParams(location.search);
 
   function isMobileTabletDevice() {
@@ -289,6 +288,26 @@
     ));
   }
 
+  function layoutMode(host, savedWidth) {
+    if (!isMobileTabletDevice()) return 'desktop';
+    const width = viewportWidth();
+    if (width >= 640 || savedWidth <= width * 2) return 'scale';
+    return host?.hasAttribute('data-widget-mobile') ? 'mobile' : 'reflow';
+  }
+
+  function setLayoutMode(host, savedWidth) {
+    const mode = layoutMode(host, savedWidth);
+    const previous = document.body.dataset.widgetLayoutMode || '';
+    document.body.dataset.widgetLayoutMode = mode;
+    document.body.classList.toggle('is-mobile-tablet-device', isMobileTabletDevice());
+    document.body.classList.toggle('is-widget-reflow', mode === 'reflow');
+    document.body.classList.toggle('is-widget-mobile', mode === 'mobile');
+    if (mode !== previous) {
+      queueMicrotask(() => window.dispatchEvent(new CustomEvent('widgetlayoutchange', { detail:{ mode } })));
+    }
+    return mode;
+  }
+
   function positiveQuery(name) {
     const value = Number(sizeQuery.get(name));
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -313,7 +332,7 @@
   function clampToCard(element) {
     if (!element) return element;
     element.style.removeProperty('translate');
-    if (document.body.classList.contains('is-widget-reflow')) return element;
+    if (document.body.classList.contains('is-widget-reflow') || document.body.classList.contains('is-widget-mobile')) return element;
     const card = element.closest('[data-widget-card]') || document.querySelector('[data-widget-card]');
     if (!card || element.hidden || !element.getClientRects().length) return element;
     const margin = 8;
@@ -341,7 +360,9 @@
     const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
     const defaultListHeight = Number(list.dataset.widgetListHeight) || list.offsetHeight || 160;
     const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
-    const isReflow = () => isMobileTabletDevice() && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
+    let savedWidth = designWidth;
+    const currentLayoutMode = () => layoutMode(host, savedWidth);
+    const isReflow = () => ['reflow','mobile'].includes(currentLayoutMode());
     let requestedListHeight = defaultListHeight;
     let renderedListHeight = defaultListHeight;
     let listLocked = false;
@@ -362,6 +383,7 @@
     }
 
     function saveSize() {
+      if (isMobileTabletDevice()) return;
       try {
         localStorage.setItem(key, JSON.stringify({
           scale: 1,
@@ -385,24 +407,24 @@
     }
 
     function commit() {
-      const reflow = isReflow();
-      document.body.classList.toggle('is-widget-reflow', reflow);
-      const visualWidth = isMobileTabletDevice()
-        ? (reflow ? viewportWidth() : Math.max(1, Math.min(designWidth, viewportWidth())))
-        : designWidth;
+      const mode = setLayoutMode(host, savedWidth);
+      const reflow = mode === 'reflow' || mode === 'mobile';
+      const baseWidth = reflow ? viewportWidth() : savedWidth;
+      const scale = mode === 'scale' ? Math.min(1, viewportWidth() / Math.max(1, savedWidth)) : 1;
+      const visualWidth = baseWidth * scale;
       const offset = listOffset();
       const maximum = Math.max(120, viewportHeight() - offset);
       if (!listLocked) requestedListHeight = Math.max(120, declaredHeight - offset);
       renderedListHeight = Math.max(Math.min(160, maximum), Math.min(maximum, requestedListHeight));
       const frameHeight = offset + renderedListHeight;
-      host.style.setProperty('--widget-content-width', `${visualWidth}px`);
-      host.style.setProperty('--widget-base-width', `${visualWidth}px`);
+      host.style.setProperty('--widget-content-width', `${baseWidth}px`);
+      host.style.setProperty('--widget-base-width', `${baseWidth}px`);
       host.style.setProperty('--widget-visual-width', `${visualWidth}px`);
       host.style.setProperty('--widget-base-height', `${frameHeight}px`);
-      host.style.setProperty('--widget-visual-height', `${frameHeight}px`);
-      host.style.setProperty('--widget-content-scale', '1');
-      card.style.setProperty('--widget-content-width', `${visualWidth}px`);
-      card.style.setProperty('--widget-content-scale', '1');
+      host.style.setProperty('--widget-visual-height', `${frameHeight * scale}px`);
+      host.style.setProperty('--widget-content-scale', String(scale));
+      card.style.setProperty('--widget-content-width', `${baseWidth}px`);
+      card.style.setProperty('--widget-content-scale', String(scale));
       card.style.height = `${frameHeight}px`;
       list.style.flex = `0 0 ${renderedListHeight}px`;
       list.style.height = `${renderedListHeight}px`;
@@ -452,6 +474,7 @@
     });
 
     const saved = readSize();
+    savedWidth = Math.max(1, number(saved.contentW, designWidth) * Math.max(.08, number(saved.scale, 1)));
     listLocked = saved.listLocked === true;
     requestedListHeight = Math.max(120, number(saved.listH, defaultListHeight));
     commit();
@@ -535,7 +558,10 @@
   const ABSOLUTE_MINIMUM_SCALE = .08;
   const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
   const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
-  const isReflow = () => isMobileTabletDevice() && viewportWidth() <= REFLOW_MAX && designWidth > viewportWidth();
+  let savedWidth = designWidth;
+  const currentLayoutMode = () => layoutMode(host, savedWidth);
+  const isReflow = () => ['reflow','mobile'].includes(currentLayoutMode());
+  const isFluidMobile = () => ['reflow','mobile'].includes(currentLayoutMode());
 
   let contentWidth = designWidth;
   host.style.setProperty('--widget-content-width', `${contentWidth}px`);
@@ -581,6 +607,7 @@
   }
 
   function saveSize() {
+    if (isMobileTabletDevice()) return;
     const nextScale = Math.max(minimumScale(), Math.min(maximumScale(), requestedScale));
     if (widthKey) sharedVisualWidth = Math.round(contentWidth * nextScale);
     const value = {
@@ -612,8 +639,7 @@
      card, so a wide or short embed can never leave an empty band around it. */
   function maximumScale() {
     const byWidth = viewportWidth() / contentWidth;
-    const byHeight = viewportHeight() / naturalHeight;
-    const viewportLimit = isMobileTabletDevice() ? Math.min(byWidth, byHeight) : Number.POSITIVE_INFINITY;
+    const viewportLimit = isMobileTabletDevice() ? byWidth : Number.POSITIVE_INFINITY;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
       ? configuredMaximumScale
       : Number.POSITIVE_INFINITY;
@@ -626,7 +652,7 @@
 
   function measureContentWidth() {
     if (sizeDrag) return contentWidth;
-    if (isReflow()) return viewportWidth();
+    if (isFluidMobile()) return viewportWidth();
     if (widthKey) {
       /* Members can have different natural heights, so their height-limited
          scales may differ. Compensate with logical width so the outer widths
@@ -660,9 +686,9 @@
     frameRequest = 0;
     frameTimer = 0;
 
-    const reflow = isReflow();
-    document.body.classList.toggle('is-widget-reflow', reflow);
-    if (reflow) {
+    const mode = setLayoutMode(host, savedWidth);
+    const fluidMobile = mode === 'reflow' || mode === 'mobile';
+    if (fluidMobile) {
       const reflowWidth = viewportWidth();
       renderedScale = 1;
       host.style.setProperty('--widget-content-width', `${reflowWidth}px`);
@@ -829,7 +855,7 @@
     if (!list) return;
     if (fromUser) listLocked = true;
     const offset = listOffset();
-    const maximum = Math.max(40, (isReflow() ? viewportHeight() : viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
+    const maximum = Math.max(40, (isFluidMobile() ? viewportHeight() : viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
     const desired = number(value, requestedListHeight ?? list.offsetHeight);
     requestedListHeight = fromUser ? Math.max(Math.min(160, maximum), Math.min(maximum, desired)) : Math.max(40, desired);
     renderedListHeight = Math.max(40, Math.min(maximum, requestedListHeight));
@@ -986,6 +1012,9 @@
   const hasHorizontal = property => Object.prototype.hasOwnProperty.call(horizontalSaved, property);
   scaleLocked = horizontalSaved.scaleLocked === true || (!hasHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(hasHorizontal));
   requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(horizontalSaved, 1));
+  savedWidth = Math.max(1, widthKey
+    ? number(horizontalSaved.visualW, number(horizontalSaved.contentW, designWidth) * requestedScale)
+    : number(horizontalSaved.contentW, designWidth) * requestedScale);
   widthLocked = horizontalSaved.widthLocked === true || (!hasHorizontal('widthLocked') && hasHorizontal('contentW'));
   if (widthKey) {
     const queryVisualWidth = querySize.contentW !== null ? querySize.contentW * requestedScale : null;

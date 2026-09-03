@@ -60,20 +60,20 @@
     .empty-list { min-height:160px; display:grid; place-items:center; color:var(--faint); border:1px dashed var(--border); border-radius:12px; font-size:11px; font-weight:700; }
     .overlay { position:absolute; z-index:20; inset:12px; display:flex; flex-direction:column; gap:12px; padding:15px; overflow:auto; background:white; border:1px solid var(--border-soft); border-radius:14px; box-shadow:0 1px 2px rgba(18,48,60,.05); }
     .overlay[hidden] { display:none; }
-    .overlay-top { justify-content:space-between; }
+    .overlay-top { justify-content:flex-start; }
+    .overlay-close { margin-left:auto; width:28px; height:28px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--secondary); font-size:12px; font-weight:800; }
+    @media (hover:hover) { .overlay-close:hover { color:var(--text); background:#F5F9FB; } }
+    @media (hover:none) { .overlay-close { width:44px; height:44px; border-radius:12px; } }
     .open-one { width:100%; min-height:84px; padding:11px; resize:vertical; line-height:1.5; }
     .open-age { flex:0 0 auto; color:var(--muted); font-size:9px; font-weight:700; white-space:nowrap; }
     .open-detail { width:100%; min-height:240px; flex:1 1 auto; padding:11px; resize:none; line-height:1.6; }
     .detail-empty { min-height:100px; border:1px dashed var(--border); border-radius:12px; background:var(--surface-soft); color:var(--muted); font-size:11px; font-weight:700; cursor:pointer; }
-    .confirm-line { display:flex; align-items:center; gap:7px; color:var(--danger); font-size:10px; font-weight:700; }
-    .confirm-line button { min-height:28px; padding:0 7px; border:1px solid #E4D5D5; border-radius:8px; background:white; color:var(--secondary); font-size:9px; font-weight:700; cursor:pointer; }
-    .confirm-line .confirm-delete { border-color:var(--danger); background:var(--danger); color:white; }
     @media (any-pointer: coarse) and (max-width:639px) {
       .card { min-height:720px; }
       .entry-row, .one-input, .add-button, .search { min-height:44px; }
       .chip-row, .filter-row { height:auto; min-height:44px; }
       .chip, .detail-toggle, .manage-button, .banner-refresh, .text-button, .danger-button,
-      .manage-row button, .confirm-line button { min-height:44px; }
+      .manage-row button { min-height:44px; }
       .list { height:auto; min-height:378px; flex:1 1 auto; }
       .item { min-height:58px; max-height:none; }
       .item-one { overflow-wrap:anywhere; text-overflow:clip; white-space:normal; }
@@ -111,7 +111,7 @@
       'use strict';
       const DAY=86400000,DEFAULT_CATS=['아이디어','방향성'];
       const card=document.getElementById('card'),fixed=document.getElementById('fixedArea'),form=document.getElementById('entryForm'),oneInput=document.getElementById('oneInput'),detailInput=document.getElementById('detailInput'),detailToggle=document.getElementById('detailToggle'),entryHint=document.getElementById('entryHint'),banner=document.getElementById('banner'),search=document.getElementById('searchInput'),filterChips=document.getElementById('filterChips'),filterCaption=document.getElementById('filterCaption'),manageButton=document.getElementById('manageButton'),managePanel=document.getElementById('managePanel'),list=document.getElementById('itemList'),overlay=document.getElementById('overlay');
-      let store=empty(),filterCat='',query='',detailOpen=false,detailEditing=false,managing=false,bannerId='',openId='',openedBefore=0,confirming=false,newId='',saveTimer=0,revision=0,saving=false,syncSignature='';
+      let store=empty(),filterCat='',query='',detailOpen=false,detailEditing=false,managing=false,bannerId='',openId='',openedBefore=0,newId='',saveTimer=0,revision=0,saving=false,syncSignature='';
       function empty(){return{items:[],cats:DEFAULT_CATS.slice(),catOpened:{}};}
       function id(){try{return crypto.randomUUID();}catch(_){return`${Date.now()}-${Math.random().toString(36).slice(2)}`;}}
       function normalize(raw){
@@ -134,8 +134,8 @@
       function renderList(){const items=filtered();list.innerHTML=items.length?items.map(item=>`<button class="item${item.id===newId?' motion-new':''}" type="button" data-open="${escapeAttr(item.id)}"><span class="item-top"><span class="item-one">${escapeHtml(item.one)}</span>${item.id===newId?'<span class="new-mark">✓</span>':''}</span><span class="item-meta">${escapeHtml(item.cat)} · ${days(item.created)===0?'오늘':`${days(item.created)}일 전`}</span></button>`).join(''):'<div class="empty-list">조건에 맞는 생각이 없습니다</div>';}
       function renderManage(){managePanel.innerHTML=`${store.cats.map((cat,index)=>`<div class="manage-row"><input class="manage-input" value="${escapeAttr(cat)}" maxlength="18" data-rename="${index}" aria-label="카테고리 이름"><button class="danger" type="button" data-remove-cat="${index}"${store.cats.length===1?' disabled':''}>삭제</button></div>`).join('')}<div class="manage-row"><input class="manage-input" id="newCat" maxlength="18" placeholder="새 카테고리"><button type="button" data-add-cat>추가</button></div>`;}
       function renderAll(){if(!bannerId||!itemById(bannerId))chooseBanner(false);renderBanner();renderFilters();renderEntryHint();renderList();if(managing)renderManage();}
-      function open(itemId){const item=itemById(itemId);if(!item)return;openId=itemId;openedBefore=item.opened;confirming=false;detailEditing=false;update(latest=>{const target=latest.items.find(entry=>entry.id===itemId);if(target){target.opened=Date.now();latest.catOpened[target.cat]=Date.now();}});renderOverlay();overlay.hidden=false;window.widgetFrame?.clampToCard(overlay);renderAll();}
-      function renderOverlay(){const item=itemById(openId);if(!item){overlay.hidden=true;return;}overlay.innerHTML=`<div class="overlay-top">${confirming?`<span class="confirm-line">삭제할까요? <button class="confirm-delete" type="button" data-confirm-delete>삭제</button><button type="button" data-cancel-delete>취소</button></span>`:`<button class="text-button" type="button" data-close>‹ 목록</button><button class="danger-button" type="button" data-delete>삭제</button>`}</div><textarea class="open-one" maxlength="240" data-open-one>${escapeHtml(item.one)}</textarea><div class="open-cats"><div class="open-chip-list">${store.cats.map(cat=>`<button class="chip${cat===item.cat?' selected':''}" type="button" data-open-cat="${escapeAttr(cat)}">${escapeHtml(cat)}</button>`).join('')}</div><span class="open-age">${days(openedBefore)}일 만에 열어봄</span></div><div class="section-divider"></div>${item.detail.trim()||detailEditing?`<textarea class="open-detail" maxlength="4000" data-open-detail>${escapeHtml(item.detail)}</textarea>`:'<button class="detail-empty" type="button" data-add-detail>＋ 상세 추가하기</button>'}`;window.widgetFrame?.clampToCard(overlay);}
+      function open(itemId){const item=itemById(itemId);if(!item)return;openId=itemId;openedBefore=item.opened;detailEditing=false;update(latest=>{const target=latest.items.find(entry=>entry.id===itemId);if(target){target.opened=Date.now();latest.catOpened[target.cat]=Date.now();}});renderOverlay();overlay.hidden=false;window.widgetFrame?.clampToCard(overlay);renderAll();}
+      function renderOverlay(){const item=itemById(openId);if(!item){overlay.hidden=true;return;}overlay.innerHTML=`<div class="overlay-top"><button class="danger-button" type="button" data-delete>삭제</button><button class="overlay-close" type="button" data-close aria-label="닫기">✕</button></div><textarea class="open-one" maxlength="240" data-open-one>${escapeHtml(item.one)}</textarea><div class="open-cats"><div class="open-chip-list">${store.cats.map(cat=>`<button class="chip${cat===item.cat?' selected':''}" type="button" data-open-cat="${escapeAttr(cat)}">${escapeHtml(cat)}</button>`).join('')}</div><span class="open-age">${days(openedBefore)}일 만에 열어봄</span></div><div class="section-divider"></div>${item.detail.trim()||detailEditing?`<textarea class="open-detail" maxlength="4000" data-open-detail>${escapeHtml(item.detail)}</textarea>`:'<button class="detail-empty" type="button" data-add-detail>＋ 상세 추가하기</button>'}`;window.widgetFrame?.clampToCard(overlay);}
       function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
       function escapeAttr(value){return escapeHtml(value);}
       form.addEventListener('submit',event=>{event.preventDefault();const one=oneInput.value.trim();if(!one)return;const now=Date.now(),item={id:id(),one,detail:detailOpen?detailInput.value:'',cat:targetCat(),created:now,opened:now};update(latest=>latest.items.unshift(item));newId=item.id;oneInput.value='';detailInput.value='';detailOpen=false;detailInput.hidden=true;detailInput.classList.remove('is-opening','is-closing');detailToggle.textContent='＋ 상세';detailToggle.setAttribute('aria-expanded','false');renderAll();list.scrollTop=0;const rowNew=list.querySelector(`[data-open="${CSS.escape(item.id)}"]`);widgetMotion.popIn(rowNew);oneInput.focus();});
@@ -148,9 +148,7 @@
         const filter=target.closest('[data-filter]');if(filter){filterCat=filter.dataset.filter;renderFilters();widgetMotion.pop(filterChips.querySelector('.chip.selected'));renderEntryHint();renderList();return;}
         const openButton=target.closest('[data-open]');if(openButton){open(openButton.dataset.open);return;}
         if(target.closest('[data-close]')){overlay.hidden=true;openId='';detailEditing=false;return;}
-        if(target.closest('[data-delete]')){confirming=true;renderOverlay();return;}
-        if(target.closest('[data-cancel-delete]')){confirming=false;renderOverlay();return;}
-        if(target.closest('[data-confirm-delete]')){const deleting=openId,rowNode=list.querySelector(`[data-open="${CSS.escape(deleting)}"]`);openId='';overlay.hidden=true;const finish=()=>{update(latest=>{latest.items=latest.items.filter(item=>item.id!==deleting);});chooseBanner(false);renderAll();};if(rowNode&&window.widgetMotion)window.widgetMotion.close(rowNode,finish);else finish();return;}
+        if(target.closest('[data-delete]')){const deleting=openId,rowNode=list.querySelector(`[data-open="${CSS.escape(deleting)}"]`);openId='';overlay.hidden=true;const finish=()=>{update(latest=>{latest.items=latest.items.filter(item=>item.id!==deleting);});chooseBanner(false);renderAll();};if(rowNode&&window.widgetMotion)window.widgetMotion.close(rowNode,finish);else finish();return;}
         const cat=target.closest('[data-open-cat]');if(cat){update(latest=>{const item=latest.items.find(entry=>entry.id===openId);if(item)item.cat=cat.dataset.openCat;});renderOverlay();renderAll();return;}
         if(target.closest('[data-add-detail]')){detailEditing=true;renderOverlay();requestAnimationFrame(()=>overlay.querySelector('[data-open-detail]')?.focus());return;}
         if(target.closest('[data-add-cat]')){const input=document.getElementById('newCat'),value=input?.value.trim();if(!value||store.cats.includes(value)||store.cats.length>=10)return;update(latest=>latest.cats.push(value));filterCat=value;renderAll();return;}

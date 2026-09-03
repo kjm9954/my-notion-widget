@@ -48,6 +48,31 @@ test("every local HTML asset reference resolves to a file", async () => {
   assert.deepEqual(missing, []);
 });
 
+test("삭제 확인 단계와 잘못된 닫기 기호가 위젯에 남지 않는다", async () => {
+  const forbidden = /×|삭제할까요|정말 삭제|← 목록|‹ 목록|confirmDeleteId|deleteArmed|deleteConfirm/;
+  const failures = [];
+  for (const file of htmlFiles) {
+    const html = await readFile(file, "utf8");
+    if (forbidden.test(html)) failures.push(file);
+  }
+  assert.deepEqual(failures, []);
+});
+
+test("아이폰 전용 5개 위젯만 전용 모바일 레이아웃을 선언한다", async () => {
+  const mobileWidgets = [
+    "Worklog/worklog.html",
+    "Worklog/weekly.html",
+    "Worklog/important-calendar.html",
+    "growth-page/goals.html",
+    "growth-page/record.html",
+  ];
+  for (const relative of mobileWidgets) {
+    const html = await readFile(resolve(root, relative), "utf8");
+    assert.match(html, /data-widget-mobile/);
+    assert.match(html, /body\.is-widget-mobile/);
+  }
+});
+
 test("polled widgets do not rebuild unchanged server content", async () => {
   const guarded = [
     "game-log-diary/achieve.html",

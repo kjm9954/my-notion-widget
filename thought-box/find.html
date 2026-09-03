@@ -233,7 +233,7 @@
       border-color:var(--dashed);
     }
     .chip:focus-visible, .manage-button:focus-visible, .text-button:focus-visible,
-    .danger-button:focus-visible, .confirm-delete:focus-visible, .cancel-delete:focus-visible {
+    .danger-button:focus-visible {
       outline:2px solid var(--secondary);
       outline-offset:2px;
     }
@@ -446,7 +446,7 @@
       align-items:center;
       gap:7px;
     }
-    .text-button, .danger-button, .confirm-delete, .cancel-delete {
+    .text-button, .danger-button {
       min-height:34px;
       display:inline-flex;
       align-items:center;
@@ -457,10 +457,16 @@
       cursor:pointer;
     }
     .text-button {
-      padding:0 4px;
+      width:28px;
+      height:28px;
+      min-height:28px;
+      margin-left:auto;
+      padding:0;
       color:var(--secondary);
       background:transparent;
       border:0;
+      border-radius:8px;
+      justify-content:center;
     }
     .danger-button {
       margin-left:auto;
@@ -469,25 +475,7 @@
       background:var(--surface);
       border:1px solid var(--danger-border);
     }
-    .delete-question {
-      color:var(--danger);
-      font-size:10px;
-      font-weight:700;
-    }
-    .confirm-delete {
-      margin-left:auto;
-      padding:0 10px;
-      color:var(--surface);
-      background:var(--danger);
-      border:1px solid var(--danger);
-    }
-    .cancel-delete {
-      padding:0 9px;
-      color:var(--secondary);
-      background:var(--surface);
-      border:1px solid var(--border);
-    }
-
+    .overlay-top .danger-button { margin-left:0; }
     .open-one {
       width:100%;
       min-height:88px;
@@ -563,8 +551,7 @@
       body.widget-page .card .chip, body.widget-page .card .manage-button,
       body.widget-page .card .banner-refresh, body.widget-page .card .manage-delete,
       body.widget-page .card .done-button, body.widget-page .card .text-button,
-      body.widget-page .card .danger-button, body.widget-page .card .confirm-delete,
-      body.widget-page .card .cancel-delete, body.widget-page .card .item { min-height:45px !important; }
+      body.widget-page .card .danger-button, body.widget-page .card .item { min-height:45px !important; }
       .chip, .manage-button, .banner-refresh { padding-top:6px; padding-bottom:6px; }
       .filter-row { height:44px; }
       .filter-block { height:52px; min-height:52px; flex-basis:52px; }
@@ -627,7 +614,6 @@
       let openId = '';
       let openedBefore = 0;
       let detailEditing = false;
-      let deleteConfirm = false;
       let savedListScroll = 0;
       let saveTimer = 0;
       let revision = 0;
@@ -1024,7 +1010,6 @@
         openId = id;
         openedBefore = item.opened;
         detailEditing = Boolean(item.detail.trim());
-        deleteConfirm = false;
         closeManage();
         const now = Math.max(Date.now(), item.created + 1);
         updateStore((latest) => {
@@ -1042,7 +1027,6 @@
       function closeOverlay() {
         openId = '';
         detailEditing = false;
-        deleteConfirm = false;
         overlay.hidden = true;
         renderList();
         itemList.scrollTop = savedListScroll;
@@ -1059,34 +1043,18 @@
 
         const top = document.createElement('div');
         top.className = 'overlay-top';
-        if (deleteConfirm) {
-          const question = document.createElement('span');
-          question.className = 'delete-question';
-          question.textContent = '삭제할까요?';
-          const confirm = document.createElement('button');
-          confirm.type = 'button';
-          confirm.className = 'confirm-delete';
-          confirm.textContent = '삭제';
-          confirm.addEventListener('click', confirmDelete);
-          const cancel = document.createElement('button');
-          cancel.type = 'button';
-          cancel.className = 'cancel-delete';
-          cancel.textContent = '취소';
-          cancel.addEventListener('click', () => { deleteConfirm = false; renderOverlay(); });
-          top.append(question, confirm, cancel);
-        } else {
-          const back = document.createElement('button');
-          back.type = 'button';
-          back.className = 'text-button';
-          back.textContent = '‹ 목록';
-          back.addEventListener('click', closeOverlay);
-          const remove = document.createElement('button');
-          remove.type = 'button';
-          remove.className = 'danger-button';
-          remove.textContent = '삭제';
-          remove.addEventListener('click', () => { deleteConfirm = true; renderOverlay(); });
-          top.append(back, remove);
-        }
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'danger-button';
+        remove.textContent = '삭제';
+        remove.addEventListener('click', deleteOpenItem);
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'text-button';
+        back.textContent = '✕';
+        back.setAttribute('aria-label','닫기');
+        back.addEventListener('click', closeOverlay);
+        top.append(remove, back);
 
         const one = document.createElement('textarea');
         one.className = 'open-one';
@@ -1166,13 +1134,12 @@
         window.widgetFrame?.clampToCard(overlay);
       }
 
-      function confirmDelete() {
+      function deleteOpenItem() {
         const deleting = openId;
         updateStore((latest) => {
           latest.items = latest.items.filter((item) => item.id !== deleting);
         });
         openId = '';
-        deleteConfirm = false;
         overlay.hidden = true;
         chooseBanner(false);
         renderBanner();

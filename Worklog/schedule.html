@@ -70,7 +70,6 @@
     .run-error { overflow:hidden; color:var(--secondary-strong); font-size:9px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
     .item-tools { justify-content:flex-end; margin-top:1px; }
     .item-action { min-height:24px; padding:4px 6px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:9px; font-weight:700; }
-    .item-action.delete-confirm { color:var(--danger); }
     .inline-editor,.title-composer {
       flex:0 0 auto; padding:10px; display:grid; align-content:start; gap:8px; border-radius:9px;
       background:var(--bg); box-shadow:var(--item-shadow); outline:1px solid var(--border-soft); outline-offset:-1px;
@@ -187,8 +186,6 @@
     let saving = false;
     let editor = null;
     let composerOpen = false;
-    let deleteConfirmId = null;
-    let deleteTimer = 0;
     let formError = "";
 
     function escapeHtml(value) {
@@ -208,8 +205,6 @@
     }
 
     function openEditor(kind = "once", schedule = null) {
-      clearTimeout(deleteTimer);
-      deleteConfirmId = null;
       formError = "";
       composerOpen = false;
       editor = schedule ? {
@@ -273,10 +268,9 @@
         ? (item.kind === "weekly" && next ? `${formatOccurrence(next.createAt)} 자동 재개` : "페이지 생성 안 함")
         : (next ? `${formatOccurrence(next.createAt)}에 페이지 생성` : "페이지 생성 시각 확인 중");
       const skipText = item.kind === "weekly" ? "이번 주는 건너뜀" : "이번 예약은 건너뜀";
-      const confirm = deleteConfirmId === item.id;
       const runError = ["failed", "uncertain"].includes(item.runStatus)
         ? `<p class="run-error" title="${escapeHtml(item.runError || "")}">${escapeHtml(item.runError || "Notion 연결을 확인해주세요")}</p>` : "";
-      return `<article class="management-item${skipped ? " skipped" : ""}" data-id="${escapeHtml(item.id)}"><span class="type-pill${item.kind === "weekly" ? " repeat" : ""}">${kind}</span><div class="item-body"><div class="name-line"><strong>${escapeHtml(item.name)}</strong>${skipped ? `<span class="skip-pill">${skipText}</span>` : `<span class="project-pill">${escapeHtml(item.project)}</span>`}</div><div class="schedule-line"><b>${escapeHtml(scheduleText)}</b><span>${leadLabel(item.leadMinutes)} 전 생성</span></div><div class="creation-line"><b>${escapeHtml(nextText)}</b>${item.lastCreatedAt ? `<span>마지막 ${escapeHtml(formatOccurrence(item.lastCreatedAt))}</span>` : ""}</div>${runError}<div class="item-tools"><button class="item-action" type="button" data-action="skip" data-id="${escapeHtml(item.id)}">${skipped ? "↻ 되돌리기" : "건너뛰기"}</button><button class="item-action" type="button" data-action="edit" data-id="${escapeHtml(item.id)}">수정</button><button class="item-action${confirm ? " delete-confirm" : ""}" type="button" data-action="delete" data-id="${escapeHtml(item.id)}">${confirm ? "삭제 확인" : "삭제"}</button></div></div></article>`;
+      return `<article class="management-item${skipped ? " skipped" : ""}" data-id="${escapeHtml(item.id)}"><span class="type-pill${item.kind === "weekly" ? " repeat" : ""}">${kind}</span><div class="item-body"><div class="name-line"><strong>${escapeHtml(item.name)}</strong>${skipped ? `<span class="skip-pill">${skipText}</span>` : `<span class="project-pill">${escapeHtml(item.project)}</span>`}</div><div class="schedule-line"><b>${escapeHtml(scheduleText)}</b><span>${leadLabel(item.leadMinutes)} 전 생성</span></div><div class="creation-line"><b>${escapeHtml(nextText)}</b>${item.lastCreatedAt ? `<span>마지막 ${escapeHtml(formatOccurrence(item.lastCreatedAt))}</span>` : ""}</div>${runError}<div class="item-tools"><button class="item-action" type="button" data-action="skip" data-id="${escapeHtml(item.id)}">${skipped ? "↻ 되돌리기" : "건너뛰기"}</button><button class="item-action" type="button" data-action="edit" data-id="${escapeHtml(item.id)}">수정</button><button class="item-action" type="button" data-action="delete" data-id="${escapeHtml(item.id)}">삭제</button></div></div></article>`;
     }
 
     function editorMarkup() {
@@ -404,20 +398,11 @@
     }
 
     async function requestDelete(id) {
-      if (deleteConfirmId !== id) {
-        deleteConfirmId = id;
-        clearTimeout(deleteTimer);
-        deleteTimer = setTimeout(() => { deleteConfirmId = null; render(); }, 3500);
-        render();
-        return;
-      }
       if (saving) return;
-      clearTimeout(deleteTimer);
       saving = true;
       render();
       try {
         await window.Store.deleteSchedule(id);
-        deleteConfirmId = null;
         await loadSchedules({ quiet:true });
       } catch (error) {
         loadError = error?.message || "삭제 실패, 다시 시도해주세요.";
@@ -504,23 +489,9 @@
       event.preventDefault();
       submitEditor();
     });
-    document.addEventListener("click", event => {
-      if (!deleteConfirmId) return;
-      const deleteButton = event.target instanceof Element
-        ? event.target.closest('button[data-action="delete"]')
-        : null;
-      if (deleteButton) return;
-      clearTimeout(deleteTimer);
-      deleteConfirmId = null;
-      render();
-    });
     document.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
-      if (deleteConfirmId) {
-        clearTimeout(deleteTimer);
-        deleteConfirmId = null;
-        render();
-      } else if (composerOpen) {
+      if (composerOpen) {
         composerOpen = false;
         render();
       } else if (editor) closeEditor();

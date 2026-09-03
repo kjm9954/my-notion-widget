@@ -73,8 +73,11 @@
       scrollbar-width:thin; scrollbar-color:var(--disabled) transparent;
     }
     .overlay-head { min-height:28px; display:flex; align-items:center; gap:8px; }
-    .back, .delete { height:28px; padding:0 8px; border:0; border-radius:8px; background:var(--surface-soft); color:var(--deep); font-size:9px; font-weight:800; }
-    .delete { margin-left:auto; color:var(--danger); background:#fff; border:1px solid var(--danger-border); }
+    .back, .delete { width:28px; height:28px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--deep); font-size:12px; font-weight:800; }
+    .delete { color:var(--danger); border:1px solid var(--danger-border); }
+    .back { margin-left:auto; color:var(--secondary); }
+    @media (hover:hover) { .back:hover { color:var(--text); background:var(--surface-soft); } }
+    @media (hover:none) { .back, .delete { width:44px; height:44px; border-radius:12px; } }
     .detail-quote { padding-left:12px; border-left:2px solid var(--border); font-size:14px; font-weight:800; line-height:1.55; }
     .detail-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px; color:var(--secondary); font-size:9px; font-weight:700; }
     .field-pill { padding:4px 7px; border-radius:999px; color:var(--action); background:var(--action-soft); }
@@ -131,7 +134,6 @@
       let fieldsExpanded = false;
       let bannerIndex = 0;
       let activeId = '';
-      let deleteArmed = false;
       let lastThoughtId = '';
       const thoughtTimers = new Map();
 
@@ -194,22 +196,22 @@
         }).join('');
         els.list.querySelectorAll('[data-quote-id]').forEach(button => button.addEventListener('click', () => openDetail(button.dataset.quoteId)));
       }
-      function openDetail(id) { activeId = id; deleteArmed = false; renderDetail(); }
+      function openDetail(id) { activeId = id; renderDetail(); }
       function renderDetail() {
         const item = quotes.find(quote => quote.id === activeId);
         if (!item) { closeDetail(); return; }
         const book = bookFor(item.bookId); const list = visibleQuotes(); const index = list.findIndex(quote => quote.id === item.id);
         const readOnly = item.readOnly === true;
         els.overlay.classList.remove('hidden');
-        els.overlay.innerHTML = `<div class="overlay-head"><button class="back" id="detailBack" type="button">← 목록</button>${readOnly ? '' : `<button class="delete" id="detailDelete" type="button">${deleteArmed ? '삭제할까요?' : '삭제'}</button>`}</div><div class="detail-quote">${escapeHtml(item.text)}</div><div class="detail-meta"><span>${escapeHtml(book.title)}${item.page ? ` · ${escapeHtml(item.page)}p` : ''}</span><span class="field-pill">${escapeHtml(book.field || '미분류')}</span></div>${item.note ? `<div class="detail-note">${escapeHtml(item.note)}</div>` : ''}${readOnly ? '<div class="detail-note">노션 원본에서 관리하는 문장입니다</div>' : `<label class="thought-label" for="thoughtInput"><span>생각 한 줄</span><span class="saved" id="savedLabel">저장됨</span></label><textarea class="thought" id="thoughtInput" placeholder="이 문장이 남긴 생각을 자유롭게 적어보세요">${escapeHtml(item.thought || '')}</textarea><div class="markdown">**굵게** 표시할 수 있어요</div>`}<div class="pager"><button type="button" id="prevQuote" ${index <= 0 ? 'disabled' : ''}>← 이전</button><span>${Math.max(0, index) + 1} / ${list.length}</span><button type="button" id="nextQuote" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>`;
+        els.overlay.innerHTML = `<div class="overlay-head">${readOnly ? '' : '<button class="delete" id="detailDelete" type="button" aria-label="삭제">✕</button>'}<button class="back" id="detailBack" type="button" aria-label="닫기">✕</button></div><div class="detail-quote">${escapeHtml(item.text)}</div><div class="detail-meta"><span>${escapeHtml(book.title)}${item.page ? ` · ${escapeHtml(item.page)}p` : ''}</span><span class="field-pill">${escapeHtml(book.field || '미분류')}</span></div>${item.note ? `<div class="detail-note">${escapeHtml(item.note)}</div>` : ''}${readOnly ? '<div class="detail-note">노션 원본에서 관리하는 문장입니다</div>' : `<label class="thought-label" for="thoughtInput"><span>생각 한 줄</span><span class="saved" id="savedLabel">저장됨</span></label><textarea class="thought" id="thoughtInput" placeholder="이 문장이 남긴 생각을 자유롭게 적어보세요">${escapeHtml(item.thought || '')}</textarea><div class="markdown">**굵게** 표시할 수 있어요</div>`}<div class="pager"><button type="button" id="prevQuote" ${index <= 0 ? 'disabled' : ''}>← 이전</button><span>${Math.max(0, index) + 1} / ${list.length}</span><button type="button" id="nextQuote" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>`;
         document.getElementById('detailBack').addEventListener('click', closeDetail);
-        document.getElementById('detailDelete')?.addEventListener('click', () => { if (!deleteArmed) { deleteArmed = true; renderDetail(); } else deleteQuote(item.id); });
+        document.getElementById('detailDelete')?.addEventListener('click', () => deleteQuote(item.id));
         document.getElementById('thoughtInput')?.addEventListener('input', event => saveThought(item.id, event.target.value));
         document.getElementById('prevQuote').addEventListener('click', () => { if (index > 0) openDetail(list[index - 1].id); });
         document.getElementById('nextQuote').addEventListener('click', () => { if (index >= 0 && index < list.length - 1) openDetail(list[index + 1].id); });
         window.widgetFrame?.clampToCard(els.overlay);
       }
-      function closeDetail() { const thoughtId=lastThoughtId;lastThoughtId='';activeId = ''; deleteArmed = false; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); if(thoughtId)widgetMotion.pop(els.list.querySelector(`[data-quote-id="${CSS.escape(thoughtId)}"] .state-dot.has-thought`)); }
+      function closeDetail() { const thoughtId=lastThoughtId;lastThoughtId='';activeId = ''; els.overlay.classList.add('hidden'); els.overlay.innerHTML = ''; renderList(); renderBanner(); if(thoughtId)widgetMotion.pop(els.list.querySelector(`[data-quote-id="${CSS.escape(thoughtId)}"] .state-dot.has-thought`)); }
       function saveThought(id, value) {
         const item = quotes.find(quote => quote.id === id); if (!item) return;
         if(!String(item.thought || '').trim()&&String(value).trim()) lastThoughtId=id;

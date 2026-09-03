@@ -66,10 +66,6 @@
     .composer:not(.has-parent) .composer-actions { display:contents; }
     .small-button { min-height:31px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--muted); font-size:9px; font-weight:750; cursor:pointer; }
     .small-button.primary { border-color:var(--action); background:var(--action); color:white; }
-    .delete-confirm { padding:8px; border:1px solid #E4D5D5; border-radius:9px; background:var(--surface); color:var(--danger); font-size:9px; font-weight:700; line-height:1.4; }
-    .confirm-actions { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-    .confirm-actions button { min-height:27px; padding:0 6px; border:1px solid #E4D5D5; border-radius:7px; background:white; color:var(--secondary); font-size:8px; font-weight:750; cursor:pointer; }
-    .confirm-actions .confirm-danger { border-color:var(--danger); background:var(--danger); color:white; }
     .bottom-line { min-height:24px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .past-toggle { display:none; padding:0; border:0; background:transparent; color:var(--muted); font-size:10px; font-weight:750; cursor:pointer; }
     .undo { margin-left:auto; color:var(--done); font-size:9px; font-weight:700; }
@@ -83,11 +79,36 @@
       .past-toggle { display:block; }
       .goal-column { min-height:230px; }
     }
+    body.is-widget-mobile .card { min-height:500px; height:auto; padding:12px; gap:10px; }
+    body.is-widget-mobile .header { min-height:44px; }
+    body.is-widget-mobile .year-title { color:var(--text); font-size:15px; font-weight:800; }
+    body.is-widget-mobile .summary { color:var(--secondary); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .goals-grid { min-height:390px; display:flex; flex-direction:column; gap:10px; }
+    body.is-widget-mobile .mobile-goal-segments { flex:0 0 auto; height:34px; padding:3px; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:2px; border-radius:999px; background:#F5F9FB; }
+    body.is-widget-mobile .mobile-goal-segment { position:relative; height:44px; min-height:44px; margin:-5px 0; padding:0 5px; border:0; border-radius:999px; background:transparent; color:var(--secondary); font-size:11px; font-weight:700; isolation:isolate; }
+    body.is-widget-mobile .mobile-goal-segment::before { content:""; position:absolute; z-index:-1; inset:8px 0; border-radius:999px; background:transparent; }
+    body.is-widget-mobile .mobile-goal-segment.is-selected { background:transparent; color:var(--action); box-shadow:none; }
+    body.is-widget-mobile .mobile-goal-segment.is-selected::before { background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    body.is-widget-mobile .mobile-goal-segment.is-past { opacity:.55; }
+    body.is-widget-mobile .mobile-goal-list { min-height:0; flex:1; padding:4px; overflow-y:auto; display:flex; flex-direction:column; background:var(--surface-soft); border:1px solid var(--border-soft); border-radius:12px; }
+    body.is-widget-mobile .mobile-goal-row { height:48px; min-height:48px; display:grid; grid-template-columns:44px minmax(0,1fr); align-items:center; }
+    body.is-widget-mobile .mobile-goal-row + .mobile-goal-row { border-top:1px solid var(--border-soft); }
+    body.is-widget-mobile .mobile-goal-check { position:relative; width:44px; height:48px; padding:0; border:0; background:transparent; }
+    body.is-widget-mobile .mobile-goal-check::before { content:""; position:absolute; left:50%; top:50%; width:24px; height:24px; border:1.5px solid #C6D6DD; border-radius:7px; background:var(--surface); transform:translate(-50%,-50%); }
+    body.is-widget-mobile .mobile-goal-row.done .mobile-goal-check::before { border-color:var(--action); background:var(--action); }
+    body.is-widget-mobile .mobile-goal-row.done .mobile-goal-check::after { content:"✓"; position:absolute; left:50%; top:50%; color:#FFFFFF; font-size:11px; font-weight:800; transform:translate(-50%,-50%); }
+    body.is-widget-mobile .mobile-goal-name { min-width:0; padding-right:8px; overflow:hidden; color:var(--text); font-size:15px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+    body.is-widget-mobile .mobile-goal-row.done .mobile-goal-name { color:var(--done); text-decoration:line-through; }
+    body.is-widget-mobile .mobile-goal-empty { min-height:90px; display:grid; place-items:center; color:var(--muted); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .mobile-goal-add { height:48px; flex:0 0 48px; display:grid; grid-template-columns:44px minmax(0,1fr); align-items:center; border:1px dashed #C6D6DD; border-radius:12px; }
+    body.is-widget-mobile .mobile-goal-plus { color:var(--muted); font-size:16px; text-align:center; }
+    body.is-widget-mobile .mobile-goal-input { width:100%; height:46px; padding:0 10px 0 0; border:0; outline:0; background:transparent; color:var(--text); font-size:16px; font-weight:600; }
+    body.is-widget-mobile .bottom-line { display:none; }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-goals.html" data-widget-max-width="1400" data-widget-height="420" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:420px;--widget-visual-height:420px">
+  <div class="widget-host" data-widget-host data-widget-mobile data-widget-key="widget-size-goals.html" data-widget-max-width="1400" data-widget-height="420" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:420px;--widget-visual-height:420px">
     <main class="card" id="card" data-widget-card aria-label="4단 목표 계층 위젯">
       <header class="header" id="header"></header>
       <section class="goals-grid" id="goalsGrid" aria-live="polite"></section>
@@ -118,7 +139,8 @@
       let saving=false;
       let knownGoalIds=new Set();
       let syncSignature='';
-      const ui={editing:'',composer:'',deleting:'',undo:null,showPast:false};
+      const ui={editing:'',composer:'',undo:null,showPast:false,mobileScope:'month'};
+      const isMobileLayout=()=>document.body.classList.contains('is-widget-mobile');
 
       function id(){return `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;}
       function clone(value){return JSON.parse(JSON.stringify(value));}
@@ -154,7 +176,7 @@
       }
       function renderHeader(){
         const total=state.goals.length,done=state.goals.filter(goal=>goal.done).length;
-        header.innerHTML=`<div class="year-title">${now.getFullYear()}</div><div class="summary"><span>${total}개 중 ${done}개 완료</span></div>`;
+        header.innerHTML=`<div class="year-title">${now.getFullYear()}${isMobileLayout()?' 목표':''}</div><div class="summary"><span>${isMobileLayout()?`${done} / ${total} 달성`:`${total}개 중 ${done}개 완료`}</span></div>`;
       }
       function row(goal){
         if(ui.editing===goal.id)return `<div class="goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><input class="edit-input" data-edit-input="${esc(goal.id)}" value="${esc(goal.t)}"><button class="text-action danger" type="button" data-delete-request="${esc(goal.id)}">삭제</button><button class="text-action" type="button" data-edit-done>완료</button></div>`;
@@ -167,19 +189,24 @@
         const picker=scope==='year'?'':`<div class="parent-picker" data-parent-picker><button class="parent-trigger" type="button" data-parent-toggle aria-expanded="false"><span class="parent-label" data-parent-label>${emptyLabel}</span><span class="parent-caret" aria-hidden="true">⌄</span></button><div class="parent-options" data-parent-options hidden><button class="parent-option is-selected" type="button" data-parent-option="">${emptyLabel}</button>${options.map(goal=>`<button class="parent-option" type="button" data-parent-option="${esc(goal.id)}">${esc(goal.t)}</button>`).join('')}</div></div>`;
         return `<div class="composer${picker?' has-parent':''}" data-composer="${scope}" data-parent-value=""><input class="composer-input" data-new-goal placeholder="${columns.find(column=>column.scope===scope).label} 목표">${picker}<div class="composer-actions"><button class="small-button primary" type="button" data-add="${scope}">추가</button><button class="small-button" type="button" data-compose-cancel>취소</button></div></div>`;
       }
-      function deleteBox(goal){
-        const childCount=state.goals.filter(item=>item.parent===goal.id).length;
-        return `<div class="delete-confirm">‘${esc(goal.t)}’ 삭제${childCount?` · 바로 연결된 목표 ${childCount}개`:''}<div class="confirm-actions"><button class="confirm-danger" type="button" data-delete-mode="${childCount?'unlink':'single'}">${childCount?'연결 해제 후 삭제':'삭제'}</button>${childCount?'<button type="button" data-delete-mode="cascade">하위 목표도 삭제</button>':''}<button type="button" data-delete-cancel>취소</button></div></div>`;
-      }
       function renderGrid(){
+        if(isMobileLayout()){
+          const scope=ui.mobileScope;
+          const goals=goalsFor(scope);
+          const segments=columns.map(column=>`<button class="mobile-goal-segment${scope===column.scope?' is-selected':''}${column.scope==='h1'&&currentHalf==='h2'?' is-past':''}" type="button" data-mobile-scope="${column.scope}" aria-pressed="${scope===column.scope}">${column.label}</button>`).join('');
+          const rows=goals.length?goals.map(goal=>`<div class="mobile-goal-row${goal.done?' done':''}" data-row="${esc(goal.id)}"><button class="mobile-goal-check" type="button" data-toggle="${esc(goal.id)}" aria-label="완료 상태 변경"></button><span class="mobile-goal-name">${esc(goal.t)}</span></div>`).join(''):'<div class="mobile-goal-empty">목표가 없습니다</div>';
+          const label=columns.find(column=>column.scope===scope)?.label||'목표';
+          grid.className='goals-grid';
+          grid.innerHTML=`<div class="mobile-goal-segments">${segments}</div><div class="mobile-goal-list">${rows}</div><form class="mobile-goal-add" data-mobile-goal-form><span class="mobile-goal-plus" aria-hidden="true">＋</span><input class="mobile-goal-input" name="title" placeholder="${label} 목표 추가 후 엔터" aria-label="${label} 목표 추가" autocomplete="off"></form>`;
+          return;
+        }
         grid.classList.toggle('show-past',ui.showPast);
         grid.innerHTML=columns.map(column=>{
           const goals=goalsFor(column.scope);
           const isPast=column.scope==='h1'&&currentHalf==='h2';
           const isAccent=column.scope===currentHalf||column.scope==='month';
           const mobileSecondary=column.scope!==currentHalf&&column.scope!=='month';
-          const deleting=ui.deleting?byId(ui.deleting):null;
-          return `<section class="goal-column${isAccent?' accent':''}${isPast?' past':''}${mobileSecondary?' mobile-secondary':''}" data-column="${column.scope}"><header class="column-head"><span class="column-label">${column.label}</span><span class="column-count">${goals.length}</span>${isPast?'<span class="past-label">지난 구간</span>':''}</header><div class="goal-list">${goals.length?goals.map(row).join(''):`<div class="empty">목표가 없습니다</div>`}</div><footer class="column-footer">${ui.composer===column.scope?composer(column.scope):`<button class="add-trigger" type="button" data-compose-open="${column.scope}">＋ 목표 추가</button>`}${deleting?.scope===column.scope?deleteBox(deleting):''}</footer></section>`;
+          return `<section class="goal-column${isAccent?' accent':''}${isPast?' past':''}${mobileSecondary?' mobile-secondary':''}" data-column="${column.scope}"><header class="column-head"><span class="column-label">${column.label}</span><span class="column-count">${goals.length}</span>${isPast?'<span class="past-label">지난 구간</span>':''}</header><div class="goal-list">${goals.length?goals.map(row).join(''):`<div class="empty">목표가 없습니다</div>`}</div><footer class="column-footer">${ui.composer===column.scope?composer(column.scope):`<button class="add-trigger" type="button" data-compose-open="${column.scope}">＋ 목표 추가</button>`}</footer></section>`;
         }).join('');
       }
       function renderBottom(){
@@ -192,12 +219,12 @@
         const parent=box?.dataset.parentValue||null;
         const goal={id:id(),scope,t:title,done:false,parent,createdAt:Date.now(),completedAt:null};state.goals.push(goal);ui.composer='';ui.undo=null;save();render();const rowNode=card.querySelector(`[data-row="${CSS.escape(goal.id)}"]`);if(rowNode){widgetMotion.popIn(rowNode);rowNode.classList.add('motion-new');setTimeout(()=>rowNode.classList.remove('motion-new'),900);}
       }
-      function remove(mode){
-        const goal=byId(ui.deleting);if(!goal)return;
+      function remove(goalId,mode='unlink'){
+        const goal=byId(goalId);if(!goal)return;
         const previous=clone(state.goals);
         if(mode==='cascade'){const removing=descendants(goal.id);state.goals=state.goals.filter(item=>!removing.has(item.id));}
         else {state.goals.forEach(item=>{if(item.parent===goal.id)item.parent=null;});state.goals=state.goals.filter(item=>item.id!==goal.id);}
-        ui.undo={name:goal.t,goals:previous};ui.deleting='';ui.editing='';save();render();
+        ui.undo={name:goal.t,goals:previous};ui.editing='';save();render();
       }
       card.addEventListener('click',event=>{
         const target=event.target;
@@ -205,13 +232,12 @@
         const parentOption=target.closest('[data-parent-option]');if(parentOption){const box=parentOption.closest('[data-composer]'),picker=parentOption.closest('[data-parent-picker]'),trigger=picker?.querySelector('[data-parent-toggle]'),label=picker?.querySelector('[data-parent-label]');if(box)box.dataset.parentValue=parentOption.dataset.parentOption||'';picker?.querySelectorAll('[data-parent-option]').forEach(option=>option.classList.toggle('is-selected',option===parentOption));if(label)label.textContent=parentOption.textContent.trim();if(trigger)trigger.setAttribute('aria-expanded','false');const options=picker?.querySelector('[data-parent-options]');if(options)options.hidden=true;trigger?.focus();return;}
         card.querySelectorAll('[data-parent-toggle][aria-expanded="true"]').forEach(trigger=>{trigger.setAttribute('aria-expanded','false');const options=trigger.closest('[data-parent-picker]')?.querySelector('[data-parent-options]');if(options)options.hidden=true;});
         const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();if(goal.done)widgetMotion.pop(toggle);const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;setTimeout(()=>render(),delay);}return;}
-        const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';ui.deleting='';render('[data-edit-input]');return;}
+        const mobileScope=target.closest('[data-mobile-scope]');if(mobileScope){ui.mobileScope=mobileScope.dataset.mobileScope;render();return;}
+        const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
-        const del=target.closest('[data-delete-request]');if(del){ui.deleting=del.dataset.deleteRequest;ui.composer='';render();return;}
-        if(target.closest('[data-delete-cancel]')){ui.deleting='';render();return;}
-        const mode=target.closest('[data-delete-mode]');if(mode){remove(mode.dataset.deleteMode);return;}
+        const del=target.closest('[data-delete-request]');if(del){const rowNode=del.closest('[data-row]'),removeNow=()=>remove(del.dataset.deleteRequest);if(rowNode&&window.widgetMotion?.close)window.widgetMotion.close(rowNode,removeNow);else removeNow();return;}
         if(target.closest('[data-undo]')&&ui.undo){state.goals=clone(ui.undo.goals);ui.undo=null;save();render();return;}
-        const open=target.closest('[data-compose-open]');if(open){ui.composer=open.dataset.composeOpen;ui.editing='';ui.deleting='';render(`[data-composer="${ui.composer}"] [data-new-goal]`);return;}
+        const open=target.closest('[data-compose-open]');if(open){ui.composer=open.dataset.composeOpen;ui.editing='';render(`[data-composer="${ui.composer}"] [data-new-goal]`);return;}
         if(target.closest('[data-compose-cancel]')){ui.composer='';render();return;}
         const addButton=target.closest('[data-add]');if(addButton){add(addButton.dataset.add);return;}
         if(target.closest('[data-past-toggle]')){ui.showPast=!ui.showPast;render();}
@@ -222,9 +248,11 @@
         if(event.target.matches('[data-new-goal]')&&event.key==='Enter'){event.preventDefault();add(event.target.closest('[data-composer]').dataset.composer);}
         if(event.target.matches('[data-edit-input]')&&(event.key==='Enter'||event.key==='Escape')){event.preventDefault();ui.editing='';render();}
       });
+      card.addEventListener('submit',event=>{const form=event.target.closest('[data-mobile-goal-form]');if(!form)return;event.preventDefault();const input=form.querySelector('[name="title"]'),title=input?.value.trim();if(!title)return;const goal={id:id(),scope:ui.mobileScope,t:title,done:false,parent:null,createdAt:Date.now(),completedAt:null};state.goals.push(goal);ui.undo=null;save();render();requestAnimationFrame(()=>card.querySelector('[data-mobile-goal-form] input')?.focus({preventScroll:true}));});
       window.addEventListener('focus',sync);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
       Store.watch(sync);
+      window.addEventListener('widgetlayoutchange',render);
       render();
       sync();
     })();

@@ -255,13 +255,6 @@ select {
   transition: background-color var(--t-press) var(--ease), transform var(--t-press) var(--ease);
 }
 
-.confirm-delete:active,
-.confirm-danger:active {
-  background: #A56B6B;
-  transform: scale(.985);
-  transition: background-color var(--t-press) var(--ease), transform var(--t-press) var(--ease);
-}
-
 body.widget-page .chip:active,
 body.widget-page .pill:active,
 body.widget-page .segment:active,
@@ -473,20 +466,23 @@ body.is-widget-list-resizing {
 
 /* Mobile reflow keeps the widget at readable 1:1 scale and lets each existing
    narrow layout rearrange against the same width its media queries see. */
-body.widget-page.is-widget-reflow {
+body.widget-page.is-widget-reflow,
+body.widget-page.is-widget-mobile {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   align-items: flex-start !important;
 }
 
-body.is-widget-reflow .widget-host {
+body.is-widget-reflow .widget-host,
+body.is-widget-mobile .widget-host {
   width: 100% !important;
   max-width: 100% !important;
   height: auto !important;
   overflow: visible;
 }
 
-body.is-widget-reflow [data-widget-card] {
+body.is-widget-reflow [data-widget-card],
+body.is-widget-mobile [data-widget-card] {
   position: relative;
   top: auto;
   left: auto;
@@ -498,11 +494,13 @@ body.is-widget-reflow [data-widget-card] {
   overflow: visible !important;
 }
 
-body.is-widget-reflow [data-widget-card] * {
+body.is-widget-reflow [data-widget-card] *,
+body.is-widget-mobile [data-widget-card] * {
   min-width: 0;
 }
 
-body.is-widget-reflow [data-widget-list] {
+body.is-widget-reflow [data-widget-list],
+body.is-widget-mobile [data-widget-list] {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
@@ -516,11 +514,24 @@ body.is-widget-reflow .widget-size-label {
   display: none !important;
 }
 
+body.is-widget-mobile .widget-size-handle,
+body.is-widget-mobile .widget-width-handle,
+body.is-widget-mobile .widget-height-handle,
+body.is-widget-mobile .widget-list-resize-handle,
+body.is-widget-mobile .widget-size-label {
+  display:none !important;
+}
+
 body.is-widget-reflow .cell-popover,
 body.is-widget-reflow #calendarPopover,
 body.is-widget-reflow #overlay,
 body.is-widget-reflow #detailOverlay,
-body.is-widget-reflow #dayOverlay .modal-panel {
+body.is-widget-reflow #dayOverlay .modal-panel,
+body.is-widget-mobile .cell-popover,
+body.is-widget-mobile #calendarPopover,
+body.is-widget-mobile #overlay,
+body.is-widget-mobile #detailOverlay,
+body.is-widget-mobile #dayOverlay .modal-panel {
   position: absolute !important;
   top: auto !important;
   right: 8px !important;
@@ -536,7 +547,12 @@ body.is-widget-reflow .cell-popover button,
 body.is-widget-reflow #calendarPopover button,
 body.is-widget-reflow #overlay button,
 body.is-widget-reflow #detailOverlay button,
-body.is-widget-reflow #dayOverlay .modal-panel button {
+body.is-widget-reflow #dayOverlay .modal-panel button,
+body.is-widget-mobile .cell-popover button,
+body.is-widget-mobile #calendarPopover button,
+body.is-widget-mobile #overlay button,
+body.is-widget-mobile #detailOverlay button,
+body.is-widget-mobile #dayOverlay .modal-panel button {
   min-height: 44px;
 }
 

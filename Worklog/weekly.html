@@ -129,6 +129,7 @@
     .modal-date { color:var(--text); font-size:13px; font-weight:800; text-align:center; }
     .modal-date span { margin-left:5px; color:var(--secondary); font-size:11px; font-weight:700; }
     .modal-close { width:28px; height:28px; color:var(--muted); }
+    @media (hover:hover) { .modal-close:hover { color:var(--text); background:var(--pill); } }
     .modal-summary {
       min-height:31px; padding-bottom:12px; border-bottom:1px solid var(--border-faint);
       display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
@@ -236,7 +237,7 @@
       }
       .modal-panel { width:calc(100% - 24px); padding:14px; }
       .modal-header { grid-template-columns:40px minmax(0,1fr) 40px 40px; }
-      .modal-arrow, .modal-close { width:40px; height:40px; }
+      .modal-arrow, .modal-close { width:44px; height:44px; }
       .modal-task { min-height:48px; grid-template-columns:8px minmax(0,1fr); grid-template-rows:auto auto; column-gap:9px; row-gap:4px; }
       .modal-task.mode-work, .modal-task.mode-life { grid-template-columns:8px minmax(0,1fr); }
       .modal-task .task-dot { grid-column:1; grid-row:1; }
@@ -245,12 +246,53 @@
       .modal-task > .modal-time, .modal-task > .modal-project, .modal-task > .modal-progress, .modal-task > .modal-memo { display:none; }
       .modal-time, .modal-project, .modal-progress, .modal-memo { font-size:9px; color:var(--muted); text-align:left; }
     }
+    body.is-widget-mobile .card { min-height:520px; height:auto; padding:12px; gap:10px; }
+    body.is-widget-mobile .weekly-top { gap:10px; }
+    body.is-widget-mobile .week-header { min-height:96px; display:grid; grid-template-columns:44px minmax(0,1fr) 44px; grid-template-rows:56px 34px; gap:6px 0; }
+    body.is-widget-mobile .week-arrow { width:44px; height:56px; border:0; background:transparent; color:var(--secondary); font-size:18px; }
+    body.is-widget-mobile .week-range { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    body.is-widget-mobile .mobile-range-title { color:var(--title); font-size:15px; font-weight:800; }
+    body.is-widget-mobile .mobile-range-summary { color:var(--muted); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .current-week,
+    body.is-widget-mobile .header-rule,
+    body.is-widget-mobile .summary-row { display:none !important; }
+    body.is-widget-mobile .mode-segment { grid-column:1 / -1; grid-row:2; width:max-content; min-height:34px; margin:0 auto; padding:3px; gap:2px; justify-content:center; border-radius:999px; background:var(--pill); }
+    body.is-widget-mobile .mode-button { position:relative; min-width:64px; min-height:44px; height:44px; margin:-5px 0; padding:0 13px; border:0; background:transparent; color:var(--secondary); isolation:isolate; }
+    body.is-widget-mobile .mode-button::before { content:""; position:absolute; z-index:-1; inset:8px 0; display:block; border:0; border-radius:999px; background:transparent; }
+    body.is-widget-mobile .mode-button.is-selected[data-mode] { border:0; background:transparent; color:var(--action); box-shadow:none; }
+    body.is-widget-mobile .mode-button.is-selected[data-mode]::before { background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.05); }
+    body.is-widget-mobile .weekly-content { min-height:390px; flex:1 1 390px; overflow:hidden; }
+    body.is-widget-mobile .desktop-view { display:none; }
+    body.is-widget-mobile .mobile-view { height:100%; display:flex; flex-direction:column; gap:10px; }
+    body.is-widget-mobile .mobile-days { padding:0; display:grid; gap:4px; background:transparent; }
+    body.is-widget-mobile .mobile-days.mode-work { grid-template-columns:repeat(5,minmax(0,1fr)); }
+    body.is-widget-mobile .mobile-days.mode-life { grid-template-columns:repeat(7,minmax(0,1fr)); }
+    body.is-widget-mobile .mobile-day { min-width:0; height:56px; min-height:56px; padding:5px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border:1px solid var(--border-pale); border-radius:9px; background:var(--surface); color:var(--secondary); }
+    body.is-widget-mobile .mobile-day.is-selected { border-color:var(--action); background:var(--action); color:#FFFFFF; box-shadow:none; }
+    body.is-widget-mobile .mobile-day.is-today:not(.is-selected) { outline:2px solid var(--action); outline-offset:-2px; }
+    body.is-widget-mobile .mobile-day.is-future { opacity:.35; }
+    body.is-widget-mobile .mobile-day-name { font-size:11px; font-weight:700; }
+    body.is-widget-mobile .mobile-day-date { font-size:14px; font-weight:800; }
+    body.is-widget-mobile .mobile-day-count { min-height:10px; color:inherit; font-size:10px; font-weight:700; }
+    body.is-widget-mobile .mobile-day.is-selected .mobile-day-count { color:inherit; }
+    body.is-widget-mobile .mobile-selected-head { min-height:32px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    body.is-widget-mobile .mobile-selected-title { color:var(--title); font-size:13px; font-weight:800; }
+    body.is-widget-mobile .mobile-selected-summary { color:var(--secondary); font-size:11px; font-weight:700; white-space:nowrap; }
+    body.is-widget-mobile .mobile-list { min-height:0; flex:1; padding:4px; overflow-y:auto; display:flex; flex-direction:column; gap:0; background:var(--surface-soft); border:1px solid var(--border-pale); border-radius:12px; }
+    body.is-widget-mobile .mobile-task { height:48px; min-height:48px; padding:0 8px; display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:8px; border:0; border-radius:9px; background:var(--surface); box-shadow:none; }
+    body.is-widget-mobile .mobile-task .task-dot { border:0; background:var(--action); }
+    body.is-widget-mobile .mobile-task.is-done .task-dot { background:var(--inactive); }
+    body.is-widget-mobile .mobile-task .task-title { font-size:15px; font-weight:600; }
+    body.is-widget-mobile .mobile-task .task-progress { display:block; color:var(--secondary); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .task-empty { min-height:96px; flex:1; display:grid; place-items:center; color:var(--muted); font-size:11px; font-weight:700; }
+    body.is-widget-mobile .expand-area,
+    body.is-widget-mobile .day-overlay { display:none !important; }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
   <script src="../store.js?v=20260903-worklog-revision"></script>
 </head>
 <body class="widget-page widget-page-centered">
-  <div class="widget-host" data-widget-host data-widget-key="widget-size-weekly.html" data-widget-max-width="2100" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:2100px;--widget-base-width:2100px;--widget-base-height:560px;--widget-visual-height:560px">
+  <div class="widget-host" data-widget-host data-widget-mobile data-widget-key="widget-size-weekly.html" data-widget-max-width="2100" data-widget-height="560" data-widget-max-scale="4" style="--widget-max-width:2100px;--widget-base-width:2100px;--widget-base-height:560px;--widget-visual-height:560px">
     <main class="card" data-widget-card aria-label="주간 업무 요약 위젯">
       <div class="weekly-top" data-widget-fixed>
         <header class="week-header">
@@ -276,7 +318,7 @@
             <button class="modal-arrow" id="modalPrevious" type="button" aria-label="기록 있는 이전 날">‹</button>
             <div class="modal-date" id="modalDate"></div>
             <button class="modal-arrow" id="modalNext" type="button" aria-label="기록 있는 다음 날">›</button>
-            <button class="modal-close" id="modalClose" type="button" aria-label="일별 상세 닫기">✕</button>
+            <button class="modal-close" id="modalClose" type="button" aria-label="닫기">✕</button>
           </header>
           <div class="modal-summary" id="modalSummary"></div>
           <div class="modal-body" id="modalBody"></div>
@@ -316,6 +358,7 @@
       const modalBody = document.getElementById('modalBody');
       const liveRegion = document.getElementById('liveRegion');
       const mobileQuery = window.matchMedia('(max-width: 639px)');
+      const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
       let initialized = false;
       let entranceDone = false;
       let lastFocused = null;
@@ -425,8 +468,8 @@
         const keys = activeKeys();
         if (keys.includes(state.selectedDay)) return;
         const todayKey = localDateKey(todayDate());
-        if (isCurrentWeek() && keys.includes(todayKey)) {
-          state.selectedDay = todayKey;
+        if (isCurrentWeek()) {
+          state.selectedDay = keys.includes(todayKey) ? todayKey : keys[0];
           return;
         }
         state.selectedDay = keys.find(key => tasksForDate(key).length) || keys[0];
@@ -434,7 +477,12 @@
 
       function renderHeader(items) {
         const keys = activeKeys();
-        weekRange.textContent = `${formatShortDate(keys[0])} ~ ${formatShortDate(keys[keys.length - 1])}`;
+        const done = items.filter(task => task.done).length;
+        const hours = items.reduce((sum, task) => sum + (task.progress ?? 0), 0);
+        if (isMobileLayout()) {
+          const detail = `${items.length}개 중 ${done} 완료${state.mode === 'work' ? ` · ${displayHours(hours)}` : ''}`;
+          weekRange.innerHTML = `<span class="mobile-range-title">${formatShortDate(keys[0])} – ${formatShortDate(keys[keys.length - 1])}</span><span class="mobile-range-summary">${detail}</span>`;
+        } else weekRange.textContent = `${formatShortDate(keys[0])} ~ ${formatShortDate(keys[keys.length - 1])}`;
         currentWeek.hidden = isCurrentWeek();
         modeSegment.querySelectorAll('[data-mode]').forEach(button => {
           const selected = button.dataset.mode === state.mode;
@@ -446,8 +494,6 @@
           summaryRow.innerHTML = '';
           return;
         }
-        const done = items.filter(task => task.done).length;
-        const hours = items.reduce((sum, task) => sum + (task.progress ?? 0), 0);
         summaryRow.innerHTML = `${state.mode === 'work' ? `<span class="summary-time">${displayHours(hours)}</span>` : ''}<span>${items.length}개 중 <b>${done}</b> 완료</span>`;
       }
 
@@ -479,7 +525,7 @@
 
       function mobileTask(task) {
         const progress = state.mode === 'work' && task.progress !== null ? `<span class="task-progress">${displayHours(task.progress)}</span>` : '';
-        return `<button class="mobile-task mode-${state.mode} ${task.done ? 'is-done' : ''}" type="button" data-open-day="${task.date}" aria-label="${escapeHtml(task.title)} 일별 상세 열기">${taskDot(task)}<span class="task-title">${escapeHtml(task.title)}</span>${progress}</button>`;
+        return `<div class="mobile-task mode-${state.mode} ${task.done ? 'is-done' : ''}">${taskDot(task)}<span class="task-title">${escapeHtml(task.title)}</span>${progress}</div>`;
       }
 
       function renderMobile(keys) {
@@ -488,17 +534,20 @@
         const tabs = keys.map(key => {
           const date = parseDate(key);
           const count = tasksForDate(key).length;
-          return `<button class="mobile-day ${key === state.selectedDay ? 'is-selected' : ''} ${key > todayKey ? 'is-future' : ''}" type="button" data-mobile-day="${key}" aria-pressed="${key === state.selectedDay}"><span class="mobile-day-name">${SHORT_DAYS[date.getDay()]}</span><span class="mobile-day-count">${count || ''}</span></button>`;
+          return `<button class="mobile-day ${key === state.selectedDay ? 'is-selected' : ''} ${key === todayKey ? 'is-today' : ''} ${key > todayKey ? 'is-future' : ''}" type="button" data-mobile-day="${key}" aria-pressed="${key === state.selectedDay}"><span class="mobile-day-name">${SHORT_DAYS[date.getDay()]}</span><span class="mobile-day-date">${date.getDate()}</span><span class="mobile-day-count">${count ? `${count}건` : ''}</span></button>`;
         }).join('');
         const items = sortedTasks(tasksForDate(state.selectedDay));
-        const visible = items.slice(0,8);
-        const hidden = Math.max(0, items.length - visible.length);
-        return `<div class="mobile-view"><div class="mobile-days mode-${state.mode}">${tabs}</div><div class="mobile-list">${visible.map(mobileTask).join('')}${hidden ? `<button class="mobile-more" type="button" data-open-day="${state.selectedDay}">이 날 전체 보기 <span class="expand-count">· ${hidden}건 더</span></button>` : ''}</div></div>`;
+        const date = parseDate(state.selectedDay);
+        const done = items.filter(task => task.done).length;
+        const hours = items.reduce((sum,task) => sum + (task.progress ?? 0),0);
+        const summary = `${items.length}개 중 ${done} 완료${state.mode === 'work' ? ` · ${displayHours(hours)}` : ''}`;
+        const rows = items.length ? items.map(mobileTask).join('') : '<div class="task-empty"><span class="empty-title">기록이 비어있어요</span></div>';
+        return `<div class="mobile-view"><div class="mobile-days mode-${state.mode}">${tabs}</div><div class="mobile-selected-head"><span class="mobile-selected-title">${date.getMonth() + 1}월 ${date.getDate()}일 ${SHORT_DAYS[date.getDay()]}</span><span class="mobile-selected-summary">${summary}</span></div><div class="mobile-list">${rows}</div></div>`;
       }
 
       function renderExpand(items) {
         const hasExpandable = activeKeys().some(key => tasksForDate(key).length > 8);
-        if (!hasExpandable || mobileQuery.matches) {
+        if (!hasExpandable || isMobileLayout()) {
           expandArea.hidden = true;
           expandArea.innerHTML = '';
           return;
@@ -515,12 +564,17 @@
       }
 
       function renderContent(items) {
+        const keys = activeKeys();
+        if (isMobileLayout()) {
+          weeklyContent.innerHTML = renderMobile(keys);
+          renderExpand(items);
+          return;
+        }
         if (!items.length) {
           weeklyContent.innerHTML = '<div class="empty-week idle-owner"><span class="idle idle-outline idle-outline-empty is-empty" aria-hidden="true"></span><span class="empty-title">기록이 비어있어요</span><span class="empty-copy">업무일지에 내용을 작성해주세요.</span></div>';
           renderExpand(items);
           return;
         }
-        const keys = activeKeys();
         weeklyContent.innerHTML = `${renderDesktop(keys)}${renderMobile(keys)}`;
         renderExpand(items);
       }
@@ -670,7 +724,7 @@
           return;
         }
         const opener = event.target.closest('[data-open-day]');
-        if (opener) openModal(opener.dataset.openDay, opener);
+        if (opener && !isMobileLayout()) openModal(opener.dataset.openDay, opener);
       });
       expandArea.addEventListener('click', event => {
         if (event.target.closest('[data-expand]')) {
@@ -712,6 +766,7 @@
       window.addEventListener('pageshow', () => syncData(true,true));
       document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(true,true); });
       mobileQuery.addEventListener?.('change', render);
+      window.addEventListener('widgetlayoutchange', render);
 
       state.weekStart = startOfWeek(todayDate());
       render();

@@ -261,11 +261,35 @@
       .detail-copy { text-overflow:clip; white-space:normal; }
       .detail-link, .detail-close { min-height:44px; }
     }
+    body.is-widget-mobile .shell { place-items:start center; padding:0; }
+    body.is-widget-mobile .card { width:100%; min-height:560px; height:auto; padding:12px; gap:10px; }
+    body.is-widget-mobile .header { min-height:56px; display:grid; grid-template-columns:44px minmax(0,1fr) 44px; gap:0; }
+    body.is-widget-mobile .month-controls { display:contents; }
+    body.is-widget-mobile .month-button { width:44px; height:56px; border:0; background:transparent; color:var(--secondary); font-size:18px; }
+    body.is-widget-mobile .mobile-month-copy { height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    body.is-widget-mobile .month-title { min-width:0; color:var(--title); font-size:15px; font-weight:800; }
+    body.is-widget-mobile .month-summary { color:var(--muted); font-size:11px; font-weight:700; text-align:center; white-space:nowrap; }
+    body.is-widget-mobile .calendar-shell { width:100%; gap:4px; padding:0; border:0; background:transparent; }
+    body.is-widget-mobile .weekdays,
+    body.is-widget-mobile .days { gap:4px; }
+    body.is-widget-mobile .weekday { height:24px; padding:0; display:grid; place-items:center; font-size:10px; font-weight:800; }
+    body.is-widget-mobile .day { height:44px; min-height:44px; padding:4px; border-radius:9px; }
+    body.is-widget-mobile .day-number { font-size:13px; font-weight:700; }
+    body.is-widget-mobile .day.selected { border-color:transparent; outline:0; background:var(--action-soft); }
+    body.is-widget-mobile .day.selected .day-number { color:var(--action); }
+    body.is-widget-mobile .day.today { outline:2px solid var(--action); outline-offset:-2px; }
+    body.is-widget-mobile .day.future { opacity:.35; }
+    body.is-widget-mobile .dot,
+    body.is-widget-mobile .legend-dot { width:6px; height:6px; flex-basis:6px; }
+    body.is-widget-mobile .legend { min-height:28px; padding-top:4px; justify-content:center; flex-wrap:nowrap; gap:10px; border:0; font-size:10px; }
+    body.is-widget-mobile .detail-row { height:48px; min-height:48px; flex:0 0 48px; margin-top:auto; padding:0 10px; flex-wrap:nowrap; }
+    body.is-widget-mobile .detail-copy { font-size:12px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    body.is-widget-mobile .detail-link { min-height:44px; display:flex; align-items:center; font-size:12px; font-weight:800; }
   </style>
   <link rel="stylesheet" href="../widget-frame.css">
 </head>
 <body class="widget-page widget-page-centered">
-  <main class="shell widget-host" data-widget-host data-widget-key="widget-size-record.html" data-widget-max-width="1400" data-widget-height="900" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:900px;--widget-visual-height:900px">
+  <main class="shell widget-host" data-widget-host data-widget-mobile data-widget-key="widget-size-record.html" data-widget-max-width="1400" data-widget-height="900" style="--widget-max-width:1400px;--widget-base-width:1400px;--widget-base-height:900px;--widget-visual-height:900px">
     <section class="card" id="card" data-widget-card aria-label="성장 기록 위젯">
       <header class="header" id="header"></header>
       <section class="calendar-shell" id="calendarShell" aria-label="월간 기록 캘린더">
@@ -302,6 +326,7 @@
       let knownDiaryDates = null;
       let knownWorklogDates = null;
       let syncSignature = '';
+      const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
 
       function pad(value) { return String(value).padStart(2, '0'); }
       function localDay(date = new Date()) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
@@ -342,14 +367,14 @@
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
         const counts = monthCounts(year, month);
-        header.innerHTML = `
-          <div class="month-controls">
-            <button class="month-button" type="button" data-month-step="-1" aria-label="이전 달">‹</button>
-            <span class="month-title">${year}년 ${month + 1}월</span>
-            <button class="month-button" type="button" data-month-step="1" aria-label="다음 달">›</button>
-          </div>
-          <span class="month-summary">일기 ${counts.diary} · 독서 ${counts.reading} · 업무 ${counts.worklog}</span>
-        `;
+        if (isMobileLayout()) {
+          const prefix = `${year}-${pad(month + 1)}-`;
+          const recorded = new Set([...Object.keys(activity.diary),...Object.keys(activity.reading),...Object.keys(activity.worklog)].filter(key => key.startsWith(prefix) && Object.values(countsFor(key)).some(Boolean))).size;
+          const daysInMonth = new Date(year,month + 1,0).getDate();
+          header.innerHTML = `<div class="month-controls"><button class="month-button" type="button" data-month-step="-1" aria-label="이전 달">‹</button><span class="mobile-month-copy"><span class="month-title">${year}년 ${month + 1}월</span><span class="month-summary">기록한 날 ${recorded} / ${daysInMonth}</span></span><button class="month-button" type="button" data-month-step="1" aria-label="다음 달">›</button></div>`;
+          return;
+        }
+        header.innerHTML = `<div class="month-controls"><button class="month-button" type="button" data-month-step="-1" aria-label="이전 달">‹</button><span class="month-title">${year}년 ${month + 1}월</span><button class="month-button" type="button" data-month-step="1" aria-label="다음 달">›</button></div><span class="month-summary">일기 ${counts.diary} · 독서 ${counts.reading} · 업무 ${counts.worklog}</span>`;
       }
 
       function renderCalendar() {
@@ -399,16 +424,15 @@
         let actions = '';
         if (isFuture) {
           copy = `${month}월 ${day}일 · 아직 오지 않음`;
-          actions = '<button class="detail-close" type="button" data-close-detail>닫기</button>';
         } else if (hasRecord) {
           copy = `${isToday ? '오늘' : `${month}월 ${day}일`} · 일기 ${counts.diary} · 독서 ${counts.reading} · 업무일지 ${counts.worklog}건`;
-          actions = linkHtml('열기', counts.diary ? datedHref(0, key) : counts.reading ? datedHref(1, key) : datedHref(2, key));
+          actions = linkHtml(isMobileLayout() ? '보기 ›' : '열기', counts.diary ? datedHref(0, key) : counts.reading ? datedHref(1, key) : datedHref(2, key));
         } else if (isToday) {
           copy = '오늘 아직 비어 있어요';
           actions = `${linkHtml('일기 쓰기', datedHref(0, key))}${linkHtml('독서 노트', datedHref(1, key))}`;
         } else {
           copy = `${month}월 ${day}일 · 기록 없음`;
-          actions = linkHtml('그날로 쓰기', datedHref(0, key));
+          actions = linkHtml(isMobileLayout() ? '그날로 쓰기 ›' : '그날로 쓰기', datedHref(0, key));
         }
         detailRow.innerHTML = `<div class="detail-copy">${copy}</div><div class="detail-actions">${actions}</div>`;
       }
@@ -431,7 +455,7 @@
         const monthStep = event.target.closest('[data-month-step]');
         if (monthStep) {
           viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + Number(monthStep.dataset.monthStep), 1);
-          selectedKey = null;
+          selectedKey = isMobileLayout() ? localKey(viewDate) : null;
           render();
           runMotion(calendarShell, 'motion-calendar-swap');
           return;
@@ -500,6 +524,7 @@
         }
       }
       window.addEventListener('focus',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});Store.watch(sync);render();sync();
+      window.addEventListener('widgetlayoutchange',render);
     })();
   </script>
   <script src="../widget-frame.js"></script>
