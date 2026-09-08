@@ -50,7 +50,7 @@
     .management-list::-webkit-scrollbar { width:4px; }
     .management-list::-webkit-scrollbar-thumb { border-radius:2px; background:var(--inactive); }
     .management-item {
-      min-height:84px; padding:8px; display:grid; grid-template-columns:58px minmax(0,1fr); gap:8px;
+      min-height:84px; padding:8px; display:grid; grid-template-columns:58px minmax(0,1fr) auto; gap:8px;
       align-items:start; flex:0 0 auto; border-radius:9px; background:var(--bg); box-shadow:var(--item-shadow);
     }
     .management-item.skipped { outline:1px dashed var(--inactive); outline-offset:-1px; box-shadow:none; }
@@ -63,13 +63,20 @@
     .skip-pill { border:1px dashed var(--inactive); background:var(--bg); color:var(--muted); }
     .item-body { min-width:0; display:grid; gap:4px; }
     .name-line,.schedule-line,.creation-line { min-width:0; gap:6px; }
-    .name-line strong { min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .name-line strong { min-width:0; max-width:100%; overflow:hidden; color:var(--text); font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+    .name-line .project-pill { min-width:0; overflow:hidden; text-overflow:ellipsis; }
     .schedule-line span,.creation-line span { color:var(--muted); font-size:9px; font-weight:700; white-space:nowrap; }
     .schedule-line b,.creation-line b { color:var(--secondary-strong); font-size:9px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .creation-line b { color:var(--title); font-weight:800; }
     .run-error { overflow:hidden; color:var(--secondary-strong); font-size:9px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
     .item-tools { justify-content:flex-end; margin-top:1px; }
     .item-action { min-height:24px; padding:4px 6px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:9px; font-weight:700; }
+    .view-close,.row-delete { width:28px; height:28px; padding:0; display:grid; place-items:center; flex:0 0 auto; border:0; border-radius:8px; background:transparent; color:var(--secondary); }
+    .view-close { margin-left:auto; }
+    .row-delete { align-self:center; color:var(--inactive); opacity:0; transition:opacity var(--t-color) var(--ease),color var(--t-color) var(--ease); }
+    .management-item:hover .row-delete,.row-delete:focus-visible { opacity:1; color:var(--secondary); }
+    @media (hover:hover) { .view-close:hover { color:var(--text); background:var(--pill); } }
+    @media (hover:none) { .view-close,.row-delete { width:44px; height:44px; border-radius:12px; } .row-delete { opacity:1; } }
     .inline-editor,.title-composer {
       flex:0 0 auto; padding:10px; display:grid; align-content:start; gap:8px; border-radius:9px;
       background:var(--bg); box-shadow:var(--item-shadow); outline:1px solid var(--border-soft); outline-offset:-1px;
@@ -133,7 +140,7 @@
       .editor-field.wide { grid-column:auto; }
       .time-result { grid-template-columns:1fr; }
       .time-result b { text-align:left; }
-      .management-item { grid-template-columns:52px minmax(0,1fr); }
+      .management-item { grid-template-columns:52px minmax(0,1fr) auto; }
       .name-line { align-items:flex-start; flex-direction:column; }
       .editor-foot .head-actions { width:100%; }
       .editor-foot .management-button { flex:1; }
@@ -229,7 +236,7 @@
           ? (composerOpen ? `${editor.name || "새 예약"} · 항목별 제목 형식` : `${editor.id ? "예약 수정" : "예약 등록"} 중`)
           : "다음으로 만들어질 페이지부터 표시";
       headActions.innerHTML = editor
-        ? `<button class="management-button text" type="button" data-action="close">Esc 닫기</button>`
+        ? `<button class="view-close" type="button" data-action="close" aria-label="닫기">✕</button>`
         : `<button class="management-button text" type="button" data-action="new-weekly">반복 등록</button><button class="management-button primary" type="button" data-action="new-once">＋ 예약</button>`;
 
       if (loading) {
@@ -270,7 +277,7 @@
       const skipText = item.kind === "weekly" ? "이번 주는 건너뜀" : "이번 예약은 건너뜀";
       const runError = ["failed", "uncertain"].includes(item.runStatus)
         ? `<p class="run-error" title="${escapeHtml(item.runError || "")}">${escapeHtml(item.runError || "Notion 연결을 확인해주세요")}</p>` : "";
-      return `<article class="management-item${skipped ? " skipped" : ""}" data-id="${escapeHtml(item.id)}"><span class="type-pill${item.kind === "weekly" ? " repeat" : ""}">${kind}</span><div class="item-body"><div class="name-line"><strong>${escapeHtml(item.name)}</strong>${skipped ? `<span class="skip-pill">${skipText}</span>` : `<span class="project-pill">${escapeHtml(item.project)}</span>`}</div><div class="schedule-line"><b>${escapeHtml(scheduleText)}</b><span>${leadLabel(item.leadMinutes)} 전 생성</span></div><div class="creation-line"><b>${escapeHtml(nextText)}</b>${item.lastCreatedAt ? `<span>마지막 ${escapeHtml(formatOccurrence(item.lastCreatedAt))}</span>` : ""}</div>${runError}<div class="item-tools"><button class="item-action" type="button" data-action="skip" data-id="${escapeHtml(item.id)}">${skipped ? "↻ 되돌리기" : "건너뛰기"}</button><button class="item-action" type="button" data-action="edit" data-id="${escapeHtml(item.id)}">수정</button><button class="item-action" type="button" data-action="delete" data-id="${escapeHtml(item.id)}">삭제</button></div></div></article>`;
+      return `<article class="management-item${skipped ? " skipped" : ""}" data-id="${escapeHtml(item.id)}"><span class="type-pill${item.kind === "weekly" ? " repeat" : ""}">${kind}</span><div class="item-body"><div class="name-line"><strong>${escapeHtml(item.name)}</strong>${skipped ? `<span class="skip-pill">${skipText}</span>` : `<span class="project-pill">${escapeHtml(item.project)}</span>`}</div><div class="schedule-line"><b>${escapeHtml(scheduleText)}</b><span>${leadLabel(item.leadMinutes)} 전 생성</span></div><div class="creation-line"><b>${escapeHtml(nextText)}</b>${item.lastCreatedAt ? `<span>마지막 ${escapeHtml(formatOccurrence(item.lastCreatedAt))}</span>` : ""}</div>${runError}<div class="item-tools"><button class="item-action" type="button" data-action="skip" data-id="${escapeHtml(item.id)}">${skipped ? "↻ 되돌리기" : "건너뛰기"}</button><button class="item-action" type="button" data-action="edit" data-id="${escapeHtml(item.id)}">수정</button></div></div><button class="row-delete" type="button" data-action="delete" data-id="${escapeHtml(item.id)}" aria-label="항목 삭제">✕</button></article>`;
     }
 
     function editorMarkup() {
@@ -400,9 +407,10 @@
     async function requestDelete(id) {
       if (saving) return;
       saving = true;
-      render();
       try {
         await window.Store.deleteSchedule(id);
+        const row = content.querySelector(`.management-item[data-id="${CSS.escape(id)}"]`);
+        if (row && window.widgetMotion) await new Promise(resolve => window.widgetMotion.close(row, resolve));
         await loadSchedules({ quiet:true });
       } catch (error) {
         loadError = error?.message || "삭제 실패, 다시 시도해주세요.";

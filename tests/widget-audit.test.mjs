@@ -49,7 +49,7 @@ test("every local HTML asset reference resolves to a file", async () => {
 });
 
 test("삭제 확인 단계와 잘못된 닫기 기호가 위젯에 남지 않는다", async () => {
-  const forbidden = /×|삭제할까요|정말 삭제|← 목록|‹ 목록|confirmDeleteId|deleteArmed|deleteConfirm/;
+  const forbidden = /×|삭제할까요|정말 삭제|← 목록|‹ 목록|Esc 닫기|confirmDeleteId|deleteArmed|deleteConfirm|dblclick|confirm\(|DOUBLE_CLICK_MS|event\.detail\s*>=\s*2/;
   const failures = [];
   for (const file of htmlFiles) {
     const html = await readFile(file, "utf8");

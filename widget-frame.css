@@ -557,9 +557,27 @@ body.is-widget-mobile #dayOverlay .modal-panel button {
 }
 
 @media (any-pointer: coarse) and (max-width: 639px) {
-  body.widget-page button:not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle),
-  body.widget-page [role="button"] {
+  body:is(.is-widget-reflow, .is-widget-mobile) :is(button, [role="button"], a):not(.widget-size-handle):not(.widget-width-handle):not(.widget-height-handle):not(.widget-list-resize-handle) {
+    min-width: 44px;
     min-height: 44px;
+  }
+  body:is(.is-widget-reflow, .is-widget-mobile) :is(input, textarea, select) {
+    max-width: 100%;
+    font-size: 16px !important;
+  }
+  body:is(.is-widget-reflow, .is-widget-mobile) :is(img, video, canvas) {
+    max-width: 100%;
+  }
+  body:is(.is-widget-reflow, .is-widget-mobile) :is(.chip, .pill, .book-chip, .filter) {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  body:is(.is-widget-reflow, .is-widget-mobile) :is(.filters, .chips, .book-chips) {
+    max-width: 100%;
+    flex-wrap: wrap;
   }
 }
 

@@ -70,15 +70,6 @@
     .past-toggle { display:none; padding:0; border:0; background:transparent; color:var(--muted); font-size:10px; font-weight:750; cursor:pointer; }
     .undo { margin-left:auto; color:var(--done); font-size:9px; font-weight:700; }
     .undo button { padding:0; border:0; background:transparent; color:var(--action); font-size:9px; font-weight:750; cursor:pointer; }
-    @media (any-pointer: coarse) and (max-width:1199px) { .goals-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media (any-pointer: coarse) and (max-width:699px) {
-      .card { min-height:540px; padding:14px; }
-      .goals-grid { grid-template-columns:1fr; }
-      .goal-column.mobile-secondary { display:none; }
-      .goals-grid.show-past .goal-column.mobile-secondary { display:flex; }
-      .past-toggle { display:block; }
-      .goal-column { min-height:230px; }
-    }
     body.is-widget-mobile .card { min-height:500px; height:auto; padding:12px; gap:10px; }
     body.is-widget-mobile .header { min-height:44px; }
     body.is-widget-mobile .year-title { color:var(--text); font-size:15px; font-weight:800; }
@@ -231,7 +222,7 @@
         const parentToggle=target.closest('[data-parent-toggle]');if(parentToggle){const picker=parentToggle.closest('[data-parent-picker]'),options=picker?.querySelector('[data-parent-options]'),opening=parentToggle.getAttribute('aria-expanded')!=='true';parentToggle.setAttribute('aria-expanded',String(opening));if(options)options.hidden=!opening;return;}
         const parentOption=target.closest('[data-parent-option]');if(parentOption){const box=parentOption.closest('[data-composer]'),picker=parentOption.closest('[data-parent-picker]'),trigger=picker?.querySelector('[data-parent-toggle]'),label=picker?.querySelector('[data-parent-label]');if(box)box.dataset.parentValue=parentOption.dataset.parentOption||'';picker?.querySelectorAll('[data-parent-option]').forEach(option=>option.classList.toggle('is-selected',option===parentOption));if(label)label.textContent=parentOption.textContent.trim();if(trigger)trigger.setAttribute('aria-expanded','false');const options=picker?.querySelector('[data-parent-options]');if(options)options.hidden=true;trigger?.focus();return;}
         card.querySelectorAll('[data-parent-toggle][aria-expanded="true"]').forEach(trigger=>{trigger.setAttribute('aria-expanded','false');const options=trigger.closest('[data-parent-picker]')?.querySelector('[data-parent-options]');if(options)options.hidden=true;});
-        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row');rowNode?.classList.toggle('done',goal.done);renderHeader();if(goal.done)widgetMotion.pop(toggle);const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;setTimeout(()=>render(),delay);}return;}
+        const toggle=target.closest('[data-toggle]');if(toggle){const goal=byId(toggle.dataset.toggle);if(goal){goal.done=!goal.done;goal.completedAt=goal.done?new Date().toISOString():null;ui.undo=null;save();const rowNode=toggle.closest('.goal-row, .mobile-goal-row');rowNode?.classList.toggle('done',goal.done);toggle.setAttribute('aria-checked',String(goal.done));renderHeader();if(goal.done)widgetMotion.pop(toggle);const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;setTimeout(()=>render(),delay);}return;}
         const mobileScope=target.closest('[data-mobile-scope]');if(mobileScope){ui.mobileScope=mobileScope.dataset.mobileScope;render();return;}
         const edit=target.closest('[data-edit]');if(edit){ui.editing=edit.dataset.edit;ui.composer='';render('[data-edit-input]');return;}
         if(target.closest('[data-edit-done]')){ui.editing='';render();return;}
@@ -252,7 +243,7 @@
       window.addEventListener('focus',sync);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
       Store.watch(sync);
-      window.addEventListener('widgetlayoutchange',render);
+      window.addEventListener('widgetlayoutchange',()=>render());
       render();
       sync();
     })();

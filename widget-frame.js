@@ -603,7 +603,9 @@
   }
 
   function readWidthSize() {
-    return withQuerySize(widthKey ? readStoredSize(widthKey) : {}, false);
+    const shared = widthKey ? readStoredSize(widthKey) : {};
+    const hasWidth = ['visualW','contentW','scale','scaleX','scaleY','width'].some(name => Number(shared[name]) > 0);
+    return withQuerySize(hasWidth ? shared : readStoredSize(key), false);
   }
 
   function saveSize() {
@@ -654,15 +656,12 @@
     if (sizeDrag) return contentWidth;
     if (isFluidMobile()) return viewportWidth();
     if (widthKey) {
-      /* Members can have different natural heights, so their height-limited
-         scales may differ. Compensate with logical width so the outer widths
-         still land on the same shared visual target. */
+      // Shared width uses the saved scale, never the temporary embed height.
       const target = Math.max(MINIMUM_CONTENT_WIDTH, number(sharedVisualWidth, designWidth));
-      const byHeight = isMobileTabletDevice() ? viewportHeight() / naturalHeight : Number.POSITIVE_INFINITY;
       const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
         ? configuredMaximumScale
         : Number.POSITIVE_INFINITY;
-      const scaleWithoutWidth = Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, byHeight, requestedScale));
+      const scaleWithoutWidth = Math.max(ABSOLUTE_MINIMUM_SCALE, Math.min(configured, requestedScale));
       return target / scaleWithoutWidth;
     }
     if (widthLocked) return contentWidth;
@@ -1013,13 +1012,13 @@
   scaleLocked = horizontalSaved.scaleLocked === true || (!hasHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(hasHorizontal));
   requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(horizontalSaved, 1));
   savedWidth = Math.max(1, widthKey
-    ? number(horizontalSaved.visualW, number(horizontalSaved.contentW, designWidth) * requestedScale)
+    ? (querySize.contentW !== null ? querySize.contentW * requestedScale : number(horizontalSaved.visualW, number(horizontalSaved.contentW, designWidth) * requestedScale))
     : number(horizontalSaved.contentW, designWidth) * requestedScale);
   widthLocked = horizontalSaved.widthLocked === true || (!hasHorizontal('widthLocked') && hasHorizontal('contentW'));
   if (widthKey) {
     const queryVisualWidth = querySize.contentW !== null ? querySize.contentW * requestedScale : null;
     const storedVisualWidth = Number(horizontalSaved.visualW);
-    sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null);
+    sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : number(horizontalSaved.contentW, designWidth) * requestedScale);
   } else {
     applyContentWidth(number(horizontalSaved.contentW, designWidth), false, requestedScale);
   }
@@ -1086,11 +1085,14 @@
       const ownsHorizontal = property => Object.prototype.hasOwnProperty.call(nextHorizontal, property);
       scaleLocked = nextHorizontal.scaleLocked === true || (!ownsHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(ownsHorizontal));
       requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(nextHorizontal, 1));
+      savedWidth = Math.max(1, widthKey && querySize.contentW === null
+        ? number(nextHorizontal.visualW, number(nextHorizontal.contentW, designWidth) * requestedScale)
+        : number(nextHorizontal.contentW, designWidth) * requestedScale);
       widthLocked = nextHorizontal.widthLocked === true || (!ownsHorizontal('widthLocked') && ownsHorizontal('contentW'));
       if (widthKey) {
         const queryVisualWidth = querySize.contentW !== null ? querySize.contentW * requestedScale : null;
         const storedVisualWidth = Number(nextHorizontal.visualW);
-        sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : null);
+        sharedVisualWidth = queryVisualWidth ?? (Number.isFinite(storedVisualWidth) && storedVisualWidth > 0 ? storedVisualWidth : number(nextHorizontal.contentW, designWidth) * requestedScale);
       } else {
         applyContentWidth(number(nextHorizontal.contentW, designWidth), false, requestedScale);
       }

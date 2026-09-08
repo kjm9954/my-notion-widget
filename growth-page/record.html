@@ -245,22 +245,6 @@
       .card { width:min(720px, calc(100vw - 32px)); }
     }
 
-    @media (any-pointer: coarse) and (max-width:639px) {
-      .shell { place-items:start center; padding:0; }
-      .card { width:100%; min-height:660px; padding:18px 12px; }
-      .month-button { width:44px; height:44px; flex-basis:44px; }
-      .header { min-height:44px; }
-      .month-summary { white-space:normal; text-align:right; }
-      .calendar-shell { gap:5px; }
-      .weekdays, .days { gap:3px; }
-      .weekday { padding-inline:2px; text-align:center; }
-      .day { height:44px; min-height:44px; padding:4px; }
-      .dot, .legend-dot { width:5px; height:5px; flex-basis:5px; }
-      .legend { flex-wrap:wrap; white-space:normal; }
-      .detail-row { height:auto; min-height:44px; flex-wrap:wrap; padding-block:6px; }
-      .detail-copy { text-overflow:clip; white-space:normal; }
-      .detail-link, .detail-close { min-height:44px; }
-    }
     body.is-widget-mobile .shell { place-items:start center; padding:0; }
     body.is-widget-mobile .card { width:100%; min-height:560px; height:auto; padding:12px; gap:10px; }
     body.is-widget-mobile .header { min-height:56px; display:grid; grid-template-columns:44px minmax(0,1fr) 44px; gap:0; }
@@ -273,7 +257,7 @@
     body.is-widget-mobile .weekdays,
     body.is-widget-mobile .days { gap:4px; }
     body.is-widget-mobile .weekday { height:24px; padding:0; display:grid; place-items:center; font-size:10px; font-weight:800; }
-    body.is-widget-mobile .day { height:44px; min-height:44px; padding:4px; border-radius:9px; }
+    body.is-widget-mobile .day { height:auto; min-height:44px; aspect-ratio:1; padding:4px; border-radius:9px; }
     body.is-widget-mobile .day-number { font-size:13px; font-weight:700; }
     body.is-widget-mobile .day.selected { border-color:transparent; outline:0; background:var(--action-soft); }
     body.is-widget-mobile .day.selected .day-number { color:var(--action); }

@@ -114,7 +114,8 @@
     @keyframes detail-open { from { max-height:0; padding-top:0; padding-bottom:0; opacity:0; } to { max-height:220px; opacity:1; } }
     @media (any-pointer: coarse) and (max-width:639px) {
       .card:not(.is-wide) .today-text { font-size:14px; }
-      .card:not(.is-wide) .filters:not(.is-expanded) { flex-wrap:nowrap; overflow:hidden; }
+      .card:not(.is-wide) .filters { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
+      .card:not(.is-wide) .chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .card:not(.is-wide) .chip { min-height:40px; flex:0 0 auto; }
       .card:not(.is-wide) .quote-summary { min-height:44px; padding:13px 2px; }
       .card:not(.is-wide) .edit-button { min-height:40px; }
@@ -311,7 +312,9 @@
       try {
         const sizeKey = 'widget-size-quote-drawer.html';
         const savedSize = JSON.parse(localStorage.getItem(sizeKey));
-        if (savedSize && typeof savedSize === 'object' && savedSize.quoteDrawerLayoutVersion !== 2) {
+        const mobileOverride = new URLSearchParams(location.search).get('mobile');
+        const mobileDevice = mobileOverride === 'on' || (mobileOverride !== 'off' && matchMedia('(any-pointer: coarse)').matches);
+        if (!mobileDevice && savedSize && typeof savedSize === 'object' && savedSize.quoteDrawerLayoutVersion !== 2) {
           const savedFrameHeight = Number(savedSize.frameH);
           const frameHeight = Number.isFinite(savedFrameHeight) && savedFrameHeight > 0 ? savedFrameHeight : (isWide ? 560 : 640);
           savedSize.listH = Math.max(160, frameHeight - (isWide ? 48 : 40));

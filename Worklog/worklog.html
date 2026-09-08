@@ -62,7 +62,7 @@
       font-size:8px; font-weight:800; line-height:1.2; font-variant-numeric:tabular-nums;
     }
     .roll-banner {
-      position:relative; flex:0 0 auto; padding:11px 48px 11px 12px; display:grid; grid-template-columns:1fr auto; gap:4px 8px;
+      position:relative; flex:0 0 auto; padding:11px 12px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px;
       background:var(--action-soft); border-radius:12px;
     }
     .roll-banner[hidden] { display:none; }
@@ -70,7 +70,7 @@
     .banner-kicker { color:var(--action); font-size:9px; font-weight:800; letter-spacing:.06em; }
     .banner-copy { color:var(--text); font-size:11px; font-weight:700; }
     .banner-dismiss {
-      position:absolute; right:10px; top:10px; width:28px; height:28px; padding:0; border:0; border-radius:8px;
+      grid-column:2; grid-row:1 / 3; align-self:start; margin-left:auto; width:28px; height:28px; padding:0; border:0; border-radius:8px;
       background:transparent; color:var(--secondary); font-size:12px; font-weight:800;
     }
     @media (hover:hover) { .banner-dismiss:hover { color:var(--text); background:var(--pill); } }
@@ -243,7 +243,7 @@
     .time-cell { position:relative; min-width:0; height:24px; display:flex; align-items:center; justify-content:center; user-select:none; }
     .time-cell .inline-cell-input { user-select:text; }
     .time-value { width:100%; height:24px; text-align:center; font-variant-numeric:tabular-nums; }
-    .time-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:2px; background:var(--surface); }
+    .time-actions { position:absolute; z-index:4; top:100%; right:0; display:none; align-items:center; justify-content:center; gap:2px; background:var(--surface); }
     .time-action { width:20px; height:24px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:10px; font-weight:700; }
     @media (hover:hover) { .time-cell.has-value:hover .time-actions { display:flex; } }
     .delete-wrap { width:28px; height:28px; display:grid; place-items:center; align-self:center; }
@@ -254,7 +254,6 @@
     }
     @media (hover:hover) { .task-row:hover .row-delete { opacity:1; pointer-events:auto; } .row-delete:hover { color:var(--secondary); } }
     @media (hover:none) { .row-delete { width:44px; height:44px; opacity:1; pointer-events:auto; } }
-    .mobile-work-meta { display:none; }
     .inline-editor {
       flex:0 0 auto; padding:10px; background:var(--surface); border-radius:9px;
       box-shadow:0 1px 2px rgba(18,48,60,.05); outline:1px solid var(--border-soft); outline-offset:-1px;
@@ -287,11 +286,13 @@
       background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.04), 0 6px 18px rgba(18,48,60,.06);
     }
     .cell-popover[hidden] { display:none; }
-    .cell-popover.kind-project { width:108px; max-height:220px; overflow-y:auto; }
+    .cell-popover.kind-project { width:168px; max-height:220px; overflow-y:auto; }
     .cell-popover.kind-q { width:148px; }
     .cell-popover.kind-due { width:176px; }
     .popover-label { display:block; margin-bottom:7px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.06em; }
     .project-options, .q-options { display:flex; flex-direction:column; gap:5px; }
+    .project-option-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; }
+    .project-option-row .row-delete { opacity:1; pointer-events:auto; }
     .project-option {
       min-height:24px; padding:4px 7px; overflow:hidden; border:0; border-radius:999px; background:var(--pill); color:var(--secondary);
       font-size:9px; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap;
@@ -333,192 +334,6 @@
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
     }
-    @media (any-pointer: coarse) and (max-width:999px) and (min-width:640px) {
-      .column-head.work, .task-row.work {
-        grid-template-columns:62px 22px minmax(90px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(36px,1.1fr) minmax(36px,1.1fr) minmax(34px,1fr) minmax(34px,1fr) minmax(40px,1.24fr) 24px 24px;
-      }
-      .column-head.work.view-memo, .task-row.work.view-memo {
-        grid-template-columns:62px 22px minmax(90px,var(--work-title-track,18.05fr)) minmax(40px,1.24fr) minmax(100px,4.5fr) minmax(40px,1.24fr) 24px 24px;
-      }
-    }
-    @media (any-pointer: coarse) and (max-width:639px) {
-      .card { padding:12px; gap:8px; }
-      .list-shell { padding:0; background:transparent; border-color:transparent; }
-      .rows-scroll { gap:8px; }
-      .task-row { box-shadow:none; outline-color:var(--border-faint); }
-      .mode-pill {
-        position:relative; min-width:44px; min-height:44px; padding:0 13px;
-        margin-block:-7px; border-color:transparent; background:transparent; isolation:isolate;
-      }
-      .mode-pill::before {
-        content:""; position:absolute; left:0; right:0; top:7px; height:30px;
-        z-index:-1; border:1px solid var(--border); border-radius:999px; background:var(--surface);
-      }
-      .mode-pill.is-selected[data-mode="work"] { border-color:transparent; background:transparent; }
-      .mode-pill.is-selected[data-mode="work"]::before { border-color:var(--action); background:var(--action); }
-      .mode-pill.is-selected[data-mode="life"] { border-color:transparent; background:transparent; }
-      .mode-pill.is-selected[data-mode="life"]::before { border-color:var(--mid); background:var(--mid); }
-      .mode-row { min-height:30px; }
-      .day-nav { grid-template-columns:44px minmax(0,1fr) 44px; gap:2px; }
-      .nav-arrow { width:44px; height:44px; border:0; background:transparent; }
-      .nav-arrow::before {
-        content:""; position:absolute; left:9px; top:5px; width:26px; height:34px;
-        border:1px solid var(--border); border-radius:8px; background:var(--surface); z-index:-1;
-      }
-      .day-button { min-height:40px; padding-left:0; padding-right:0; }
-      .roll-count { padding:0; border-radius:0; background:transparent; color:var(--faint); font-size:10px; font-weight:700; }
-      .day-button.is-selected .roll-count { color:var(--action); font-weight:800; }
-      .day-count-line { min-height:0; gap:3px; }
-      .day-count { font-size:10px; }
-      .card-header { min-height:0; padding-top:10px; align-items:center; gap:8px; }
-      .date-side { gap:6px; align-items:baseline; flex-wrap:nowrap; }
-      .date-title { font-size:15px; }
-      .weekday-label { font-size:12.5px; font-weight:600; }
-      .week-caption { display:none; }
-      .summary-side { flex-wrap:nowrap; row-gap:0; gap:8px; font-size:11px; }
-      .summary-side > span:first-child { margin-left:auto; }
-      .view-toggle-button {
-        position:relative; min-width:0; min-height:44px; margin-block:-10px; padding:0 9px;
-        display:grid; place-items:center; background:transparent; font-size:11px; isolation:isolate;
-      }
-      .view-toggle-button.is-selected { background:transparent; }
-      .view-toggle-button.is-selected::before {
-        content:""; position:absolute; z-index:-1; left:0; right:0; top:10px; height:24px;
-        border-radius:6px; background:var(--surface); box-shadow:0 1px 2px rgba(18,48,60,.10);
-      }
-      .view-toggle { flex:0 0 auto; margin-left:0; padding:2px; border-radius:8px; }
-      .column-head.work { display:none; }
-      .task-row.work {
-        height:auto; min-height:0; padding:11px 10px; display:grid; grid-template-columns:26px minmax(0,1fr) 22px;
-        column-gap:10px; row-gap:7px; align-items:start;
-      }
-      .task-row.work.view-memo { grid-template-columns:26px minmax(0,1fr) 22px; }
-      .task-row.work > :not(.task-main):not(.check-wrap):not(.delete-wrap):not(.mobile-work-meta) { display:none; }
-      .task-row.work .check-wrap {
-        position:relative; width:26px; height:22px; grid-column:1; grid-row:1;
-        display:grid; place-items:center;
-      }
-      .task-row.work .done-check {
-        position:absolute; left:50%; top:50%; width:44px; height:44px; margin:0;
-        border:0; background:transparent; color:transparent; transform:translate(-50%,-50%);
-      }
-      .task-row.work .done-check::before {
-        content:""; position:absolute; left:50%; top:50%; width:20px; height:20px;
-        border:1.5px solid var(--inactive); border-radius:6px; background:var(--surface);
-        transform:translate(-50%,-50%);
-        transition:background-color .12s var(--ease), border-color .12s var(--ease);
-      }
-      .task-row.work .done-check.is-done.mode-work::before { border-color:var(--action); background:var(--action); }
-      .task-row.work .done-check.is-done::after {
-        content:"✓"; position:absolute; left:50%; top:50%; color:#FFFFFF; font-size:11px; font-weight:800;
-        line-height:1; transform:translate(-50%,-50%);
-      }
-      .task-row.work .delete-wrap {
-        position:relative; width:22px; height:22px; grid-column:3; grid-row:1;
-        display:grid; place-items:center;
-      }
-      .task-row.work .row-delete {
-        position:absolute; left:50%; top:50%; width:40px; height:40px;
-        transform:translate(-50%,-50%); color:var(--inactive); font-size:13px;
-      }
-      .task-row.work .task-main {
-        grid-column:2; grid-row:1; flex-direction:row; align-items:baseline; flex-wrap:wrap; gap:6px;
-      }
-      .task-row.work .task-title-button {
-        width:auto; max-width:100%; height:auto; min-height:0 !important; padding:0;
-        font-size:14px; font-weight:600; line-height:1.35;
-        display:-webkit-box; overflow:hidden; white-space:normal; text-overflow:clip;
-        -webkit-box-orient:vertical; -webkit-line-clamp:2; text-wrap:pretty;
-      }
-      .task-row.work .roll-caption { display:inline; margin-top:0; font-size:11px; line-height:1.35; }
-      .task-row.work .task-title-button.strike-anim::after { left:0; animation-name:worklog-strike-mobile; }
-      .task-row.work .mobile-work-meta { min-width:0; display:flex; align-items:center; gap:6px; }
-      .task-row.work .mobile-work-meta.pills {
-        grid-column:2; grid-row:2; display:flex; align-items:center; flex-wrap:wrap; gap:5px;
-      }
-      .task-row.work .mobile-work-meta.pills > * { flex:0 0 auto; }
-      .task-row.work .mobile-work-meta.pills .project-button {
-        width:auto; max-width:140px; min-height:44px; margin-block:-10px;
-      }
-      .task-row.work .mobile-work-meta.pills .project-pill {
-        width:auto; padding:3px 7px; border-radius:6px; font-size:11px; font-weight:600;
-      }
-      .task-row.work .mobile-work-meta.pills .q-button {
-        width:auto; min-width:28px; min-height:44px; margin-block:-10px;
-      }
-      .task-row.work .mobile-work-meta.pills .q-badge {
-        width:auto; min-width:24px; height:20px; padding:0 5px; border-radius:6px; font-size:10px;
-      }
-      .task-row.work .mobile-work-meta.pills .status-button {
-        width:auto; min-height:44px; margin-block:-10px;
-      }
-      .task-row.work .mobile-work-meta.pills .status-pill {
-        width:auto; padding:3px 7px; border-radius:6px; font-size:11px; font-weight:600;
-      }
-      .task-row.work .due-inline {
-        margin-left:auto; display:inline-flex; align-items:center; gap:0;
-      }
-      .task-row.work .due-inline .meta-label { display:none; }
-      .task-row.work .due-inline .date-cell {
-        width:auto; min-width:32px; min-height:44px; margin-block:-10px; padding:0 2px;
-        color:var(--muted); font-size:11px; font-weight:600; text-align:right;
-      }
-      .task-row.work .mobile-work-meta.times {
-        grid-column:2; grid-row:3; display:flex; flex-wrap:nowrap; align-items:center; gap:8px;
-        color:var(--deep); font-variant-numeric:tabular-nums;
-      }
-      .task-row.work .mobile-work-meta.times > * { flex:0 0 auto; white-space:nowrap; }
-      .task-row.work .mobile-work-meta.times .time-span,
-      .task-row.work .mobile-work-meta.times .progress-span { display:inline-flex; align-items:center; gap:3px; }
-      .task-row.work .mobile-work-meta.times .time-span { color:var(--text); font-size:12.5px; font-weight:700; }
-      .task-row.work .mobile-work-meta.times .meta-rule { width:1px; height:11px; background:var(--border-soft); }
-      .task-row.work .mobile-work-meta .meta-label { color:var(--faint); font-size:10.5px; font-weight:700; }
-      .task-row.work .mobile-work-meta.times .meta-value { color:var(--deep); font-size:12px; font-weight:600; }
-      .task-row.work .mobile-work-meta.times .time-cell { width:auto; height:auto; min-height:0; }
-      .task-row.work .mobile-work-meta.times .time-value,
-      .task-row.work .mobile-work-meta.times .number-button { width:auto; min-height:44px; margin-block:-10px; }
-      .task-row.work.view-memo .mobile-work-meta.times { grid-column:2; grid-row:3; display:block; }
-      .task-row.work.view-memo .mobile-work-meta.times .memo { width:100%; min-width:0; display:block; white-space:normal; }
-      .task-row.work.view-memo .mobile-work-meta.times .memo-button {
-        width:100%; height:auto; min-height:38px; padding:0; text-align:left;
-        display:-webkit-box; overflow:hidden; color:var(--deep); font-size:12.5px; font-weight:500; line-height:1.5;
-        text-overflow:clip; white-space:normal; -webkit-box-orient:vertical; -webkit-line-clamp:2;
-        text-wrap:pretty;
-      }
-      .task-row.work.view-memo .mobile-work-meta.times .memo-button.is-empty { min-height:24px; color:var(--faint); font-size:11px; }
-      .task-row.work.view-memo .mobile-work-meta.times .inline-cell-input.memo-input { height:38px; font-size:12.5px; }
-      .task-row.work .mobile-work-meta .cell-button { width:auto; color:inherit; font-size:inherit; font-weight:inherit; }
-      .task-row.work .mobile-work-meta .date-cell { width:auto; }
-      .column-head.life { display:none; }
-      .task-row.life { height:auto; min-height:0; padding:9px 10px; grid-template-columns:62px 22px minmax(0,1fr) 44px 40px; grid-template-rows:40px 32px; gap:6px; }
-      .task-row.life .project-button { grid-column:1; grid-row:1; }
-      .task-row.life .q-slot { grid-column:2; grid-row:1; }
-      .task-row.life .task-main { grid-column:3; grid-row:1; }
-      .task-row.life .date-cell { grid-column:1 / span 2; grid-row:2; }
-      .task-row.life .memo { grid-column:3; grid-row:2; }
-      .task-row.life .check-wrap { width:44px; height:44px; grid-column:4; grid-row:1 / span 2; }
-      .task-row.life .delete-wrap { width:40px; height:44px; grid-column:5; grid-row:1 / span 2; }
-      .task-row .cell-button { min-height:40px; }
-      .task-row .q-button { width:40px; }
-      .task-row .time-cell, .task-row .time-value { height:40px; }
-      .row-delete { width:40px; height:40px; color:var(--inactive); }
-      .column-head { padding-left:7px; padding-right:7px; }
-      .add-row { min-height:44px; padding:11px; border-radius:12px; font-size:12.5px; font-weight:600; }
-      .editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .editor-field.is-wide { grid-column:span 2; }
-      .editor-button { min-height:40px; }
-      .column-resize-handle { display:none; }
-    }
-    @media (any-pointer: coarse) and (max-width:447px) { .task-row.life { grid-template-columns:52px 22px minmax(0,1fr) 40px 40px; gap:5px; } }
-    @media (any-pointer: coarse) and (max-width:320px) {
-      .card { padding-left:10px; padding-right:10px; }
-      .day-track { overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; }
-      .day-track::-webkit-scrollbar { display:none; }
-      .day-button { min-width:40px; flex:0 0 40px; min-height:40px; scroll-snap-align:center; }
-      .day-name { font-size:11px; }
-      .summary-divider { display:none; }
-      .task-row.life { grid-template-columns:44px 18px minmax(0,1fr) 40px 40px; gap:4px; }
-    }
     body.is-widget-mobile .card { min-height:520px; height:auto; padding:12px; gap:10px; }
     body.is-widget-mobile .worklog-top { gap:10px; }
     body.is-widget-mobile .day-nav { order:1; grid-template-columns:44px minmax(0,1fr) 44px; gap:0; }
@@ -555,7 +370,6 @@
     body.is-widget-mobile .task-row.is-done .task-title-button { color:var(--done); text-decoration:line-through; }
     body.is-widget-mobile .task-row .roll-caption,
     body.is-widget-mobile .task-row .delete-wrap,
-    body.is-widget-mobile .task-row .mobile-work-meta { display:none !important; }
     body.is-widget-mobile .worklog-bottom { flex:0 0 auto; }
     body.is-widget-mobile .mobile-add-form { height:48px; display:grid; grid-template-columns:44px minmax(0,1fr); align-items:center; border:1px dashed var(--inactive); border-radius:12px; }
     body.is-widget-mobile .mobile-add-plus { color:var(--muted); font-size:16px; font-weight:700; text-align:center; }
@@ -620,8 +434,7 @@
       const ui = {
         selectedDate:'', adding:false, draftTask:null, editingId:null, inlineEdit:null,
         newId:null, popover:null, projectAdding:false,
-        projectChoiceTimer:null, dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0,
-        timeClick:null
+        dirtyFields:new Set(), columnResize:null, longPress:null, rowDrag:null, suppressClickUntil:0
       };
       let state = defaultState();
       let pendingExternalSync = false;
@@ -1500,7 +1313,7 @@
           return `<span class="time-cell"><input class="inline-cell-input time-input" value="${escapeHtml(value || '')}" inputmode="numeric" data-inline-input data-inline-task="${escapeHtml(task.id)}" data-inline-field="${field}" aria-label="${label} 시간 편집"></span>`;
         }
         return `<span class="time-cell ${value ? 'has-value' : ''}">
-          <button class="cell-button number-cell time-value ${value ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간 ${value ? value : '현재 시각으로 기록'}, 두 번 클릭하면 직접 입력" title="클릭: 현재 시각 · 두 번 클릭: 직접 입력">${value || '–'}</button>
+          <button class="cell-button number-cell time-value ${value ? '' : 'is-missing'}" type="button" data-cell-task="${escapeHtml(task.id)}" data-cell-field="${field}" aria-label="${label} 시간 편집${value ? `, 현재 ${value}` : ''}" title="클릭: 시간 직접 입력">${value || '–'}</button>
           ${value ? `<span class="time-actions"><button class="time-action" type="button" data-time-retry="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 다시 찍기">↻</button><button class="time-action" type="button" data-time-clear="${field}" data-task-id="${escapeHtml(task.id)}" aria-label="${label} 시간 비우기">✕</button></span>` : ''}
         </span>`;
       }
@@ -1538,17 +1351,6 @@
         return `<span class="delete-wrap"><button class="row-delete" type="button" data-row-delete="${escapeHtml(task.id)}" aria-label="삭제">✕</button></span>`;
       }
 
-      function mobileWorkMeta(task, status, progress, estimate) {
-        const due = `<span class="due-inline"><span class="meta-label">목표</span>${dueCell(task)}</span>`;
-        const pills = `<span class="mobile-work-meta pills">${projectButton(task)}${qButton(task)}${statusButton(task, status)}${due}</span>`;
-        if (state.workView === 'memo') {
-          const memo = ui.inlineEdit?.taskId === task.id && ui.inlineEdit?.field === 'memo'
-            ? memoCell(task)
-            : `<span class="cell memo"><button class="memo-button ${task.memo ? '' : 'is-empty'}" type="button" data-inline-start="memo" data-task-id="${escapeHtml(task.id)}" aria-label="메모 ${task.memo ? '편집' : '추가'}">${task.memo ? escapeHtml(task.memo) : '메모 추가'}</button></span>`;
-          return `${pills}<span class="mobile-work-meta times memo-view">${memo}</span>`;
-        }
-        return `${pills}<span class="mobile-work-meta times"><span class="time-span">${timeCell(task, 'start')}<span>–</span>${timeCell(task, 'end')}</span><span class="meta-rule" aria-hidden="true"></span><span class="progress-span"><span class="meta-label">진행</span><span class="meta-value">${hourButton(task, 'progress', progress)}</span><span class="meta-value">/</span><span class="meta-value">${hourButton(task, 'est', estimate)}</span></span></span>`;
-      }
 
       function workRow(task, draft = false) {
         const progress = progressOf(task);
@@ -1565,7 +1367,6 @@
           ${statusButton(task, status)}
           ${completionButton(task)}
           ${deleteButton(task)}
-          ${mobileWorkMeta(task, status, progress, task.est)}
         </${tag}>`;
       }
 
@@ -1657,8 +1458,6 @@
       }
 
       function closeCellPopover() {
-        if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
-        ui.projectChoiceTimer = null;
         ui.popover = null;
         ui.projectAdding = false;
         card.querySelectorAll('.is-popover-open').forEach(element => element.classList.remove('is-popover-open'));
@@ -1797,7 +1596,7 @@
         }
         cellPopover.className = `cell-popover kind-${ui.popover.field}`;
         if (ui.popover.field === 'project') {
-          const options = projectChoices(task).map(project => `<button class="project-option ${project === (task.proj || '미분류') ? 'is-selected' : ''}" type="button" data-project-choice="${escapeHtml(project)}" aria-label="${escapeHtml(project)}${project === '미분류' ? '' : ', 두 번 누르면 구분 제거'}">${escapeHtml(project)}</button>`).join('');
+          const options = projectChoices(task).map(project => `<div class="project-option-row"><button class="project-option ${project === (task.proj || '미분류') ? 'is-selected' : ''}" type="button" data-project-choice="${escapeHtml(project)}">${escapeHtml(project)}</button>${project === '미분류' ? '' : `<button class="row-delete" type="button" data-project-remove="${escapeHtml(project)}" aria-label="구분 삭제">✕</button>`}</div>`).join('');
           const canAdd = customProjects(task).length < 3;
           const add = !canAdd ? '' : ui.projectAdding
             ? `<form data-project-new-form><input class="project-new-input" name="project" maxlength="30" autocomplete="off" aria-label="새 구분 이름"></form>`
@@ -1910,11 +1709,9 @@
       }
 
       function resetTransient() {
-        if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
         cancelLongPress();
         clearRowDropTarget();
         taskList.querySelectorAll('.is-reordering').forEach(element => element.classList.remove('is-reordering'));
-        ui.projectChoiceTimer = null;
         ui.adding = false;
         ui.draftTask = null;
         ui.editingId = null;
@@ -2259,39 +2056,11 @@
         finishRowDrag(event,true);
       });
 
-      const DOUBLE_CLICK_MS = 500;
-
-      // 시작·종료 칸의 두 번째 클릭 = 직접 입력. 첫 클릭 뒤 셀이 다시 그려지고
-      // 호버 시 ↻·✕ 오버레이가 덮이는 탓에 브라우저 dblclick은 신뢰할 수 없어 직접 판정한다.
-      function timeCellDoubleClick(event) {
-        const zone = event.target.closest('[data-cell-task][data-cell-field="start"], [data-cell-task][data-cell-field="end"], [data-time-retry], [data-time-clear]');
-        if (!zone) {
-          ui.timeClick = null;
-          return null;
-        }
-        const id = zone.dataset.cellTask || zone.dataset.taskId;
-        const field = zone.dataset.cellField || zone.dataset.timeRetry || zone.dataset.timeClear;
-        const previous = ui.timeClick;
-        const now = Date.now();
-        ui.timeClick = { id, field, at:now };
-        if (previous && previous.id === id && previous.field === field && now - previous.at <= DOUBLE_CLICK_MS) {
-          ui.timeClick = null;
-          return { id, field };
-        }
-        return null;
-      }
 
       card.addEventListener('click', event => {
         if (Date.now() < ui.suppressClickUntil && event.target.closest('.task-row')) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          return;
-        }
-        const timeDouble = timeCellDoubleClick(event);
-        if (timeDouble) {
-          event.preventDefault();
-          window.getSelection?.()?.removeAllRanges();
-          beginInlineEdit(timeDouble.id, timeDouble.field);
           return;
         }
         if (event.target.closest('[data-dismiss-banner]')) {
@@ -2314,22 +2083,14 @@
           input?.focus();
           return;
         }
+        const projectRemove = event.target.closest('[data-project-remove]');
+        if (projectRemove) { removeProject(projectRemove.dataset.projectRemove); return; }
         const projectChoice = event.target.closest('[data-project-choice]');
         if (projectChoice && ui.popover) {
           const id = ui.popover.taskId;
           const value = projectChoice.dataset.projectChoice;
-          if (event.detail >= 2 && value !== '미분류') {
-            if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
-            ui.projectChoiceTimer = null;
-            removeProject(value);
-            return;
-          }
-          if (ui.projectChoiceTimer) window.clearTimeout(ui.projectChoiceTimer);
-          ui.projectChoiceTimer = window.setTimeout(() => {
-            ui.projectChoiceTimer = null;
-            closeCellPopover();
-            if (updateTask(id, task => { task.proj = value || '미분류'; }, '구분을 바꿨습니다.')) popTaskCell(id,'project');
-          },220);
+          closeCellPopover();
+          if (updateTask(id, task => { task.proj = value || ''; }, '구분을 바꿨습니다.')) popTaskCell(id,'project');
           return;
         }
         const qChoice = event.target.closest('[data-q-choice]');
@@ -2386,7 +2147,6 @@
         }
         const inlineStart = event.target.closest('[data-inline-start]');
         if (inlineStart) {
-          if (isMobileLayout() && inlineStart.dataset.inlineStart === 'title') return;
           if (event.shiftKey) {
             resetTransient();
             ui.editingId = inlineStart.dataset.taskId;
@@ -2399,18 +2159,21 @@
         if (cellButton) {
           const id = cellButton.dataset.cellTask;
           const field = cellButton.dataset.cellField;
+          if (['project','q'].includes(field) && !cellButton.closest('[data-quick-add-form]')) {
+            updateTask(id, task => {
+              if (field === 'project') {
+                const choices = projectChoices(task);
+                const next = choices[(choices.indexOf(task.proj || '미분류') + 1) % choices.length];
+                task.proj = next === '미분류' ? '' : next;
+              } else task.q = task.q >= 1 && task.q < 4 ? task.q + 1 : task.q === 4 ? null : 1;
+            }, field === 'project' ? '구분을 바꿨습니다.' : 'Q를 바꿨습니다.');
+            return;
+          }
           if (['project','q','due','progress','est'].includes(field)) {
             openPopover(id, field);
             return;
           }
-          if ((field === 'start' || field === 'end') && !taskById(id)?.[field]) {
-            updateTask(id, task => {
-              task[field] = currentTimeKey();
-              if (field === 'end' && !task.progressTouched && task.start) task.progress = durationOf(task);
-            }, `${field === 'start' ? '시작' : '종료'} 시간을 기록했습니다.`);
-            return;
-          }
-          if ((field === 'start' || field === 'end') && mobileQuery.matches) {
+          if (field === 'start' || field === 'end') {
             beginInlineEdit(id, field);
             return;
           }

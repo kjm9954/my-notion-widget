@@ -97,15 +97,8 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /widgetMotion\?\.spark\?\.\(check,check\.offsetWidth \/ 2,check\.offsetHeight \/ 2\)/);
   assert.match(html, /'상태를 바꿨습니다\.','status'/);
   assert.match(html, /'완료 상태를 바꿨습니다\.','checkbox'/);
-  assert.match(html, /class="due-inline"/);
-  assert.match(html, /class="meta-rule"/);
-  assert.match(html, /class="mobile-work-meta times memo-view"/);
-  assert.match(html, /-webkit-line-clamp:2/);
-  assert.match(html, /\.task-row\.work\.view-memo \{ grid-template-columns:26px minmax\(0,1fr\) 22px; \}/);
-  assert.match(html, /\.task-row\.work \.mobile-work-meta\.pills \{[\s\S]*?grid-column:2; grid-row:2; display:flex/);
-  assert.match(html, /\.task-row\.work \.due-inline \{[\s\S]*?margin-left:auto; display:inline-flex/);
-  assert.match(html, /\.task-row\.work \.mobile-work-meta\.times \{[\s\S]*?grid-column:2; grid-row:3/);
-  assert.match(html, /\.task-row\.work \.check-wrap \{[\s\S]*?width:26px; height:22px; grid-column:1; grid-row:1/);
+  assert.doesNotMatch(html, /mobile-work-meta/);
+  assert.match(html, /data-mobile-add-form/);
   assert.match(html, /<span class="project-pill">/);
   assert.match(html, /<span class="status-pill \$\{status\.className\}">/);
 });

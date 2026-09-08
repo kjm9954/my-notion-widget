@@ -242,38 +242,6 @@
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
     }
-    @media (any-pointer: coarse) and (max-width:999px) {
-      .calendar-card { padding:12px; }
-      .weekdays, .month-grid { gap:3px; }
-      .day { padding:4px; }
-      .event { padding:3px; gap:3px; }
-      .event-name { font-size:9px; }
-      .popover { width:min(300px,calc(100% - 24px)); }
-      .editor-popover { width:min(340px,calc(100% - 24px)); }
-    }
-    @media (any-pointer: coarse) and (max-width:639px) {
-      .widget-head { min-height:44px; margin-bottom:6px; }
-      .nav-button, .month-button, .close-button { min-width:44px; min-height:44px; }
-      .month-nav { gap:0; }
-      .month-button { padding:4px; font-size:11px; }
-      .remain { max-width:74px; font-size:9px; white-space:normal; text-align:right; }
-      .weekdays { gap:2px; padding-left:2px; padding-right:2px; }
-      .weekday { font-size:9px; }
-      .month-grid { gap:2px; padding:2px; }
-      .day { padding:3px; }
-      .date { min-height:14px; text-align:center; }
-      .events { min-height:8px; display:flex; flex-wrap:wrap; justify-content:center; gap:2px; }
-      .event { width:8px; min-height:8px; display:block; padding:0; border:0; background:transparent; box-shadow:none; }
-      .event.wait { border:0; }
-      .event-name { display:none; }
-      .project-dot { display:block; }
-      .day-add-zone { width:44px; height:44px; bottom:auto; }
-      .day-add { top:0; right:0; width:44px; height:44px; border-color:transparent; background:transparent; opacity:.45; visibility:visible; pointer-events:auto; }
-      .task-row, .status-choice, .project-choice, .due-chip, .text-button, .secondary-button, .danger-button { min-height:40px; }
-      .project-choice { width:40px; flex-basis:40px; }
-      .popover { max-height:calc(100% - 32px); overflow:auto; }
-      .due-picker { position:fixed; }
-    }
     @media (hover:none) {
       .day-add { opacity:.45; visibility:visible; pointer-events:auto; }
       .day-add-zone { width:44px; height:44px; bottom:auto; }
@@ -287,8 +255,8 @@
     body.is-widget-mobile .remain { grid-column:2; grid-row:2; max-width:none; font-size:11px; font-weight:700; letter-spacing:0; text-align:center; white-space:nowrap; }
     body.is-widget-mobile .weekdays { gap:4px; padding:0; }
     body.is-widget-mobile .weekday { height:24px; min-height:24px; font-size:10px; font-weight:800; }
-    body.is-widget-mobile .month-grid { min-height:auto; flex:0 0 auto; grid-auto-rows:44px; gap:4px; padding:0; border:0; background:transparent; }
-    body.is-widget-mobile .day { height:44px; min-height:44px; padding:4px; border:1px solid var(--edge); background:var(--bg); }
+    body.is-widget-mobile .month-grid { min-height:auto; flex:0 0 auto; grid-auto-rows:auto; gap:4px; padding:0; border:0; background:transparent; }
+    body.is-widget-mobile .day { height:auto; min-height:44px; aspect-ratio:1; padding:4px; border:1px solid var(--edge); background:var(--bg); }
     body.is-widget-mobile .day.selected { background:#E2F0F6; color:var(--action); }
     body.is-widget-mobile .day.future { opacity:.6; }
     body.is-widget-mobile .date { min-height:18px; color:var(--secondary); font-family:inherit; font-size:13px; font-weight:700; text-align:left; }
