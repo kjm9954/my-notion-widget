@@ -144,8 +144,33 @@ async (page) => {
     await desktop.screenshot({path:`output/playwright/1440-full-${file.replaceAll('/','-')}.png`});
     await audit.screenshot({path:`output/playwright/820-full-${file.replaceAll('/','-')}.png`});
   }
+  for (const [device,tab] of [['desktop',desktop],['tablet',audit]]) {
+    for (const view of ['time','memo']) {
+      await tab.goto('http://127.0.0.1:4173/Worklog/worklog.html?qa=full',{waitUntil:'networkidle'});
+      await tab.locator(`[data-work-view="${view}"]`).click();
+      for (const [field,value,choice] of [['project','두번째 구분','[data-project-choice="두번째 구분"]'],['q',4,'[data-q-choice="4"]']]) {
+        const first=tab.locator(`.task-row [data-cell-field="${field}"]`).first();
+        const id=await first.getAttribute('data-cell-task');
+        const cell=tab.locator(`.task-row [data-cell-task="${id}"][data-cell-field="${field}"]`);
+        const before=await cell.innerText(),writes=await tab.evaluate(()=>window.__writes.length);
+        await cell.click();
+        await tab.locator('#cellPopover').waitFor({state:'visible'});
+        const options=field==='project'?'[data-project-choice]':'[data-q-choice]';
+        check(`${device} ${view} ${field} opens choices without changing data`,await tab.locator(`#cellPopover ${options}`).count()>1&&await cell.innerText()===before&&await tab.evaluate(()=>window.__writes.length)===writes);
+        await tab.screenshot({path:`output/playwright/worklog-${device}-${view}-${field}-choices.png`});
+        const bounds=await tab.locator('#cellPopover').boundingBox(),frame=await tab.locator('[data-widget-card]').boundingBox();
+        check(`${device} ${view} ${field} choices stay inside card`,bounds.x>=frame.x-1&&bounds.y>=frame.y-1&&bounds.x+bounds.width<=frame.x+frame.width+1&&bounds.y+bounds.height<=frame.y+frame.height+1);
+        await tab.keyboard.press('Escape');
+        check(`${device} ${view} ${field} cancels without saving`,!await tab.locator('#cellPopover').isVisible()&&await tab.evaluate(()=>window.__writes.length)===writes);
+        await cell.click();
+        await tab.locator(`#cellPopover ${choice}`).click();
+        await tab.waitForFunction(({id,field,value,writes})=>window.__writes.slice(writes).some(w=>w.value.upserts?.some(t=>t.id===id&&t[field==='project'?'proj':'q']===value)),{id,field,value,writes});
+        check(`${device} ${view} ${field} saves selected value and closes`,!await tab.locator('#cellPopover').isVisible());
+      }
+    }
+  }
   await desktop.goto('http://127.0.0.1:4173/Worklog/worklog.html?qa=full',{waitUntil:'networkidle'});
-  for(const field of ['project','q','status']){
+  for(const field of ['status']){
     const cell=desktop.locator(`.task-row [data-cell-field="${field}"]`).first();
     const id=await cell.getAttribute('data-cell-task'),before=await cell.innerText();
     await cell.click();

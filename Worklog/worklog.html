@@ -2159,16 +2159,6 @@
         if (cellButton) {
           const id = cellButton.dataset.cellTask;
           const field = cellButton.dataset.cellField;
-          if (['project','q'].includes(field) && !cellButton.closest('[data-quick-add-form]')) {
-            updateTask(id, task => {
-              if (field === 'project') {
-                const choices = projectChoices(task);
-                const next = choices[(choices.indexOf(task.proj || '미분류') + 1) % choices.length];
-                task.proj = next === '미분류' ? '' : next;
-              } else task.q = task.q >= 1 && task.q < 4 ? task.q + 1 : task.q === 4 ? null : 1;
-            }, field === 'project' ? '구분을 바꿨습니다.' : 'Q를 바꿨습니다.');
-            return;
-          }
           if (['project','q','due','progress','est'].includes(field)) {
             openPopover(id, field);
             return;

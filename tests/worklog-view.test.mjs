@@ -103,6 +103,21 @@ test("업무일지는 시간·메모 전환과 두 열 구성을 모두 포함",
   assert.match(html, /<span class="status-pill \$\{status\.className\}">/);
 });
 
+test("프로젝트와 Q 버튼은 값을 바꾸지 않고 선택 목록을 연다", async () => {
+  const html = await readFile(new URL("../Worklog/worklog.html", import.meta.url), "utf8");
+  const start = html.indexOf("const cellButton = event.target.closest('[data-cell-task][data-cell-field]');");
+  const end = html.indexOf("const toggleButton =", start);
+  assert.ok(start >= 0 && end > start);
+  const clickCell = new Function("event", "openPopover", "updateTask", "beginInlineEdit", html.slice(start, end));
+  for (const field of ["project", "q"]) {
+    const opened = [], writes = [];
+    const cell = { dataset:{ cellTask:"task-1", cellField:field }, closest:() => null };
+    clickCell({ target:{ closest:() => cell } }, (...args) => opened.push(args), (...args) => writes.push(args), () => assert.fail("선택 버튼이 텍스트 편집을 열면 안 됩니다"));
+    assert.deepEqual(opened, [["task-1", field]], `${field}: 첫 클릭은 목록 열기`);
+    assert.equal(writes.length, 0, `${field}: 값을 고르기 전에는 저장하지 않음`);
+  }
+});
+
 test("마감 현황은 업무일지의 표시 설정 변경을 화면 변경으로 오인하지 않음", async () => {
   const html = await readFile(new URL("../Worklog/deadline-horizon.html", import.meta.url), "utf8");
   assert.match(html, /JSON\.stringify\(projects\) !== JSON\.stringify\(previousProjects\)/);
