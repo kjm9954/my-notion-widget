@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8791"],
       "port": 8791
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

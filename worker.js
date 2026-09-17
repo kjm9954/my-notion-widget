@@ -40,7 +40,8 @@ export default {
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
     };
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
@@ -63,6 +64,11 @@ export default {
         const meta = { id: instanceId, createdAt: new Date().toISOString() };
         await saveRawSetting(env, instanceMetaKey(instanceId), meta);
         return json({ ok: true, data: meta }, 201);
+      }
+
+      // ───────── 인수인계 Q&A (등록된 방 키로만 접근) ─────────
+      if (path.startsWith("/api/qa/")) {
+        return await handleQaRequest(request, env, url, json, cors);
       }
 
       const rawInstanceId = url.searchParams.get("w") || "";
@@ -1890,4 +1896,430 @@ function normalizeNotesState(raw) {
 
 async function loadNotesState(env) {
   return normalizeNotesState(await loadSetting(env, "notes", { items: [] }));
+}
+
+// ───────── 인수인계 Q&A ─────────
+// 접근 키(방 키)는 Authorization: Bearer 로 받는다. 이전 임베드 주소 호환으로 ?room= 도 받는다.
+// qa_rooms 에 등록된 키만 유효하다. status: active(읽기·쓰기) | readonly(읽기만) | revoked(차단)
+// 사람 이름·카테고리는 코드에 두지 않는다. 방마다 qa_rooms.config 에 저장하고 접근 키로만 내려준다.
+const QA_ROOM_RE = /^qa_[A-Za-z0-9_-]{32,80}$/;
+const QA_IMAGE_ID_RE = /^img:[A-Za-z0-9_-]{8,40}$/;
+const QA_THREAD_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const QA_STATUSES = ["대기", "답변됨", "확인완료"];
+const QA_LIMITS = {
+  threads: 3000,
+  messages: 500,
+  title: 60,
+  text: 8000,
+  images: 5,
+  imageBytes: 4 * 1024 * 1024,
+  who: 20,
+  category: 30,
+  guide: 120,
+  readers: 8,
+  config: 32 * 1024,
+  configUsers: 8,
+  configCategories: 30,
+  configMinors: 30,
+};
+const QA_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const QA_IMAGE_CHUNK = 500000; // base64 글자 수. D1 한 행 한도(2MB)보다 충분히 작게 나눈다
+const QA_BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+const QA_DAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
+function qaRoomKey(request, url) {
+  const auth = String(request.headers.get("Authorization") || "").trim();
+  const bearer = /^Bearer\s+(\S+)$/i.exec(auth);
+  return bearer ? bearer[1] : (url.searchParams.get("room") || "");
+}
+
+async function handleQaRequest(request, env, url, json, cors) {
+  const room = qaRoomKey(request, url);
+  if (!QA_ROOM_RE.test(room)) return json({ ok: false, error: room ? "invalid key" : "missing key" }, 401);
+  const roomRow = await env.DB.prepare(`SELECT revision, status FROM qa_rooms WHERE room = ?`).bind(room).first();
+  if (!roomRow || roomRow.status === "revoked") return json({ ok: false, error: "unknown or revoked key" }, 401);
+  const access = roomRow.status === "readonly" ? "read" : "write";
+  const revision = Number(roomRow.revision) || 0;
+  const path = url.pathname;
+  const method = request.method;
+  if (method === "POST" && access !== "write") return json({ ok: false, error: "read-only key" }, 403);
+
+  if (path === "/api/qa/revision" && method === "GET") {
+    return json({ ok: true, data: { revision, access } });
+  }
+
+  if (path === "/api/qa/config" && method === "GET") {
+    const row = await env.DB.prepare(`SELECT config FROM qa_rooms WHERE room = ?`).bind(room).first();
+    const config = safeParse(row?.config, {});
+    return json({ ok: true, data: { access, config: config && typeof config === "object" && !Array.isArray(config) ? config : {} } });
+  }
+
+  if (path === "/api/qa/config" && method === "POST") {
+    const text = await request.text();
+    if (text.length > QA_LIMITS.config) return json({ ok: false, error: "config too large" }, 413);
+    const config = safeParse(text, null);
+    const problem = qaConfigProblem(config);
+    if (problem) return json({ ok: false, error: problem }, 400);
+    await env.DB.prepare(`UPDATE qa_rooms SET config = ? WHERE room = ?`).bind(JSON.stringify(config), room).run();
+    return json({ ok: true, data: { config } });
+  }
+
+  if (path === "/api/qa/state" && method === "GET") {
+    let since = Math.max(0, Number(url.searchParams.get("since")) || 0);
+    if (since > 1e12) since = 0; // 이전 클라이언트가 보낸 시각 값 → 전체 동기화로 전환
+    const { results } = await env.DB.prepare(
+      `SELECT payload, rev FROM qa_threads WHERE room = ? AND rev > ? ORDER BY rev ASC`
+    ).bind(room, since > 0 ? since : -1).all();
+    const rows = results || [];
+    const threads = rows.map(row => safeParse(row.payload, null)).filter(Boolean);
+    const maxRev = rows.reduce((max, row) => Math.max(max, Number(row.rev) || 0), 0);
+    return json({ ok: true, data: { revision, access, threads, since: Math.max(revision, maxRev, since), full: since === 0 } });
+  }
+
+  if (path === "/api/qa/index" && method === "GET") {
+    const { results } = await env.DB.prepare(`SELECT payload FROM qa_threads WHERE room = ?`).bind(room).all();
+    const items = (results || [])
+      .map(row => safeParse(row.payload, null))
+      .filter(Boolean)
+      .map(qaSummary)
+      .sort((a, b) => b.lastAt - a.lastAt);
+    return json({ ok: true, data: { revision, access, items } });
+  }
+
+  if (path === "/api/qa/thread" && method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    if (!QA_THREAD_ID_RE.test(id)) return json({ ok: false, error: "invalid thread id" }, 400);
+    const loaded = await qaLoadThread(env, room, id);
+    if (!loaded) return json({ ok: false, error: "thread not found" }, 404);
+    return json({ ok: true, data: { revision, thread: loaded.thread } });
+  }
+
+  if (path === "/api/qa/op" && method === "POST") {
+    const op = await request.json().catch(() => null);
+    const result = await qaApplyOp(env, room, op);
+    if (result.error) return json({ ok: false, error: result.error }, result.status || 400);
+    return json({ ok: true, data: result });
+  }
+
+  // 이미지는 D1에 base64 조각으로 저장한다. 인코딩·디코딩은 브라우저가 맡아 Worker CPU를 아낀다.
+  if (path === "/api/qa/image" && method === "POST") {
+    const contentType = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    let type;
+    let base64;
+    if (contentType === "application/json") {
+      const body = await request.json().catch(() => null);
+      type = String(body?.type || "").toLowerCase();
+      base64 = typeof body?.data === "string" ? body.data : "";
+    } else {
+      // 이전 클라이언트는 이미지 바이트를 그대로 보낸다
+      type = contentType;
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      if (bytes.byteLength > QA_LIMITS.imageBytes) return json({ ok: false, error: "image too large" }, 413);
+      base64 = qaBytesToBase64(bytes);
+    }
+    if (!QA_IMAGE_TYPES.has(type)) return json({ ok: false, error: "unsupported image type" }, 415);
+    const size = qaBase64Size(base64);
+    if (size < 0) return json({ ok: false, error: "invalid image data" }, 400);
+    if (size === 0) return json({ ok: false, error: "empty image" }, 400);
+    if (size > QA_LIMITS.imageBytes) return json({ ok: false, error: "image too large" }, 413);
+    const id = `img:${randomUrlSafeId(12)}`;
+    const parts = Math.ceil(base64.length / QA_IMAGE_CHUNK);
+    const now = Date.now();
+    const statements = [];
+    for (let part = 0; part < parts; part++) {
+      statements.push(env.DB.prepare(
+        `INSERT INTO qa_images (room, id, part, parts, type, size, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(room, id, part, parts, type, size, base64.slice(part * QA_IMAGE_CHUNK, (part + 1) * QA_IMAGE_CHUNK), now));
+    }
+    await env.DB.batch(statements);
+    return json({ ok: true, data: { id, size } }, 201);
+  }
+
+  if (path === "/api/qa/image" && method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    const image = QA_IMAGE_ID_RE.test(id) ? await qaLoadImage(env, room, id) : null;
+    if (!image) return json({ ok: false, error: "image not found" }, 404);
+    return json({ ok: true, data: image });
+  }
+
+  return json({ ok: false, error: "qa endpoint not found" }, 404);
+}
+
+function qaIsName(value, max) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= max;
+}
+
+// 방 설정의 모양만 확인한다. 값은 위젯이 글자로만 그린다.
+function qaConfigProblem(config) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) return "config must be an object";
+  const users = config.users;
+  if (!Array.isArray(users) || !users.length || users.length > QA_LIMITS.configUsers) return "users required";
+  for (const user of users) {
+    if (!user || !qaIsName(user.name, QA_LIMITS.who)) return "invalid user name";
+    if (user.role !== "answerer" && user.role !== "asker") return "invalid user role";
+    if (user.desc !== undefined && typeof user.desc !== "string") return "invalid user desc";
+  }
+  if (new Set(users.map(user => user.name)).size !== users.length) return "duplicate user name";
+  const categories = config.categories;
+  if (!Array.isArray(categories) || !categories.length || categories.length > QA_LIMITS.configCategories) return "categories required";
+  for (const category of categories) {
+    if (!category || !qaIsName(category.major, QA_LIMITS.category)) return "invalid category";
+    const minors = category.minors;
+    if (!Array.isArray(minors) || !minors.length || minors.length > QA_LIMITS.configMinors) return "invalid minors";
+    if (minors.some(minor => !qaIsName(minor, QA_LIMITS.category))) return "invalid minors";
+  }
+  if (config.text !== undefined && (!config.text || typeof config.text !== "object" || Array.isArray(config.text))) return "invalid text";
+  return "";
+}
+
+function qaImageKey(room, id) {
+  return `qa-img:${room}:${id}`;
+}
+
+function qaBytesToBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function qaBase64Size(text) {
+  if (typeof text !== "string" || text.length % 4 !== 0 || !QA_BASE64_RE.test(text)) return -1;
+  const padding = text.endsWith("==") ? 2 : text.endsWith("=") ? 1 : 0;
+  return (text.length / 4) * 3 - padding;
+}
+
+async function qaLoadImage(env, room, id) {
+  const { results } = await env.DB.prepare(
+    `SELECT part, parts, type, size, data FROM qa_images WHERE room = ? AND id = ? ORDER BY part ASC`
+  ).bind(room, id).all();
+  const rows = results || [];
+  if (rows.length && rows.length === Number(rows[0].parts)) {
+    return { type: rows[0].type, size: Number(rows[0].size) || 0, data: rows.map(row => row.data).join("") };
+  }
+  // 예전에 KV에 저장한 이미지는 읽기만 한다
+  if (!env.KV) return null;
+  const { value, metadata } = await env.KV.getWithMetadata(qaImageKey(room, id), "arrayBuffer");
+  if (!value) return null;
+  return { type: metadata?.type || "image/jpeg", size: value.byteLength, data: qaBytesToBase64(new Uint8Array(value)) };
+}
+
+function qaBumpRoom(env, room, now) {
+  return env.DB.prepare(
+    `UPDATE qa_rooms SET revision = revision + 1, updated_at = ? WHERE room = ?`
+  ).bind(now, room);
+}
+
+function qaBatchim(word) {
+  const code = String(word || "").trim().slice(-1).charCodeAt(0);
+  if (!(code >= 0xac00 && code <= 0xd7a3)) return 0;
+  return (code - 0xac00) % 28;
+}
+
+function qaJosaRo(word) {
+  const b = qaBatchim(word);
+  return b === 0 || b === 8 ? "로" : "으로";
+}
+
+function qaKst(at) {
+  return new Date(at + 9 * 60 * 60 * 1000);
+}
+
+function qaDateLabel(at) {
+  const d = qaKst(at);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 ${QA_DAYS[d.getUTCDay()]}`;
+}
+
+function qaTimeLabel(at) {
+  const d = qaKst(at);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function qaFormatSysDate(at) {
+  const d = qaKst(at);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 ${qaTimeLabel(at)}`;
+}
+
+function qaWho(value) {
+  return cleanText(value, QA_LIMITS.who);
+}
+
+function qaNormalizeRead(raw) {
+  const read = {};
+  if (!raw || typeof raw !== "object") return read;
+  for (const [name, value] of Object.entries(raw).slice(0, QA_LIMITS.readers)) {
+    const who = qaWho(name);
+    if (who) read[who] = value === true;
+  }
+  return read;
+}
+
+function qaNormalizeMessage(raw, now) {
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.system) {
+    return { system: true, at: Math.min(Number(raw.at) || now, now), text: cleanText(raw.text, 200) };
+  }
+  const who = qaWho(raw.who);
+  if (!who) return null;
+  const images = (Array.isArray(raw.images) ? raw.images : [])
+    .map(v => String(v || ""))
+    .filter(v => QA_IMAGE_ID_RE.test(v))
+    .slice(0, QA_LIMITS.images);
+  const text = cleanText(raw.text, QA_LIMITS.text);
+  if (!text && !images.length) return null;
+  const at = Math.min(Number(raw.at) || now, now);
+  const message = {
+    who,
+    at,
+    date: cleanText(raw.date, 24) || qaDateLabel(at),
+    time: cleanText(raw.time, 8) || qaTimeLabel(at),
+    images,
+    text,
+  };
+  const clientId = cleanText(raw.clientId, 64);
+  if (clientId) message.clientId = clientId;
+  return message;
+}
+
+function qaNormalizeThread(raw, now) {
+  if (!raw || typeof raw !== "object") return null;
+  const title = cleanText(raw.title, QA_LIMITS.title);
+  if (!title) return null;
+  const messages = (Array.isArray(raw.messages) ? raw.messages : [])
+    .map(m => qaNormalizeMessage(m, now))
+    .filter(Boolean)
+    .slice(0, QA_LIMITS.messages);
+  const id = QA_THREAD_ID_RE.test(String(raw.id || "")) ? String(raw.id) : `t_${now}_${randomUrlSafeId(6)}`;
+  const createdAt = Number(raw.createdAt) || now;
+  return {
+    id,
+    cat1: cleanText(raw.cat1, QA_LIMITS.category),
+    cat2: cleanText(raw.cat2, QA_LIMITS.category),
+    guide: cleanText(raw.guide, QA_LIMITS.guide),
+    title,
+    status: QA_STATUSES.includes(raw.status) ? raw.status : "대기",
+    read: qaNormalizeRead(raw.read),
+    messages,
+    createdAt,
+    updatedAt: Number(raw.updatedAt) || createdAt,
+  };
+}
+
+function qaSummary(thread) {
+  const messages = Array.isArray(thread.messages) ? thread.messages : [];
+  const real = messages.filter(m => m && !m.system);
+  const first = real[0] || null;
+  const last = real[real.length - 1] || null;
+  return {
+    id: thread.id,
+    title: thread.title,
+    cat1: thread.cat1 || "",
+    cat2: thread.cat2 || "",
+    guide: thread.guide || "",
+    status: thread.status,
+    author: first ? first.who : "",
+    lastWho: last ? last.who : "",
+    read: thread.read || {},
+    replies: Math.max(0, real.length - 1),
+    createdAt: Number(thread.createdAt) || 0,
+    updatedAt: Number(thread.updatedAt) || Number(thread.createdAt) || 0,
+    lastAt: messages.reduce((max, m) => Math.max(max, Number(m?.at) || 0), 0),
+  };
+}
+
+async function qaLoadThread(env, room, id) {
+  const row = await env.DB.prepare(`SELECT payload, rev FROM qa_threads WHERE room = ? AND id = ?`).bind(room, id).first();
+  if (!row) return null;
+  const thread = safeParse(row.payload, null);
+  return thread ? { thread, rev: Number(row.rev) || 0 } : null;
+}
+
+async function qaApplyOp(env, room, op) {
+  const type = String(op?.type || "");
+  const now = Date.now();
+
+  if (type === "create") {
+    const thread = qaNormalizeThread(op.thread, now);
+    if (!thread) return { error: "invalid thread" };
+    if (!thread.messages.length || thread.messages[0].system) return { error: "thread needs a first message" };
+    thread.createdAt = now;
+    thread.updatedAt = now;
+    if (!Object.keys(thread.read).length) thread.read = { [thread.messages[0].who]: true };
+    const countRow = await env.DB.prepare(`SELECT COUNT(*) AS n FROM qa_threads WHERE room = ?`).bind(room).first();
+    if (Number(countRow?.n) >= QA_LIMITS.threads) return { error: "room is full", status: 507 };
+    const results = await env.DB.batch([
+      qaBumpRoom(env, room, now),
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO qa_threads (room, id, payload, updated_at, rev)
+         VALUES (?, ?, ?, ?, (SELECT revision FROM qa_rooms WHERE room = ?))`
+      ).bind(room, thread.id, JSON.stringify(thread), now, room),
+    ]);
+    const saved = await qaLoadThread(env, room, thread.id);
+    if (!saved) return { error: "conflict, retry", status: 409 };
+    // 같은 id 로 다시 보낸 등록은 새로 만들지 않고 이미 저장된 것을 돌려준다
+    return { thread: saved.thread, revision: saved.rev, duplicate: !results[1]?.meta?.changes };
+  }
+
+  const threadId = String(op?.threadId || "");
+  if (!QA_THREAD_ID_RE.test(threadId)) return { error: "invalid thread id" };
+  if (!["message", "status", "read"].includes(type)) return { error: "unknown op" };
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const loaded = await qaLoadThread(env, room, threadId);
+    if (!loaded) return { error: "thread not found", status: 404 };
+    const thread = qaNormalizeThread(loaded.thread, now);
+    let changed = false;
+
+    if (type === "message") {
+      const message = qaNormalizeMessage({ ...op.message, at: now }, now);
+      if (!message) return { error: "invalid message" };
+      const duplicate = message.clientId && thread.messages.some(m => !m.system && m.clientId === message.clientId);
+      if (!duplicate) {
+        if (thread.messages.length >= QA_LIMITS.messages) return { error: "thread is full", status: 507 };
+        thread.messages.push(message);
+        if (QA_STATUSES.includes(op.status)) thread.status = op.status;
+        const read = qaNormalizeRead(op.read);
+        if (!Object.keys(read).length) {
+          for (const name of Object.keys(thread.read)) read[name] = false;
+        }
+        read[message.who] = true;
+        thread.read = read;
+        changed = true;
+      }
+    } else if (type === "status") {
+      const who = qaWho(op.who);
+      const status = QA_STATUSES.includes(op.status) ? op.status : null;
+      if (!who || !status) return { error: "invalid status" };
+      if (thread.status !== status) {
+        thread.status = status;
+        thread.messages.push({ system: true, at: now, text: `— ${who}님이 ${status}${qaJosaRo(status)} 변경 · ${qaFormatSysDate(now)}` });
+        changed = true;
+      }
+    } else {
+      const who = qaWho(op.who);
+      if (!who) return { error: "invalid user" };
+      if (thread.read[who] !== true) {
+        thread.read[who] = true;
+        changed = true;
+      }
+    }
+
+    if (!changed) return { thread, revision: loaded.rev, unchanged: true };
+    thread.updatedAt = now;
+    const results = await env.DB.batch([
+      qaBumpRoom(env, room, now),
+      env.DB.prepare(
+        `UPDATE qa_threads
+         SET payload = ?, updated_at = ?, rev = (SELECT revision FROM qa_rooms WHERE room = ?)
+         WHERE room = ? AND id = ? AND rev = ?`
+      ).bind(JSON.stringify(thread), now, room, room, threadId, loaded.rev),
+    ]);
+    if (results[1]?.meta?.changes) {
+      const saved = await qaLoadThread(env, room, threadId);
+      return { thread: saved?.thread || thread, revision: saved?.rev || 0 };
+    }
+    // 다른 사람이 같은 질문을 동시에 고쳤다 → 다시 읽어서 재적용
+  }
+  return { error: "conflict, retry", status: 409 };
 }

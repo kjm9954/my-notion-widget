@@ -1,3 +1,6 @@
 .wrangler/
 output/playwright/
 .playwright-cli/
+
+# 인수인계 Q&A 비공개 설정·샘플(이름·카테고리). 공개 저장소에 올리지 않는다.
+handover-qa/private/
