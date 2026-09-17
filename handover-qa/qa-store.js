@@ -170,6 +170,7 @@
   /* ───────── 방 설정(비공개) ───────── */
   const CONFIG_CACHE_KEY = scope ? 'qa.config.' + scope : '';
   let readyTask = null;
+  let roomAccess = 'write';   // 방 설정 응답이 알려 주는 키 권한: write | read
 
   function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -187,6 +188,7 @@
     if (rawKey) {
       try {
         const data = await sendJson('/api/qa/config');
+        roomAccess = data.access === 'read' ? 'read' : 'write';
         const room = isPlainObject(data.config) ? data.config : {};
         local.set(CONFIG_CACHE_KEY, room);
         return room;
@@ -222,6 +224,7 @@
     return readyTask;
   }
   function getConfig() { return cfg; }
+  function getAccess() { return roomAccess; }
   function textOf(section) { return (cfg.text && cfg.text[section]) || {}; }
 
   /* ───────── 사용자 ───────── */
@@ -270,6 +273,12 @@
   function isCategory(major, minor) {
     const found = getCategories().find(c => c.major === major);
     return !!found && (!minor || found.minors.includes(minor));
+  }
+
+  /* ───────── 임베드 값 ───────── */
+  // 임베드 주소 # 뒤의 값(예: major, guide)을 읽는다. 위젯은 location 을 직접 읽지 않는다.
+  function hashParam(name) {
+    return String(hash.get(name) || '').trim();
   }
 
   /* ───────── 위젯 폭 ───────── */
@@ -607,8 +616,10 @@
     hasKey: () => !!rawKey,
     ready,
     getConfig,
+    getAccess,
     text: textOf,
     applyFrameWidth,
+    hashParam,
     local,
     on,
     emit,

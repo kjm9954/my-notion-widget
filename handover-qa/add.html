@@ -268,8 +268,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   <input type="file" id="file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-major-only"></script>
-<script src="qa-store.js?v=20260918-major-only"></script>
+<script src="qa-config.js?v=20260918-mini"></script>
+<script src="qa-store.js?v=20260918-mini"></script>
 <script>
 (function () {
   'use strict';
@@ -928,6 +928,10 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     applyText();
     if (!S.getUsers().length || !S.getCategories().length) {
       showAccess('notReady');
+      return;
+    }
+    if (S.getAccess() === 'read') {
+      showAccess('denied');
       return;
     }
     ui.author = S.getAuthor();
