@@ -63,9 +63,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 .chip{position:relative;min-height:32px;padding:var(--chip-pad);border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12.5px;font-weight:500;line-height:1.4;text-align:left;transition:background-color 120ms,border-color 120ms,color 120ms}
 .chip::after{content:"";position:absolute;inset:-3px 0}
 .chip.major.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
-.chip.minor.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
 .chip:disabled{cursor:default}
-.hint{font-size:12px;line-height:32px;color:var(--text-3)}
 
 /* 입력 */
 .input,.textarea{width:100%;border:1px solid var(--border);border-radius:6px;background:var(--surface);outline:none;transition:border-color 120ms,box-shadow 120ms}
@@ -198,7 +196,6 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       <section class="field" aria-labelledby="l-cat">
         <span class="eyebrow" id="l-cat"></span>
         <div class="chips" id="majors" role="group" aria-labelledby="l-cat"></div>
-        <div class="chips" id="minors" role="group" aria-labelledby="l-cat"></div>
       </section>
 
       <section class="field">
@@ -271,8 +268,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   <input type="file" id="file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-width"></script>
-<script src="qa-store.js?v=20260918-width"></script>
+<script src="qa-config.js?v=20260918-major-only"></script>
+<script src="qa-store.js?v=20260918-major-only"></script>
 <script>
 (function () {
   'use strict';
@@ -300,7 +297,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 
   const el = {
     body: $('body'), form: $('form'), setup: $('setup'), access: $('access'),
-    pill: $('author-pill'), majors: $('majors'), minors: $('minors'),
+    pill: $('author-pill'), majors: $('majors'),
     title: $('title'), text: $('text'), thumbs: $('thumbs'), file: $('file'),
     similar: $('similar'), similarText: $('similar-text'), similarAct: $('similar-act'), sthread: $('sthread'),
     mine: $('mine'), mineList: $('mine-list'),
@@ -313,7 +310,6 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     access: null,          // none | expired | denied
     author: null,
     major: '',
-    minor: '',
     images: [],            // { blob, url, tooBig }
     phase: 'idle',         // idle | busy | done | fail
     attempt: null,
@@ -424,6 +420,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   }
 
   /* ───────── 카테고리 ───────── */
+  // 카테고리는 한 단계(대분류)만 고른다.
   function renderCategories() {
     const categories = S.getCategories();
     const locked = ui.phase === 'busy' || ui.phase === 'done';
@@ -431,28 +428,13 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       const on = c.major === ui.major;
       return `<button type="button" class="chip major ${on ? 'on' : ''}" data-major="${esc(c.major)}" aria-pressed="${on}" ${locked ? 'disabled' : ''}>${esc(c.major)}</button>`;
     }).join('');
-    const current = categories.find(c => c.major === ui.major);
-    el.minors.innerHTML = current
-      ? current.minors.map(minor => {
-          const on = minor === ui.minor;
-          return `<button type="button" class="chip minor ${on ? 'on' : ''}" data-minor="${esc(minor)}" aria-pressed="${on}" ${locked ? 'disabled' : ''}>${esc(minor)}</button>`;
-        }).join('')
-      : `<span class="hint">${esc(T.pickMajorFirst)}</span>`;
   }
 
   el.majors.addEventListener('click', event => {
     const chip = event.target.closest('.chip');
     if (!chip || chip.disabled || chip.dataset.major === ui.major) return;
     ui.major = chip.dataset.major;
-    ui.minor = '';
-    onEdit();
-  });
-
-  el.minors.addEventListener('click', event => {
-    const chip = event.target.closest('.chip');
-    if (!chip || chip.disabled) return;
-    ui.minor = chip.dataset.minor;
-    S.local.set(LAST_CATEGORY_KEY, { major: ui.major, minor: ui.minor });
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
     onEdit();
   });
 
@@ -480,13 +462,13 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     return (ui.phase === 'idle' || ui.phase === 'fail')
       && !!ui.author
       && !!el.title.value.trim()
-      && !!ui.minor
+      && !!ui.major
       && (!!el.text.value.trim() || ui.images.length > 0)
       && !ui.images.some(image => image.tooBig);
   }
 
   function signature() {
-    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.minor, ui.images.map(i => i.url)]);
+    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(i => i.url)]);
   }
 
   function onEdit() {
@@ -531,7 +513,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   function saveDraft() {
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => {
-      const draft = { title: el.title.value, body: el.text.value, major: ui.major, minor: ui.minor };
+      const draft = { title: el.title.value, body: el.text.value, major: ui.major };
       if (!draft.title.trim() && !draft.body.trim()) {
         S.local.remove(DRAFT_KEY);
         ui.draftSaved = false;
@@ -555,9 +537,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       el.title.value = String(draft.title || '').slice(0, 60);
       el.text.value = String(draft.body || '');
       ui.draftSaved = !!(el.title.value.trim() || el.text.value.trim());
-      if (S.isCategory(draft.major, draft.minor)) {
+      if (S.isCategory(draft.major)) {
         ui.major = draft.major;
-        ui.minor = draft.minor || '';
         return;
       }
     }
@@ -565,10 +546,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   }
 
   function applyLastCategory(last = S.local.get(LAST_CATEGORY_KEY)) {
-    if (last && S.isCategory(last.major, last.minor)) {
-      ui.major = last.major;
-      ui.minor = last.minor || '';
-    }
+    if (last && S.isCategory(last.major)) ui.major = last.major;
   }
 
   /* ───────── 이미지 ───────── */
@@ -715,7 +693,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     el.sthread.innerHTML = `
       <div>
         <div class="st-title">${esc(thread.title)}</div>
-        <div class="st-meta"><span>${esc(thread.cat2 || '')}</span><span>·</span><i class="dot ${dotClass(thread.status)}"></i><span>${esc(thread.status)}</span></div>
+        <div class="st-meta"><span>${esc(thread.cat1 || thread.cat2 || '')}</span><span>·</span><i class="dot ${dotClass(thread.status)}"></i><span>${esc(thread.status)}</span></div>
       </div>
       ${messages}
       <div class="st-actions">
@@ -871,7 +849,6 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
         body: el.text.value,
         images: ui.images.map(image => image.blob),
         major: ui.major,
-        minor: ui.minor,
         guide: '',
         author: ui.author,
       }, { attempt, onProgress: renderProgress });
@@ -883,7 +860,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       return;
     }
     ui.attempt = null;
-    S.local.set(LAST_CATEGORY_KEY, { major: ui.major, minor: ui.minor });
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
     clearDraft();
     setPhase('done');
     setSimilar(null);

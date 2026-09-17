@@ -273,12 +273,18 @@ test("방 설정은 접근 키로만 읽고, 쓰기 키로 모양을 검사해 �
     { users: [], categories: config.categories },
     { users: [{ name: "가", role: "boss" }], categories: config.categories },
     { users: [{ name: "가", role: "asker" }, { name: "가", role: "asker" }], categories: config.categories },
-    { users: config.users, categories: [{ major: "큰 분류", minors: [] }] },
+    { users: config.users, categories: [{ major: "큰 분류" }, { major: "큰 분류" }] },
+    { users: config.users, categories: [{ major: "큰 분류", minors: [""] }] },
     { users: config.users, categories: config.categories, text: "문구" },
   ];
   for (const bad of invalid) {
     assert.equal((await call(env, "POST", "/api/qa/config", { json: bad })).status, 400, JSON.stringify(bad));
   }
+  // 소분류 없이 대분류만 있는 설정도 받는다
+  const majorsOnly = { users: config.users, categories: [{ major: "큰 분류" }, { major: "다른 분류", minors: [] }] };
+  assert.equal((await call(env, "POST", "/api/qa/config", { json: majorsOnly })).status, 200);
+  assert.deepEqual((await call(env, "GET", "/api/qa/config")).data.data.config, majorsOnly);
+  assert.equal((await call(env, "POST", "/api/qa/config", { json: config })).status, 200);
   const huge = { ...config, text: { add: { titlePlaceholder: "x".repeat(40000) } } };
   assert.equal((await call(env, "POST", "/api/qa/config", { json: huge })).status, 413);
   assert.deepEqual((await call(env, "GET", "/api/qa/config")).data.data.config, config);
@@ -291,7 +297,6 @@ test("공개 파일에는 이름·카테고리가 없고, 비공개 설정과 �
   const publicConfig = sandbox.QA_CONFIG;
   assert.deepEqual(publicConfig.users, []);
   assert.deepEqual(publicConfig.categories, []);
-  assert.deepEqual(publicConfig.listFilterMinors, []);
 
   const gitignore = await readFile(new URL("../.gitignore", import.meta.url), "utf8");
   assert.match(gitignore, /^handover-qa\/private\/$/m);
@@ -312,7 +317,7 @@ test("공개 파일에는 이름·카테고리가 없고, 비공개 설정과 �
   }
   const words = [
     ...privateConfig.users.map(user => user.name),
-    ...privateConfig.categories.flatMap(category => [category.major, ...category.minors]),
+    ...privateConfig.categories.flatMap(category => [category.major, ...(category.minors || [])]),
   ];
   assert.ok(words.length >= 4);
   const files = tracked.filter(file =>

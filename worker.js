@@ -2064,10 +2064,11 @@ function qaConfigProblem(config) {
   if (!Array.isArray(categories) || !categories.length || categories.length > QA_LIMITS.configCategories) return "categories required";
   for (const category of categories) {
     if (!category || !qaIsName(category.major, QA_LIMITS.category)) return "invalid category";
-    const minors = category.minors;
-    if (!Array.isArray(minors) || !minors.length || minors.length > QA_LIMITS.configMinors) return "invalid minors";
+    const minors = category.minors === undefined ? [] : category.minors;
+    if (!Array.isArray(minors) || minors.length > QA_LIMITS.configMinors) return "invalid minors";
     if (minors.some(minor => !qaIsName(minor, QA_LIMITS.category))) return "invalid minors";
   }
+  if (new Set(categories.map(category => category.major)).size !== categories.length) return "duplicate category";
   if (config.text !== undefined && (!config.text || typeof config.text !== "object" || Array.isArray(config.text))) return "invalid text";
   return "";
 }

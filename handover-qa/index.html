@@ -459,8 +459,8 @@ body.dev .harness{display:flex}
   <input type="file" id="cw-file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-width"></script>
-<script src="qa-store.js?v=20260918-width"></script>
+<script src="qa-config.js?v=20260918-major-only"></script>
+<script src="qa-store.js?v=20260918-major-only"></script>
 <script>
 (function(){
 'use strict';
@@ -486,7 +486,7 @@ const DEV  = DEV_HARNESS || S.dev;
 const REMOTE = S.hasKey();                 // 접근 키가 있으면 서버 동기화, 없으면 이 브라우저에만 저장
 const STORE_KEY = 'handoverQA.v1' + (REMOTE ? ':' + S.scope : '');   // localStorage 키 하나
 
-let USERS = [], CATS = [], CAT1 = [], CAT2 = [], FILTERS = ['전체'];
+let USERS = [], CATS = [], CAT1 = [], FILTERS = ['전체'];
 function applyConfig(){
   C = S.getConfig();
   const text = C.text || {};
@@ -494,8 +494,7 @@ function applyConfig(){
   USERS   = S.getUsers().map(u => u.name);
   CATS    = S.getCategories();
   CAT1    = CATS.map(c => c.major);
-  CAT2    = CATS.flatMap(c => c.minors);
-  FILTERS = ['전체', ...CAT1, ...(C.listFilterMinors || []).filter(m => CAT2.includes(m))];
+  FILTERS = ['전체', ...CAT1];   // 카테고리는 대분류 한 단계만 쓴다
 }
 applyConfig();
 const STATUS  = {
@@ -756,7 +755,7 @@ function cardHTML(t, pinned){
     <div class="card-body">
       <div class="card-top"><span class="card-title">${esc(t.title)}</span><span class="card-time">${fmtList(lastAt(t))}</span></div>
       <div class="card-preview">${esc(preview)}</div>
-      <div class="card-meta"><span class="chip">${esc(t.cat2)}</span><span class="status"><i class="dot ${st.color}"></i>${esc(t.status)}</span>${right}</div>
+      <div class="card-meta"><span class="chip">${esc(t.cat1 || t.cat2)}</span><span class="status"><i class="dot ${st.color}"></i>${esc(t.status)}</span>${right}</div>
     </div></div>`;
 }
 function renderList(){
@@ -827,7 +826,7 @@ async function enterList(){
 const ctxs = {
   detail:  { images: [], ta: $('#det-input'), attachEl: $('#det-attach'), file: $('#file-input'), key: () => 't' + ui.threadId },
   compose: { images: [], ta: $('#cmp-text'),  attachEl: $('#cmp-attach'), file: $('#file-input'), key: () => 'compose' },
-  widget:  { images: [], ta: $('#cw-text'),   attachEl: $('#cw-attach'),  file: $('#cw-file'),    key: () => 'widget:' + (params.get('cat2') || '') }
+  widget:  { images: [], ta: $('#cw-text'),   attachEl: $('#cw-attach'),  file: $('#cw-file'),    key: () => 'widget:' + (params.get('cat1') || params.get('cat2') || '') }
 };
 let fileTarget = null;
 
@@ -929,7 +928,7 @@ function saveDraft(name){
   draftTimer = setTimeout(() => {
     const ctx = ctxs[name]; const key = ctx.key();
     const d = { text: ctx.ta.value, images: ctx.images.slice() };
-    if (name === 'compose'){ d.title = $('#cmp-title').value; d.cat2 = ui.cmpCat || ''; }
+    if (name === 'compose'){ d.title = $('#cmp-title').value; d.cat1 = ui.cmpCat || ''; }
     if (name === 'widget'){ d.title = $('#cw-title').value; }
     if (!d.text && !d.images.length && !d.title) delete state.drafts[key]; else state.drafts[key] = d;
     save();
@@ -965,7 +964,7 @@ function renderDetailHead(){
   const t = cur(); if (!t) return;
   const first = t.messages.find(m => !m.system);
   $('#det-title').textContent = t.title;
-  $('#det-meta').textContent = `${t.cat2} · ${first ? first.who + ' ' + fmtShort(first.at) : ''} 등록`;
+  $('#det-meta').textContent = `${t.cat1 || t.cat2} · ${first ? first.who + ' ' + fmtShort(first.at) : ''} 등록`;
   $('#det-status').textContent = t.status;
   $('#det-dot').className = 'dot ' + ((STATUS[t.status] || {}).color || '');
 }
@@ -1128,12 +1127,12 @@ $('#vw-next').addEventListener('click', () => vwMove(1));
 
 /* ===== 3-4 새 질문 ===== */
 function renderCmpCats(){
-  $('#cmp-cats').innerHTML = CAT2.map(c => `<button class="cchip ${ui.cmpCat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+  $('#cmp-cats').innerHTML = CAT1.map(c => `<button class="cchip ${ui.cmpCat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
 }
 $('#cmp-cats').addEventListener('click', e => { const b = e.target.closest('.cchip'); if (!b) return; ui.cmpCat = ui.cmpCat === b.dataset.cat ? null : b.dataset.cat; renderCmpCats(); saveDraft('compose'); });
 function openCompose(prefill){
   const d = restoreDraft('compose');
-  ui.cmpCat = CAT2.includes(d.cat2) ? d.cat2 : null; renderCmpCats();
+  ui.cmpCat = CAT1.includes(d.cat1) ? d.cat1 : null; renderCmpCats();
   $('#cmp-title').value = prefill != null && prefill !== '' ? prefill.slice(0, 60) : (d.title || '');
   updateCmpTitle(); show('compose'); $('#cmp-title').focus();
 }
@@ -1172,7 +1171,7 @@ async function registerQuestion(){
   if (!ctx.ta.value.trim() && !ctx.images.length){ toast('내용을 한 줄 이상 적어주세요.'); ctx.ta.focus(); return; }
   ui.registering = true; updateCmpTitle(); $('#btn-register').textContent = '등록 중…';
   try {
-    await createQuestion({ author: state.me, major: S.majorOf(ui.cmpCat), minor: ui.cmpCat, guide: '', title, ctx }, 'failRegister');
+    await createQuestion({ author: state.me, major: ui.cmpCat, minor: '', guide: '', title, ctx }, 'failRegister');
     clearDraft('compose'); ctx.images = []; ctx.ta.value = ''; $('#cmp-title').value = ''; ui.cmpCat = null; renderAttach(ctx); save();
     goList(); toast('질문을 등록했습니다.');
   } catch(e){
@@ -1200,12 +1199,12 @@ function initWidget(){
   document.body.classList.add('mode-compose');
   const cw = $('#cw'); cw.hidden = false;
   const fallback = C.fallbackCategory || {};
-  const cat2 = params.get('cat2') || '';
-  const cat1 = params.get('cat1') || S.majorOf(cat2) || '';
+  // 카테고리는 대분류(cat1)만 쓴다. 예전 주소의 cat2 는 대분류를 찾는 데만 쓴다.
+  const cat1 = params.get('cat1') || S.majorOf(params.get('cat2') || '') || fallback.major || '';
   const guide = params.get('guide') || '';
   $('#cw-eyebrow').textContent = TC.eyebrow || '';
   $('#cw-done-desc').textContent = TC.doneDesc || '';
-  $('#cw-chip').textContent = cat2 || cat1 || fallback.minor || '';
+  $('#cw-chip').textContent = cat1;
   const listUrl = new URL(location.pathname, location.href);
   if (DEV) listUrl.searchParams.set('dev', '1');
   if (DEV && params.get('api')) listUrl.searchParams.set('api', params.get('api'));
@@ -1241,7 +1240,7 @@ function initWidget(){
     $('#cw-submit').disabled = true;
     try {
       if (!REMOTE) load();                    // 같은 브라우저의 다른 탭에서 바뀐 내용과 합치기
-      await createQuestion({ author, major: cat1 || fallback.major || '', minor: cat2 || fallback.minor || '', guide, title, ctx }, 'failRegister');
+      await createQuestion({ author, major: cat1, minor: '', guide, title, ctx }, 'failRegister');
     } catch(e){
       $('#cw-submit').disabled = false; saveDraft('widget'); setState('fail'); return;
     }
@@ -1306,7 +1305,6 @@ function initHarness(){
   const composeUrl = new URL(location.pathname, location.href);
   composeUrl.searchParams.set('mode', 'compose');
   if (devCat.major) composeUrl.searchParams.set('cat1', devCat.major);
-  if (devCat.minor) composeUrl.searchParams.set('cat2', devCat.minor);
   $('#h-compose-link').href = carry(composeUrl);
   $('#h-main-link').href = carry(new URL(location.pathname, location.href));
   if (MODE === 'compose'){ $$('.harness [data-w], #h-loading, #h-error, #h-fail-send, #h-fail-status').forEach(b => b.style.display = 'none'); }

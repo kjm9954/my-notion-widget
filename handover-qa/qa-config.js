@@ -20,7 +20,6 @@ window.QA_CONFIG = {
   // 방 설정이 없을 때 쓰는 빈 값. 실제 값은 방 설정이 채운다.
   users: [],
   categories: [],
-  listFilterMinors: [],
   fallbackCategory: null,
   devComposeCategory: null,
 
@@ -73,7 +72,6 @@ window.QA_CONFIG = {
       labelTitle: '제목',
       labelBody: '내용',
       labelMine: '내가 남긴 질문',
-      pickMajorFirst: '대분류를 먼저 고르세요',
       titlePlaceholder: '[대상] + 궁금한 점',
       bodyPlaceholder: '어디까지 해봤고 무엇이 막혔는지. 스크린샷은 Ctrl+V',
 

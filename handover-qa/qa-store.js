@@ -518,7 +518,8 @@
     const images = Array.isArray(input.images) ? input.images : [];
     const report = (stage, progress) => { attempt.stage = stage; onProgress({ stage, progress, total: 3 }); };
     try {
-      if (!title || !getUser(author) || !input.minor) throw new QAError('invalid', 400, 'missing fields');
+      const major = String(input.major || majorOf(input.minor) || '').trim();
+      if (!title || !getUser(author) || !major) throw new QAError('invalid', 400, 'missing fields');
       if (!body && !images.length) throw new QAError('invalid', 400, 'empty body');
 
       if (!attempt.created) {
@@ -537,8 +538,8 @@
         const at = Date.now();
         const thread = {
           id: attempt.id,
-          cat1: input.major || majorOf(input.minor),
-          cat2: input.minor,
+          cat1: major,
+          cat2: String(input.minor || ''),
           guide: String(input.guide || ''),
           title,
           status: statusAfterPost(author),

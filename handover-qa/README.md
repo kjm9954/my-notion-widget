@@ -20,7 +20,7 @@
 |---|---|---|
 | 질문형 | `https://kjm9954.github.io/my-notion-widget/handover-qa/add.html#k=<접근 키>` | 900 |
 | 목록형 | `https://kjm9954.github.io/my-notion-widget/handover-qa/index.html#k=<접근 키>` | 1000 |
-| 입력 전용(가이드 페이지 하단) | `https://kjm9954.github.io/my-notion-widget/handover-qa/index.html?mode=compose&cat1=<대분류>&cat2=<소분류>&guide=<페이지 이름>#k=<접근 키>` | 96~268 |
+| 입력 전용(가이드 페이지 하단) | `https://kjm9954.github.io/my-notion-widget/handover-qa/index.html?mode=compose&cat1=<카테고리>&guide=<페이지 이름>#k=<접근 키>` | 96~268 |
 
 **폭**: 두 위젯은 노션 임베드 블록의 폭을 그대로 채웁니다. 노션에서 블록에 마우스를 올리면 나오는 양옆 손잡이를 끌어 폭을 맞추세요. 폭을 고정하고 싶으면 주소 끝에 `&w=<px>` 를 붙입니다(예: `#k=<접근 키>&w=600`). 그 폭을 넘지 않고 가운데 정렬됩니다. 두 위젯을 같은 폭으로 맞추려면 같은 값을 쓰세요.
 
@@ -58,7 +58,7 @@ curl -X POST -H "Authorization: Bearer <접근 키>" -H "Content-Type: applicati
 curl -H "Authorization: Bearer <접근 키>" https://notion-widget.wldnjsdkk.workers.dev/api/qa/config
 ```
 
-설정 모양: `users`(1~8명, `name`·`role`(`answerer` 또는 `asker`)·`desc`), `categories`(`major`·`minors`), 선택 항목 `listFilterMinors`·`fallbackCategory`·`devComposeCategory`·`text`(공개 문구를 덮어쓸 값).
+설정 모양: `users`(1~8명, `name`·`role`(`answerer` 또는 `asker`)·`desc`), `categories`(`major` 한 단계, 이름이 겹치면 안 됨), 선택 항목 `fallbackCategory`·`devComposeCategory`·`text`(공개 문구를 덮어쓸 값). 카테고리는 대분류 한 단계만 씁니다.
 
 ## 저장 용량
 
