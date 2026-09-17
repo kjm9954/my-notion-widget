@@ -107,9 +107,16 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 .thumb .rm{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--surface);background:var(--ink);color:#fff;font-size:8px;line-height:1;display:flex;align-items:center;justify-content:center}
 .thumb .rm::after{content:"";position:absolute;inset:-8px}
 
-/* 하단 줄 */
+/* 하단 줄: 카테고리 칩 · 작성자 | 취소 등록 */
 .foot{display:flex;align-items:center;gap:10px;min-height:36px}
-.meta{flex:1;min-width:0;text-align:left;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot-left{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.cats{display:flex;flex-wrap:wrap;gap:4px}
+.cat{height:24px;padding:0 8px;border-radius:3px;border:1px solid var(--border);background:var(--surface);font-size:11.5px;font-weight:400;line-height:22px;color:var(--text-2);white-space:nowrap}
+.cat:hover{border-color:var(--line-strong)}
+.cat.on{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent);font-weight:600}
+.cat:disabled{cursor:default}
+.meta-sep{font-size:11.5px;color:var(--text-3)}
+.meta{min-width:0;text-align:left;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta:hover{color:var(--text-2)}
 .note{flex:1;min-width:0;font-size:11.5px;color:var(--red)}
 .actions{display:flex;align-items:center;gap:4px;flex:none;margin-left:auto}
@@ -151,8 +158,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 @container (max-width:638px){
   .bar-count{display:none}
   .s-extra{display:none}
-  .foot{flex-wrap:wrap;row-gap:2px}
-  .foot > .meta,.foot > .note{flex-basis:100%}
+  .foot{flex-wrap:wrap;row-gap:4px}
+  .foot > .foot-left,.foot > .note{flex-basis:100%}
 }
 </style>
 </head>
@@ -179,7 +186,11 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     <textarea class="text" id="text"></textarea>
     <div class="thumbs" id="thumbs" hidden></div>
     <div class="foot" id="foot">
-      <button type="button" class="meta" id="meta"></button>
+      <div class="foot-left" id="foot-left">
+        <span class="cats" id="cats" role="group"></span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <button type="button" class="meta" id="meta"></button>
+      </div>
       <span class="note" id="note" hidden></span>
       <div class="actions">
         <button type="button" class="btn-text" id="cancel"></button>
@@ -220,8 +231,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   </div>
 </div>
 
-<script src="qa-config.js?v=20260918-mini"></script>
-<script src="qa-store.js?v=20260918-mini"></script>
+<script src="qa-config.js?v=20260918-mini2"></script>
+<script src="qa-store.js?v=20260918-mini2"></script>
 <script>
 (function () {
   'use strict';
@@ -245,10 +256,12 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   const TEXT_MIN = 62;
   const TEXT_MAX = 200;
 
-  // 카테고리와 가이드명은 임베드 주소에서만 받는다(화면에서 바꿀 수 없음).
-  const MAJOR = S.hashParam('major');
+  // 임베드 주소는 모든 가이드 페이지에서 같다. 카테고리는 위젯에서 고른다.
+  // 주소에 major 가 있으면 처음 선택값으로만 쓰고, guide 가 있으면 함께 저장한다.
+  const HASH_MAJOR = S.hashParam('major');
   const GUIDE = S.hashParam('guide');
-  const DRAFT_KEY = 'qa.draft.' + (GUIDE || MAJOR || 'default');
+  const LAST_CATEGORY_KEY = 'qa.lastCategory';
+  const DRAFT_KEY = 'qa.draft.' + (GUIDE || 'mini');
 
   const $ = id => document.getElementById(id);
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -259,7 +272,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     pickText: $('pick-text'), pickUsers: $('pick-users'),
     form: $('form'), title: $('title'), text: $('text'), thumbs: $('thumbs'),
     similar: $('similar'), sLabel: $('s-label'), sTitle: $('s-title'), sExtra: $('s-extra'), sAct: $('s-act'), thread: $('thread'),
-    foot: $('foot'), meta: $('meta'), note: $('note'), cancel: $('cancel'), submit: $('submit'),
+    foot: $('foot'), footLeft: $('foot-left'), cats: $('cats'), meta: $('meta'), note: $('note'), cancel: $('cancel'), submit: $('submit'),
     footPick: $('foot-pick'), footPickText: $('foot-pick-text'), footPickUsers: $('foot-pick-users'),
     busyText: $('busy-text'), busyBar: $('busy-bar'), doneText: $('done-text'),
     failText: $('fail-text'), failCode: $('fail-code'), retry: $('retry'),
@@ -270,6 +283,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     state: 'loading',
     access: '',
     author: null,
+    major: '',
     images: [],            // { blob, url, tooBig }
     attempt: null,
     index: null,
@@ -297,6 +311,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     el.retry.textContent = T.retry || '';
     el.accessRetry.textContent = T.accessRetry || '';
     el.meta.title = T.changeAuthor || '';
+    el.cats.setAttribute('aria-label', T.categoryGroup || '');
     el.sLabel.textContent = T.similarLabel || '';
   }
 
@@ -328,14 +343,13 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     renderCount();
   }
 
-  // kind: none | expired | denied | offline | notReady | badCategory
+  // kind: none | expired | denied | offline | notReady
   const ACCESS = {
     none: { tone: 'bg', mark: '?', text: () => T.noKey },
     expired: { tone: 'rust', mark: '!', text: () => T.expired, retry: true },
     denied: { tone: 'red', mark: '!', text: () => T.denied, code: true },
     offline: { tone: 'rust', mark: '!', text: () => T.offline, retry: true },
     notReady: { tone: 'bg', mark: '?', text: () => T.notReady, retry: true },
-    badCategory: { tone: 'rust', mark: '!', text: () => T.badCategory },
   };
   function showAccess(kind) {
     const info = ACCESS[kind] || ACCESS.offline;
@@ -351,7 +365,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   /* ───────── 접힘 바 ───────── */
   function renderCount() {
     const items = (ui.index && ui.index.items) || [];
-    const n = GUIDE ? items.filter(item => item.guide === GUIDE).length : items.filter(item => item.major === MAJOR).length;
+    const n = GUIDE ? items.filter(item => item.guide === GUIDE).length : items.length;
     el.barCount.textContent = fill(T.pastCount, { n });
     el.barCount.hidden = !ui.index || n === 0;
   }
@@ -361,6 +375,30 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     setState('expanded');
     el.title.focus({ preventScroll: true });
   });
+
+  /* ───────── 카테고리 ───────── */
+  function renderCats() {
+    const locked = ui.state !== 'expanded';
+    el.cats.innerHTML = S.getCategories().map(category => {
+      const on = category.major === ui.major;
+      return `<button type="button" class="cat ${on ? 'on' : ''}" data-major="${esc(category.major)}" aria-pressed="${on}" ${locked ? 'disabled' : ''}>${esc(category.major)}</button>`;
+    }).join('');
+  }
+
+  el.cats.addEventListener('click', event => {
+    const chip = event.target.closest('.cat');
+    if (!chip || chip.disabled || chip.dataset.major === ui.major) return;
+    ui.major = chip.dataset.major;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    renderFoot();
+    saveDraft();
+  });
+
+  function applyDefaultCategory(draftMajor) {
+    const last = S.local.get(LAST_CATEGORY_KEY);
+    const candidates = [draftMajor, HASH_MAJOR, last && last.major];
+    ui.major = candidates.find(major => major && S.isCategory(major)) || '';
+  }
 
   /* ───────── 작성자 ───────── */
   function renderPicker(target) {
@@ -401,6 +439,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   function canSubmit() {
     return ui.state === 'expanded'
       && !!ui.author
+      && !!ui.major
       && !!el.title.value.trim()
       && (!!el.text.value.trim() || ui.images.length > 0);
   }
@@ -408,7 +447,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   function renderFoot() {
     el.foot.hidden = ui.picking;
     el.footPick.hidden = !ui.picking;
-    el.meta.textContent = `${GUIDE || MAJOR} · ${ui.author || ''}`;
+    renderCats();
+    el.meta.textContent = ui.author || '';
     el.submit.disabled = !canSubmit();
     el.cancel.disabled = ui.state !== 'expanded';
     scheduleFit();
@@ -419,8 +459,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     clearTimeout(noteTimer);
     el.note.textContent = message;
     el.note.hidden = false;
-    el.meta.hidden = true;
-    noteTimer = setTimeout(() => { el.note.hidden = true; el.meta.hidden = false; }, NOTE_MS);
+    el.footLeft.hidden = true;
+    noteTimer = setTimeout(() => { el.note.hidden = true; el.footLeft.hidden = false; }, NOTE_MS);
   }
 
   el.title.addEventListener('input', () => {
@@ -483,7 +523,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   function saveDraft() {
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => {
-      const draft = { title: el.title.value, body: el.text.value };
+      const draft = { title: el.title.value, body: el.text.value, major: ui.major };
       if (!draft.title.trim() && !draft.body.trim()) S.local.remove(DRAFT_KEY);
       else S.local.set(DRAFT_KEY, draft);
     }, 300);
@@ -496,9 +536,10 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 
   function restoreDraft() {
     const draft = S.local.get(DRAFT_KEY);
-    if (!draft || typeof draft !== 'object') return;
-    el.title.value = String(draft.title || '').slice(0, 60);
-    el.text.value = String(draft.body || '');
+    const saved = draft && typeof draft === 'object' ? draft : {};
+    el.title.value = String(saved.title || '').slice(0, 60);
+    el.text.value = String(saved.body || '');
+    applyDefaultCategory(saved.major);
   }
 
   /* ───────── 이미지 ───────── */
@@ -688,7 +729,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 
   /* ───────── 등록 ───────── */
   function signature() {
-    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.images.map(image => image.url)]);
+    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(image => image.url)]);
   }
 
   function failureLine(error) {
@@ -727,7 +768,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
         title: el.title.value,
         body: el.text.value,
         images: ui.images.map(image => image.blob),
-        major: MAJOR,
+        major: ui.major,
         minor: '',
         guide: GUIDE,
         author: ui.author,
@@ -742,6 +783,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       return;
     }
     ui.attempt = null;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
     clearDraft();
     setState('done');
     loadIndex(true);
@@ -763,7 +805,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     clearDraft();
     setSimilar(null);
     el.note.hidden = true;
-    el.meta.hidden = false;
+    el.footLeft.hidden = false;
+    applyDefaultCategory();   // 카테고리는 마지막 선택을 유지한다
   }
 
   el.submit.addEventListener('click', submit);
@@ -802,7 +845,6 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     refreshText();
     applyText();
     if (!S.getUsers().length || !S.getCategories().length) { showAccess('notReady'); return; }
-    if (!MAJOR || !S.isCategory(MAJOR)) { showAccess('badCategory'); return; }
     if (S.getAccess() === 'read') { showAccess('denied'); return; }
     ui.author = S.getAuthor();
     if (!ui.started) {

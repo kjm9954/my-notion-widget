@@ -65,6 +65,7 @@ window.QA_CONFIG = {
       pastCount: '지난 질문 {n}건',
       pickAuthor: '누구로 질문을 남기시나요?',
       changeAuthor: '눌러서 작성자 바꾸기',
+      categoryGroup: '카테고리',
       titlePlaceholder: '제목 한 줄',
       bodyPlaceholder: '어디까지 해봤고 무엇이 막혔는지. 스크린샷은 Ctrl+V',
       cancel: '취소',
@@ -95,7 +96,6 @@ window.QA_CONFIG = {
       deniedCode: '403 쓰기 권한',
       offline: '질문함에 연결하지 못했어요 · 네트워크를 확인해 주세요',
       notReady: '방 설정이 비어 있어요 · 관리자가 사용자와 카테고리를 등록해야 합니다',
-      badCategory: '위젯 주소의 카테고리가 방 설정에 없어요 · major 값을 확인해 주세요',
       accessRetry: '다시 시도',
     },
 

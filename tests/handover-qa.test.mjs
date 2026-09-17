@@ -340,23 +340,24 @@ test("두 위젯은 임베드 폭을 채우고, w 값으로만 같은 방식으�
   }
 });
 
-test("미니 질문형은 공용 파일을 쓰고, 카테고리·가이드명을 주소 해시에서만 받아 고치지 못하게 한다", async () => {
+test("미니 질문형은 공용 파일을 쓰고, 고정 주소에서 카테고리를 위젯 안에서 고르게 한다", async () => {
   const miniSource = await readFile(new URL("../handover-qa/compose.html", import.meta.url), "utf8");
   const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");
   assert.match(miniSource, /<script src="qa-config\.js(\?v=[\w-]+)?"><\/script>/);
   assert.match(miniSource, /<script src="qa-store\.js(\?v=[\w-]+)?"><\/script>/);
   assert.match(storeSource, /function hashParam\(name\)/);
-  assert.match(miniSource, /S\.hashParam\('major'\)/);
+  assert.match(miniSource, /S\.hashParam\('major'\)/);   // 선택 사항: 처음 선택값
   assert.match(miniSource, /S\.hashParam\('guide'\)/);
   assert.doesNotMatch(miniSource, /hashParam\('minor'\)/);
   assert.doesNotMatch(miniSource, /location\./);
   assert.doesNotMatch(miniSource, /console\./);
-  // 카테고리를 고르는 칩이나 새 탭 링크를 두지 않는다
+  // 새 탭 링크는 두지 않고, 카테고리는 방 설정 목록에서 고른다
   assert.doesNotMatch(miniSource, /target="_blank"|window\.open/);
-  assert.doesNotMatch(miniSource, /class="chip/);
+  assert.match(miniSource, /S\.getCategories\(\)/);
   assert.match(miniSource, /S\.createQuestion\(/);
-  assert.match(miniSource, /major: MAJOR/);
+  assert.match(miniSource, /major: ui\.major/);
   assert.match(miniSource, /guide: GUIDE/);
+  assert.match(miniSource, /!!ui\.major/);
   assert.match(miniSource, /'qa\.draft\.' \+/);
 });
 
