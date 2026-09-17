@@ -272,6 +272,16 @@
     return !!found && (!minor || found.minors.includes(minor));
   }
 
+  /* ───────── 위젯 폭 ───────── */
+  // 기본은 노션 임베드 블록 폭을 그대로 채운다(노션에서 블록 양옆 손잡이로 조절).
+  // 임베드 주소에 w=<px> 를 붙이면 그 폭을 넘지 않게 가운데 정렬한다.
+  function applyFrameWidth(root = document.documentElement) {
+    const width = Number(hash.get('w') || search.get('w'));
+    if (!Number.isFinite(width) || width < 320 || width > 2400) return null;
+    root.style.setProperty('--qa-max-width', `${Math.round(width)}px`);
+    return Math.round(width);
+  }
+
   /* ───────── 날짜 표기 ───────── */
   const pad = n => String(n).padStart(2, '0');
   function dateLabel(at) { const d = new Date(at); return `${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}`; }
@@ -597,6 +607,7 @@
     ready,
     getConfig,
     text: textOf,
+    applyFrameWidth,
     local,
     on,
     emit,

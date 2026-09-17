@@ -323,6 +323,18 @@ test("공개 파일에는 이름·카테고리가 없고, 비공개 설정과 �
   }
 });
 
+test("두 위젯은 임베드 폭을 채우고, w 값으로만 같은 방식으로 최대 폭을 정한다", async () => {
+  const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");
+  const addSource = await readFile(new URL("../handover-qa/add.html", import.meta.url), "utf8");
+  const listSource = await readFile(new URL("../handover-qa/index.html", import.meta.url), "utf8");
+  assert.match(storeSource, /function applyFrameWidth/);
+  for (const source of [addSource, listSource]) {
+    assert.match(source, /S\.applyFrameWidth\(\)/);
+    assert.match(source, /max-width:var\(--qa-max-width,none\)/);
+    assert.doesNotMatch(source, /max-width:600px/);
+  }
+});
+
 test("질문형 위젯은 키를 주소 해시에서만 읽고 헤더로만 보내며 기록하지 않는다", async () => {
   const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");
   const addSource = await readFile(new URL("../handover-qa/add.html", import.meta.url), "utf8");

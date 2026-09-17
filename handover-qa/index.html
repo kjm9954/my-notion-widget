@@ -12,7 +12,8 @@
   --bg:#FCFBFD; --surface:#FFFFFF; --sunk:#F6F3F9;
   --text:#1E1A26; --text-2:#57506A; --text-3:#8B849C; --text-4:#C9C3D6;
   --border:#E7E3EE; --border-soft:#F0EDF5;
-  --accent:#7B2D8E; --accent-bg:#F6ECF8; --accent-line:#E7CFEC; --accent-dis:#EADDEE;
+  --accent:#7B2D8E; --accent-bg:#F6ECF8; --accent-line:#E7CFEC;
+  --ink:#1E1A26; --ink-hover:#2C2637; --ink-off:#C9C3D6;
   --teal:#0B6E6E; --teal-bg:#E6F1F1; --teal-line:#C9E2E2;
   --rust:#B0521B; --rust-bg:#FAEDE4; --rust-line:#EDD5C4;
   --red:#A3221F; --red-bg:#FAEAEA; --red-line:#E6C6C5;
@@ -21,7 +22,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
-html,body{height:100%;overflow:hidden;background:var(--bg)}
+html,body{height:100%;overflow:hidden;background:transparent}
 body{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:var(--text);font-size:14px;line-height:1.6}
 button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
 button{background:none;border:0;cursor:pointer;padding:0}
@@ -42,10 +43,12 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 .qa-chips::-webkit-scrollbar{display:none}
 
 /* ===== 스테이지 / 루트 ===== */
-#stage{height:100%;width:100%;max-width:600px;margin:0 auto}
+#stage{height:100%;width:100%;max-width:var(--qa-max-width,none);margin:0 auto}
 body.dev{overflow:auto}
-body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px;outline:1px solid var(--border)}
-#app{position:relative;height:100%;width:100%;background:var(--bg);overflow:hidden;container-type:inline-size}
+body.dev{background:var(--bg)}
+body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px}
+/* 노션 섹션 카드와 같은 프레임: 흰 면 + 연한 1px 선 + 둥근 모서리 12. 오버레이는 이 안에서 잘린다. */
+#app{position:relative;height:100%;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;container-type:inline-size}
 .screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 120ms ease;background:var(--bg)}
 .screen.on{opacity:1;pointer-events:auto}
 
@@ -70,10 +73,13 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px;o
 .text-btn{font-size:13.5px;font-weight:600;color:var(--text-2);min-height:44px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center}
 .text-btn.accent{color:var(--accent)}
 .pill-btn{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:999px;background:var(--sunk);color:var(--text-2);font-size:12.5px;font-weight:600;white-space:nowrap}
-.btn-round-accent{width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;font-size:22px;font-weight:400;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:none}
-.btn-primary{display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 18px;border-radius:6px;background:var(--accent);color:#fff;font-size:14.5px;font-weight:600;transition:background 120ms}
+/* 주요 버튼은 질문형과 같은 잉크색 */
+.btn-round-ink{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;font-size:22px;font-weight:400;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:background 120ms}
+.btn-round-ink:hover{background:var(--ink-hover)}
+.btn-primary{display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 18px;border-radius:6px;background:var(--ink);color:#fff;font-size:14.5px;font-weight:600;transition:background 120ms}
+.btn-primary:hover:not(:disabled){background:var(--ink-hover)}
 .btn-primary.sm{height:40px;padding:0 16px;font-size:13.5px}
-.btn-primary:disabled{background:var(--accent-dis);font-weight:400}
+.btn-primary:disabled{background:var(--ink-off);font-weight:400}
 .btn-outline{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13.5px;font-weight:600}
 .input-sunk{width:100%;height:40px;border:0;border-radius:6px;background:var(--sunk);padding:0 12px;font-size:13.5px;line-height:1.6}
 .text-input{width:100%;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:0 12px;font-size:13.5px;line-height:1.6}
@@ -191,9 +197,10 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px;o
 .input-row{display:flex;align-items:flex-end;gap:8px}
 .input-row textarea{flex:1;min-height:46px;max-height:200px;height:46px;border:0;border-radius:14px;background:var(--sunk);padding:11px 14px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;overflow-y:hidden}
 .input-row textarea:disabled{color:var(--text-3)}
-.send{width:42px;height:42px;border-radius:50%;background:var(--accent-dis);color:#fff;font-size:18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;margin-bottom:2px;transition:background 120ms}
-.send.ready{background:var(--accent)}
-.send:disabled{background:var(--accent-dis)}
+.send{width:42px;height:42px;border-radius:50%;background:var(--ink-off);color:#fff;font-size:18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;margin-bottom:2px;transition:background 120ms}
+.send.ready{background:var(--ink)}
+.send.ready:hover:not(:disabled){background:var(--ink-hover)}
+.send:disabled{background:var(--ink-off)}
 
 /* ===== 새 질문 ===== */
 .cmp-head{flex:none;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--border)}
@@ -239,7 +246,8 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px;o
 .vw-img{flex:1;min-height:0;background-position:center;background-repeat:no-repeat;background-size:contain;margin:12px}
 
 /* ===== 폭 대응 ===== */
-@container (max-width:419px){
+/* #app 의 1px 테두리 두 줄을 뺀 안쪽 폭 기준이라 417 = 바깥 폭 419 */
+@container (max-width:417px){
   #app > *{--av-list:32px;--thumb-w:88px;--thumb-h:63px}
   .list-head{padding:16px 14px 12px}
   .pill-btn{padding:0 10px;font-size:12px}
@@ -249,7 +257,7 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px;o
 
 /* ===== 입력 전용 위젯 ===== */
 body.mode-compose #stage{display:none}
-.cw{max-width:100%;height:96px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px;position:relative}
+.cw{max-width:var(--qa-max-width,100%);margin-left:auto;margin-right:auto;height:96px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px;position:relative}
 body.dev .cw{margin:56px 12px 0}
 .cw[data-state=expanded]{height:auto;min-height:268px;border-color:var(--accent)}
 .cw[data-state=done]{height:128px;border-color:var(--teal-line)}
@@ -333,7 +341,7 @@ body.dev .harness{display:flex}
         <div><h1 class="screen-title">질문</h1><div class="lh-count" id="list-count"></div></div>
         <div class="lh-actions">
           <button class="pill-btn" id="btn-switch"></button>
-          <button class="btn-round-accent" id="btn-new" aria-label="새 질문">+</button>
+          <button class="btn-round-ink" id="btn-new" aria-label="새 질문">+</button>
         </div>
       </div>
       <div class="search">
@@ -451,8 +459,8 @@ body.dev .harness{display:flex}
   <input type="file" id="cw-file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-room-config"></script>
-<script src="qa-store.js?v=20260918-room-config"></script>
+<script src="qa-config.js?v=20260918-width"></script>
+<script src="qa-store.js?v=20260918-width"></script>
 <script>
 (function(){
 'use strict';
@@ -460,6 +468,7 @@ body.dev .harness{display:flex}
 /* ===== 설정 ===== */
 // 카테고리·사용자·문구는 qa-config.js, 저장·전송은 qa-store.js 에서 가져온다.
 const S = window.QAStore;
+S.applyFrameWidth();
 // 이름·카테고리는 방 설정(서버)에 있으므로 QAStore.ready() 뒤에 applyConfig() 로 다시 읽는다.
 let C = S.getConfig();
 let TL = {}, TC = {}, TA = {}, STATUS_DESC = {};
