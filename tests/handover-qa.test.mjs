@@ -340,6 +340,20 @@ test("두 위젯은 임베드 폭을 채우고, w 값으로만 같은 방식으�
   }
 });
 
+test("목록형은 질문한 사람 화면에서 남의 답변 대신 본인 질문을 앞세운다", async () => {
+  const listSource = await readFile(new URL("../handover-qa/index.html", import.meta.url), "utf8");
+  const configSource = await readFile(new URL("../handover-qa/qa-config.js", import.meta.url), "utf8");
+  // 맨 위 묶음은 아직 답이 오지 않은 자기 질문
+  assert.match(listSource, /const askedBy\s*=/);
+  assert.match(listSource, /askedBy\(t\) === state\.me && waiting\(t\)/);
+  assert.match(configSource, /pinnedForAsker: '답변을 기다리는 내 질문'/);
+  // 카드에는 마지막 글이 아니라 첫 글(질문)을 쓴다
+  assert.match(listSource, /const face = \(!answerer && real\(t\)\[0\]\)/);
+  // 새 답변은 묶음 밖 카드에 배지로 남고, 그 배지는 묶음 밖에서도 색이 있다
+  assert.match(listSource, /newReply\(t\) \? `<span class="badge fill">/);
+  assert.match(listSource, /\.badge\.fill\{background:var\(--pin,var\(--accent\)\)/);
+});
+
 test("미니 질문형은 공용 파일을 쓰고, 고정 주소에서 카테고리를 위젯 안에서 고르게 한다", async () => {
   const miniSource = await readFile(new URL("../handover-qa/compose.html", import.meta.url), "utf8");
   const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");

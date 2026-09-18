@@ -47,7 +47,7 @@ window.QA_CONFIG = {
     // 목록형
     list: {
       pinnedForAnswerer: '새 질문 도착 · 답변 대기',
-      pinnedForAsker: '새 답변 도착',
+      pinnedForAsker: '답변을 기다리는 내 질문',
       placeholderForAnswerer: '답변을 입력하세요',
       placeholderForAsker: '꼬리 질문을 입력하세요',
       keyRejected: '접근 키가 만료됐거나 권한이 없습니다. 임베드 주소를 다시 확인해 주세요.',

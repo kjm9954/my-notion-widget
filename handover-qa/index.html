@@ -68,8 +68,8 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px}
 .dot.rust{background:var(--rust)} .dot.teal{background:var(--teal)}
 .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-2);white-space:nowrap}
 .badge{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
-.badge.fill{background:var(--pin);color:#fff}
-.badge.line{color:var(--pin);border:1px solid var(--pin-line)}
+.badge.fill{background:var(--pin,var(--accent));color:#fff}
+.badge.line{color:var(--pin,var(--accent));border:1px solid var(--pin-line,var(--accent-line))}
 .text-btn{font-size:13.5px;font-weight:600;color:var(--text-2);min-height:44px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center}
 .text-btn.accent{color:var(--accent)}
 .pill-btn{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:999px;background:var(--sunk);color:var(--text-2);font-size:12.5px;font-weight:600;white-space:nowrap}
@@ -459,8 +459,8 @@ body.dev .harness{display:flex}
   <input type="file" id="cw-file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-mini2"></script>
-<script src="qa-store.js?v=20260918-mini2"></script>
+<script src="qa-config.js?v=20260918-asker-view"></script>
+<script src="qa-store.js?v=20260918-asker-view"></script>
 <script>
 (function(){
 'use strict';
@@ -670,10 +670,14 @@ const byId     = id => state.threads.find(t => t.id === id);
 const real     = t => t.messages.filter(m => !m.system && !m.pending && !m.failed);
 const lastReal = t => { const r = real(t); return r[r.length - 1]; };
 const lastAt   = t => t.messages.reduce((mx, m) => (m.failed || m.pending) ? mx : Math.max(mx, m.at || 0), 0);
+const askedBy  = t => (real(t)[0] || {}).who;               // 질문을 남긴 사람
+const waiting  = t => { const l = lastReal(t); return !!l && !S.isAnswerer(l.who); };
+const newReply = t => { const l = lastReal(t); return !!l && S.isAnswerer(l.who) && !(t.read || {})[state.me]; };
 function isPinned(t){
-  const l = lastReal(t); if (!l) return false;
-  if (S.isAnswerer(state.me)) return !S.isAnswerer(l.who);
-  return S.isAnswerer(l.who) && !t.read[state.me];
+  if (!lastReal(t)) return false;
+  if (S.isAnswerer(state.me)) return waiting(t);
+  // 질문한 사람에게는 아직 답변이 오지 않은 자기 질문을 맨 위에 모은다
+  return askedBy(t) === state.me && waiting(t) && t.status !== S.STATUS.DONE;
 }
 function fakeRequest(flag, ms){
   return new Promise(res => setTimeout(() => { const fail = dev[flag]; dev[flag] = false; syncHarness(); res(!fail); }, ms || 380));
@@ -743,13 +747,16 @@ function filtered(){
   }).sort((a, b) => lastAt(b) - lastAt(a));
 }
 function cardHTML(t, pinned){
+  const answerer = S.isAnswerer(state.me);
   const l = lastReal(t);
-  const spk = l ? l.who : state.me;
-  const preview = l ? (l.text.trim() || (l.images.length ? `사진 ${l.images.length}장` : '')) : '';
+  const face = (!answerer && real(t)[0]) || l;   // 질문한 사람에게는 본인 질문을 보여준다
+  const spk = face ? face.who : state.me;
+  const preview = face ? (face.text.trim() || (face.images.length ? `사진 ${face.images.length}장` : '')) : '';
   const st = STATUS[t.status] || STATUS[S.STATUS.WAITING];
-  const right = pinned
-    ? (!t.read[state.me] ? `<span class="badge fill">NEW</span>` : `<span class="badge line">답변 대기</span>`)
-    : `<span class="meta-replies">응답 ${Math.max(0, real(t).length - 1)}</span>`;
+  const replies = `<span class="meta-replies">응답 ${Math.max(0, real(t).length - 1)}</span>`;
+  const right = answerer
+    ? (pinned ? (!t.read[state.me] ? `<span class="badge fill">NEW</span>` : `<span class="badge line">답변 대기</span>`) : replies)
+    : (pinned ? `<span class="badge line">답변 대기</span>` : (newReply(t) ? `<span class="badge fill">NEW</span>` : replies));
   return `<div class="card ${pinned?'pinned':''} ${t.status===S.STATUS.DONE?'done':''}" role="button" tabindex="0" data-id="${esc(t.id)}">
     <span class="avatar av40">${esc(spk)}</span>
     <div class="card-body">
