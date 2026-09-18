@@ -352,6 +352,8 @@ test("목록형은 질문한 사람 화면에서 남의 답변 대신 본인 질
   // 새 답변은 묶음 밖 카드에 배지로 남고, 그 배지는 묶음 밖에서도 색이 있다
   assert.match(listSource, /newReply\(t\) \? `<span class="badge fill">/);
   assert.match(listSource, /\.badge\.fill\{background:var\(--pin,var\(--accent\)\)/);
+  // 맨 위 묶음이 없으면 나머지 목록에 제목을 붙이지 않는다
+  assert.ok(listSource.includes('if (pinned.length) html += `<div class="group-label">이전 대화</div>`;'));
 });
 
 test("미니 질문형은 공용 파일을 쓰고, 고정 주소에서 카테고리를 위젯 안에서 고르게 한다", async () => {

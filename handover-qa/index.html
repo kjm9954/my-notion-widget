@@ -792,7 +792,9 @@ function renderList(){
       html += `<div class="pin-group ${answerer?'answerer':'asker'}"><div class="group-label">${esc(answerer ? TL.pinnedForAnswerer : TL.pinnedForAsker)}<span class="cnt">${pinned.length}</span></div><div class="cards">${pinned.map(t => cardHTML(t, true)).join('')}</div></div>`;
     }
     if (rest.length){
-      html += `<div class="group-label">이전 대화</div><div class="cards">${rest.map(t => cardHTML(t, false)).join('')}</div>`;
+      // 맨 위 묶음이 없으면 나머지가 곧 전체이므로 '이전 대화' 제목을 붙이지 않는다
+      if (pinned.length) html += `<div class="group-label">이전 대화</div>`;
+      html += `<div class="cards">${rest.map(t => cardHTML(t, false)).join('')}</div>`;
     }
   }
   listBody.innerHTML = html;
