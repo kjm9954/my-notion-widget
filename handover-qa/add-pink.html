@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Q&amp;A Compose</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#FDFBFC; --surface:#FFFFFF; --sunk:#F9F3F6;
+  --text:#241A1F; --text-2:#66505A; --text-3:#9C858E; --line-strong:#CFBCC4; --line-scroll:#E2D5DC;
+  --border:#EEE3E8; --border-soft:#F6EEF2;
+  --accent:#B02068; --accent-bg:#FAECF2; --accent-line:#EFD2E0;
+  --teal:#0B6E6E; --teal-bg:#E6F1F1; --teal-line:#C9E2E2;
+  --rust:#B0521B; --rust-bg:#FAEDE4; --rust-line:#EDD5C4;
+  --red:#96201C; --red-bg:#FAEAEA; --red-line:#E6C6C5;
+  --ink:#241A1F; --ink-hover:#322329; --ink-off:#CFBCC4;
+  --focus:0 0 0 1.5px var(--accent), 0 0 0 4.5px var(--accent-bg);
+  --thumb-w:78px; --thumb-h:56px; --chip-pad:6px 12px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%;margin:0;overflow:hidden;background:transparent}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:var(--text);font-size:14px;line-height:1.6}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+button{background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:default}
+button:focus{outline:none}
+button:focus-visible{box-shadow:var(--focus)}
+input::placeholder,textarea::placeholder{color:var(--text-3)}
+
+/* ── 프레임 ── */
+.qa-root{position:relative;display:flex;flex-direction:column;width:100%;height:100%;max-width:var(--qa-max-width,none);margin:0 auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;container-type:inline-size}
+
+/* ── 스크롤 ── */
+.qa-scroll{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-scroll) transparent}
+.qa-scroll::-webkit-scrollbar{width:10px;height:10px}
+.qa-scroll::-webkit-scrollbar-track{background:transparent}
+.qa-scroll::-webkit-scrollbar-thumb{background:var(--line-scroll);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+.qa-scroll:hover::-webkit-scrollbar-thumb{background:var(--line-strong);background-clip:content-box}
+.qa-scroll::-webkit-scrollbar-thumb:active{background:var(--text-3);background-clip:content-box}
+
+/* ── 헤더 ── */
+.hd{flex:none;padding:18px 20px 14px;border-bottom:1px solid var(--border)}
+.hd-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
+.hd-title{margin:0;font-size:20px;font-weight:700;line-height:1.35;letter-spacing:-.02em}
+.pill{position:relative;flex:none;height:28px;padding:0 12px;border-radius:999px;background:var(--sunk);color:var(--text-2);font-size:12px;font-weight:600;white-space:nowrap}
+.pill::after{content:"";position:absolute;inset:-8px -6px}
+.pill:disabled{font-weight:400}
+.hd-desc{margin:6px 0 0;font-size:12.5px;line-height:1.65;color:var(--text-2)}
+
+/* ── 본문 ── */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 20px 20px;background:var(--surface)}
+.body.tone-bg{background:var(--bg)}
+.form{flex:1 0 auto;display:flex;flex-direction:column;gap:18px}
+.field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.field.grow{flex:1 0 auto}
+.eyebrow{display:block;font-size:10.5px;font-weight:800;letter-spacing:.15em;line-height:1.4;color:var(--text-3)}
+
+/* 카테고리 칩 */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative;min-height:32px;padding:var(--chip-pad);border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12.5px;font-weight:500;line-height:1.4;text-align:left;transition:background-color 120ms,border-color 120ms,color 120ms}
+.chip::after{content:"";position:absolute;inset:-3px 0}
+.chip.major.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+.chip:disabled{cursor:default}
+
+/* 입력 */
+.input,.textarea{width:100%;border:1px solid var(--border);border-radius:6px;background:var(--surface);outline:none;transition:border-color 120ms,box-shadow 120ms}
+.input{height:44px;padding:0 12px;font-size:14.5px;line-height:1.5}
+.textarea{flex:1 0 auto;min-height:150px;padding:10px 12px;font-size:14px;line-height:1.75;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.input:focus{border:1.5px solid var(--accent);box-shadow:0 0 0 3px var(--accent-bg);padding:0 11.5px}
+.textarea:focus{border:1.5px solid var(--accent);box-shadow:0 0 0 3px var(--accent-bg);padding:9.5px 11.5px}
+.input:disabled,.textarea:disabled{background:var(--surface);color:var(--text-2)}
+
+/* 유사 질문 */
+.similar{display:flex;align-items:center;gap:10px;width:100%;min-height:32px;padding:7px 10px;border-radius:4px;background:var(--sunk);text-align:left;font-size:12px;line-height:1.5;color:var(--text-2)}
+.similar .s-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.similar b{font-weight:600;color:var(--text)}
+.similar .s-act{flex:none;font-size:11.5px;font-weight:600;color:var(--accent)}
+.sthread{display:flex;flex-direction:column;gap:12px;padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+.st-title{font-size:13.5px;font-weight:700;line-height:1.45;word-break:break-word}
+.st-meta{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:11px;line-height:1.5;color:var(--text-3)}
+.st-msg{display:flex;flex-direction:column;gap:4px;min-width:0}
+.st-who{font-size:11px;line-height:1.5;color:var(--text-3)}
+.st-text{font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.st-sys{font-size:11px;line-height:1.5;color:var(--text-3);text-align:center}
+.st-imgs{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.st-img{width:var(--thumb-w);height:var(--thumb-h);border-radius:6px;border:1px solid var(--border);background:var(--sunk) center/cover no-repeat;cursor:zoom-in}
+.st-img.on{border-color:var(--text-3)}
+.st-big{display:block;width:100%;height:220px;border-radius:6px;border:1px solid var(--border);background:var(--sunk) center/contain no-repeat;cursor:zoom-out}
+.st-note{font-size:12px;line-height:1.6;color:var(--text-3)}
+.st-note button{font-size:12px;font-weight:600;color:var(--text-2);min-height:32px;padding:0 4px}
+.st-actions{display:flex;gap:8px}
+.btn-line{flex:1;min-height:40px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13px;font-weight:600}
+.btn-line.teal{border-color:var(--teal-line);color:var(--teal)}
+.img-missing{background-image:none !important}
+
+/* 이미지 */
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;padding-top:6px}
+.thumb{position:relative;flex:none;width:var(--thumb-w);height:var(--thumb-h);border-radius:6px;border:1px solid var(--border);background:var(--sunk) center/cover no-repeat}
+.thumb.too-big{border-color:var(--red)}
+.thumb .rm{position:absolute;top:-6px;right:-6px;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--surface);background:var(--ink);color:#fff;font-size:8px;line-height:1;display:flex;align-items:center;justify-content:center}
+.thumb .rm::after{content:"";position:absolute;inset:-10px}
+.thumb .rm:disabled{background:var(--ink-off)}
+.slot{flex:none;width:var(--thumb-w);height:var(--thumb-h);border-radius:6px;border:1px dashed var(--line-strong);background:transparent;color:var(--text-3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10.5px;line-height:1.3}
+.slot .plus{font-size:16px;line-height:1}
+.slot:disabled{font-weight:400}
+
+/* 내가 남긴 질문 */
+.mine{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:6px}
+.mine li{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border-top:1px solid var(--border-soft)}
+.mine li:first-child{border-top:0}
+.m-title{flex:1;min-width:0;font-size:12.5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-status{flex:none;font-size:11px;color:var(--text-3)}
+.dot{display:inline-block;flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-strong)}
+.dot.rust{background:var(--rust)}
+.dot.teal{background:var(--teal)}
+
+/* 첫 실행 · 접근 불가 */
+.center{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:8px 0}
+.center.access{align-items:center;text-align:center}
+.c-title{margin:0;font-size:20px;font-weight:700;line-height:1.35;letter-spacing:-.02em}
+.c-desc{margin:0;font-size:12.5px;line-height:1.65;color:var(--text-2)}
+.users{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.user{display:grid;grid-template-columns:46px 1fr;grid-template-rows:auto auto;column-gap:14px;row-gap:2px;align-items:center;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);text-align:left}
+.user:hover{border-color:var(--line-strong)}
+.user.on{border-color:var(--ink)}
+.avatar{grid-row:1/3;width:46px;height:46px;border-radius:50%;background:var(--sunk);color:var(--text-2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.u-name{font-size:16px;font-weight:700;line-height:1.4}
+.u-role{font-size:12.5px;line-height:1.5;color:var(--text-2)}
+.circ{width:48px;height:48px;margin-bottom:6px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800}
+.circ.none{background:var(--bg);border:1.5px dashed var(--line-strong);color:var(--text-3)}
+.circ.rust{background:var(--rust-bg);border:1px solid var(--rust-line);color:var(--rust)}
+.circ.red{background:var(--red-bg);border:1px solid var(--red-line);color:var(--red)}
+.a-title{margin:0;font-size:15.5px;font-weight:700;line-height:1.45}
+.a-desc{margin:0;max-width:300px;font-size:12.5px;line-height:1.65;color:var(--text-2)}
+.btn-rust{margin-top:8px;min-height:44px;padding:0 18px;border-radius:6px;border:1px solid var(--rust-line);background:var(--surface);color:var(--rust);font-size:13px;font-weight:600}
+.code{margin-top:6px;padding:4px 8px;border-radius:4px;border:1px solid var(--red-line);background:var(--red-bg);color:var(--red);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.5}
+
+/* ── 하단 액션 ── */
+.ft{flex:none;border-top:1px solid var(--border);background:var(--surface)}
+.ft.is-done{border-top-color:var(--teal-line);background:var(--teal-bg)}
+.ft.is-fail{border-top-color:var(--red-line);background:var(--red-bg)}
+.ft-row{display:flex;align-items:center;gap:8px;min-height:65px;padding:10px 20px}
+.caption{flex:1;min-width:0;font-size:11.5px;line-height:1.5;color:var(--text-3)}
+.caption.warn{color:var(--red)}
+.btn-text{min-height:44px;padding:0 10px;font-size:13px;font-weight:600;color:var(--text-2)}
+.btn-text:disabled{font-weight:400}
+.btn-ink{min-height:44px;padding:11px 22px;border-radius:6px;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;line-height:1.5;transition:background-color 120ms}
+.btn-ink:hover:not(:disabled){background:var(--ink-hover)}
+.btn-ink:disabled{background:var(--ink-off);font-weight:400}
+.busy{flex-direction:column;align-items:stretch;justify-content:center;gap:9px}
+.busy-top{display:flex;align-items:center;gap:8px}
+.spinner{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--ink);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+.busy-label{font-size:13px;font-weight:600}
+.busy-stage{margin-left:auto;font-size:11.5px;color:var(--text-3)}
+.bar{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.seg{position:relative;height:4px;border-radius:2px;background:var(--border-soft);overflow:hidden}
+.seg i{position:absolute;top:0;bottom:0;left:0;width:0;background:var(--ink);transition:width 160ms ease}
+.mark{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.is-done .mark{background:var(--teal)}
+.is-fail .mark{background:var(--red)}
+.done-text{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--teal)}
+.btn-teal{min-height:44px;padding:0 6px;font-size:13px;font-weight:600;color:var(--teal)}
+.fail-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.fail-text{font-size:13px;font-weight:600;line-height:1.45;color:var(--red)}
+.fail-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.5;color:var(--red);word-break:break-word}
+.btn-red{flex:none;min-height:44px;padding:0 6px;font-size:13px;font-weight:700;color:var(--red)}
+
+/* ── 토스트 ── */
+.toast{position:absolute;left:50%;bottom:80px;z-index:5;max-width:calc(100% - 32px);padding:8px 14px;border-radius:6px;background:var(--ink);color:#fff;font-size:12.5px;line-height:1.5;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,6px);transition:opacity 140ms,transform 140ms}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ── 폭 대응 ── */
+/* 루트의 1px 테두리 두 줄을 뺀 안쪽 폭 기준이라 417 = 바깥 폭 419 */
+@container (max-width:417px){
+  .body{--thumb-w:64px;--thumb-h:46px;--chip-pad:5px 10px}
+}
+</style>
+</head>
+<body>
+<div class="qa-root" id="root">
+  <header class="hd">
+    <div class="hd-row">
+      <h1 class="hd-title" id="hd-title"></h1>
+      <button type="button" class="pill" id="author-pill" hidden></button>
+    </div>
+    <p class="hd-desc" id="hd-desc"></p>
+  </header>
+
+  <main class="body qa-scroll" id="body">
+    <div class="form" id="form" hidden>
+      <section class="field" aria-labelledby="l-cat">
+        <span class="eyebrow" id="l-cat"></span>
+        <div class="chips" id="majors" role="group" aria-labelledby="l-cat"></div>
+      </section>
+
+      <section class="field">
+        <label class="eyebrow" for="title" id="l-title"></label>
+        <input class="input" id="title" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+        <button type="button" class="similar" id="similar" aria-expanded="false" hidden>
+          <span class="s-text" id="similar-text"></span><span class="s-act" id="similar-act"></span>
+        </button>
+        <div class="sthread" id="sthread" hidden></div>
+      </section>
+
+      <section class="field grow">
+        <label class="eyebrow" for="text" id="l-body"></label>
+        <textarea class="textarea" id="text"></textarea>
+        <div class="thumbs" id="thumbs"></div>
+      </section>
+
+      <section class="field" id="mine" hidden>
+        <span class="eyebrow" id="l-mine"></span>
+        <ul class="mine" id="mine-list"></ul>
+      </section>
+    </div>
+
+    <div class="center" id="setup" hidden>
+      <span class="eyebrow" id="setup-brand"></span>
+      <h2 class="c-title" id="setup-title"></h2>
+      <p class="c-desc" id="setup-desc"></p>
+      <div class="users" id="users"></div>
+    </div>
+
+    <div class="center access" id="access" hidden>
+      <span class="circ" id="access-mark"></span>
+      <h2 class="a-title" id="access-title"></h2>
+      <p class="a-desc" id="access-desc"></p>
+      <span class="code" id="access-code" hidden></span>
+      <button type="button" class="btn-rust" id="access-retry" hidden></button>
+    </div>
+  </main>
+
+  <footer class="ft" id="ft">
+    <div class="ft-row" id="ft-idle">
+      <span class="caption" id="caption"></span>
+      <button type="button" class="btn-text" id="cancel"></button>
+      <button type="button" class="btn-ink" id="submit" disabled></button>
+    </div>
+    <div class="ft-row busy" id="ft-busy" hidden>
+      <div class="busy-top">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="busy-label" id="busy-label"></span>
+        <span class="busy-stage" id="busy-stage"></span>
+      </div>
+      <div class="bar" aria-hidden="true"><span class="seg"><i></i></span><span class="seg"><i></i></span><span class="seg"><i></i></span></div>
+    </div>
+    <div class="ft-row" id="ft-done" hidden>
+      <span class="mark" aria-hidden="true">✓</span>
+      <span class="done-text" id="done-text"></span>
+      <button type="button" class="btn-teal" id="again"></button>
+    </div>
+    <div class="ft-row" id="ft-fail" hidden>
+      <span class="mark" aria-hidden="true">!</span>
+      <div class="fail-body">
+        <span class="fail-text" id="fail-text"></span>
+        <span class="fail-code" id="fail-code"></span>
+      </div>
+      <button type="button" class="btn-red" id="retry"></button>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+</div>
+
+<script src="qa-config.js?v=20260918-asker-view"></script>
+<script src="qa-store.js?v=20260918-asker-view"></script>
+<script>
+(function () {
+  'use strict';
+
+  const S = window.QAStore;
+  S.applyFrameWidth();
+  // 문구는 공개 설정으로 먼저 그리고, 방 설정을 받은 뒤 다시 읽는다(이름·카테고리가 든 문구는 방 설정에만 있다).
+  let T = {};
+  let TA = {};
+  function refreshText() {
+    T = S.text('add');
+    TA = S.text('access');
+  }
+  refreshText();
+  const IMG = Object.assign({ max: 5, maxBytes: 3 * 1024 * 1024 }, S.getConfig().images || {});
+  const DRAFT_KEY = 'qa.addDraft';
+  const LAST_CATEGORY_KEY = 'qa.lastCategory';
+  const DONE_RESET_MS = 3000;
+
+  const $ = id => document.getElementById(id);
+  const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fill = (template, vars) => String(template || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] == null ? '' : vars[k]));
+  const megabytes = Math.round(IMG.maxBytes / 1024 / 1024 * 10) / 10;
+  const dotClass = status => status === S.STATUS.WAITING ? 'rust' : status === S.STATUS.ANSWERED ? 'teal' : '';
+
+  const el = {
+    body: $('body'), form: $('form'), setup: $('setup'), access: $('access'),
+    pill: $('author-pill'), majors: $('majors'),
+    title: $('title'), text: $('text'), thumbs: $('thumbs'), file: $('file'),
+    similar: $('similar'), similarText: $('similar-text'), similarAct: $('similar-act'), sthread: $('sthread'),
+    mine: $('mine'), mineList: $('mine-list'),
+    ft: $('ft'), idle: $('ft-idle'), busy: $('ft-busy'), done: $('ft-done'), fail: $('ft-fail'),
+    caption: $('caption'), cancel: $('cancel'), submit: $('submit'), toast: $('toast'),
+  };
+
+  const ui = {
+    view: 'form',          // form | setup | access
+    access: null,          // none | expired | denied
+    author: null,
+    major: '',
+    images: [],            // { blob, url, tooBig }
+    phase: 'idle',         // idle | busy | done | fail
+    attempt: null,
+    index: null,
+    similar: null,
+    similarOpen: false,
+    similarThread: null,
+    similarState: 'idle',  // idle | loading | error
+    similarBig: '',
+    draftSaved: false,
+  };
+
+  /* ───────── 고정 문구 ───────── */
+  function applyText() {
+    $('hd-title').textContent = T.title || '';
+    $('hd-desc').textContent = T.desc || '';
+    $('l-cat').textContent = T.labelCategory || '';
+    $('l-title').textContent = T.labelTitle || '';
+    $('l-body').textContent = T.labelBody || '';
+    $('l-mine').textContent = T.labelMine || '';
+    el.title.placeholder = T.titlePlaceholder || '';
+    el.text.placeholder = T.bodyPlaceholder || '';
+    $('setup-brand').textContent = (S.getConfig().text || {}).brand || '';
+    $('setup-title').textContent = T.setupTitle || '';
+    $('setup-desc').textContent = T.setupDesc || '';
+    el.cancel.textContent = T.cancel || '';
+    el.submit.textContent = T.submit || '';
+    $('busy-label').textContent = T.progress || '';
+    $('done-text').textContent = T.done || '';
+    $('again').textContent = T.again || '';
+    $('fail-text').textContent = T.failed || '';
+    $('retry').textContent = T.retry || '';
+    el.pill.title = T.changeAuthor || '';
+  }
+
+  let toastTimer = 0;
+  function toast(message) {
+    if (!message) return;
+    el.toast.textContent = message;
+    el.toast.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('on'), 2200);
+  }
+
+  /* ───────── 화면 전환 ───────── */
+  function setView(view) {
+    ui.view = view;
+    el.form.hidden = view !== 'form';
+    el.setup.hidden = view !== 'setup';
+    el.access.hidden = view !== 'access';
+    el.ft.hidden = view !== 'form';
+    el.body.classList.toggle('tone-bg', view === 'access' && (ui.access === 'none' || ui.access === 'notReady'));
+    renderPill();
+    if (view === 'form') {
+      renderMine();
+      scheduleGrow();
+    }
+  }
+
+  function renderPill() {
+    el.pill.hidden = !ui.author || ui.view === 'access';
+    el.pill.textContent = ui.author || '';
+    el.pill.disabled = ui.phase === 'busy' || ui.phase === 'done';
+    el.pill.setAttribute('aria-label', `${T.changeAuthor || ''}: ${ui.author || ''}`);
+  }
+
+  function showSetup() {
+    const users = S.getUsers();
+    $('users').innerHTML = users.map(u => `
+      <button type="button" class="user ${u.name === ui.author ? 'on' : ''}" data-user="${esc(u.name)}">
+        <span class="avatar">${esc(u.name)}</span>
+        <span class="u-name">${esc(u.name)}</span>
+        <span class="u-role">${esc(u.desc || '')}</span>
+      </button>`).join('');
+    setView('setup');
+  }
+
+  // kind: none(키 없음) | expired(키 거부) | denied(쓰기 권한 없음) | offline(연결 실패) | notReady(방 설정 없음)
+  const ACCESS = {
+    none: { tone: 'none', mark: '?', title: () => TA.noKeyTitle, desc: () => TA.noKeyDesc },
+    expired: { tone: 'rust', mark: '!', title: () => TA.expiredTitle, desc: () => TA.expiredDesc, retry: true },
+    denied: { tone: 'red', mark: '!', title: () => T.deniedTitle, desc: () => T.deniedDesc, code: true },
+    offline: { tone: 'rust', mark: '!', title: () => TA.offlineTitle, desc: () => TA.offlineDesc, retry: true },
+    notReady: { tone: 'none', mark: '?', title: () => TA.notReadyTitle, desc: () => TA.notReadyDesc, retry: true },
+  };
+
+  function showAccess(kind) {
+    const info = ACCESS[kind] || ACCESS.offline;
+    ui.access = kind;
+    const mark = $('access-mark');
+    const code = $('access-code');
+    const retry = $('access-retry');
+    mark.className = 'circ ' + info.tone;
+    mark.textContent = info.mark;
+    $('access-title').textContent = info.title() || '';
+    $('access-desc').textContent = info.desc() || '';
+    code.hidden = !info.code;
+    code.textContent = T.deniedCode || '';
+    retry.hidden = !info.retry;
+    retry.textContent = TA.retry || '';
+    setView('access');
+  }
+
+  function showMain() {
+    ui.access = null;
+    if (ui.author) setView('form');
+    else showSetup();
+  }
+
+  /* ───────── 카테고리 ───────── */
+  // 카테고리는 한 단계(대분류)만 고른다.
+  function renderCategories() {
+    const categories = S.getCategories();
+    const locked = ui.phase === 'busy' || ui.phase === 'done';
+    el.majors.innerHTML = categories.map(c => {
+      const on = c.major === ui.major;
+      return `<button type="button" class="chip major ${on ? 'on' : ''}" data-major="${esc(c.major)}" aria-pressed="${on}" ${locked ? 'disabled' : ''}>${esc(c.major)}</button>`;
+    }).join('');
+  }
+
+  el.majors.addEventListener('click', event => {
+    const chip = event.target.closest('.chip');
+    if (!chip || chip.disabled || chip.dataset.major === ui.major) return;
+    ui.major = chip.dataset.major;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    onEdit();
+  });
+
+  /* ───────── 입력 ───────── */
+  // 내용 칸은 남는 높이를 채우고, 글이 길어지면 칸 자체가 늘어나 본문 한 곳에서만 스크롤한다.
+  function growText() {
+    const ta = el.text;
+    if (el.form.hidden) return;
+    const keep = el.body.scrollTop;
+    ta.style.minHeight = '0px';
+    ta.style.flexGrow = '0';
+    ta.style.height = '0px';
+    const needed = ta.scrollHeight + 2;
+    ta.style.height = '';
+    ta.style.flexGrow = '';
+    ta.style.minHeight = Math.max(150, needed) + 'px';
+    el.body.scrollTop = keep;
+  }
+
+  function isEmpty() {
+    return !el.title.value.trim() && !el.text.value.trim() && !ui.images.length;
+  }
+
+  function canSubmit() {
+    return (ui.phase === 'idle' || ui.phase === 'fail')
+      && !!ui.author
+      && !!el.title.value.trim()
+      && !!ui.major
+      && (!!el.text.value.trim() || ui.images.length > 0)
+      && !ui.images.some(image => image.tooBig);
+  }
+
+  function signature() {
+    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(i => i.url)]);
+  }
+
+  function onEdit() {
+    // 질문이 아직 만들어지지 않은 실패 상태에서 내용을 고치면 기본 하단 줄로 돌아간다.
+    if (ui.phase === 'fail' && !(ui.attempt && ui.attempt.created)) setPhase('idle');
+    renderCategories();
+    saveDraft();
+    renderFooter();
+  }
+
+  el.title.addEventListener('input', () => {
+    onEdit();
+    scheduleSimilar();
+  });
+  el.title.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      submit();
+    }
+  });
+  el.text.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      submit();
+    }
+  });
+  el.text.addEventListener('input', event => {
+    S.continueNumberedList(event, el.text);
+    growText();
+    onEdit();
+  });
+  // 폭이 바뀌면 줄 수가 달라지므로 다시 잰다. 화면을 그리지 않는 동안에도 동작하도록 타이머를 쓴다.
+  let growTimer = 0;
+  function scheduleGrow() {
+    clearTimeout(growTimer);
+    growTimer = setTimeout(growText, 30);
+  }
+  window.addEventListener('resize', scheduleGrow);
+
+  /* ───────── 임시 저장 ───────── */
+  let draftTimer = 0;
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const draft = { title: el.title.value, body: el.text.value, major: ui.major };
+      if (!draft.title.trim() && !draft.body.trim()) {
+        S.local.remove(DRAFT_KEY);
+        ui.draftSaved = false;
+      } else {
+        ui.draftSaved = S.local.set(DRAFT_KEY, draft);
+      }
+      renderFooter();
+    }, 300);
+  }
+
+  function clearDraft() {
+    clearTimeout(draftTimer);
+    S.local.remove(DRAFT_KEY);
+    ui.draftSaved = false;
+  }
+
+  function restoreDraft() {
+    const draft = S.local.get(DRAFT_KEY);
+    const last = S.local.get(LAST_CATEGORY_KEY);
+    if (draft && typeof draft === 'object') {
+      el.title.value = String(draft.title || '').slice(0, 60);
+      el.text.value = String(draft.body || '');
+      ui.draftSaved = !!(el.title.value.trim() || el.text.value.trim());
+      if (S.isCategory(draft.major)) {
+        ui.major = draft.major;
+        return;
+      }
+    }
+    applyLastCategory(last);
+  }
+
+  function applyLastCategory(last = S.local.get(LAST_CATEGORY_KEY)) {
+    if (last && S.isCategory(last.major)) ui.major = last.major;
+  }
+
+  /* ───────── 이미지 ───────── */
+  function renderThumbs() {
+    const locked = ui.phase === 'busy' || ui.phase === 'done';
+    const items = ui.images.map((image, i) => `
+      <div class="thumb ${image.tooBig ? 'too-big' : ''}" style="background-image:url('${image.url}')">
+        <button type="button" class="rm" data-i="${i}" aria-label="${esc(T.removeImage)}" ${locked ? 'disabled' : ''}>✕</button>
+      </div>`).join('');
+    const slot = ui.images.length < IMG.max
+      ? `<button type="button" class="slot" id="slot" aria-label="${esc(T.imageSlotLabel)}" ${locked ? 'disabled' : ''}><span class="plus">+</span><span>${esc(T.imageSlot)}</span></button>`
+      : '';
+    el.thumbs.innerHTML = items + slot;
+  }
+
+  el.thumbs.addEventListener('click', event => {
+    const remove = event.target.closest('.rm');
+    if (remove && !remove.disabled) {
+      const [image] = ui.images.splice(Number(remove.dataset.i), 1);
+      if (image) URL.revokeObjectURL(image.url);
+      renderThumbs();
+      onEdit();
+      return;
+    }
+    const slot = event.target.closest('.slot');
+    if (slot && !slot.disabled) {
+      el.file.value = '';
+      el.file.click();
+    }
+  });
+
+  el.file.addEventListener('change', () => addImages(Array.from(el.file.files || [])));
+
+  document.addEventListener('paste', event => {
+    if (ui.view !== 'form' || ui.phase === 'busy' || ui.phase === 'done') return;
+    const files = S.imagesFromClipboard(event);
+    if (!files.length) return;
+    event.preventDefault();
+    addImages(files);
+  });
+
+  let imageQueue = Promise.resolve();
+  function addImages(files) {
+    imageQueue = imageQueue.then(async () => {
+      let added = 0;
+      let limited = false;
+      let failed = false;
+      for (const file of files) {
+        if (ui.images.length >= IMG.max) { limited = true; break; }
+        try {
+          const { blob } = await S.compressImage(file);
+          if (ui.images.length >= IMG.max) { limited = true; break; }
+          ui.images.push({ blob, url: URL.createObjectURL(blob), tooBig: blob.size > IMG.maxBytes });
+          added++;
+        } catch (_) {
+          failed = true;
+        }
+      }
+      renderThumbs();
+      onEdit();
+      if (ui.images.some(image => image.tooBig)) toast(fill(T.imageTooBig, { mb: megabytes }));
+      else if (limited) toast(fill(T.imageLimit, { max: IMG.max }));
+      else if (failed) toast(T.imageFailed);
+      else if (added) toast(fill(T.imageAdded, { n: added }));
+    });
+    return imageQueue;
+  }
+
+  function clearImages() {
+    ui.images.forEach(image => URL.revokeObjectURL(image.url));
+    ui.images = [];
+  }
+
+  /* ───────── 유사 질문 ───────── */
+  let similarTimer = 0;
+  let similarSeq = 0;
+  function scheduleSimilar() {
+    clearTimeout(similarTimer);
+    similarTimer = setTimeout(refreshSimilar, 300);
+  }
+
+  async function refreshSimilar() {
+    const seq = ++similarSeq;
+    const query = el.title.value.trim();
+    if (!query || ui.view === 'access') { setSimilar(null); return; }
+    try {
+      const best = await S.findSimilar(query);
+      if (seq === similarSeq) setSimilar(best);
+    } catch (error) {
+      if (seq !== similarSeq) return;
+      if (handleAccessError(error)) return;
+      setSimilar(null);
+    }
+  }
+
+  function setSimilar(item) {
+    if (!item || !ui.similar || ui.similar.id !== item.id) {
+      ui.similarOpen = false;
+      ui.similarThread = null;
+      ui.similarState = 'idle';
+      ui.similarBig = '';
+    }
+    ui.similar = item;
+    renderSimilar();
+  }
+
+  function renderSimilar() {
+    const item = ui.similar;
+    el.similar.hidden = !item;
+    el.sthread.hidden = !item || !ui.similarOpen;
+    if (!item) {
+      el.sthread.innerHTML = '';
+      return;
+    }
+    el.similarText.innerHTML = `${esc(T.similarLabel)} <b>${esc(item.title)}</b>`;
+    el.similarAct.textContent = ui.similarOpen ? T.similarClose : T.similarOpen;
+    el.similar.setAttribute('aria-expanded', String(ui.similarOpen));
+    if (!ui.similarOpen) return;
+
+    if (ui.similarState === 'loading') {
+      el.sthread.innerHTML = `<div class="st-note">${esc(T.similarLoading)}</div>`;
+      return;
+    }
+    if (ui.similarState === 'error' || !ui.similarThread) {
+      el.sthread.innerHTML = `<div class="st-note">${esc(T.similarError)} <button type="button" data-act="reload">${esc(T.similarRetry)}</button></div>`;
+      return;
+    }
+    const thread = ui.similarThread;
+    const messages = (thread.messages || []).map(m => {
+      if (m.system) return `<div class="st-sys">${esc(m.text)}</div>`;
+      const images = (m.images || []).filter(S.isStoredImage);
+      const big = images.includes(ui.similarBig)
+        ? `<button type="button" class="st-big" data-big="" ${S.imageAttr(ui.similarBig, esc)} aria-label="${esc(T.similarImage)}"></button>`
+        : '';
+      const thumbs = images.length
+        ? `<div class="st-imgs">${images.map(ref => `<button type="button" class="st-img ${ref === ui.similarBig ? 'on' : ''}" data-big="${esc(ref)}" ${S.imageAttr(ref, esc)} aria-label="${esc(T.similarImage)}"></button>`).join('')}</div>`
+        : '';
+      return `<div class="st-msg">
+        <div class="st-who">${esc(m.who)} · ${S.shortDate(m.at)} ${S.timeLabel(m.at)}</div>
+        ${m.text ? `<div class="st-text">${esc(m.text)}</div>` : ''}
+        ${thumbs}${big}
+      </div>`;
+    }).join('');
+    el.sthread.innerHTML = `
+      <div>
+        <div class="st-title">${esc(thread.title)}</div>
+        <div class="st-meta"><span>${esc(thread.cat1 || thread.cat2 || '')}</span><span>·</span><i class="dot ${dotClass(thread.status)}"></i><span>${esc(thread.status)}</span></div>
+      </div>
+      ${messages}
+      <div class="st-actions">
+        <button type="button" class="btn-line teal" data-act="solved">${esc(T.solved)}</button>
+        <button type="button" class="btn-line" data-act="keep">${esc(T.keepWriting)}</button>
+      </div>`;
+    S.hydrate(el.sthread);
+  }
+
+  async function openSimilar() {
+    const item = ui.similar;
+    if (!item) return;
+    ui.similarOpen = true;
+    ui.similarState = 'loading';
+    renderSimilar();
+    try {
+      const thread = await S.getQuestion(item.id);
+      if (!ui.similar || ui.similar.id !== item.id || !ui.similarOpen) return;
+      ui.similarThread = thread;
+      ui.similarState = 'idle';
+    } catch (error) {
+      if (handleAccessError(error)) return;
+      if (!ui.similar || ui.similar.id !== item.id) return;
+      ui.similarState = 'error';
+    }
+    renderSimilar();
+  }
+
+  el.similar.addEventListener('click', () => {
+    if (ui.similarOpen) {
+      ui.similarOpen = false;
+      ui.similarBig = '';
+      renderSimilar();
+    } else {
+      openSimilar();
+    }
+  });
+
+  el.sthread.addEventListener('click', event => {
+    const image = event.target.closest('[data-big]');
+    if (image) {
+      const ref = image.dataset.big;
+      ui.similarBig = ref && ref !== ui.similarBig ? ref : '';
+      renderSimilar();
+      return;
+    }
+    const action = event.target.closest('[data-act]');
+    if (!action) return;
+    if (action.dataset.act === 'reload') openSimilar();
+    if (action.dataset.act === 'keep') {
+      ui.similarOpen = false;
+      ui.similarBig = '';
+      renderSimilar();
+    }
+    if (action.dataset.act === 'solved') {
+      resetForm();
+      toast(T.solvedToast);
+    }
+  });
+
+  /* ───────── 내가 남긴 질문 ───────── */
+  function renderMine() {
+    const items = ((ui.index && ui.index.items) || [])
+      .filter(item => item.author === ui.author)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 3);
+    el.mine.hidden = !items.length;
+    el.mineList.innerHTML = items.map(item => `
+      <li><i class="dot ${dotClass(item.status)}"></i><span class="m-title">${esc(item.title)}</span><span class="m-status">${esc(item.status)}</span></li>`).join('');
+  }
+
+  let indexSeq = 0;
+  async function loadIndex(force = false) {
+    const seq = ++indexSeq;
+    try {
+      const index = await S.getIndex({ force });
+      if (seq !== indexSeq) return;
+      ui.index = index;
+      if (index.access === 'read') { showAccess('denied'); return; }
+      if (ui.view === 'access') showMain();
+      renderMine();
+    } catch (error) {
+      if (seq === indexSeq) handleAccessError(error);
+    }
+  }
+
+  function handleAccessError(error) {
+    if (!error || (error.kind !== 'expired' && error.kind !== 'denied')) return false;
+    showAccess(error.kind);
+    return true;
+  }
+
+  /* ───────── 하단 액션 ───────── */
+  function setPhase(phase) {
+    ui.phase = phase;
+    el.idle.hidden = phase !== 'idle';
+    el.busy.hidden = phase !== 'busy';
+    el.done.hidden = phase !== 'done';
+    el.fail.hidden = phase !== 'fail';
+    el.ft.classList.toggle('is-done', phase === 'done');
+    el.ft.classList.toggle('is-fail', phase === 'fail');
+    const locked = phase === 'busy' || phase === 'done';
+    el.title.disabled = locked;
+    el.text.disabled = locked;
+    renderCategories();
+    renderThumbs();
+    renderPill();
+    renderFooter();
+  }
+
+  function renderFooter() {
+    const tooBig = ui.images.some(image => image.tooBig);
+    el.caption.textContent = tooBig
+      ? fill(T.imageTooBig, { mb: megabytes })
+      : fill(T.imageCount, { n: ui.images.length, max: IMG.max }) + (ui.draftSaved ? ` · ${T.draftSaved}` : '');
+    el.caption.classList.toggle('warn', tooBig);
+    el.submit.disabled = !canSubmit();
+    el.cancel.disabled = ui.phase !== 'idle' || isEmpty();
+  }
+
+  function renderProgress({ stage, progress }) {
+    const stages = T.stages || [];
+    document.querySelectorAll('#ft-busy .seg i').forEach((bar, i) => {
+      bar.style.width = i < stage ? '100%' : i === stage ? `${Math.round(progress * 100)}%` : '0%';
+    });
+    $('busy-stage').textContent = fill(T.stageLine, { stage: stages[stage] || '', i: stage + 1, n: 3 });
+  }
+
+  function failureLine(error) {
+    const stages = T.stages || [];
+    const stage = stages[error && error.stage != null ? error.stage : 0] || '';
+    let reason;
+    if (error && error.exhausted) reason = fill(T.reasonRetries, { n: error.retries || 3 });
+    else if (error && error.status) reason = fill(T.reasonHttp, { status: error.status });
+    else reason = T.reasonNetwork;
+    return fill(T.failedLine, { stage, reason });
+  }
+
+  let doneTimer = 0;
+  async function submit() {
+    if (!canSubmit()) return;
+    await imageQueue;
+    if (!canSubmit()) return;
+    const sig = signature();
+    if (ui.attempt && !ui.attempt.created && ui.attempt.signature !== sig) ui.attempt = null;
+    if (!ui.attempt) ui.attempt = S.newAttempt(sig);
+    const attempt = ui.attempt;
+    setPhase('busy');
+    renderProgress({ stage: attempt.created ? 2 : 0, progress: 0 });
+    try {
+      await S.createQuestion({
+        title: el.title.value,
+        body: el.text.value,
+        images: ui.images.map(image => image.blob),
+        major: ui.major,
+        guide: '',
+        author: ui.author,
+      }, { attempt, onProgress: renderProgress });
+    } catch (error) {
+      setPhase('fail');
+      $('fail-code').textContent = failureLine(error);
+      saveDraft();
+      handleAccessError(error);
+      return;
+    }
+    ui.attempt = null;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    clearDraft();
+    setPhase('done');
+    setSimilar(null);
+    loadIndex();
+    clearTimeout(doneTimer);
+    doneTimer = setTimeout(() => { if (ui.phase === 'done') resetForm(); }, DONE_RESET_MS);
+  }
+
+  // 제목·내용·이미지를 비우고 카테고리는 마지막 선택으로 둔다.
+  function resetForm() {
+    clearTimeout(doneTimer);
+    ui.attempt = null;
+    el.title.value = '';
+    el.text.value = '';
+    clearImages();
+    clearDraft();
+    applyLastCategory();
+    setSimilar(null);
+    setPhase('idle');
+    growText();
+  }
+
+  el.submit.addEventListener('click', submit);
+  $('retry').addEventListener('click', submit);
+  el.cancel.addEventListener('click', () => { if (!el.cancel.disabled) resetForm(); });
+  $('again').addEventListener('click', () => {
+    resetForm();
+    el.title.focus({ preventScroll: true });
+  });
+
+  /* ───────── 작성자 ───────── */
+  el.pill.addEventListener('click', () => {
+    if (el.pill.disabled) return;
+    showSetup();
+  });
+
+  $('users').addEventListener('click', event => {
+    const card = event.target.closest('.user');
+    if (!card) return;
+    S.setAuthor(card.dataset.user);
+  });
+
+  S.on('author', name => {
+    ui.author = name;
+    if (ui.view === 'access') { renderPill(); return; }
+    if (!name) { showSetup(); return; }
+    if (ui.view === 'setup') setView('form');
+    renderPill();
+    renderMine();
+    renderFooter();
+  });
+
+  /* ───────── 시작 ───────── */
+  let started = false;
+
+  // 방 설정(이름·카테고리)을 받은 뒤에 폼을 그린다.
+  async function start() {
+    try {
+      await S.ready({ force: true });
+    } catch (error) {
+      showAccess(error.kind === 'expired' || error.kind === 'denied' ? error.kind : 'offline');
+      return;
+    }
+    refreshText();
+    applyText();
+    if (!S.getUsers().length || !S.getCategories().length) {
+      showAccess('notReady');
+      return;
+    }
+    if (S.getAccess() === 'read') {
+      showAccess('denied');
+      return;
+    }
+    ui.author = S.getAuthor();
+    if (!started) {
+      started = true;
+      restoreDraft();
+      setPhase('idle');
+      S.on('changed', () => loadIndex());
+      window.addEventListener('focus', () => loadIndex());
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') loadIndex();
+      });
+    }
+    showMain();
+    loadIndex();
+    if (el.title.value.trim()) scheduleSimilar();
+  }
+
+  applyText();
+  $('access-retry').addEventListener('click', () => (started && ui.access !== 'notReady' ? loadIndex(true) : start()));
+
+  if (!S.hasKey()) {
+    // 접근 키가 없으면 서버에 아무것도 요청하지 않는다.
+    showAccess('none');
+    return;
+  }
+  start();
+})();
+</script>
+</body>
+</html>

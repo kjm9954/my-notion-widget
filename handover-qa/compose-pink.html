@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Q&amp;A Mini</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#FDFBFC; --surface:#FFFFFF; --sunk:#F9F3F6;
+  --text:#241A1F; --text-2:#66505A; --text-3:#9C858E; --line-strong:#CFBCC4; --line-scroll:#E2D5DC;
+  --border:#EEE3E8; --border-soft:#F6EEF2;
+  --accent:#B02068; --accent-hover:#8E1953; --accent-bg:#FAECF2; --accent-line:#EFD2E0;
+  --teal:#0B6E6E; --teal-bg:#E4F2F1; --teal-line:#C9E2E2;
+  --rust:#B0521B; --rust-bg:#FBEFE5; --rust-line:#EDD5C4;
+  --red:#96201C; --red-bg:#FBEBEA; --red-line:#E6C6C5;
+  --ink:#241A1F; --ink-hover:#322329; --ink-off:#CFBCC4;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;color:var(--text);font-size:13px;line-height:1.5}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+button{background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:default}
+button:focus{outline:none}
+button:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:4px}
+input::placeholder,textarea::placeholder{color:var(--text-3)}
+
+/* ── 프레임: 가이드 본문 아래의 작은 카드. 상태는 테두리 색으로만 구분한다 ── */
+.mini{position:relative;width:100%;max-width:var(--qa-max-width,none);margin:0 auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;container-type:inline-size;transition:border-color 120ms}
+.mini[data-state=expanded]{border-color:var(--accent)}
+.mini[data-state=done]{border-color:var(--teal-line)}
+.mini[data-state=fail]{border-color:var(--red-line)}
+.mini[data-state=access][data-tone=bg]{background:var(--bg)}
+.mini[data-state=access][data-tone=rust]{border-color:var(--rust-line)}
+.mini[data-state=access][data-tone=red]{border-color:var(--red-line)}
+
+/* 상태마다 한 부분만 보인다 */
+.part{display:none}
+.mini:is([data-state=loading],[data-state=collapsed]) .p-bar{display:flex}
+.mini[data-state=pick] .p-pick{display:flex}
+.mini[data-state=expanded] .p-form{display:flex}
+.mini[data-state=busy] .p-busy{display:flex}
+.mini[data-state=done] .p-done{display:flex}
+.mini[data-state=fail] .p-fail{display:flex}
+.mini[data-state=access] .p-access{display:flex}
+
+/* 한 줄(40px) */
+.line{align-items:center;gap:8px;width:100%;height:38px;padding:0 14px;font-size:13px;line-height:1.5;text-align:left}
+.line-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 접힘 */
+.plus{flex:none;width:14px;font-size:14px;font-weight:600;line-height:1;color:var(--accent);text-align:center}
+.bar-text{color:var(--text-3)}
+.bar-count{flex:none;font-size:12px;color:var(--text-2)}
+.p-bar:hover .bar-text{color:var(--text-2)}
+.p-bar:hover .plus{color:var(--accent-hover)}
+.mini[data-state=loading] .p-bar{cursor:default}
+
+/* 작성자 고르기 */
+.pick-users{display:flex;align-items:center;gap:6px;flex:none;color:var(--text-3)}
+.pick-user{padding:4px 2px;font-size:13px;font-weight:400;color:var(--text-2)}
+.pick-user.on{font-weight:600;color:var(--accent)}
+.pick-user:hover{color:var(--accent-hover)}
+
+/* 펼침 */
+.p-form{flex-direction:column;gap:6px;padding:12px 16px}
+.title{display:block;width:100%;height:36px;padding:7px 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;font-size:15px;font-weight:600;line-height:1.4;outline:none}
+.title:focus{border-bottom:1.5px solid var(--accent);padding-bottom:6.5px}
+.text{display:block;width:100%;height:62px;min-height:62px;padding:2px 0;border:0;background:transparent;font-size:13.5px;line-height:1.7;resize:none;outline:none;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.title:disabled,.text:disabled{color:var(--text-2)}
+
+/* 비슷한 질문 */
+.similar{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:4px;background:var(--sunk);text-align:left;font-size:12px;line-height:1.5;color:var(--text-2)}
+.s-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-text b{font-weight:600;color:var(--text)}
+.s-act{flex:none;font-size:11.5px;font-weight:600;color:var(--accent)}
+.similar:hover .s-act{color:var(--accent-hover)}
+.thread{display:flex;flex-direction:column;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-scroll) transparent}
+.thread::-webkit-scrollbar{width:10px}
+.thread::-webkit-scrollbar-track{background:transparent}
+.thread::-webkit-scrollbar-thumb{background:var(--line-scroll);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+.thread:hover::-webkit-scrollbar-thumb{background:var(--line-strong);background-clip:content-box}
+.t-msg{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.t-who{flex:none;width:32px;font-size:11.5px;font-weight:600;line-height:1.7;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.t-text{margin:0;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.t-imgs{display:flex;flex-wrap:wrap;gap:6px}
+.t-img{width:74px;height:54px;border-radius:4px;border:1px solid var(--border);background:var(--sunk) center/cover no-repeat;cursor:zoom-in}
+.t-img.on{border-color:var(--text-3)}
+.t-big{display:block;width:100%;height:180px;border-radius:4px;border:1px solid var(--border);background:var(--sunk) center/contain no-repeat;cursor:zoom-out}
+.t-sys{font-size:11px;line-height:1.5;color:var(--text-3);text-align:center}
+.t-note{font-size:12px;color:var(--text-3)}
+.t-note button{font-size:12px;font-weight:600;color:var(--text-2)}
+.t-actions{display:flex;justify-content:flex-end;gap:6px}
+.btn-line{height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:600;color:var(--text-2)}
+.btn-line.teal{border-color:var(--teal-line);color:var(--teal)}
+.img-missing{background-image:none !important}
+
+/* 이미지 */
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;padding-top:6px}
+.thumb{position:relative;flex:none;width:64px;height:46px;border-radius:4px;border:1px solid var(--border);background:var(--sunk) center/cover no-repeat}
+.thumb.too-big{border-color:var(--red)}
+.thumb .rm{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--surface);background:var(--ink);color:#fff;font-size:8px;line-height:1;display:flex;align-items:center;justify-content:center}
+.thumb .rm::after{content:"";position:absolute;inset:-8px}
+
+/* 하단 줄: 카테고리 칩 · 작성자 | 취소 등록 */
+.foot{display:flex;align-items:center;gap:10px;min-height:36px}
+.foot-left{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.cats{display:flex;flex-wrap:wrap;gap:4px}
+.cat{height:24px;padding:0 8px;border-radius:3px;border:1px solid var(--border);background:var(--surface);font-size:11.5px;font-weight:400;line-height:22px;color:var(--text-2);white-space:nowrap}
+.cat:hover{border-color:var(--line-strong)}
+.cat.on{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent);font-weight:600}
+.cat:disabled{cursor:default}
+.meta-sep{font-size:11.5px;color:var(--text-3)}
+.meta{min-width:0;text-align:left;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta:hover{color:var(--text-2)}
+.note{flex:1;min-width:0;font-size:11.5px;color:var(--red)}
+.actions{display:flex;align-items:center;gap:4px;flex:none;margin-left:auto}
+.btn-text{height:32px;padding:0 10px;font-size:12.5px;font-weight:600;color:var(--text-2)}
+.btn-text:disabled{font-weight:400}
+.btn-ink{padding:8px 18px;border-radius:6px;background:var(--ink);color:#fff;font-size:12.5px;font-weight:600;line-height:1.3;transition:background-color 120ms}
+.btn-ink:hover:not(:disabled){background:var(--ink-hover)}
+.btn-ink:disabled{background:var(--ink-off);font-weight:400}
+.foot-pick .pick-text{flex:1;min-width:0;font-size:11.5px;color:var(--text-3)}
+
+/* 상태 줄 */
+.spinner{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--ink);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+.progress{flex:none;width:96px;height:3px;border-radius:2px;background:var(--border-soft);overflow:hidden}
+.progress i{display:block;width:0;height:100%;background:var(--ink);transition:width 160ms ease}
+.mark{flex:none;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;line-height:1;color:#fff}
+.p-done .mark{background:var(--teal)}
+.p-done .line-text{font-weight:600;color:var(--teal)}
+.p-fail{flex-direction:column;justify-content:center;gap:1px;height:66px;padding:0 14px}
+.fail-row{display:flex;align-items:center;gap:8px;min-width:0}
+.p-fail .mark{background:var(--red)}
+.fail-text{flex:1;min-width:0;padding:0;text-align:left;font-size:13px;font-weight:600;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fail-text:disabled{cursor:default}
+.fail-code{padding-left:24px;font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn-plain{flex:none;height:28px;padding:0 6px;font-size:13px;font-weight:700}
+.p-fail .btn-plain{color:var(--red)}
+.p-access .mark{background:var(--text-3)}
+.mini[data-tone=bg] .p-access .mark{background:transparent;border:1px dashed var(--line-strong);color:var(--text-3)}
+.mini[data-tone=bg] .p-access .line-text{color:var(--text-2)}
+.mini[data-tone=rust] .p-access .mark{background:var(--rust)}
+.mini[data-tone=rust] .p-access .line-text{color:var(--rust)}
+.mini[data-tone=rust] .p-access .btn-plain{font-weight:600;color:var(--rust)}
+.mini[data-tone=red] .p-access .mark{background:var(--red)}
+.mini[data-tone=red] .p-access .line-text{color:var(--red)}
+.access-code{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--red)}
+
+/* ── 640px 이하(테두리 두 줄을 뺀 안쪽 638) ── */
+@container (max-width:638px){
+  .bar-count{display:none}
+  .s-extra{display:none}
+  .foot{flex-wrap:wrap;row-gap:4px}
+  .foot > .foot-left,.foot > .note{flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<div class="mini" id="root" data-state="loading">
+  <button type="button" class="part line p-bar" id="bar">
+    <span class="plus" aria-hidden="true">+</span>
+    <span class="line-text bar-text" id="bar-text"></span>
+    <span class="bar-count" id="bar-count" hidden></span>
+  </button>
+
+  <div class="part line p-pick" id="pick">
+    <span class="line-text" id="pick-text"></span>
+    <span class="pick-users" id="pick-users"></span>
+  </div>
+
+  <div class="part p-form" id="form">
+    <input class="title" id="title" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+    <button type="button" class="similar" id="similar" aria-expanded="false" hidden>
+      <span class="s-text"><span id="s-label"></span> <b id="s-title"></b><span class="s-extra" id="s-extra"></span></span>
+      <span class="s-act" id="s-act"></span>
+    </button>
+    <div class="thread" id="thread" hidden></div>
+    <textarea class="text" id="text"></textarea>
+    <div class="thumbs" id="thumbs" hidden></div>
+    <div class="foot" id="foot">
+      <div class="foot-left" id="foot-left">
+        <span class="cats" id="cats" role="group"></span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <button type="button" class="meta" id="meta"></button>
+      </div>
+      <span class="note" id="note" hidden></span>
+      <div class="actions">
+        <button type="button" class="btn-text" id="cancel"></button>
+        <button type="button" class="btn-ink" id="submit" disabled></button>
+      </div>
+    </div>
+    <div class="foot foot-pick" id="foot-pick" hidden>
+      <span class="pick-text" id="foot-pick-text"></span>
+      <span class="pick-users" id="foot-pick-users"></span>
+    </div>
+  </div>
+
+  <div class="part line p-busy" id="busy">
+    <span class="spinner" aria-hidden="true"></span>
+    <span class="line-text" id="busy-text"></span>
+    <span class="progress" aria-hidden="true"><i id="busy-bar"></i></span>
+  </div>
+
+  <div class="part line p-done" id="done">
+    <span class="mark" aria-hidden="true">✓</span>
+    <span class="line-text" id="done-text"></span>
+  </div>
+
+  <div class="part p-fail" id="fail">
+    <div class="fail-row">
+      <span class="mark" aria-hidden="true">!</span>
+      <button type="button" class="fail-text" id="fail-text"></button>
+      <button type="button" class="btn-plain" id="retry"></button>
+    </div>
+    <div class="fail-code" id="fail-code"></div>
+  </div>
+
+  <div class="part line p-access" id="access">
+    <span class="mark" id="access-mark" aria-hidden="true">!</span>
+    <span class="line-text" id="access-text"></span>
+    <span class="access-code" id="access-code" hidden></span>
+    <button type="button" class="btn-plain" id="access-retry" hidden></button>
+  </div>
+</div>
+
+<script src="qa-config.js?v=20260918-asker-view"></script>
+<script src="qa-store.js?v=20260918-asker-view"></script>
+<script>
+(function () {
+  'use strict';
+
+  const S = window.QAStore;
+  S.applyFrameWidth();
+
+  // 문구는 공개 설정으로 먼저 그리고, 방 설정을 받은 뒤 다시 읽는다.
+  let T = {};
+  let TA = {};
+  function refreshText() {
+    T = S.text('mini');
+    TA = S.text('add');
+  }
+  refreshText();
+
+  const IMG = Object.assign({ max: 5, maxBytes: 3 * 1024 * 1024 }, S.getConfig().images || {});
+  const MEGABYTES = Math.round(IMG.maxBytes / 1024 / 1024 * 10) / 10;
+  const DONE_RESET_MS = 3000;
+  const NOTE_MS = 3500;
+  const TEXT_MIN = 62;
+  const TEXT_MAX = 200;
+
+  // 임베드 주소는 모든 가이드 페이지에서 같다. 카테고리는 위젯에서 고른다.
+  // 주소에 major 가 있으면 처음 선택값으로만 쓰고, guide 가 있으면 함께 저장한다.
+  const HASH_MAJOR = S.hashParam('major');
+  const GUIDE = S.hashParam('guide');
+  const LAST_CATEGORY_KEY = 'qa.lastCategory';
+  const DRAFT_KEY = 'qa.draft.' + (GUIDE || 'mini');
+
+  const $ = id => document.getElementById(id);
+  const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fill = (template, vars) => String(template || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] == null ? '' : vars[k]));
+
+  const el = {
+    root: $('root'), bar: $('bar'), barText: $('bar-text'), barCount: $('bar-count'),
+    pickText: $('pick-text'), pickUsers: $('pick-users'),
+    form: $('form'), title: $('title'), text: $('text'), thumbs: $('thumbs'),
+    similar: $('similar'), sLabel: $('s-label'), sTitle: $('s-title'), sExtra: $('s-extra'), sAct: $('s-act'), thread: $('thread'),
+    foot: $('foot'), footLeft: $('foot-left'), cats: $('cats'), meta: $('meta'), note: $('note'), cancel: $('cancel'), submit: $('submit'),
+    footPick: $('foot-pick'), footPickText: $('foot-pick-text'), footPickUsers: $('foot-pick-users'),
+    busyText: $('busy-text'), busyBar: $('busy-bar'), doneText: $('done-text'),
+    failText: $('fail-text'), failCode: $('fail-code'), retry: $('retry'),
+    accessMark: $('access-mark'), accessText: $('access-text'), accessCode: $('access-code'), accessRetry: $('access-retry'),
+  };
+
+  const ui = {
+    state: 'loading',
+    access: '',
+    author: null,
+    major: '',
+    images: [],            // { blob, url, tooBig }
+    attempt: null,
+    index: null,
+    similar: null,
+    threadOpen: false,
+    thread: null,
+    threadState: 'idle',   // idle | loading | error
+    big: '',
+    picking: false,
+    started: false,
+  };
+
+  /* ───────── 문구 ───────── */
+  function applyText() {
+    el.barText.textContent = T.collapsed || '';
+    el.pickText.textContent = T.pickAuthor || '';
+    el.footPickText.textContent = T.pickAuthor || '';
+    el.title.placeholder = T.titlePlaceholder || '';
+    el.text.placeholder = T.bodyPlaceholder || '';
+    el.cancel.textContent = T.cancel || '';
+    el.submit.textContent = T.submit || '';
+    el.busyText.textContent = T.progress || '';
+    el.doneText.textContent = T.done || '';
+    el.failText.textContent = T.failed || '';
+    el.retry.textContent = T.retry || '';
+    el.accessRetry.textContent = T.accessRetry || '';
+    el.meta.title = T.changeAuthor || '';
+    el.cats.setAttribute('aria-label', T.categoryGroup || '');
+    el.sLabel.textContent = T.similarLabel || '';
+  }
+
+  /* ───────── 상태 ───────── */
+  function setState(state, tone) {
+    ui.state = state;
+    el.root.dataset.state = state;
+    if (tone) el.root.dataset.tone = tone;
+    else delete el.root.dataset.tone;
+    const locked = state !== 'expanded';
+    el.title.disabled = locked;
+    el.text.disabled = locked;
+    if (state === 'expanded') {
+      renderFoot();
+      scheduleFit();
+    }
+  }
+
+  function showHome() {
+    ui.access = '';
+    if (!ui.author) {
+      renderPicker(el.pickUsers);
+      setState('pick');
+    } else if (hasContent()) {
+      setState('expanded');
+    } else {
+      setState('collapsed');
+    }
+    renderCount();
+  }
+
+  // kind: none | expired | denied | offline | notReady
+  const ACCESS = {
+    none: { tone: 'bg', mark: '?', text: () => T.noKey },
+    expired: { tone: 'rust', mark: '!', text: () => T.expired, retry: true },
+    denied: { tone: 'red', mark: '!', text: () => T.denied, code: true },
+    offline: { tone: 'rust', mark: '!', text: () => T.offline, retry: true },
+    notReady: { tone: 'bg', mark: '?', text: () => T.notReady, retry: true },
+  };
+  function showAccess(kind) {
+    const info = ACCESS[kind] || ACCESS.offline;
+    ui.access = kind;
+    el.accessMark.textContent = info.mark;
+    el.accessText.textContent = info.text() || '';
+    el.accessCode.hidden = !info.code;
+    el.accessCode.textContent = T.deniedCode || '';
+    el.accessRetry.hidden = !info.retry;
+    setState('access', info.tone);
+  }
+
+  /* ───────── 접힘 바 ───────── */
+  function renderCount() {
+    const items = (ui.index && ui.index.items) || [];
+    const n = GUIDE ? items.filter(item => item.guide === GUIDE).length : items.length;
+    el.barCount.textContent = fill(T.pastCount, { n });
+    el.barCount.hidden = !ui.index || n === 0;
+  }
+
+  el.bar.addEventListener('click', () => {
+    if (ui.state !== 'collapsed') return;
+    setState('expanded');
+    el.title.focus({ preventScroll: true });
+  });
+
+  /* ───────── 카테고리 ───────── */
+  function renderCats() {
+    const locked = ui.state !== 'expanded';
+    el.cats.innerHTML = S.getCategories().map(category => {
+      const on = category.major === ui.major;
+      return `<button type="button" class="cat ${on ? 'on' : ''}" data-major="${esc(category.major)}" aria-pressed="${on}" ${locked ? 'disabled' : ''}>${esc(category.major)}</button>`;
+    }).join('');
+  }
+
+  el.cats.addEventListener('click', event => {
+    const chip = event.target.closest('.cat');
+    if (!chip || chip.disabled || chip.dataset.major === ui.major) return;
+    ui.major = chip.dataset.major;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    renderFoot();
+    saveDraft();
+  });
+
+  function applyDefaultCategory(draftMajor) {
+    const last = S.local.get(LAST_CATEGORY_KEY);
+    const candidates = [draftMajor, HASH_MAJOR, last && last.major];
+    ui.major = candidates.find(major => major && S.isCategory(major)) || '';
+  }
+
+  /* ───────── 작성자 ───────── */
+  function renderPicker(target) {
+    target.innerHTML = S.getUsers().map((user, i) => {
+      const on = user.name === ui.author;
+      return `${i ? '<span aria-hidden="true">/</span>' : ''}<button type="button" class="pick-user ${on ? 'on' : ''}" data-user="${esc(user.name)}" aria-pressed="${on}">${esc(user.name)}</button>`;
+    }).join('');
+  }
+
+  function pickFrom(event) {
+    const button = event.target.closest('.pick-user');
+    if (button) S.setAuthor(button.dataset.user);
+  }
+  el.pickUsers.addEventListener('click', pickFrom);
+  el.footPickUsers.addEventListener('click', pickFrom);
+
+  el.meta.addEventListener('click', () => {
+    if (ui.state !== 'expanded') return;
+    ui.picking = true;
+    renderPicker(el.footPickUsers);
+    renderFoot();
+  });
+
+  S.on('author', name => {
+    ui.author = name;
+    ui.picking = false;
+    if (!ui.started || ui.state === 'access') return;
+    if (!name) { showHome(); return; }
+    if (ui.state === 'pick') { showHome(); return; }
+    renderFoot();
+  });
+
+  /* ───────── 입력 ───────── */
+  function hasContent() {
+    return !!(el.title.value.trim() || el.text.value.trim() || ui.images.length);
+  }
+
+  function canSubmit() {
+    return ui.state === 'expanded'
+      && !!ui.author
+      && !!ui.major
+      && !!el.title.value.trim()
+      && (!!el.text.value.trim() || ui.images.length > 0);
+  }
+
+  function renderFoot() {
+    el.foot.hidden = ui.picking;
+    el.footPick.hidden = !ui.picking;
+    renderCats();
+    el.meta.textContent = ui.author || '';
+    el.submit.disabled = !canSubmit();
+    el.cancel.disabled = ui.state !== 'expanded';
+    scheduleFit();
+  }
+
+  let noteTimer = 0;
+  function showNote(message) {
+    clearTimeout(noteTimer);
+    el.note.textContent = message;
+    el.note.hidden = false;
+    el.footLeft.hidden = true;
+    noteTimer = setTimeout(() => { el.note.hidden = true; el.footLeft.hidden = false; }, NOTE_MS);
+  }
+
+  el.title.addEventListener('input', () => {
+    renderFoot();
+    saveDraft();
+    scheduleSimilar();
+  });
+  el.text.addEventListener('input', event => {
+    S.continueNumberedList(event, el.text);
+    renderFoot();
+    saveDraft();
+  });
+  [el.title, el.text].forEach(field => field.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      submit();
+    }
+  }));
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || ui.state !== 'expanded') return;
+    if (ui.picking) { ui.picking = false; renderFoot(); return; }
+    if (ui.threadOpen) { closeThread(); return; }
+    if (!hasContent()) setState('collapsed');
+  });
+
+  /* ───────── 높이 맞추기 ─────────
+     위젯 자체는 스크롤하지 않는다. 임베드 높이 안에서 내용 칸은 200까지 늘고,
+     그보다 길면 내용 칸만, 펼친 스레드가 길면 스레드 칸만 스크롤한다. */
+  let fitTimer = 0;
+  function scheduleFit() {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fit, 0);
+  }
+
+  function fit() {
+    if (ui.state !== 'expanded') return;
+    const limit = window.innerHeight;
+    if (ui.threadOpen && !el.thread.hidden) {
+      el.thread.style.maxHeight = 'none';
+      const rest = el.root.offsetHeight - el.thread.offsetHeight;
+      el.thread.style.maxHeight = Math.max(90, limit - rest) + 'px';
+      return;
+    }
+    const ta = el.text;
+    ta.style.height = TEXT_MIN + 'px';
+    ta.style.overflowY = 'hidden';
+    const content = ta.scrollHeight;
+    const spare = Math.max(0, limit - el.root.offsetHeight);
+    const cap = Math.min(TEXT_MAX, TEXT_MIN + spare);
+    const height = Math.max(TEXT_MIN, Math.min(content, cap));
+    ta.style.height = height + 'px';
+    ta.style.overflowY = content > height ? 'auto' : 'hidden';
+  }
+
+  window.addEventListener('resize', scheduleFit);
+
+  /* ───────── 임시 저장 ───────── */
+  let draftTimer = 0;
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const draft = { title: el.title.value, body: el.text.value, major: ui.major };
+      if (!draft.title.trim() && !draft.body.trim()) S.local.remove(DRAFT_KEY);
+      else S.local.set(DRAFT_KEY, draft);
+    }, 300);
+  }
+
+  function clearDraft() {
+    clearTimeout(draftTimer);
+    S.local.remove(DRAFT_KEY);
+  }
+
+  function restoreDraft() {
+    const draft = S.local.get(DRAFT_KEY);
+    const saved = draft && typeof draft === 'object' ? draft : {};
+    el.title.value = String(saved.title || '').slice(0, 60);
+    el.text.value = String(saved.body || '');
+    applyDefaultCategory(saved.major);
+  }
+
+  /* ───────── 이미지 ───────── */
+  function renderThumbs() {
+    el.thumbs.hidden = !ui.images.length || ui.threadOpen;
+    el.thumbs.innerHTML = ui.images.map((image, i) => `
+      <div class="thumb ${image.tooBig ? 'too-big' : ''}" style="background-image:url('${image.url}')">
+        <button type="button" class="rm" data-i="${i}" aria-label="${esc(T.removeImage)}">✕</button>
+      </div>`).join('');
+    scheduleFit();
+  }
+
+  el.thumbs.addEventListener('click', event => {
+    const remove = event.target.closest('.rm');
+    if (!remove || ui.state !== 'expanded') return;
+    const [image] = ui.images.splice(Number(remove.dataset.i), 1);
+    if (image) URL.revokeObjectURL(image.url);
+    renderThumbs();
+    renderFoot();
+  });
+
+  document.addEventListener('paste', event => {
+    if (ui.state !== 'expanded') return;
+    const files = S.imagesFromClipboard(event);
+    if (!files.length) return;
+    event.preventDefault();
+    addImages(files);
+  });
+
+  let imageQueue = Promise.resolve();
+  function addImages(files) {
+    imageQueue = imageQueue.then(async () => {
+      let limited = false;
+      let failed = false;
+      for (const file of files) {
+        if (ui.images.length >= IMG.max) { limited = true; break; }
+        try {
+          const { blob } = await S.compressImage(file);
+          if (ui.images.length >= IMG.max) { limited = true; break; }
+          ui.images.push({ blob, url: URL.createObjectURL(blob), tooBig: blob.size > IMG.maxBytes });
+        } catch (_) {
+          failed = true;
+        }
+      }
+      renderThumbs();
+      renderFoot();
+      if (limited) showNote(fill(T.imageLimit, { max: IMG.max }));
+      else if (failed) showNote(T.imageFailed);
+    });
+    return imageQueue;
+  }
+
+  function clearImages() {
+    ui.images.forEach(image => URL.revokeObjectURL(image.url));
+    ui.images = [];
+    renderThumbs();
+  }
+
+  /* ───────── 비슷한 질문 ───────── */
+  let similarTimer = 0;
+  let similarSeq = 0;
+  function scheduleSimilar() {
+    clearTimeout(similarTimer);
+    similarTimer = setTimeout(refreshSimilar, 300);
+  }
+
+  async function refreshSimilar() {
+    const seq = ++similarSeq;
+    const query = el.title.value.trim();
+    if (!query) { setSimilar(null); return; }
+    try {
+      const best = await S.findSimilar(query);
+      if (seq === similarSeq) setSimilar(best);
+    } catch (error) {
+      if (seq !== similarSeq) return;
+      if (error.kind === 'expired' || error.kind === 'denied') { showAccess(error.kind); return; }
+      setSimilar(null);
+    }
+  }
+
+  function setSimilar(item) {
+    if (!item || !ui.similar || ui.similar.id !== item.id) {
+      ui.threadOpen = false;
+      ui.thread = null;
+      ui.threadState = 'idle';
+      ui.big = '';
+    }
+    ui.similar = item;
+    renderSimilar();
+  }
+
+  function renderSimilar() {
+    const item = ui.similar;
+    el.similar.hidden = !item;
+    el.thread.hidden = !item || !ui.threadOpen;
+    // 스레드를 읽는 동안에는 내용 칸과 이미지를 잠시 접어 스레드에 자리를 준다(내용은 그대로 남는다).
+    el.text.hidden = !!item && ui.threadOpen;
+    el.thumbs.hidden = !ui.images.length || (!!item && ui.threadOpen);
+    if (!item) {
+      el.thread.innerHTML = '';
+      scheduleFit();
+      return;
+    }
+    el.sTitle.textContent = item.title;
+    el.sExtra.textContent = ` — ${item.status === S.STATUS.WAITING ? T.similarWaiting : T.similarAnswered}`;
+    el.sAct.textContent = ui.threadOpen ? T.similarClose : T.similarOpen;
+    el.similar.setAttribute('aria-expanded', String(ui.threadOpen));
+    if (ui.threadOpen) renderThread();
+    scheduleFit();
+  }
+
+  function renderThread() {
+    if (ui.threadState === 'loading') {
+      el.thread.innerHTML = `<div class="t-note">${esc(T.similarLoading)}</div>`;
+      return;
+    }
+    if (ui.threadState === 'error' || !ui.thread) {
+      el.thread.innerHTML = `<div class="t-note">${esc(T.similarError)} <button type="button" data-act="reload">${esc(T.similarRetry)}</button></div>`;
+      return;
+    }
+    const rows = (ui.thread.messages || []).map(message => {
+      if (message.system) return `<div class="t-sys">${esc(message.text)}</div>`;
+      const images = (message.images || []).filter(S.isStoredImage);
+      const thumbs = images.length
+        ? `<div class="t-imgs">${images.map(ref => `<button type="button" class="t-img ${ref === ui.big ? 'on' : ''}" data-big="${esc(ref)}" ${S.imageAttr(ref, esc)} aria-label="${esc(T.similarImage)}"></button>`).join('')}</div>`
+        : '';
+      const big = images.includes(ui.big)
+        ? `<button type="button" class="t-big" data-big="" ${S.imageAttr(ui.big, esc)} aria-label="${esc(T.similarImage)}"></button>`
+        : '';
+      return `<div class="t-msg">
+        <span class="t-who">${esc(message.who)}</span>
+        <div class="t-body">${message.text ? `<p class="t-text">${esc(message.text)}</p>` : ''}${thumbs}${big}</div>
+      </div>`;
+    }).join('');
+    el.thread.innerHTML = `${rows}
+      <div class="t-actions">
+        <button type="button" class="btn-line teal" data-act="solved">${esc(T.solved)}</button>
+        <button type="button" class="btn-line" data-act="keep">${esc(T.keepWriting)}</button>
+      </div>`;
+    S.hydrate(el.thread);
+  }
+
+  async function openThread() {
+    const item = ui.similar;
+    if (!item) return;
+    ui.threadOpen = true;
+    ui.threadState = 'loading';
+    renderSimilar();
+    try {
+      const thread = await S.getQuestion(item.id);
+      if (!ui.similar || ui.similar.id !== item.id || !ui.threadOpen) return;
+      ui.thread = thread;
+      ui.threadState = 'idle';
+    } catch (error) {
+      if (error.kind === 'expired' || error.kind === 'denied') { showAccess(error.kind); return; }
+      if (!ui.similar || ui.similar.id !== item.id) return;
+      ui.threadState = 'error';
+    }
+    renderSimilar();
+  }
+
+  function closeThread() {
+    ui.threadOpen = false;
+    ui.big = '';
+    renderSimilar();
+  }
+
+  el.similar.addEventListener('click', () => (ui.threadOpen ? closeThread() : openThread()));
+
+  el.thread.addEventListener('click', event => {
+    const image = event.target.closest('[data-big]');
+    if (image) {
+      const ref = image.dataset.big;
+      ui.big = ref && ref !== ui.big ? ref : '';
+      renderSimilar();
+      return;
+    }
+    const action = event.target.closest('[data-act]');
+    if (!action) return;
+    if (action.dataset.act === 'reload') openThread();
+    if (action.dataset.act === 'keep') closeThread();
+    if (action.dataset.act === 'solved') {
+      resetForm();
+      setState('collapsed');
+    }
+  });
+
+  /* ───────── 등록 ───────── */
+  function signature() {
+    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(image => image.url)]);
+  }
+
+  function failureLine(error) {
+    const stages = TA.stages || [];
+    const stage = stages[error && error.stage != null ? error.stage : 0] || '';
+    let reason;
+    if (error && error.exhausted) reason = fill(TA.reasonRetries, { n: error.retries || 3 });
+    else if (error && error.status) reason = fill(TA.reasonHttp, { status: error.status });
+    else reason = TA.reasonNetwork;
+    return fill(TA.failedLine, { stage, reason });
+  }
+
+  function renderProgress({ stage, progress }) {
+    el.busyBar.style.width = `${Math.round(((stage + progress) / 3) * 100)}%`;
+  }
+
+  let doneTimer = 0;
+  async function submit() {
+    if (!canSubmit()) return;
+    await imageQueue;
+    if (!canSubmit()) return;
+    if (ui.images.some(image => image.tooBig)) {
+      renderThumbs();
+      showNote(fill(T.imageTooBig, { mb: MEGABYTES }));
+      return;
+    }
+    const sig = signature();
+    if (ui.attempt && !ui.attempt.created && ui.attempt.signature !== sig) ui.attempt = null;
+    if (!ui.attempt) ui.attempt = S.newAttempt(sig);
+    const attempt = ui.attempt;
+    ui.picking = false;
+    renderProgress({ stage: attempt.created ? 2 : 0, progress: 0 });
+    setState('busy');
+    try {
+      await S.createQuestion({
+        title: el.title.value,
+        body: el.text.value,
+        images: ui.images.map(image => image.blob),
+        major: ui.major,
+        minor: '',
+        guide: GUIDE,
+        author: ui.author,
+      }, { attempt, onProgress: renderProgress });
+    } catch (error) {
+      if (error.kind === 'expired' || error.kind === 'denied') { saveDraft(); showAccess(error.kind); return; }
+      el.failCode.textContent = failureLine(error);
+      el.failText.disabled = attempt.created;
+      el.failText.title = attempt.created ? '' : (T.failedHint || '');
+      setState('fail');
+      saveDraft();
+      return;
+    }
+    ui.attempt = null;
+    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    clearDraft();
+    setState('done');
+    loadIndex(true);
+    clearTimeout(doneTimer);
+    doneTimer = setTimeout(() => {
+      if (ui.state !== 'done') return;
+      resetForm();
+      setState('collapsed');
+    }, DONE_RESET_MS);
+  }
+
+  function resetForm() {
+    clearTimeout(doneTimer);
+    ui.attempt = null;
+    ui.picking = false;
+    el.title.value = '';
+    el.text.value = '';
+    clearImages();
+    clearDraft();
+    setSimilar(null);
+    el.note.hidden = true;
+    el.footLeft.hidden = false;
+    applyDefaultCategory();   // 카테고리는 마지막 선택을 유지한다
+  }
+
+  el.submit.addEventListener('click', submit);
+  el.retry.addEventListener('click', submit);
+  el.failText.addEventListener('click', () => {
+    // 아직 질문이 만들어지지 않았을 때만 폼으로 돌아가 내용을 고칠 수 있다.
+    if (ui.attempt && ui.attempt.created) return;
+    setState('expanded');
+  });
+  el.cancel.addEventListener('click', () => {
+    resetForm();
+    setState('collapsed');
+  });
+
+  /* ───────── 목록 요약(지난 질문 수·비슷한 질문) ───────── */
+  async function loadIndex(force = false) {
+    try {
+      const index = await S.getIndex({ force });
+      ui.index = index;
+      if (index.access === 'read') { showAccess('denied'); return; }
+      if (ui.state === 'access' && ui.started) showHome();
+      renderCount();
+    } catch (error) {
+      if (error.kind === 'expired' || error.kind === 'denied') showAccess(error.kind);
+    }
+  }
+
+  /* ───────── 시작 ───────── */
+  async function start() {
+    try {
+      await S.ready({ force: true });
+    } catch (error) {
+      showAccess(error.kind === 'expired' || error.kind === 'denied' ? error.kind : 'offline');
+      return;
+    }
+    refreshText();
+    applyText();
+    if (!S.getUsers().length || !S.getCategories().length) { showAccess('notReady'); return; }
+    if (S.getAccess() === 'read') { showAccess('denied'); return; }
+    ui.author = S.getAuthor();
+    if (!ui.started) {
+      ui.started = true;
+      restoreDraft();
+      window.addEventListener('focus', () => loadIndex());
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') loadIndex();
+      });
+    }
+    showHome();
+    loadIndex();
+    if (el.title.value.trim()) scheduleSimilar();
+  }
+
+  el.accessRetry.addEventListener('click', () => {
+    if (ui.started && ui.access !== 'notReady' && ui.access !== 'offline') loadIndex(true);
+    else start();
+  });
+
+  applyText();
+  if (!S.hasKey()) {
+    // 접근 키가 없으면 서버에 아무것도 요청하지 않는다.
+    showAccess('none');
+    return;
+  }
+  start();
+})();
+</script>
+</body>
+</html>
