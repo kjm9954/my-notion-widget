@@ -26,7 +26,9 @@ export function mount(root, source, now = () => Date.now()) {
   const content = make('div', 'wr-content');
   const error = make('p', 'wr-error'); error.hidden = true; error.setAttribute('role', 'alert');
   const live = make('span', 'wr-sr'); live.setAttribute('role', 'status');
-  card.append(header, content, error, live); root.replaceChildren(card);
+  // The deadline card starts with its list; keep its accessible section name.
+  if (kind !== 'deadlines') card.append(header);
+  card.append(content, error, live); root.replaceChildren(card);
   content.append(make('p', 'wr-message', '불러오는 중이에요.'));
 
   let state = null, signature = '', disposed = false, running = null, queued = false, period;

@@ -386,7 +386,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           const card=document.querySelector('.wr-card').getBoundingClientRect();
           const list=document.querySelector('.wr-content');
           return {width:frame.width,height:frame.height,cardHeight:card.height,
-            font:getComputedStyle(document.querySelector('.wr-title')).fontSize,
+            font:getComputedStyle(document.querySelector('.wr-content')).fontSize,
             scale:document.querySelector('[data-widget-host]').style.getPropertyValue('--widget-content-scale'),
             scroll:list.scrollHeight,client:list.clientHeight};
         });
@@ -478,6 +478,15 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           db.goals.items.forEach((g, i) => { g.color = ['#6b7b49','#bd9671','#8298a0','#e4d18b'][i]; });
           const pages = await openAll();
           const [goals, due, week, month] = pages;
+          assert.equal(await due.locator('.wr-header, .wr-title').count(),0,`${label}: deadline title and header spacing removed`);
+          assert.equal(await due.locator('.wr-card').getAttribute('aria-label'),'3일 안 마감');
+          assert.equal(await due.title(),'3일 안 마감');
+          const listAtTop=await due.locator('.wr-card').evaluate(card=>{
+            const style=getComputedStyle(card);
+            return Math.abs(card.querySelector('.wr-content').getBoundingClientRect().top-card.getBoundingClientRect().top-parseFloat(style.paddingTop)-parseFloat(style.borderTopWidth))<1;
+          });
+          assert.equal(listAtTop,true,`${label}: no empty header gap`);
+          for(const page of [goals,week,month]) assert.equal(await page.locator('.wr-title').count(),1);
           for(const resizable of [due,week]) assert.equal(await resizable.locator('.widget-height-handle-bottom').isVisible(),!touch,`${label} vertical handle visibility`);
           for (let i = 0; i < pages.length; i++) {
             const page = pages[i];
@@ -576,6 +585,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         const pages = await openAll();
         assert.match(await text(pages[0], '.wr-message'), /목표가 없/);
         assert.match(await text(pages[1], '.wr-message'), /마감할 업무가 없/);
+        assert.equal(await pages[1].locator('.wr-header, .wr-title').count(),0);
         assert.equal(await pages[2].locator('.wr-day-empty').count(), 5);
         assert.equal(await pages[3].locator('.wr-dot').count(), 0);
         assert.equal(await pages[3].locator('.wr-date').count(), 35);
@@ -584,6 +594,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           await notify(page); await page.waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'error');
           assert.match(await text(page, '.wr-error'), /갱신하지 못/);
         }
+        assert.equal(await pages[1].locator('.wr-header, .wr-title').count(),0);
         // A new document with cached data still shows an initial error, not an empty result.
         await pages[0].reload();
         await pages[0].waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'error');
