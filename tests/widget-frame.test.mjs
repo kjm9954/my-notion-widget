@@ -18,6 +18,20 @@ test("노션 임베드가 늦게 펼쳐져도 프레임을 다시 맞춘다", ()
   assert.match(source, /\[60, 250, 1000\]\.forEach\(delay => setTimeout\(commitFrame, delay\)\)/);
 });
 
+test("마감 위젯만 세로 조절을 켜고 최소 높이를 지정하며 다른 읽기 위젯은 자동 높이를 유지한다", async () => {
+  assert.match(source,/Number\(host\.dataset\.widgetMinHeight\) \|\| 0/);
+  const html=await readFile(new URL('../cream-olive-garden/Worklog/deadlines.html',import.meta.url),'utf8');
+  const readCss=await readFile(new URL('../cream-olive-garden/Worklog/read-widgets.css',import.meta.url),'utf8');
+  assert.match(html,/read-widget-height-resizable/);
+  assert.match(html,/data-widget-min-height="160"/);
+  assert.doesNotMatch(html,/data-widget-auto-height/);
+  assert.match(readCss,/:not\(\.read-widget-height-resizable\) \.widget-height-handle/);
+  for(const file of ['weekly-goals','week-review','month-calendar']) {
+    const page=await readFile(new URL(`../cream-olive-garden/Worklog/${file}.html`,import.meta.url),'utf8');
+    assert.match(page,/data-widget-auto-height/);
+  }
+});
+
 test("업무일지는 체크 외곽선을 덧그리지 않고 빈 목록만 유휴 모션을 사용한다", () => {
   assert.match(source, /'worklog\.html': \{ empty:'\.list-shell\.is-empty' \}/);
   assert.doesNotMatch(source, /'worklog\.html': \{[^\n]*done-check/);

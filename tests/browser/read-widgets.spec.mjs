@@ -164,8 +164,9 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         await week.waitForFunction(() => document.querySelector('[data-date="2026-09-29"] .wr-day-count')?.textContent === '1 / 8');
         await month.waitForFunction(() => document.querySelectorAll('[data-date="2026-09-29"] .wr-dot').length === 4);
         await writer.locator('[data-goal-task="t4"]').click();
-        await goals.waitForFunction(() => document.querySelector('[data-goal-id="1"] .wg-count')?.textContent.includes('9'));
-        assert.equal(db.worklog.tasks.find(t => t.id === 't4').goalId, '1');
+        await goals.waitForSelector('[data-goal-id="t4"]');
+        assert.equal(await text(goals,'[data-goal-id="t4"] .wg-name'),'업무 4');
+        assert.equal(db.worklog.tasks.find(t => t.id === 't4').goalId, 't4');
         const notes = await context.newPage(); await notes.clock.setFixedTime(now);
         await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
         await notes.locator('[data-note-id="n1"]').waitFor();
@@ -225,6 +226,93 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
       } finally { await context.close(); }
     });
 
+    await t.test('worklog goal selection works with no pre-created goals and follows completion, reload and deselection', async () => {
+      const {context,db,originalDb,errors,openAll}=await setup(browser);
+      try {
+        db.goals={week:'',items:[],seq:0,carryHandledWeek:''};
+        db.worklog.tasks.forEach(task=>{task.goalId=null;});
+        const original=structuredClone(originalDb);
+        const [goals,due,week,month]=await openAll();
+        const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+        await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        await writer.locator('[data-goal-task="t0"]').click();
+        await goals.waitForSelector('[data-goal-id="t0"]');
+        assert.equal(await text(goals,'[data-goal-id="t0"] .wg-name'),db.worklog.tasks[0].title);
+        assert.equal(await text(goals,'[data-goal-id="t0"] .wg-count'),'업무 0/1');
+        assert.equal(await writer.locator('[data-goal-task="t0"]').getAttribute('aria-pressed'),'true');
+        if(process.env.TEST_SCREENSHOT_DIR) {
+          await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
+          await goals.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,'selected-task-goal.png'),fullPage:false});
+        }
+        await writer.locator('[data-toggle-task="t0"]').click();
+        await goals.waitForFunction(()=>document.querySelector('[data-goal-id="t0"] .wg-count strong')?.textContent==='1');
+        await due.waitForFunction(()=>!document.querySelector('[data-task-id="t0"]'));
+        await month.waitForFunction(()=>document.querySelectorAll('[data-date="2026-09-29"] .wr-dot').length===4);
+        await writer.reload(); await goals.reload();
+        await writer.locator('[data-goal-task="t0"][aria-pressed="true"]').waitFor();
+        await goals.locator('[data-goal-id="t0"]').waitFor();
+        assert.equal(await text(goals,'[data-goal-id="t0"] .wg-count'),'업무 1/1');
+        await writer.locator('[data-goal-task="t0"]').click();
+        await goals.waitForFunction(()=>document.querySelectorAll('.wg-row').length===0);
+        assert.match(await text(goals,'.wr-message'),/목표가 없/);
+        assert.equal(db.worklog.tasks[0].done,true,'deselecting a goal must not change completion');
+        assert.equal(db.worklog.tasks[0].goalId,null);
+        assert.deepEqual(db.goals.items,[],'no secondary goal save or sample goal');
+        assert.ok(db.writes.every(r=>r.instance===instance && r.path==='/api/worklog/patch'));
+        assert.deepEqual(originalDb,original); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('deadline vertical handles resize only height and persist through reload and live updates', async () => {
+      const {context,db,errors,open,notify}=await setup(browser);
+      try {
+        const page=await open('deadlines');
+        const metrics=()=>page.evaluate(()=>{
+          const frame=document.querySelector('[data-widget-card]').getBoundingClientRect();
+          const card=document.querySelector('.wr-card').getBoundingClientRect();
+          const list=document.querySelector('.wr-content');
+          return {width:frame.width,height:frame.height,cardHeight:card.height,
+            font:getComputedStyle(document.querySelector('.wr-title')).fontSize,
+            scale:document.querySelector('[data-widget-host]').style.getPropertyValue('--widget-content-scale'),
+            scroll:list.scrollHeight,client:list.clientHeight};
+        });
+        const before=await metrics(),handle=page.locator('.widget-height-handle-bottom');
+        assert.equal(await handle.isVisible(),true);
+        await handle.focus(); await handle.press('ArrowDown');
+        await page.waitForFunction(h=>document.querySelector('[data-widget-card]').getBoundingClientRect().height>h+10,before.height);
+        let current=await metrics();
+        assert.equal(current.width,before.width); assert.equal(current.font,before.font); assert.equal(current.scale,before.scale);
+        // The frame styles update before the queued viewport handle positions.
+        await page.waitForFunction(h=>Number(document.querySelector('.widget-height-handle-bottom').getAttribute('aria-valuenow'))===Math.round(h),current.height);
+        const box=await handle.boundingBox();
+        await page.mouse.move(box.x+box.width/2,box.y+box.height/2); await page.mouse.down();
+        assert.equal(await page.locator('body').evaluate(el=>el.classList.contains('is-widget-scaling')),true);
+        await page.mouse.move(box.x+box.width/2,box.y+box.height/2+80,{steps:5}); await page.mouse.up();
+        await page.waitForFunction(h=>document.querySelector('[data-widget-card]').getBoundingClientRect().height>h+60,current.height);
+        const key='widget-size-cream-olive-deadlines-read-v1';
+        const saved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
+        assert.equal(saved.heightLocked,true); assert.equal(saved.contentW,before.width);
+        await page.reload(); await page.locator('.wr-deadline').first().waitFor();
+        current=await metrics(); assert.ok(Math.abs(current.height-saved.frameH)<1);
+        assert.ok(Math.abs(current.height-current.cardHeight-12)<1);
+        const tasks=db.worklog.tasks; db.worklog.tasks=[]; await notify(page);
+        await page.getByText('3일 안에 마감할 업무가 없어요.').waitFor();
+        assert.ok(Math.abs((await metrics()).height-saved.frameH)<1);
+        db.worklog.tasks=tasks; await notify(page); await page.locator('.wr-deadline').first().waitFor();
+        await handle.focus(); for(let i=0;i<30;i++) await handle.press('ArrowUp');
+        current=await metrics(); assert.equal(current.height,160); assert.equal(current.width,before.width);
+        assert.ok(current.scroll>current.client,'short frame scrolls its list without losing rows');
+        assert.ok(Math.abs(current.height-current.cardHeight-12)<1);
+        assert.equal(await page.locator('.wr-deadline').count(),5);
+        if(process.env.TEST_SCREENSHOT_DIR) {
+          await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
+          await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,'deadline-height-handle.png'),fullPage:false});
+        }
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
     await t.test('desktop/iPad/mobile: wrapping, equal weekday heights, dot rows, no overflow, mouse-only tooltip', async () => {
       for (const [label, width, height, touch, screen] of [['desktop',1440,1000,false], ['ipad',768,1024,true], ['mobile',390,844,true], ['small-mobile',320,740,true], ['narrow-desktop',480,900,false], ['ipad-split',480,900,true,{width:768,height:1024}], ['phone-landscape',844,390,true,{width:390,height:844}]]) {
         const { context, db, errors, openAll } = await setup(browser, { viewport:{ width, height }, hasTouch:touch, isMobile:touch, ...(screen ? { screen } : {}) });
@@ -233,6 +321,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           db.goals.items.forEach((g, i) => { g.color = ['#6b7b49','#bd9671','#8298a0','#e4d18b'][i]; });
           const pages = await openAll();
           const [goals, due, week, month] = pages;
+          assert.equal(await due.locator('.widget-height-handle-bottom').isVisible(),!touch,`${label} vertical handle visibility`);
           for (let i = 0; i < pages.length; i++) {
             const page = pages[i];
             const metrics = await page.evaluate(() => {

@@ -1494,7 +1494,9 @@
         const goals = goalsForTask(task);
         const index = goals.findIndex(goal => goal.id === task.goalId);
         const goal = goals[index];
-        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="목표 연결, ${goal ? `${index + 1}: ${escapeHtml(goal.name)}` : '없음'}" aria-disabled="${goals.length === 0}"><span class="goal-dot ${goal ? 'is-linked' : ''}" ${goal ? `style="--goal-color:${escapeHtml(goal.color)}"` : ''}>${goal ? index + 1 : ''}</span></button>`;
+        const selected = task.goalId != null && task.goalId !== '';
+        const label = selected ? '이번 주 목표 선택 해제' : '이번 주 목표로 선택';
+        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="${label}: ${escapeHtml(task.title)}" aria-pressed="${selected}"><span class="goal-dot ${selected ? 'is-linked' : ''}" ${selected ? `style="--goal-color:${escapeHtml(goal?.color || 'var(--action)')}"` : ''}>${selected ? (goal ? index + 1 : '✓') : ''}</span></button>`;
       }
 
       function timeCell(task, field) {
@@ -2299,11 +2301,8 @@
         if (goalControl) {
           const task = taskById(goalControl.dataset.goalTask);
           if (!task || task.mode !== 'work') return;
-          const goals = goalsForTask(task);
-          if (!goals.length) return;
-          const index = goals.findIndex(goal => goal.id === task.goalId);
-          const next = goals[index + 1] || null;
-          if (updateTask(task.id, item => { item.goalId = next?.id || null; }, next ? `목표 ${index + 2}에 연결했습니다.` : '목표 연결을 해제했습니다.')) {
+          const selected = task.goalId != null && task.goalId !== '';
+          if (updateTask(task.id, item => { item.goalId = selected ? null : String(item.id); }, selected ? '이번 주 목표에서 해제했습니다.' : '이번 주 목표로 선택했습니다.')) {
             taskList.querySelector(`[data-goal-task="${CSS.escape(task.id)}"]`)?.focus({ preventScroll:true });
           }
           return;

@@ -3,7 +3,13 @@ html, body { margin:0; background:transparent; }
 body.widget-page.read-widget-page { overflow-x:hidden !important; overflow-y:auto !important; min-height:0; }
 .read-widget-host.widget-host { background:transparent; border-radius:0; box-shadow:none; overflow:visible; }
 .read-widget-frame { box-sizing:border-box; padding:6px; }
-.read-widget-page .widget-height-handle { display:none; }
+.read-widget-page:not(.read-widget-height-resizable) .widget-height-handle { display:none; }
+/* Deadlines use the existing vertical frame handles; only the list scrolls. */
+.read-widget-height-resizable [data-read-widget] { height:100%; min-height:0; }
+.read-widget-height-resizable .wr-card { height:100%; min-height:0; display:flex; flex-direction:column; }
+.read-widget-height-resizable .wr-header, .read-widget-height-resizable .wr-error { flex-shrink:0; }
+.read-widget-height-resizable .wr-content { flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto; }
+.read-widget-height-resizable .wr-content > * { min-height:100%; }
 .read-widget-page .widget-size-label { color:#747963; }
 .read-widget-page .idle, .read-widget-page .idle-owner::after { animation:none !important; display:none !important; }
 .read-loading { font:13px/1.65 sans-serif; color:#747963; padding:14px 16px; }

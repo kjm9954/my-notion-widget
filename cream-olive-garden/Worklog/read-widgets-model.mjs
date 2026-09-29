@@ -46,7 +46,17 @@ export function normalizeSnapshot(worklog, goals) {
     const values = slots.map(i => ordered[i]).sort((a, b) => positions.get(String(a.id)) - positions.get(String(b.id)));
     slots.forEach((slot, i) => { ordered[slot] = values[i]; });
   }
-  return { tasks: ordered, weeklyGoals: normalizeGoals(goals) };
+  const weeklyGoals = normalizeGoals(goals);
+  // Selecting a task as a goal stores its own ID in the existing goalId field.
+  // Derive its name/week from the task, so edits, completion and removal stay in
+  // sync without a second write or the legacy goal editor's five-item limit.
+  for (const task of ordered) {
+    if (task.id == null || !String(task.id) || String(task.goalId ?? '') !== String(task.id) || !isDateKey(task.date)) continue;
+    const id = String(task.id), weekKey = mondayOf(task.date);
+    if (weeklyGoals.some(goal => goal.id === id && goal.weekKey === weekKey)) continue;
+    weeklyGoals.push({ id, name:String(task.title || ''), color:null, weekKey });
+  }
+  return { tasks: ordered, weeklyGoals };
 }
 export function goalForTask(state, task) {
   if (task.goalId == null || !isDateKey(task.date)) return null;

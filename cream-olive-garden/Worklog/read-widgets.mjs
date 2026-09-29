@@ -1,5 +1,5 @@
 import { calendarToday, worklogToday, mondayOf, addDays, normalizeWeek, summarizeGoals,
-  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs';
+  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-height-goals';
 
 const titles = { goals:'이번 주 목표', deadlines:'3일 안 마감', week:'이번 주 한 일', calendar:'월 캘린더' };
 

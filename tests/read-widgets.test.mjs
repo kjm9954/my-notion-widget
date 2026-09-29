@@ -64,6 +64,24 @@ test('오늘~+3일 포함 최대 5건, 완료 뒤 6번째 진입, +4일/지난�
   assert.deepEqual(deadlines(range, today).map(t => t.days), [0,1,2,3]);
 });
 
+test('WORK LOG에서 선택한 업무는 별도 목표 등록 없이 자동 표시되고 선택 해제·수정·완료를 반영한다', () => {
+  const tasks = Array.from({length:7},(_,i)=>task(`selected-${i}`,{goalId:`selected-${i}`,title:i===0?goal.text:`목표 ${i}`}));
+  tasks.push(task('not-selected',{goalId:null}),task('life-selected',{goalId:'life-selected',mode:'life'}));
+  const read=()=>normalizeSnapshot({tasks},{week:'',items:[]});
+  let state=read(), rows=summarizeGoals(state,monday);
+  assert.equal(rows.length,7); assert.equal(rows[0].name,goal.text);
+  assert.deepEqual(rows.map(g=>[g.done,g.total]),Array.from({length:7},()=>[0,1]));
+  assert.equal(goalForTask(state,tasks[0]).id,'selected-0');
+  tasks[0].done=true; tasks[0].title='수정된 업무 제목';
+  rows=summarizeGoals(read(),monday);
+  assert.equal(rows[0].name,'수정된 업무 제목'); assert.equal(rows[0].done,1);
+  tasks[0].goalId=null;
+  assert.equal(summarizeGoals(read(),monday).length,6);
+  tasks[1].date='2026-10-05';
+  assert.equal(summarizeGoals(read(),monday).length,5);
+  assert.equal(summarizeGoals(read(),'2026-10-05').length,1);
+});
+
 test('한 일은 doneAt 대신 date, 하루 8개와 미완료를 모두 유지한다', () => {
   const state = snapshot(Array.from({ length:8 }, (_, i) => task(i, { done:i === 0, doneAt:'2026-10-02' })));
   const days = weekDays(state, monday);

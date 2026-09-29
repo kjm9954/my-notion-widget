@@ -560,7 +560,8 @@
   const defaultListHeight = Number(list?.dataset.widgetListHeight) || list?.offsetHeight || 0;
   const ABSOLUTE_MINIMUM_SCALE = .08;
   const MINIMUM_CONTENT_WIDTH = Math.min(designWidth, Math.max(120, designWidth * .3));
-  const MINIMUM_FRAME_HEIGHT = Math.min(declaredHeight, Math.max(48, declaredHeight * .2));
+  const MINIMUM_FRAME_HEIGHT = Math.max(Number(host.dataset.widgetMinHeight) || 0,
+    Math.min(declaredHeight, Math.max(48, declaredHeight * .2)));
   let savedWidth = designWidth;
   const currentLayoutMode = () => layoutMode(host, savedWidth);
   const isReflow = () => ['reflow','mobile'].includes(currentLayoutMode());
