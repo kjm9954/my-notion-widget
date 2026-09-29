@@ -122,7 +122,8 @@ export function createSource(store) {
       return normalizeSnapshot(worklog, goals);
     },
     subscribe(callback) {
-      return store.watch(callback, store.MIN_WATCH_INTERVAL_MS, { allowWhileEditing: true, initial: false });
+      return store.watch(callback, 120000, { allowWhileEditing: true, initial: false,
+        paths: ['/api/worklog/', '/api/weekly-goals/'] });
     }
   };
 }

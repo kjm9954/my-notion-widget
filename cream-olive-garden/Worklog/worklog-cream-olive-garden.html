@@ -523,7 +523,7 @@
     body.is-worklog-compact .mini-calendar-grid { gap:0; }
     body.is-worklog-compact .mobile-add-form { height:auto; min-height:48px; }
   </style>
-  <script src="../../store.js?v=20260929-isolated-set" data-store-isolated></script>
+  <script src="../../store.js?v=20260929-read-economy" data-store-isolated data-store-coalesce></script>
   <script src="../grass-field-renderer.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
@@ -2630,7 +2630,8 @@
           entranceDone = true;
           window.widgetMotion?.cascade?.(taskList.querySelectorAll('.task-row'));
         }
-        Store.watch(() => syncFromServer(false),1500,{ allowWhileEditing:true });
+        Store.watch(() => syncFromServer(false),120000,{ allowWhileEditing:true, initial:false,
+          paths:['/api/worklog/', '/api/weekly-goals/'] });
       }
 
       bootstrap();

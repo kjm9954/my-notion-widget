@@ -1,7 +1,7 @@
 import { calendarToday, worklogToday, mondayOf, addDays, normalizeWeek, summarizeGoals,
-  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-goal-colors';
+  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-read-economy';
 import { goalNumberAppearance } from './worklog-task-controls.mjs?v=20260929-goal-colors';
-export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-goal-colors';
+export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-read-economy';
 
 const titles = { goals:'이번 주 목표', deadlines:'3일 안 마감', week:'이번 주 한 일', calendar:'월 캘린더' };
 
@@ -182,10 +182,13 @@ export function mount(root, source, now = () => Date.now()) {
         const next = await source.read();
         if (disposed) return;
         state = next; render(); error.hidden = true; root.dataset.status = 'ready';
-      } catch (_) {
+      } catch (failure) {
         if (disposed) return;
-        if (!state) content.replaceChildren(make('p', 'wr-message', '불러오지 못했어요. 연결이 돌아오면 다시 확인할게요.'));
-        error.textContent = state ? '갱신하지 못했어요. 마지막으로 확인한 내용을 표시하고 있어요.' : '데이터 연결을 확인해 주세요.';
+        if (!state) content.replaceChildren(make('p', 'wr-message', failure.dailyLimit
+          ? '오늘의 서버 사용 한도에 도달했어요.' : '불러오지 못했어요. 연결이 돌아오면 다시 확인할게요.'));
+        error.textContent = failure.dailyLimit
+          ? '한국 시간 오전 9시 이후 자동으로 다시 확인합니다.' + (state ? ' 마지막으로 확인한 내용을 표시하고 있어요.' : '')
+          : state ? '갱신하지 못했어요. 마지막으로 확인한 내용을 표시하고 있어요.' : '데이터 연결을 확인해 주세요.';
         error.hidden = false; root.dataset.status = 'error';
       } finally {
         running = null;

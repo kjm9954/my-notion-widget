@@ -2,6 +2,10 @@
 // 위젯은 이 파일의 함수만 부른다. 직접 fetch/localStorage 하지 않는다.
 
 const API = "https://notion-widget.wldnjsdkk.workers.dev";
+// Opt in only for the new suite; legacy widgets keep their polling policy.
+const COALESCE_READS = document.currentScript?.hasAttribute('data-store-coalesce') === true;
+const SHARED_READ_INTERVAL_MS = 120000;
+const GOALS_READ_INTERVAL_MS = 300000;
 // New independent sets opt in. Never inherit or publish a legacy instance key.
 const ISOLATED_INSTANCE = document.currentScript?.hasAttribute('data-store-isolated') === true
   || new URLSearchParams(window.location.search || '').get('isolated') === '1';
@@ -59,6 +63,7 @@ const MIN_WATCH_INTERVAL_MS = 60000;
 const READING_SYNC_INTERVAL_MS = 60000;
 const storeListeners = new Set();
 const memoryCache = new Map();
+const memoryCacheTimes = new Map();
 const inFlightGets = new Map();
 let storeChannel = null;
 let instanceDiscoveryChannel = null;
@@ -92,7 +97,7 @@ function nextWorkerQuotaResetAt(now = Date.now()) {
 
 function createServerBackoffError(until, dailyLimit = false) {
   const error = new Error(dailyLimit
-    ? "서버 요청 한도 초과 · 오전 9시 자동 재시도"
+    ? "서버 하루 사용 한도 초과 · 오전 9시 자동 재시도"
     : "서버 요청이 많아 잠시 후 자동 재시도");
   error.serverBackoff = true;
   error.dailyLimit = dailyLimit;
@@ -102,7 +107,9 @@ function createServerBackoffError(until, dailyLimit = false) {
 
 async function readServerBackoff() {
   if (serverBackoffUntil > Date.now()) return serverBackoffUntil;
-  if (serverBackoffLoaded || !("caches" in window)) return 0;
+  serverBackoffUntil = 0;
+  serverBackoffDaily = false;
+  if (!("caches" in window)) return 0;
   serverBackoffLoaded = true;
   try {
     const response = await (await caches.open(STORE_CACHE)).match(serverBackoffCacheUrl());
@@ -145,6 +152,8 @@ function rememberServerBackoff(until, options = {}) {
 }
 
 function clearServerBackoff(options = {}) {
+  // A successful request already in flight must not cancel another tab's quota pause.
+  if (serverBackoffUntil > Date.now()) return;
   if (!serverBackoffUntil && serverBackoffLoaded) return;
   serverBackoffUntil = 0;
   serverBackoffDaily = false;
@@ -179,8 +188,9 @@ async function parseApiResponse(response) {
 
 function applyServerBackoff(error) {
   const detail = `${error?.message || ""} ${error?.responseText || ""}`;
-  if (error?.status !== 429 && !/\b1027\b/.test(detail)) return false;
-  const dailyLimit = /\b1027\b/.test(detail);
+  const dailyLimit = /\b1027\b/.test(detail)
+    || /D1_ERROR:.*exceeded D1's free tier daily row (?:read|write) limit/i.test(detail);
+  if (error?.status !== 429 && !dailyLimit) return false;
   const until = dailyLimit
     ? nextWorkerQuotaResetAt()
     : Math.max(Number(error?.retryAfter) || 0, Date.now() + MIN_WATCH_INTERVAL_MS);
@@ -287,7 +297,7 @@ function showStoreError(error) {
   if (typeof document === "undefined" || !document.body) return;
   const detail = String(error?.message || error || "");
   const message = error?.dailyLimit
-    ? "서버 요청 한도 초과 · 오전 9시 자동 재시도"
+    ? "서버 하루 사용 한도 초과 · 오전 9시 자동 재시도"
     : error?.serverBackoff
       ? "서버 요청이 많아 잠시 후 자동 재시도"
       : error?.serverUpgradeNeeded || /인스턴스/.test(detail)
@@ -334,13 +344,19 @@ function clearStoreError() {
   document.querySelector("[data-store-error-indicator]")?.remove();
 }
 
-function notifyStoreListeners() {
-  storeListeners.forEach(listener => listener());
+function notifyStoreListeners(change) {
+  storeListeners.forEach(listener => listener(change));
 }
 
 try {
   storeChannel = new BroadcastChannel(STORE_CHANNEL);
-  storeChannel.addEventListener("message", notifyStoreListeners);
+  storeChannel.addEventListener("message", event => {
+    // The shared cache was committed before this notification. Drop stale memory
+    // copies, not shared data; the receiving iframe can render without a GET.
+    memoryCache.clear();
+    memoryCacheTimes.clear();
+    notifyStoreListeners(event?.data);
+  });
 } catch (_) {}
 
 try {
@@ -353,7 +369,7 @@ try {
 } catch (_) {}
 
 function announceChange(path) {
-  notifyStoreListeners();
+  notifyStoreListeners({ type:"changed", path });
   try { storeChannel?.postMessage({ type: "changed", path, at: Date.now() }); } catch (_) {}
 }
 
@@ -361,8 +377,10 @@ function watch(callback, interval = MIN_WATCH_INTERVAL_MS, options = {}) {
   const allowWhileEditing = options?.allowWhileEditing === true;
   let running = false;
   let queued = false;
-  const run = () => {
+  const run = change => {
     if (document.hidden) return;
+    if (serverBackoffUntil > Date.now()) return;
+    if (change?.path && options.paths && !options.paths.some(path => change.path.startsWith(path))) return;
     const active = document.activeElement;
     if (!allowWhileEditing && active && (active.matches("input, textarea, select") || active.isContentEditable)) return;
     if (running) { queued = true; return; }
@@ -373,7 +391,8 @@ function watch(callback, interval = MIN_WATCH_INTERVAL_MS, options = {}) {
     });
   };
   storeListeners.add(run);
-  const timer = setInterval(run, Math.max(MIN_WATCH_INTERVAL_MS, Number(interval) || MIN_WATCH_INTERVAL_MS));
+  const timer = setInterval(run, Math.max(MIN_WATCH_INTERVAL_MS, Number(interval) || MIN_WATCH_INTERVAL_MS,
+    COALESCE_READS ? SHARED_READ_INTERVAL_MS : 0));
   const initialTimer = options?.initial === false ? null : setTimeout(run, 0);
   const onVisible = () => { if (!document.hidden) run(); };
   const onPageHide = event => { if (!event.persisted) stop(); };
@@ -423,19 +442,19 @@ function cloneData(data) {
   return JSON.parse(JSON.stringify(data));
 }
 
-async function readCached(url) {
+async function readCached(url, shared = false) {
   const inMemory = memoryCache.get(url);
-  if (inMemory) {
+  if (inMemory && !shared) {
     const data = parseCached(inMemory);
-    if (data) return { data, serialized: inMemory };
+    if (data) return { data, serialized: inMemory, validatedAt:memoryCacheTimes.get(url) || 0 };
     memoryCache.delete(url);
   }
 
-  if (!("caches" in window)) return null;
+  if (!("caches" in window)) return shared ? readCached(url) : null;
   try {
     const cache = await caches.open(STORE_CACHE);
     const response = await cache.match(url);
-    if (!response) return null;
+    if (!response) return inMemory ? { data:parseCached(inMemory), serialized:inMemory, validatedAt:memoryCacheTimes.get(url) || 0 } : null;
     const serialized = await response.text();
     const data = parseCached(serialized);
     if (!data) {
@@ -443,17 +462,20 @@ async function readCached(url) {
       return null;
     }
     memoryCache.set(url, serialized);
-    return { data, serialized };
+    const validatedAt = Number(response.headers.get("X-Store-Validated-At")) || 0;
+    memoryCacheTimes.set(url, validatedAt);
+    return { data, serialized, validatedAt };
   } catch (_) {
-    return null;
+    return inMemory ? { data:parseCached(inMemory), serialized:inMemory, validatedAt:memoryCacheTimes.get(url) || 0 } : null;
   }
 }
 
-function writeCached(url, data, serialized = JSON.stringify(data)) {
+async function writeCached(url, data, serialized = JSON.stringify(data), validatedAt = Date.now()) {
   memoryCache.set(url, serialized);
+  memoryCacheTimes.set(url, validatedAt);
   if (!("caches" in window)) return;
-  void caches.open(STORE_CACHE).then(cache => cache.put(url, new Response(serialized, {
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+  await caches.open(STORE_CACHE).then(cache => cache.put(url, new Response(serialized, {
+    headers: { "Content-Type": "application/json; charset=utf-8", "X-Store-Validated-At":String(validatedAt) },
   }))).catch(() => {});
 }
 
@@ -472,6 +494,7 @@ function comparablePayload(path, serialized) {
 
 async function deleteCachedUrl(url) {
   memoryCache.delete(url);
+  memoryCacheTimes.delete(url);
   inFlightGets.delete(url);
   if (!("caches" in window)) return;
   try { await (await caches.open(STORE_CACHE)).delete(url); } catch (_) {}
@@ -481,30 +504,94 @@ function invalidateApiGet(path) {
   return deleteCachedUrl(apiUrl(path));
 }
 
+function sharedReadAge(path) {
+  if (!COALESCE_READS) return 0;
+  if (path === "/api/weekly-goals/state") return GOALS_READ_INTERVAL_MS;
+  return ["/api/worklog/state", "/api/notes/state"].includes(path) ? SHARED_READ_INTERVAL_MS : 0;
+}
+
+function withReadLock(url, callback) {
+  const locks = window.navigator?.locks;
+  if (!locks) return callback();
+  let entered = false;
+  return locks.request(`notion-widget-read:${url}`, () => { entered = true; return callback(); }).catch(error => {
+    // Some embedded/private contexts expose the API but deny access. Never retry
+    // a failed callback (especially a POST); only fall back before it has started.
+    if (!entered && ["SecurityError", "NotAllowedError", "InvalidStateError"].includes(error?.name)) return callback();
+    throw error;
+  });
+}
+
+function isRecentCache(path, cached) {
+  const age = Date.now() - (cached?.validatedAt || 0);
+  const offset = path === "/api/worklog/state" ? 6 * 60 * 60 * 1000 : 0;
+  return cached?.data?.cached !== true && cached?.validatedAt > 0 && age >= 0 && age < sharedReadAge(path)
+    && todayStr(new Date(cached.validatedAt - offset)) === todayStr(new Date(Date.now() - offset));
+}
+
+async function fetchSharedRead(url) {
+  // A stalled read must release the lock so a later retry/write can proceed.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try { return await parseApiResponse(await fetch(url, { cache:"no-store", signal:controller.signal })); }
+  finally { clearTimeout(timer); }
+}
+
+async function assertServerAvailable() {
+  const until = await readServerBackoff();
+  if (until > Date.now()) {
+    const error = createServerBackoffError(until, serverBackoffDaily);
+    error.silent = true;
+    throw error;
+  }
+}
+
+function rejectQuotaSnapshot(cached) {
+  if (!cached) return;
+  const until = nextWorkerQuotaResetAt();
+  rememberServerBackoff(until, { dailyLimit:true });
+  throw createServerBackoffError(until, true);
+}
+
 function requestFresh(path, url, cachedPromise, options = {}) {
   if (inFlightGets.has(url)) return inFlightGets.get(url);
 
-  const request = readServerBackoff().then(until => {
-    if (until > Date.now()) {
-      const error = createServerBackoffError(until, serverBackoffDaily);
-      error.silent = true;
+  const perform = async () => {
+    try {
+      await assertServerAvailable();
+      const shared = sharedReadAge(path) > 0;
+      const read = address => shared ? fetchSharedRead(address) : fetch(address, { cache:"no-store" }).then(parseApiResponse);
+      const cached = shared ? await readCached(url, true) : await cachedPromise;
+      if (shared && isRecentCache(path, cached)) return cached.data;
+      let data;
+      // Reuse the existing revision endpoint: unchanged tasks need no full scan.
+      if (shared && path === "/api/worklog/state" && cached?.data?.cached !== true && cached?.data?.data?.lastRollDay) {
+        const revisionUrl = new URL(url);
+        revisionUrl.pathname = "/api/worklog/revision";
+        const revision = (await read(revisionUrl.toString())).data;
+        rejectQuotaSnapshot(revision?.cached === true);
+        const state = cached.data.data;
+        if (Number(revision?.revision) === Number(state.revision) && revision?.day === state.lastRollDay) data = cached.data;
+      }
+      if (!data) data = await read(url);
+      if (shared && path === "/api/worklog/state") rejectQuotaSnapshot(data.cached === true);
+      const serialized = JSON.stringify(data);
+      const changed = Boolean(cached && comparablePayload(path, cached.serialized) !== comparablePayload(path, serialized));
+      await writeCached(url, data, serialized);
+      clearServerBackoff();
+      clearStoreError();
+      if (changed) announceChange(path);
+      return data;
+    } catch (error) {
+      // Publish the pause before releasing the cross-widget lock.
+      if (!error?.silent) applyServerBackoff(error);
       throw error;
     }
-    return fetch(url, { cache: "no-store" });
-  }).then(parseApiResponse).then(async data => {
-    const serialized = JSON.stringify(data);
-    const cached = await cachedPromise;
-    const changed = Boolean(cached && comparablePayload(path, cached.serialized) !== comparablePayload(path, serialized));
-    writeCached(url, data, serialized);
-    clearServerBackoff();
-    clearStoreError();
-    if (changed) announceChange(path);
-    return data;
-  }).catch(async error => {
-    if (!error?.silent) {
-      applyServerBackoff(error);
+  };
+  const request = Promise.resolve().then(() => sharedReadAge(path) ? withReadLock(url, perform) : perform()).catch(async error => {
+    if (!error?.silent || error.dailyLimit) {
       const cached = await cachedPromise;
-      if (!cached && options.reportError !== false) showStoreError(error);
+      if ((!cached || error.dailyLimit) && options.reportError !== false) showStoreError(error);
     }
     throw error;
   }).finally(() => {
@@ -538,37 +625,48 @@ async function apiGetFresh(path, instanceId = WIDGET_INSTANCE_ID, options = {}) 
 }
 async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
   const url = apiUrl(path, includeInstance, instanceId);
-  try {
-    const until = await readServerBackoff();
-    if (until > Date.now()) {
-      throw createServerBackoffError(until, serverBackoffDaily);
+  const statePath = path.startsWith("/api/worklog/") ? "/api/worklog/state"
+    : path.startsWith("/api/notes/") ? "/api/notes/state"
+      : path === "/api/weekly-goals/state" ? path : null;
+  const stateUrl = statePath ? apiUrl(statePath, includeInstance, instanceId) : null;
+  const perform = async () => {
+    try {
+      const until = await readServerBackoff();
+      if (until > Date.now()) {
+        throw createServerBackoffError(until, serverBackoffDaily);
+      }
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await parseApiResponse(res);
+      clearServerBackoff();
+      if (stateUrl) {
+        if (data.data !== undefined) await writeCached(stateUrl, data);
+        else await deleteCachedUrl(stateUrl);
+      } else if (path.endsWith("/state") && data.data !== undefined) await writeCached(url, data);
+      if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
+        await Promise.all([
+          invalidateApiGet("/api/reading/library"),
+          invalidateApiGet("/api/reading/library?fresh=1"),
+        ]);
+      }
+      clearStoreError();
+      return data;
+    } catch (error) {
+      if (path === "/api/notes/patch" && error.status === 200 && /notion-widget API 서버/.test(error.responseText || "")) {
+        error.serverUpgradeNeeded = true;
+        error.message = "메모 저장 기능을 사용하려면 서버 업데이트가 필요합니다.";
+      }
+      applyServerBackoff(error);
+      showStoreError(error);
+      throw error;
     }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await parseApiResponse(res);
-    clearServerBackoff();
-    if (path.endsWith("/state") && data.data !== undefined) writeCached(url, data);
-    if (path.startsWith("/api/reading/") && path !== "/api/reading/library") {
-      await Promise.all([
-        invalidateApiGet("/api/reading/library"),
-        invalidateApiGet("/api/reading/library?fresh=1"),
-      ]);
-    }
-    clearStoreError();
-    announceChange(path);
-    return data;
-  } catch (error) {
-    if (path === "/api/notes/patch" && error.status === 200 && /notion-widget API 서버/.test(error.responseText || "")) {
-      error.serverUpgradeNeeded = true;
-      error.message = "메모 저장 기능을 사용하려면 서버 업데이트가 필요합니다.";
-    }
-    applyServerBackoff(error);
-    showStoreError(error);
-    throw error;
-  }
+  };
+  const data = await (stateUrl ? withReadLock(stateUrl, perform) : perform());
+  announceChange(path);
+  return data;
 }
 
 async function createWidgetInstance() {
@@ -763,7 +861,7 @@ async function resolveWorklogInstanceId() {
 async function loadWorklogState(options = {}) {
   const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
   const statePath = "/api/worklog/state";
-  if (options?.fresh === true) return (await apiGetFresh(statePath, instanceId)).data;
+  if (options?.fresh === true || COALESCE_READS) return (await apiGetFresh(statePath, instanceId)).data;
 
   const stateUrl = apiUrl(statePath, true, instanceId);
   const cached = await readCached(stateUrl);
@@ -789,7 +887,6 @@ async function saveWorklogState(state) {
 async function patchWorklogState(patch) {
   const instanceId = WIDGET_INSTANCE_ID || await resolveWorklogInstanceId();
   const data = (await apiPost("/api/worklog/patch", patch, true, instanceId)).data;
-  writeCached(apiUrl("/api/worklog/state", true, instanceId), { ok: true, data });
   return data;
 }
 async function saveWorklogView(view) {
@@ -813,7 +910,7 @@ async function saveImportantCalendarState(state) {
 async function loadWeeklyGoalsState(options = {}) {
   // Read views need a confirmed response: a cached empty list must not hide an outage.
   // opt-in only; existing goal editors retain their cache/instance behavior.
-  if (options?.fresh === true) {
+  if (options?.fresh === true || COALESCE_READS) {
     const instanceId = options.worklogInstance === true
       ? WIDGET_INSTANCE_ID || await resolveWorklogInstanceId() : WIDGET_INSTANCE_ID;
     return (await apiGetFresh("/api/weekly-goals/state", instanceId)).data;
@@ -826,6 +923,7 @@ async function saveWeeklyGoalsState(state) {
 
 // ───────── 메모장 ─────────
 async function loadNotesState() {
+  if (COALESCE_READS) return (await apiGetFresh("/api/notes/state")).data;
   return (await apiGet("/api/notes/state")).data;
 }
 async function saveNotesState(state) {
@@ -833,7 +931,6 @@ async function saveNotesState(state) {
 }
 async function patchNotesState(patch) {
   const data = (await apiPost("/api/notes/patch", patch)).data;
-  writeCached(apiUrl("/api/notes/state"), { ok: true, data });
   return data;
 }
 

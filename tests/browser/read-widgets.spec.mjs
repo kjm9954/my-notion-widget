@@ -53,6 +53,8 @@ async function setup(browser, options = {}) {
       if (req.method() === 'OPTIONS') return route.fulfill({ status:204, headers });
       if (![instance,originalInstance].includes(entry.instance)) return route.fulfill({status:404,headers,json:{ok:false,error:'unknown fixture instance'}});
       const targetDb = entry.instance === instance ? db : originalDb;
+      if (db.fail === 'd1') return route.fulfill({ status:500, headers, json:{ok:false,
+        error:"Error: D1_ERROR: Your account has exceeded D1's free tier daily row read limit."} });
       if (db.fail === url.pathname || db.fail === 'all') return route.fulfill({ status:503, headers, json:{ ok:false, error:'isolated offline test' } });
       let data;
       if (req.method() === 'POST') {
@@ -103,6 +105,10 @@ async function setup(browser, options = {}) {
     return page;
   }
   async function notify(page) {
+    // Simulate a committed change from another device after the bounded cache
+    // freshness window. Same-browser writes are tested through the actual editors.
+    db.worklog.revision++;
+    await page.clock.setFixedTime(new Date(await page.evaluate(() => Date.now()) + 360001));
     await page.evaluate(() => { window.dispatchEvent(new Event('focus')); });
   }
   async function openAll() {
@@ -134,9 +140,63 @@ async function expectPretendard(page, selector) {
   } finally {await session.detach();}
 }
 
-test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
+test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
   const browser = await chromium.launch({ headless:true, ...(process.env.TEST_BROWSER_CHANNEL ? { channel:process.env.TEST_BROWSER_CHANNEL } : {}) });
   try {
+    await t.test('shared reads collapse focus bursts, reuse successful writes and poll only revision while unchanged',async()=>{
+      const {context,db,errors,openAll}=await setup(browser);
+      try {
+        const pages=await openAll();
+        const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+        await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        await writer.locator('[data-toggle-task="t0"]').waitFor();
+        const reads=()=>db.requests.filter(r=>r.method==='GET');
+        assert.equal(reads().filter(r=>r.path==='/api/worklog/state').length,1);
+        assert.equal(reads().filter(r=>r.path==='/api/weekly-goals/state').length,1);
+        for(const page of pages) await page.evaluate(()=>{for(let i=0;i<8;i++)window.dispatchEvent(new Event('focus'));});
+        await writer.locator('[data-toggle-task="t0"]').click();
+        await pages[2].waitForFunction(()=>document.querySelector('[data-date="2026-09-29"] .wr-day-count')?.textContent==='1 / 8');
+        await pages[1].waitForFunction(()=>!document.querySelector('[data-task-id="t0"]'));
+        assert.equal(reads().length,2,'no GET after the successful edit/focus bursts');
+        const notes=await context.newPage(); await notes.clock.setFixedTime(now);
+        await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
+        await notes.locator('[data-note-id="n1"]').waitFor();
+        await notes.locator('[data-note-id="old-done"]').waitFor({state:'detached'});
+        assert.equal(reads().filter(r=>r.path.includes('worklog')||r.path.includes('weekly-goals')).length,2,'notes cleanup must not refetch tasks/goals');
+        for(const page of [...pages,writer]) await page.clock.setFixedTime(new Date(now.getTime()+121000));
+        for(const page of pages) await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        await pages[0].waitForFunction(()=>document.querySelector('[data-read-widget]').getAttribute('aria-busy')==='false');
+        assert.equal(reads().filter(r=>r.path==='/api/worklog/revision').length,1);
+        assert.equal(reads().filter(r=>r.path==='/api/worklog/state').length,1);
+        assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('D1 HTTP 500 pauses all six widgets and reloads until reset without misreporting empty data',async()=>{
+      const {context,db,errors,openAll}=await setup(browser);
+      try {
+        const pages=await openAll(); db.fail='d1';
+        for(const page of pages) await page.clock.setFixedTime(new Date(now.getTime()+360001));
+        for(const page of pages) await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        await pages[0].waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='error');
+        assert.match(await text(pages[0],'.wr-error'),/오전 9시/);
+        const count=db.requests.length;
+        for(const page of pages) {
+          await page.reload();
+          await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='error');
+          assert.match(await text(page,'.wr-message'),/한도/);
+        }
+        for(const file of ['worklog-cream-olive-garden','notes']) {
+          const page=await context.newPage(); await page.clock.setFixedTime(new Date(now.getTime()+360001));
+          await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+          await page.waitForFunction(()=>!!window.Store);
+          await page.evaluate(async()=>{await Store.loadWorklogState({fresh:true}).catch(()=>{});window.dispatchEvent(new Event('focus'));});
+        }
+        assert.equal(db.requests.length,count,'reloads/focuses/new documents cannot hammer an exhausted account');
+        assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
     await t.test('all six widgets render bundled Pretendard glyphs, controls and tooltips with external font hosts blocked',async()=>{
       for(const [width,height,touch] of [[1440,1000,false],[768,1024,true],[390,844,true]]) {
         const {context,db,errors,openAll}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
@@ -723,6 +783,8 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         assert.equal(await due.locator('[data-task-id="t7"]').count(),0);
         db.worklog.tasks[0].done=true; db.worklog.tasks[3].done=true;
         const week=await open('week-review');
+        await notify(week);
+        await week.waitForFunction(()=>document.querySelector('[data-date="2026-09-29"] .wr-day-count')?.textContent==='3 / 8');
         assert.deepEqual(await ids(week,'[data-date="2026-09-29"] .wr-task'),['t1','t3','t0','t2','t5','t4','t6','t7']);
         assert.equal(await week.locator('.is-first-open').count(),1);
         assert.equal(await week.locator('.is-first-open').getAttribute('data-task-id'),'t2');

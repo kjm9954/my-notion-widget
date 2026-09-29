@@ -172,7 +172,7 @@ test('실제 두 Store read와 공통 watch만 사용하고 실패를 빈 상태
   };
   const source = createSource(store);
   assert.deepEqual(await source.read(), { tasks:[], weeklyGoals:[] }); source.subscribe(() => {});
-  assert.deepEqual(calls, [['tasks', { fresh:true }], ['goals', { fresh:true, worklogInstance:true }], ['watch', 60000, { allowWhileEditing:true, initial:false }]]);
+  assert.deepEqual(calls, [['tasks', { fresh:true }], ['goals', { fresh:true, worklogInstance:true }], ['watch', 120000, { allowWhileEditing:true, initial:false, paths:['/api/worklog/', '/api/weekly-goals/'] }]]);
   store.loadWeeklyGoalsState = async () => { throw new Error('offline'); };
   await assert.rejects(source.read(), /offline/);
   assert.throws(() => normalizeSnapshot({}, { items:[] }));

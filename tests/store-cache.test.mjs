@@ -32,15 +32,21 @@ function deferred() {
 
 function createStore(fetchImpl, persisted = new Map(), options = {}) {
   const intervalCallbacks = [];
+  const intervalDurations = [];
+  const windowEvents = new Map();
   const instanceStorage = options.instanceStorage || new Map();
   const cacheApi = {
     async open() {
       return {
         async match(url) {
-          return persisted.has(String(url)) ? new Response(persisted.get(String(url))) : undefined;
+          const entry = persisted.get(String(url));
+          return entry === undefined ? undefined : typeof entry === 'string'
+            ? new Response(entry) : new Response(entry.body, { headers:entry.headers });
         },
         async put(url, response) {
-          persisted.set(String(url), await response.text());
+          const body = await response.text();
+          persisted.set(String(url), response.headers.has('X-Store-Validated-At')
+            ? { body, headers:Object.fromEntries(response.headers) } : body);
         },
         async delete(url) {
           return persisted.delete(String(url));
@@ -62,11 +68,15 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
       removeItem(key) { instanceStorage.delete(key); },
     },
     caches: cacheApi,
-    addEventListener() {},
-    removeEventListener() {},
+    navigator: { locks:options.locks },
+    addEventListener(type, callback) {
+      if (!windowEvents.has(type)) windowEvents.set(type, new Set());
+      windowEvents.get(type).add(callback);
+    },
+    removeEventListener(type, callback) { windowEvents.get(type)?.delete(callback); },
   };
   const document = options.document || {
-    currentScript: { hasAttribute:name => options.isolated === true && name === 'data-store-isolated' },
+    currentScript: { hasAttribute:name => (options.isolated === true && name === 'data-store-isolated') || (options.coalesce === true && name === 'data-store-coalesce') },
     referrer: "https://www.notion.so/work-log-page",
     hidden: false,
     activeElement: null,
@@ -85,15 +95,23 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
     URL,
     URLSearchParams,
     Response,
+    AbortController,
     structuredClone,
     fetch: fetchImpl,
-    setInterval: callback => { intervalCallbacks.push(callback); return intervalCallbacks.length; },
+    setInterval: (callback, duration) => { intervalCallbacks.push(callback); intervalDurations.push(duration); return intervalCallbacks.length; },
     clearInterval() {},
     setTimeout,
     clearTimeout,
   };
+  if (options.now) context.Date = class extends Date {
+    constructor(...args) { super(...(args.length ? args : [options.now()])); }
+    static now() { return options.now(); }
+  };
+  if (options.noCache) delete window.caches;
   vm.runInNewContext(source, context);
   window.Store.__runIntervals = () => intervalCallbacks.forEach(callback => callback());
+  window.Store.__intervalDurations = intervalDurations;
+  window.Store.__event = type => windowEvents.get(type)?.forEach(callback => callback({ type }));
   return window.Store;
 }
 
@@ -374,4 +392,174 @@ test("무료 요청 한도 초과 뒤에는 다음 초기화 전까지 서버를
 
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal([...persisted.keys()].some(key => key.endsWith("/__notion-widget-server-backoff-v1__")), true);
+});
+
+function sharedLocks() {
+  const tails = new Map();
+  return { request(name, callback) {
+    const run = (tails.get(name) || Promise.resolve()).then(callback);
+    tails.set(name, run.catch(() => {}));
+    return run;
+  } };
+}
+function sharedChannels() {
+  const channels = new Map();
+  return class {
+    constructor(name) {
+      this.name = name;
+      if (!channels.has(name)) channels.set(name, new Set());
+      channels.get(name).add(this);
+    }
+    addEventListener(_, callback) { this.callback = callback; }
+    postMessage(data) { for (const peer of channels.get(this.name)) if (peer !== this) peer.callback?.({ data }); }
+  };
+}
+const settle = () => new Promise(resolve => setTimeout(resolve, 20));
+const fixtureDay = '2026-09-29';
+const fixtureTime = Date.parse('2026-09-29T12:00:00+09:00');
+
+test('다섯 위젯의 업무/목표 동시 조회를 각각 한 번으로 합치고 변경 없으면 revision만 읽는다', async () => {
+  const persisted = new Map(), locks = sharedLocks(), BroadcastChannel = sharedChannels();
+  let now = fixtureTime, revision = 1;
+  const paths = [];
+  const fetch = async url => {
+    const path = new URL(url).pathname; paths.push(path);
+    return Response.json({ ok:true, data:path.endsWith('/revision') ? {revision,day:fixtureDay}
+      : path.includes('weekly-goals') ? {week:fixtureDay,items:[]}
+        : {revision,lastRollDay:fixtureDay,tasks:[{id:'task',done:revision>1}]} });
+  };
+  const readers = Array.from({length:5}, () => createStore(fetch, persisted,
+    {coalesce:true,isolated:true,locks,BroadcastChannel,now:()=>now}));
+  const load = () => Promise.all(readers.map(store => Promise.all([
+    store.loadWorklogState({fresh:true}), store.loadWeeklyGoalsState({fresh:true})
+  ])));
+  await load(); assert.equal(paths.length,2);
+  await load(); assert.equal(paths.length,2,'focus/reload bursts reuse confirmed data');
+  now += 120001;
+  await load(); assert.equal(paths.length,3); assert.equal(paths.at(-1),'/api/worklog/revision');
+  now += 120001; revision++;
+  const changed = await load();
+  assert.equal(paths.length,5); assert.ok(changed.every(([state])=>state.tasks[0].done));
+  now += 120001;
+  await load(); assert.equal(paths.length,7,'one revision plus one goals refresh, not five full reads');
+});
+
+test('저장 응답을 공유한 다음 알리므로 완료/목표 수정은 추가 GET 없이 즉시 반영된다', async () => {
+  const persisted = new Map(), locks = sharedLocks(), BroadcastChannel = sharedChannels();
+  const options = {coalesce:true,isolated:true,locks,BroadcastChannel,now:()=>fixtureTime};
+  let state = {revision:1,lastRollDay:fixtureDay,tasks:[{id:'task',done:false}]}, gets=0;
+  const fetch = async (_, request) => {
+    if (request?.method === 'POST') state = {...state,revision:2,tasks:[{id:'task',done:true,goalId:'worklog:goal:2'}]};
+    else gets++;
+    return Response.json({ok:true,data:state});
+  };
+  const writer=createStore(fetch,persisted,options), reader=createStore(fetch,persisted,options);
+  await reader.loadWorklogState({fresh:true});
+  let observed;
+  const stop=reader.watch(async()=>{observed=await reader.loadWorklogState({fresh:true});},120000,
+    {initial:false,paths:['/api/worklog/']});
+  await writer.patchWorklogState({upserts:[{id:'task',done:true}]}); await settle(); stop();
+  assert.equal(observed.tasks[0].done,true); assert.equal(observed.tasks[0].goalId,'worklog:goal:2');
+  assert.equal(gets,1);
+});
+
+test('같은 잠금 안에서 늦은 GET과 저장을 순서대로 처리해 저장 결과를 옛 조회가 덮지 않는다', async () => {
+  const response=deferred(), persisted=new Map(), locks=sharedLocks();
+  const options={coalesce:true,isolated:true,locks,now:()=>fixtureTime};
+  let posts=0;
+  const fetch=async(_,request)=>{
+    if(request?.method==='POST'){posts++;return Response.json({ok:true,data:{revision:2,tasks:[{done:true}]}});}
+    return response.promise;
+  };
+  const reader=createStore(fetch,persisted,options),writer=createStore(fetch,persisted,options);
+  const read=reader.loadWorklogState({fresh:true}); await settle();
+  const write=writer.patchWorklogState({upserts:[]}); await settle(); assert.equal(posts,0);
+  response.resolve(Response.json({ok:true,data:{revision:1,tasks:[{done:false}]}}));
+  await Promise.all([read,write]);
+  assert.equal((await reader.loadWorklogState({fresh:true})).revision,2);
+});
+
+test('HTTP 500 D1 읽기/쓰기 한도도 다른 위젯·새 문서까지 공유해 오전 9시 이후에만 재시도한다', async () => {
+  for(const operation of ['read','write']) {
+    const persisted=new Map(),locks=sharedLocks(),BroadcastChannel=sharedChannels();
+    let now=fixtureTime, requests=0, failing=true;
+    const fetch=async()=>{
+      requests++;
+      return failing ? Response.json({ok:false,error:`Error: D1_ERROR: Your account has exceeded D1's free tier daily row ${operation} limit.`},{status:500})
+        : Response.json({ok:true,data:{revision:2,tasks:[]}});
+    };
+    const options={coalesce:true,isolated:true,locks,BroadcastChannel,now:()=>now};
+    const stores=Array.from({length:4},()=>createStore(fetch,persisted,options));
+    const results=await Promise.allSettled(stores.map(store=>store.loadWorklogState({fresh:true})));
+    assert.ok(results.every(result=>result.status==='rejected'&&result.reason.dailyLimit));
+    assert.equal(requests,1); await settle();
+    const next=createStore(fetch,persisted,options);
+    await assert.rejects(next.loadWorklogState({fresh:true}),/오전 9시/);
+    await assert.rejects(next.patchWorklogState({upserts:[]}),/오전 9시/);
+    assert.equal(requests,1);
+    now=Date.parse('2026-09-30T09:00:06+09:00'); failing=false;
+    assert.equal((await next.loadWorklogState({fresh:true})).revision,2); assert.equal(requests,2);
+  }
+});
+
+test('서버 quota 대체 스냅샷을 최신 성공 자료로 간주하거나 대기 해제하지 않는다', async () => {
+  let now=fixtureTime, fallback=false, calls=0;
+  const store=createStore(async url=>{
+    calls++;
+    return Response.json({ok:true,data:new URL(url).pathname.endsWith('/revision')
+      ? {revision:1,day:fixtureDay,cached:fallback}
+      : {revision:1,lastRollDay:fixtureDay,tasks:[]}});
+  },new Map(),{coalesce:true,now:()=>now});
+  await store.loadWorklogState({fresh:true}); now+=120001; fallback=true;
+  await assert.rejects(store.loadWorklogState({fresh:true}),error=>error.dailyLimit===true);
+  await assert.rejects(store.loadWorklogState({fresh:true}),/오전 9시/); assert.equal(calls,2);
+});
+
+test('공유 캐시는 키별로 격리되고 Web Locks/Cache Storage가 없어도 정상 읽기와 저장을 유지한다', async () => {
+  for(const noCache of [false,true]) {
+    const persisted=new Map(); let requests=0;
+    const fetch=async url=>{requests++;return Response.json({ok:true,data:{tasks:[],key:new URL(url).searchParams.get('w')}});};
+    const options={coalesce:true,isolated:true,noCache,now:()=>fixtureTime};
+    const a=createStore(fetch,persisted,options);
+    const b=createStore(fetch,persisted,{...options,search:'?w=w_different_abcdefghijklmnopqrstuvwx'});
+    assert.notEqual((await a.loadWorklogState()).key,(await b.loadWorklogState()).key);
+    await a.loadWorklogState(); assert.equal(requests,2);
+    await a.patchWorklogState({upserts:[]}); assert.equal(requests,3);
+  }
+});
+
+test('유효기간 이후 연결 실패는 빈 상태/성공으로 숨기지 않고 한국 오전 6시에 다시 확인한다', async () => {
+  let now=Date.parse('2026-09-30T05:59:50+09:00'), fail=false, calls=0;
+  const store=createStore(async()=>{
+    calls++; if(fail)throw new Error('offline');
+    return Response.json({ok:true,data:{revision:1,lastRollDay:fixtureDay,tasks:[]}});
+  },new Map(),{coalesce:true,now:()=>now});
+  await store.loadWorklogState({fresh:true}); fail=true; now+=20000;
+  await assert.rejects(store.loadWorklogState({fresh:true}),/offline/); assert.equal(calls,2);
+});
+
+test('새 위젯 감시는 2분 주기이며 메모 변경으로 업무/목표를 다시 조회하지 않는다', async () => {
+  const BroadcastChannel=sharedChannels(),persisted=new Map();
+  const options={coalesce:true,BroadcastChannel};
+  const writer=createStore(async()=>Response.json({ok:true,data:{items:[]}}),persisted,options);
+  const reader=createStore(async()=>Response.json({ok:true,data:{}}),persisted,options);
+  let reads=0;
+  const stop=reader.watch(()=>{reads++;},1500,{initial:false,paths:['/api/worklog/','/api/weekly-goals/']});
+  await writer.patchNotesState({updates:[]}); await settle(); assert.equal(reads,0);
+  reader.__event('focus'); await settle(); assert.equal(reads,1);
+  assert.deepEqual(reader.__intervalDurations,[120000]); stop();
+});
+
+test('임베드가 Web Locks 접근을 거절하면 안전하게 조회하며 실패한 저장 자체를 재전송하지 않는다', async () => {
+  const denied=Object.assign(new Error('embedded policy'),{name:'SecurityError'});
+  let gets=0,posts=0;
+  const fetch=async(_,options)=>{
+    if(options?.method==='POST'){posts++;throw denied;}
+    gets++;return Response.json({ok:true,data:{tasks:[]}});
+  };
+  const store=createStore(fetch,new Map(),{coalesce:true,locks:{request:async()=>{throw denied;}}});
+  await store.loadWorklogState({fresh:true}); assert.equal(gets,1);
+  await assert.rejects(store.patchWorklogState({upserts:[]}),/embedded policy/); assert.equal(posts,1);
+  const permitted=createStore(fetch,new Map(),{coalesce:true,locks:sharedLocks()});
+  await assert.rejects(permitted.patchWorklogState({upserts:[]}),/embedded policy/); assert.equal(posts,2);
 });

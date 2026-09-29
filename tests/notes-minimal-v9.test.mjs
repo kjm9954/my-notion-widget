@@ -6,7 +6,7 @@ const html = readFileSync(new URL('../cream-olive-garden/Worklog/notes.html', im
 const css = readFileSync(new URL('../cream-olive-garden/notes-theme.css', import.meta.url), 'utf8');
 
 test('v9 notes keeps the Store, instance path and editing safeguards', () => {
-  assert.match(html, /src="\.\.\/\.\.\/store\.js\?v=20260929-isolated-set"/);
+  assert.match(html, /src="\.\.\/\.\.\/store\.js\?v=20260929-read-economy" data-store-isolated data-store-coalesce/);
   for (const feature of ['Store.loadNotesState()', 'Store.patchNotesState(pendingWrites[0])', 'saveQueue.then(', 'Store.watch(syncFromServer', 'event.isComposing', 'event.keyCode === 229', 'localRevision', 'pendingSync', 'notesArea.inert']) {
     assert.ok(html.includes(feature), feature);
   }
