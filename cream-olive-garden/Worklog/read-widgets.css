@@ -22,10 +22,10 @@ body.widget-page.read-widget-page { overflow-x:hidden !important; overflow-y:aut
 .read-widget-height-resizable .wr-content > * { min-height:100%; }
 .read-widget-page .widget-size-label { color:var(--wr-muted); }
 .read-widget-page .idle, .read-widget-page .idle-owner::after { animation:none !important; display:none !important; }
-.read-loading { font:13px/1.65 sans-serif; color:var(--wr-muted); padding:14px 16px; }
+.read-loading { font:13px/1.65 var(--widget-font-family); color:var(--wr-muted); padding:14px 16px; }
 [data-read-widget] {
   width:100%; min-width:0; position:relative; color:var(--wr-ink); background:transparent; color-scheme:light;
-  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-family:var(--widget-font-family);
   font-size:13px; line-height:1.65; -webkit-font-smoothing:antialiased; container:wr-widget / inline-size;
 }
 [data-read-widget] * { box-sizing:border-box; }
@@ -43,7 +43,7 @@ body.widget-page.read-widget-page { overflow-x:hidden !important; overflow-y:aut
 [data-read-widget] .wr-dot { display:inline-block; flex:0 0 8px; width:8px; height:8px; border-radius:50%; background:var(--dot-color); }
 [data-read-widget] .wr-dot.is-empty { background:transparent; border:1.5px solid var(--wr-complete); }
 [data-read-widget] .wr-ellipsis { display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.wr-tooltip { position:fixed; z-index:100; box-sizing:border-box; padding:8px 10px; border:1px solid var(--wr-window-border); border-radius:10px; background:var(--wr-surface); color:var(--wr-ink); font:600 12px/1.6 "Pretendard Variable",sans-serif; box-shadow:0 6px 18px #45472F1F; pointer-events:none; white-space:normal; overflow-wrap:anywhere; }
+.wr-tooltip { position:fixed; z-index:100; box-sizing:border-box; padding:8px 10px; border:1px solid var(--wr-window-border); border-radius:10px; background:var(--wr-surface); color:var(--wr-ink); font:600 12px/1.6 var(--widget-font-family); box-shadow:0 6px 18px #45472F1F; pointer-events:none; white-space:normal; overflow-wrap:anywhere; }
 .wr-tooltip[hidden] { display:none; }
 [data-read-widget] .wr-today-tag { display:inline-block; margin-left:5px; padding:1px 6px; border-radius:999px; background:var(--wr-today); color:var(--wr-today-ink); font-size:10px; font-weight:800; line-height:1.4; white-space:nowrap; }
 [data-read-widget] .wr-deadlines { display:flex; flex-direction:column; gap:6px; list-style:none; padding:0; margin:0; border:0; background:none; }

@@ -42,7 +42,7 @@ async function setup(browser, options = {}) {
       const path = resolve(root, '.' + decodeURIComponent(url.pathname));
       if (!path.startsWith(resolve(root) + sep)) return route.abort();
       try {
-        const mime = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.webp':'image/webp', '.png':'image/png', '.json':'application/json' }[extname(path)] || 'application/octet-stream';
+        const mime = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.webp':'image/webp', '.png':'image/png', '.json':'application/json', '.woff2':'font/woff2' }[extname(path)] || 'application/octet-stream';
         return route.fulfill({ body:await readFile(path), contentType:mime });
       } catch { return route.fulfill({ status:404, body:'Not found' }); }
     }
@@ -115,9 +115,98 @@ async function setup(browser, options = {}) {
 }
 const text = (page, selector) => page.locator(selector).textContent();
 
+// Verify glyphs actually come from a downloaded custom font, not just a CSS name.
+async function expectPretendard(page, selector) {
+  await page.locator(selector).first().waitFor();
+  await page.evaluate(async()=>{
+    await document.fonts.load('600 13px "Pretendard Variable"','업무 기록 꼼꼼한 검토 1234 ABC');
+    await document.fonts.ready;
+  });
+  assert.match(await page.locator(selector).first().evaluate(n=>getComputedStyle(n).fontFamily),/^"Pretendard Variable"/);
+  const session=await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable'); await session.send('CSS.enable');
+    const {root}=await session.send('DOM.getDocument');
+    const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector});
+    const {fonts}=await session.send('CSS.getPlatformFontsForNode',{nodeId});
+    assert.ok(fonts.some(font=>font.isCustomFont&&font.glyphCount>0&&font.familyName.includes('Pretendard')),`${selector}: ${JSON.stringify(fonts)}`);
+    assert.ok(fonts.every(font=>!font.glyphCount||font.familyName.includes('Pretendard')),`${selector}: unexpected fallback ${JSON.stringify(fonts)}`);
+  } finally {await session.detach();}
+}
+
 test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
   const browser = await chromium.launch({ headless:true, ...(process.env.TEST_BROWSER_CHANNEL ? { channel:process.env.TEST_BROWSER_CHANNEL } : {}) });
   try {
+    await t.test('all six widgets render bundled Pretendard glyphs, controls and tooltips with external font hosts blocked',async()=>{
+      for(const [width,height,touch] of [[1440,1000,false],[768,1024,true],[390,844,true]]) {
+        const {context,db,errors,openAll}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
+        try {
+          const fontRequests=[],externalFonts=[];
+          context.on('request',req=>{
+            if(req.resourceType()==='font')fontRequests.push(req.url());
+            if(/jsdelivr|cdnjs|unpkg|fonts\.google/.test(req.url()))externalFonts.push(req.url());
+          });
+          const [goals,due,week,month]=await openAll();
+          for(const [page,selector] of [[goals,'.wg-name'],[due,'.wr-ellipsis'],[week,'.wr-task-name'],[month,'.wr-date-number']]) await expectPretendard(page,selector);
+          if(!touch) {
+            await due.locator('.wr-ellipsis').first().dispatchEvent('pointerover',{pointerType:'mouse'});
+            await expectPretendard(due,'.wr-tooltip');
+          }
+          const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+          await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+          await expectPretendard(writer,'.task-title-button');
+          await expectPretendard(writer,'.mode-pill');
+          await writer.locator('[data-inline-start="title"][data-task-id="t0"]').click();
+          assert.match(await writer.locator('[data-inline-input]').evaluate(n=>getComputedStyle(n).fontFamily),/^"Pretendard Variable"/);
+          await writer.keyboard.press('Escape');
+          const notes=await context.newPage(); await notes.clock.setFixedTime(now);
+          await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
+          await expectPretendard(notes,'.memo-text');
+          await expectPretendard(notes,'.add-row');
+          await notes.locator('[data-note-id="n1"] .memo-text').click();
+          assert.match(await notes.locator('#activeNoteInput').evaluate(n=>getComputedStyle(n).fontFamily),/^"Pretendard Variable"/);
+          // Probe text not limited to the original design preview, in each used weight.
+          for(const page of [goals,due,week,month,writer,notes]) {
+            const loaded=await page.evaluate(async()=>{
+              for(const weight of [400,500,600,700,800]) await document.fonts.load(`${weight} 13px "Pretendard Variable"`,'꼼꼼한 뷰 쀍 ABC 1234');
+              return [...document.fonts].filter(f=>f.family.includes('Pretendard')).map(f=>({family:f.family,status:f.status,weight:f.weight}));
+            });
+            assert.deepEqual(loaded,[{family:'Pretendard Variable',status:'loaded',weight:'45 920'}]);
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+          }
+          assert.ok(fontRequests.length>=6);
+          assert.ok(fontRequests.every(url=>url===`${origin}/cream-olive-garden/assets/fonts/pretendard-1.3.9/PretendardVariable.woff2`));
+          assert.deepEqual(externalFonts,[]); assert.deepEqual(errors,[]);
+          assert.ok(db.writes.every(write=>write.path==='/api/notes/patch'),'only the existing notes cleanup may write to the memory fixture');
+        } finally {await context.close();}
+      }
+    });
+
+    await t.test('initial static loading text uses the bundled font before widget scripts run',async()=>{
+      const {context,db}=await setup(browser,{javaScriptEnabled:false});
+      try {
+        for(const file of files) {
+          const page=await context.newPage();
+          await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+          await expectPretendard(page,'.read-loading');
+        }
+        assert.deepEqual(db.requests,[]); assert.deepEqual(db.writes,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('missing-key and data-error messages use Pretendard including the inline Store indicator',async()=>{
+      const {context,db,errors}=await setup(browser);
+      try {
+        for(const file of [...files,'worklog-cream-olive-garden','notes']) {
+          const page=await context.newPage(); await page.clock.setFixedTime(now);
+          await page.goto(`${origin}${prefix}${file}.html`);
+          if(files.includes(file)) await expectPretendard(page,'.wr-message');
+          await expectPretendard(page,'[data-store-error-indicator]');
+        }
+        assert.deepEqual(db.requests,[]); assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
     await t.test('actual worklog completion and goal editor propagate through Store/BroadcastChannel', async () => {
       const { context, db, errors, openAll } = await setup(browser);
       try {

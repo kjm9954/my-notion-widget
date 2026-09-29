@@ -44,6 +44,14 @@ WORK LOG에서 Q를 바꾸면 해당 날짜를 **Q1 → Q2 → Q3 → Q4 → 미
 - WORK LOG 우선순위 배지는 `Q1`~`Q4` 대신 **`1`~`4`**로 표시합니다. 미설정은 `–`이며 선택 목록·Q 저장 값·자동 정렬은 유지합니다. 목록에서 Enter로 선택해도 적용되도록 키보드 처리도 보정했습니다.
 - WORK LOG 배경은 그대로입니다. 나머지 다섯 위젯의 바깥 카드는 **`#FDF6ED`**로 통일했습니다. 네 읽기 위젯은 이미 같은 색이어서 이전 `#FAF7EF`가 남은 새 메모 카드만 맞췄습니다. 바깥은 투명하며 안쪽 요일·주말·오늘·메모 목록 색과 기능은 유지합니다.
 
+## 공통 프리텐다드 웹폰트
+
+여섯 크림·올리브 위젯은 모두 `../pretendard.css`와 자체 호스팅한 **Pretendard Variable v1.3.9 전체 WOFF2**를 사용합니다. 기기에 설치된 글꼴이나 외부 CDN을 사용하지 않고 같은 버전을 다운로드합니다. 메모의 미리보기용 `WLPreview` 서브셋은 제거했습니다. 본문·제목·버튼·입력창·툴팁·초기 로딩·연결 오류 안내에 같은 글꼴이 적용됩니다. 기존 글자 크기·굵기·데이터 동작은 유지합니다.
+
+글꼴 원본은 [Pretendard 공식 배포본](https://github.com/orioncactus/pretendard/tree/v1.3.9)입니다. `assets/fonts/pretendard-1.3.9/`에 변경하지 않은 글꼴, OFL 라이선스와 출처·해시를 함께 보관합니다. 각 HTML에서 같은 URL을 preload하므로 브라우저가 페이지 간 캐시를 재사용할 수 있습니다. ZIP에도 이 파일과 공통 CSS를 포함해야 합니다.
+
+최초 웹폰트 다운로드는 네트워크가 필요합니다. 다운로드 실패·브라우저의 웹폰트 차단 시에는 가독성을 위해 시스템 대체 글꼴을 사용합니다. OS별 안티앨리어싱이나 폰트가 지원하지 않는 문자까지 동일한 모양을 보장하지는 않습니다.
+
 ## 원본 복사 상태와 안전 조건
 
 소스·정적 화면 준비와 사용자 기록 복사는 별도 단계입니다. 원본 임베드 주소/키가 확인되기 전에는 새 인스턴스를 만들거나 기록을 읽고 복사하지 않습니다. 실제 키·기록·개별 복사 결과는 공개 문서가 아닌 개인용 인계 문서에서 관리합니다.
@@ -84,18 +92,19 @@ WORK LOG는 `widget-size-cream-olive-worklog-v8`, 메모는 `widget-size-cream-o
 
 ## 검증
 
-2026-09-29 번호 색·표기·배경 후속 수정: 변경 영역 Node 48/48, 격리 브라우저 21개 시나리오(상위 포함 22/22) 통과. 전체 Node 테스트는 115개 통과, 기존 환경 의존 실패 2건입니다. `git diff --check` 통과 및 원래 `Worklog/`의 업무일지·메모, Store·Worker 무변경을 확인했습니다.
+2026-09-29 공통 프리텐다드 후속 수정: 변경 영역 Node 51/51, 격리 브라우저 24개 시나리오(상위 포함 25/25) 통과. 전체 Node 테스트는 118개 통과, 기존 환경 의존 실패 2건입니다. `git diff --check` 통과 및 원래 `Worklog/`의 업무일지·메모, Store·Worker 무변경을 확인했습니다.
 
 모든 브라우저 요청을 로컬 소스와 메모리 fixture로 처리했습니다. 운영 사용자 API를 호출하지 않았고 실제 기록을 변경하지 않았습니다.
 
 ```powershell
-node --test tests/read-widgets.test.mjs tests/worklog-task-controls.test.mjs tests/notes-minimal-v9.test.mjs tests/store-cache.test.mjs tests/widget-frame.test.mjs
+node --test tests/pretendard-font.test.mjs tests/read-widgets.test.mjs tests/worklog-task-controls.test.mjs tests/notes-minimal-v9.test.mjs tests/store-cache.test.mjs tests/widget-frame.test.mjs
 node --test tests/browser/read-widgets.spec.mjs
 ```
 
 브라우저 테스트는 Playwright가 필요합니다. 별도 설치 경로는 `PLAYWRIGHT_MODULE`, 설치된 Edge는 `TEST_BROWSER_CHANNEL=msedge`로 지정할 수 있습니다.
 
 - 공개본의 실제 기존 업무일지 완료 체크/목표 편집 → 동일 인스턴스의 새 네 화면 자동 반영.
+- 공식 폰트 바이너리 해시·OFL 포함·여섯 위젯 preload 대조. 외부 글꼴 호스트 차단 상태에서 CDP로 실제 렌더링된 Pretendard 커스텀 글꼴을 PC/iPad/모바일에서 확인. 입력창·툴팁·정적 로딩·Store 오류 안내도 검사.
 - Q 변경/해제·드래그 후 Q 재정렬·상세 편집·새 업무 추가·새로고침, 다른 날짜/모드/원본 불변 검증.
 - 목표 미선택/1/2/3 순환·동일 번호 복수 행·번호순 정렬·완료 수·이전 체크 호환을 PC/iPad/모바일 및 키보드로 검증.
 - WORK LOG와 네 읽기 화면의 세 가지 목표 색 일치, 선택 변경·해제·새로고침 반영, 저장 색 보존·색 데이터 쓰기 없음 확인.
@@ -111,7 +120,7 @@ node --test tests/browser/read-widgets.spec.mjs
 - 완료 우선/Q순/최초 미완료 구분선, 600px 경계에서 기기와 관계없는 열 전환, 과거 scale 0.5 설정 및 모서리 드래그에도 글자 축소 없음 검증.
 
 전체 공개본 테스트에는 원래부터 필요한 비공개 `handover-qa/private/qa-sample.js`와 별도 `TodayPriority` C# 프로젝트가 없어 실패 2건이 있습니다. 변경 전 main 스냅샷에서도 같은 실패를 재현했습니다. 이를 숨기기 위해 테스트나 비공개 파일을 변경/공개하지 않았습니다.
-브라우저 검증은 Edge/Chromium 에뮬레이션이며 실제 iPad Safari 및 운영 Notion 임베드 검증은 별도입니다. 테스트 중 외부 폰트는 차단했습니다.
+브라우저 검증은 Edge/Chromium 에뮬레이션이며 실제 iPad Safari 및 운영 Notion 임베드 검증은 별도입니다. 외부 폰트는 차단했고, 새 여섯 화면은 프로젝트의 실제 WOFF2를 불러와 검증했습니다.
 
 ## 적용 주의
 
