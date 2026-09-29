@@ -1,7 +1,7 @@
 import { calendarToday, worklogToday, mondayOf, addDays, normalizeWeek, summarizeGoals,
-  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-read-economy';
+  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-last-known';
 import { goalNumberAppearance } from './worklog-task-controls.mjs?v=20260929-goal-colors';
-export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-read-economy';
+export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-last-known';
 
 const titles = { goals:'이번 주 목표', deadlines:'3일 안 마감', week:'이번 주 한 일', calendar:'월 캘린더' };
 
@@ -114,7 +114,8 @@ export function mount(root, source, now = () => Date.now()) {
         count.append(make('span', '', '업무 '), make('strong', '', goal.done), make('span', 'wg-slash', '/'), make('span', '', goal.total));
         row.append(number, make('p', 'wg-name', goal.name), count); list.append(row);
       }
-      fragment.append(rows.length ? list : make('p', 'wr-message', '이번 주에 설정된 목표가 없어요.'));
+      fragment.append(rows.length ? list : make('p', 'wr-message', state.readWarning?.missingGoals
+        ? '저장된 목표 정보를 확인하지 못했어요.' : '이번 주에 설정된 목표가 없어요.'));
     } else if (kind === 'deadlines') {
       const rows = deadlines(state, today), list = make('ul', 'wr-deadlines');
       for (const task of rows) {
@@ -181,7 +182,14 @@ export function mount(root, source, now = () => Date.now()) {
       try {
         const next = await source.read();
         if (disposed) return;
-        state = next; render(); error.hidden = true; root.dataset.status = 'ready';
+        state = next; render();
+        const warning = next.readWarning;
+        error.hidden = !warning;
+        error.textContent = warning ? (warning.dailyLimit
+          ? '이전 데이터 표시 중 · 서버 한도 초과로 오전 9시 이후 갱신합니다.'
+          : '이전 데이터 표시 중 · 연결이 돌아오면 다시 갱신합니다.') + (warning.missingGoals ? ' 목표 정보는 확인하지 못했습니다.' : '') : '';
+        root.dataset.status = warning ? 'stale' : 'ready';
+        if (warning) live.textContent = error.textContent;
       } catch (failure) {
         if (disposed) return;
         if (!state) content.replaceChildren(make('p', 'wr-message', failure.dailyLimit
@@ -189,7 +197,7 @@ export function mount(root, source, now = () => Date.now()) {
         error.textContent = failure.dailyLimit
           ? '한국 시간 오전 9시 이후 자동으로 다시 확인합니다.' + (state ? ' 마지막으로 확인한 내용을 표시하고 있어요.' : '')
           : state ? '갱신하지 못했어요. 마지막으로 확인한 내용을 표시하고 있어요.' : '데이터 연결을 확인해 주세요.';
-        error.hidden = false; root.dataset.status = 'error';
+        error.hidden = false; root.dataset.status = state ? 'stale' : 'error';
       } finally {
         running = null;
         if (!disposed) {

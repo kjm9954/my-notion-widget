@@ -175,25 +175,83 @@ test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
     await t.test('D1 HTTP 500 pauses all six widgets and reloads until reset without misreporting empty data',async()=>{
       const {context,db,errors,openAll}=await setup(browser);
       try {
-        const pages=await openAll(); db.fail='d1';
-        for(const page of pages) await page.clock.setFixedTime(new Date(now.getTime()+360001));
-        for(const page of pages) await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-        await pages[0].waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='error');
+        const pages=await openAll();
+        const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+        await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        await writer.locator('[data-toggle-task="t0"]').waitFor();
+        const notes=await context.newPage(); await notes.clock.setFixedTime(now);
+        await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
+        await notes.locator('[data-note-id="n1"]').waitFor();
+        await notes.locator('[data-note-id="old-done"]').waitFor({state:'detached'});
+        const writesBefore=db.writes.length;
+        db.fail='d1';
+        for(const page of [...pages,writer,notes]) await page.clock.setFixedTime(new Date(now.getTime()+360001));
+        for(const page of [...pages,writer,notes]) await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        for(const page of pages) await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='stale');
         assert.match(await text(pages[0],'.wr-error'),/오전 9시/);
+        await writer.waitForFunction(()=>document.querySelector('[data-widget-card]').dataset.readStatus==='stale');
+        await notes.waitForFunction(()=>document.querySelector('#notesCard').dataset.readStatus==='stale');
         const count=db.requests.length;
         for(const page of pages) {
           await page.reload();
-          await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='error');
-          assert.match(await text(page,'.wr-message'),/한도/);
+          await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='stale');
+          assert.match(await text(page,'.wr-error'),/이전 데이터 표시 중/);
         }
-        for(const file of ['worklog-cream-olive-garden','notes']) {
-          const page=await context.newPage(); await page.clock.setFixedTime(new Date(now.getTime()+360001));
-          await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
-          await page.waitForFunction(()=>!!window.Store);
-          await page.evaluate(async()=>{await Store.loadWorklogState({fresh:true}).catch(()=>{});window.dispatchEvent(new Event('focus'));});
-        }
+        assert.equal(await pages[0].locator('.wg-row').count(),4);
+        assert.equal(await pages[1].locator('.wr-deadline').count(),5);
+        assert.equal(await text(pages[2],'[data-date="2026-09-29"] .wr-day-count'),'0 / 8');
+        assert.equal(await pages[3].locator('[data-date="2026-09-29"] .wr-dot').count(),5);
+        await pages[2].getByRole('button',{name:'이전 주',exact:true}).click();
+        const period=await text(pages[2],'.wr-period'); await pages[2].reload();
+        await pages[2].waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='stale');
+        assert.equal(await text(pages[2],'.wr-period'),period);
+        await writer.reload(); await notes.reload();
+        await writer.waitForFunction(()=>document.querySelector('[data-widget-card]').dataset.readStatus==='stale');
+        await notes.waitForFunction(()=>document.querySelector('#notesCard').dataset.readStatus==='stale');
+        assert.equal(await writer.locator('[data-toggle-task="t0"]').isDisabled(),true);
+        assert.equal(await notes.locator('[data-note-id="n1"] .check-action').isDisabled(),true);
+        assert.equal(await notes.locator('[data-note-id="n1"] .memo-text').textContent(),'기존 메모');
+        assert.equal(await writer.locator('#readStatus').isVisible(),true);
+        assert.equal(await notes.locator('.notes-live').isVisible(),true);
+        const blank=await context.newPage();await blank.clock.setFixedTime(new Date(now.getTime()+360001));
+        await blank.goto(`${origin}${prefix}deadlines.html?w=${originalInstance}`);
+        await blank.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='error');
+        assert.equal(await blank.locator('.wr-deadline').count(),0,'never show another key’s snapshot');
         assert.equal(db.requests.length,count,'reloads/focuses/new documents cannot hammer an exhausted account');
-        assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+        assert.equal(db.writes.length,writesBefore,'cached display does not clean up, roll tasks or save');
+        db.fail=null; db.worklog.tasks[0].done=true;db.worklog.revision++;
+        for(const page of pages) await page.clock.setFixedTime(new Date('2026-09-30T09:00:06+09:00'));
+        for(const page of pages) await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        for(const page of pages) await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='ready');
+        assert.equal(await pages[1].locator('[data-task-id="t0"]').count(),0);
+        for(const page of [writer,notes]) {
+          await page.clock.setFixedTime(new Date('2026-09-30T09:00:06+09:00'));
+          await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        }
+        await writer.waitForFunction(()=>document.querySelector('[data-widget-card]').dataset.readStatus==='ready');
+        await notes.waitForFunction(()=>document.querySelector('#notesCard').dataset.readStatus==='ready');
+        assert.equal(await notes.locator('[data-note-id="n1"] .check-action').isDisabled(),false);
+        assert.equal(await writer.locator('#readStatus').isVisible(),false);
+        assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('missing goal cache does not hide available tasks or invent an empty-goal success on mobile',async()=>{
+      const {context,db,errors}=await setup(browser,{viewport:{width:390,height:844},hasTouch:true,isMobile:true});
+      try {
+        db.fail='/api/weekly-goals/state';
+        for(const file of files) {
+          const page=await context.newPage();await page.clock.setFixedTime(now);
+          await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+          await page.waitForFunction(()=>document.querySelector('[data-read-widget]').dataset.status==='stale');
+          assert.match(await text(page,'.wr-error'),/목표 정보는 확인하지 못/);
+          if(file==='weekly-goals') assert.match(await text(page,'.wr-message'),/목표 정보를 확인하지 못/);
+          if(file==='deadlines') assert.equal(await page.locator('.wr-deadline').count(),5);
+          if(file==='week-review') assert.equal(await page.locator('[data-date="2026-09-29"] .wr-task').count(),8);
+          if(file==='month-calendar') assert.equal(await page.locator('[data-date="2026-09-29"] .wr-dot').count(),5);
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        }
+        assert.deepEqual(db.writes,[]);assert.deepEqual(errors,[]);
       } finally {await context.close();}
     });
 
@@ -945,14 +1003,15 @@ test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
         assert.equal(await pages[3].locator('.wr-date').count(), 35);
         db.fail = '/api/weekly-goals/state';
         for (const page of pages) {
-          await notify(page); await page.waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'error');
-          assert.match(await text(page, '.wr-error'), /갱신하지 못/);
+          await notify(page); await page.waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'stale');
+          assert.match(await text(page, '.wr-error'), /이전 데이터/);
         }
         assert.equal(await pages[1].locator('.wr-header, .wr-title').count(),0);
-        // A new document with cached data still shows an initial error, not an empty result.
+        // An actually empty prior result is restored, with a persistent stale warning.
         await pages[0].reload();
-        await pages[0].waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'error');
-        assert.match(await text(pages[0], '.wr-message'), /불러오지 못/);
+        await pages[0].waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'stale');
+        assert.match(await text(pages[0], '.wr-message'), /목표가 없/);
+        assert.equal(await pages[0].locator('.wr-error').isVisible(),true);
         db.fail = null;
         for (const page of pages) {
           await notify(page); await page.waitForFunction(() => document.querySelector('[data-read-widget]').dataset.status === 'ready');

@@ -563,3 +563,33 @@ test('임베드가 Web Locks 접근을 거절하면 안전하게 조회하며 �
   const permitted=createStore(fetch,new Map(),{coalesce:true,locks:sharedLocks()});
   await assert.rejects(permitted.patchWorklogState({upserts:[]}),/embedded policy/); assert.equal(posts,2);
 });
+
+test('한도 초과와 새로고침 이후 같은 키의 마지막 데이터를 오류와 함께 제공하고 저장 실패는 캐시를 덮지 않는다', async () => {
+  const persisted=new Map(); let now=fixtureTime,fail=false,calls=0;
+  const snapshot={revision:1,lastRollDay:fixtureDay,tasks:[{id:'task',title:'마지막 저장',done:false}]};
+  const fetch=async()=>{calls++;return fail
+    ? Response.json({ok:false,error:"D1_ERROR: Your account has exceeded D1's free tier daily row read limit."},{status:500})
+    : Response.json({ok:true,data:snapshot});};
+  const options={coalesce:true,isolated:true,now:()=>now};
+  const first=createStore(fetch,persisted,options);
+  await first.loadWorklogState({fresh:true}); now+=120001;fail=true;
+  const check=error=>{assert.deepEqual(error.cachedData,snapshot);assert.equal(error.dailyLimit,true);return true;};
+  await assert.rejects(first.loadWorklogState({fresh:true}),check); await settle();
+  const reloaded=createStore(fetch,persisted,options);
+  await assert.rejects(reloaded.loadWorklogState({fresh:true}),check);
+  await assert.rejects(reloaded.patchWorklogState({upserts:[{id:'task',done:true}]}),/오전 9시/);
+  await assert.rejects(reloaded.loadWorklogState({fresh:true}),check); assert.equal(calls,2);
+  const other=createStore(fetch,persisted,{...options,search:'?w=w_other_abcdefghijklmnopqrstuvwx'});
+  await assert.rejects(other.loadWorklogState({fresh:true}),error=>error.cachedData===undefined);
+  now=Date.parse('2026-09-30T09:00:06+09:00');fail=false;
+  assert.deepEqual(await reloaded.loadWorklogState({fresh:true}),snapshot);
+});
+
+test('서버의 업무 대체 스냅샷은 fresh 성공이 아닌 이전 데이터로 보존하며 403에는 캐시를 내주지 않는다', async () => {
+  const persisted=new Map(); let now=fixtureTime;
+  const store=createStore(async()=>Response.json({ok:true,cached:true,data:{tasks:[{id:'backup'}]}}),persisted,{coalesce:true,now:()=>now});
+  await assert.rejects(store.loadWorklogState({fresh:true}),error=>error.dailyLimit&&error.cachedData.tasks[0].id==='backup'&&error.cachedAt===0);
+  await settle(); now=Date.parse('2026-09-30T09:00:06+09:00');
+  const forbidden=createStore(async()=>Response.json({ok:false,error:'forbidden'},{status:403}),persisted,{coalesce:true,now:()=>now});
+  await assert.rejects(forbidden.loadWorklogState({fresh:true}),error=>error.status===403&&error.cachedData===undefined);
+});

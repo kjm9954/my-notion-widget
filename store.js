@@ -363,7 +363,10 @@ try {
   serverStatusChannel = new BroadcastChannel(SERVER_STATUS_CHANNEL);
   serverStatusChannel.addEventListener("message", event => {
     const message = event?.data || {};
-    if (message.type === "backoff") rememberServerBackoff(message.until, { announce:false, dailyLimit:message.dailyLimit === true });
+    if (message.type === "backoff") {
+      rememberServerBackoff(message.until, { announce:false, dailyLimit:message.dailyLimit === true });
+      notifyStoreListeners({ type:"backoff" });
+    }
     if (message.type === "backoff-clear") clearServerBackoff({ announce:false });
   });
 } catch (_) {}
@@ -379,7 +382,7 @@ function watch(callback, interval = MIN_WATCH_INTERVAL_MS, options = {}) {
   let queued = false;
   const run = change => {
     if (document.hidden) return;
-    if (serverBackoffUntil > Date.now()) return;
+    if (serverBackoffUntil > Date.now() && options.allowCached !== true) return;
     if (change?.path && options.paths && !options.paths.some(path => change.path.startsWith(path))) return;
     const active = document.activeElement;
     if (!allowWhileEditing && active && (active.matches("input, textarea, select") || active.isContentEditable)) return;
@@ -574,7 +577,13 @@ function requestFresh(path, url, cachedPromise, options = {}) {
         if (Number(revision?.revision) === Number(state.revision) && revision?.day === state.lastRollDay) data = cached.data;
       }
       if (!data) data = await read(url);
-      if (shared && path === "/api/worklog/state") rejectQuotaSnapshot(data.cached === true);
+      if (shared && path === "/api/worklog/state" && data.cached === true) {
+        // A server snapshot is usable for display, never proof of a fresh read.
+        // Prefer the last locally confirmed result; retain the server fallback
+        // only when this instance has no local data yet (unknown confirmation time).
+        if (!cached) await writeCached(url, data, JSON.stringify(data), 0);
+        rejectQuotaSnapshot(true);
+      }
       const serialized = JSON.stringify(data);
       const changed = Boolean(cached && comparablePayload(path, cached.serialized) !== comparablePayload(path, serialized));
       await writeCached(url, data, serialized);
@@ -589,8 +598,15 @@ function requestFresh(path, url, cachedPromise, options = {}) {
     }
   };
   const request = Promise.resolve().then(() => sharedReadAge(path) ? withReadLock(url, perform) : perform()).catch(async error => {
+    const cached = sharedReadAge(path) ? await readCached(url, true) : await cachedPromise;
+    // Opt-in screens can explicitly render a last-known result while retaining
+    // the error. Never turn authentication/key failures into a cached success.
+    if (sharedReadAge(path) && cached?.data?.data !== undefined
+        && (!error.status || error.status >= 500 || error.status === 429 || error.serverBackoff)) {
+      Object.defineProperty(error, "cachedData", { value:cloneData(cached.data.data), configurable:true });
+      error.cachedAt = cached.validatedAt || 0;
+    }
     if (!error?.silent || error.dailyLimit) {
-      const cached = await cachedPromise;
       if ((!cached || error.dailyLimit) && options.reportError !== false) showStoreError(error);
     }
     throw error;

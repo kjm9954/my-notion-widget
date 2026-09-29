@@ -113,16 +113,27 @@ export function shiftMonth(monthKey, delta) {
   return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 7);
 }
 export function createSource(store) {
+  async function readLastKnown(load, optional = false) {
+    try { return { data:await load() }; }
+    catch (error) {
+      if (error.cachedData !== undefined) return { data:error.cachedData, error };
+      if (optional && (!error.status || error.status >= 500 || error.serverBackoff)) return { data:{ items:[] }, error, missing:true };
+      throw error;
+    }
+  }
   return {
     async read() {
       const [worklog, goals] = await Promise.all([
-        store.loadWorklogState({ fresh: true }),
-        store.loadWeeklyGoalsState({ fresh: true, worklogInstance: true })
+        readLastKnown(() => store.loadWorklogState({ fresh: true })),
+        readLastKnown(() => store.loadWeeklyGoalsState({ fresh: true, worklogInstance: true }), true)
       ]);
-      return normalizeSnapshot(worklog, goals);
+      const snapshot = normalizeSnapshot(worklog.data, goals.data);
+      const failures = [worklog.error, goals.error].filter(Boolean);
+      if (failures.length) snapshot.readWarning = { dailyLimit:failures.some(error => error.dailyLimit), missingGoals:goals.missing === true };
+      return snapshot;
     },
     subscribe(callback) {
-      return store.watch(callback, 120000, { allowWhileEditing: true, initial: false,
+      return store.watch(callback, 120000, { allowWhileEditing: true, initial: false, allowCached:true,
         paths: ['/api/worklog/', '/api/weekly-goals/'] });
     }
   };

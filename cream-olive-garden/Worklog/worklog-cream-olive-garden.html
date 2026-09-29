@@ -523,7 +523,7 @@
     body.is-worklog-compact .mini-calendar-grid { gap:0; }
     body.is-worklog-compact .mobile-add-form { height:auto; min-height:48px; }
   </style>
-  <script src="../../store.js?v=20260929-read-economy" data-store-isolated data-store-coalesce></script>
+  <script src="../../store.js?v=20260929-last-known" data-store-isolated data-store-coalesce></script>
   <script src="../grass-field-renderer.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
@@ -540,6 +540,7 @@
           <button class="nav-arrow" id="nextDay" type="button" data-nav="next" aria-label="다음 요일">›</button>
         </nav>
         <section class="roll-banner" id="rollBanner" data-roll-banner hidden aria-live="polite"></section>
+        <p class="roll-banner" id="readStatus" hidden role="status"></p>
         <header class="card-header" id="cardHeader" data-worklog-header></header>
       </div>
       <section class="list-shell" id="taskList" data-widget-list data-widget-list-height="368" data-worklog-list aria-label="기록 목록"></section>
@@ -579,6 +580,25 @@
       const narrowQuery = window.matchMedia('(max-width: 320px)');
       const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
       let weeklyGoalsState = null;
+      let readOnlyCache = false;
+      function showReadWarning(failure) {
+        const notice = document.getElementById('readStatus');
+        readOnlyCache = Boolean(failure);
+        notice.hidden = !failure;
+        notice.textContent = failure ? (failure.dailyLimit
+          ? '이전 데이터 표시 중 · 오전 9시 이후 갱신합니다.'
+          : '이전 데이터 표시 중 · 연결이 돌아오면 갱신합니다.') + ' 저장은 연결 복구 후 가능합니다.' : '';
+        card.dataset.readStatus = failure ? 'stale' : 'ready';
+        lockCachedControls();
+      }
+      function lockCachedControls() {
+        for (const area of [taskList, addArea, cellPopover]) {
+          area.querySelectorAll('button, input, textarea, select').forEach(control => {
+            if (readOnlyCache && !control.disabled) { control.dataset.cacheDisabled = ''; control.disabled = true; }
+            else if (!readOnlyCache && control.hasAttribute('data-cache-disabled')) { control.removeAttribute('data-cache-disabled'); control.disabled = false; }
+          });
+        }
+      }
       const calendarToday = () => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 
       function fitTextareas() {
@@ -835,6 +855,7 @@
       }
 
       function persist(next) {
+        if (readOnlyCache) return false;
         const previous = normalizeState(state);
         const normalized = normalizeState(next);
         refreshPriorityOrder(previous, normalized);
@@ -1075,6 +1096,7 @@
       }
 
       function persistColumnSplit(mode, value) {
+        if (readOnlyCache) return Promise.resolve();
         const minimum = mode === 'work' ? .2 : .25;
         const maximum = mode === 'work' ? .82 : .75;
         const next = normalizeSplit(value,DEFAULT_COLUMN_SPLIT[mode],minimum,maximum);
@@ -1848,6 +1870,7 @@
         renderCellPopover();
         updateCompactLayout();
         window.worklogGrass?.setDate?.(ui.selectedDate);
+        lockCachedControls();
       }
 
       function renderWorkView() {
@@ -1860,6 +1883,7 @@
         if (nextScroll) nextScroll.scrollTop = listScroll;
         renderCellPopover();
         updateCompactLayout();
+        lockCachedControls();
       }
 
       function runOnce(element, className) {
@@ -1889,6 +1913,7 @@
       }
 
       function persistWorkView(view) {
+        if (readOnlyCache) return;
         localRevision += 1;
         saveQueue = saveQueue
           .then(() => Store.saveWorklogView(view))
@@ -2559,25 +2584,37 @@
         const requestRevision = localRevision;
         let loaded;
         let loadedGoals = weeklyGoalsState;
+        let readFailure = null;
         try {
           await saveQueue;
           const results = await Promise.all([
-            Store.loadWorklogState(),
+            Store.loadWorklogState().catch(error => {
+              if (error.cachedData === undefined) throw error;
+              readFailure = error;
+              return error.cachedData;
+            }),
             Store.loadWeeklyGoalsState().catch(error => {
+              readFailure = readFailure?.dailyLimit ? readFailure : error;
               console.warn('이번 주 목표를 불러오지 못했습니다.', error);
-              return weeklyGoalsState;
+              return error.cachedData ?? weeklyGoalsState;
             })
           ]);
           loaded = normalizeState(results[0]);
           loadedGoals = results[1];
         } catch (error) {
           console.warn('업무일지 데이터를 불러오지 못했습니다.', error);
+          readOnlyCache = true;
+          const notice = document.getElementById('readStatus');
+          notice.hidden = false;
+          notice.textContent = error.dailyLimit ? '서버 한도 초과 · 표시할 이전 데이터가 없습니다. 오전 9시 이후 다시 확인합니다.' : '데이터를 불러오지 못했습니다. 연결 복구 후 다시 확인합니다.';
+          card.dataset.readStatus = 'error';
           liveRegion.textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
           if (!ui.selectedDate) ui.selectedDate = localDateKey(clampDateToMode(todayDate(),state.mode));
           renderAll();
           return false;
         }
         if (requestId !== syncRequestId || requestRevision !== localRevision) return false;
+        showReadWarning(readFailure);
         const goalsChanged = JSON.stringify(weeklyGoalsState) !== JSON.stringify(loadedGoals);
         weeklyGoalsState = loadedGoals;
         if (ui.adding || ui.editingId || ui.inlineEdit || ui.popover || ui.columnResize || ui.longPress || ui.rowDrag || addArea.querySelector('.mobile-add-input')?.value) {
@@ -2596,8 +2633,10 @@
         resetToToday = resetToToday || dayChanged;
         state = loaded;
         pendingServerState = null;
-        pendingExternalSync = !rollDayIfNeeded();
-        if (resetToToday) applyOpenDefaults();
+        pendingExternalSync = readOnlyCache ? false : !rollDayIfNeeded();
+        if (readOnlyCache) {
+          if (!ui.selectedDate) ui.selectedDate = localDateKey(clampDateToMode(rememberedView()?.date || todayDate(),state.mode));
+        } else if (resetToToday) applyOpenDefaults();
         else {
           const selected = clampDateToMode(parseDate(ui.selectedDate) || todayDate(),state.mode);
           ui.selectedDate = localDateKey(selected);
@@ -2605,6 +2644,7 @@
         }
         liveRegion.textContent = '';
         renderAll();
+        showReadWarning(readFailure);
         return true;
       }
 
@@ -2630,7 +2670,7 @@
           entranceDone = true;
           window.widgetMotion?.cascade?.(taskList.querySelectorAll('.task-row'));
         }
-        Store.watch(() => syncFromServer(false),120000,{ allowWhileEditing:true, initial:false,
+        Store.watch(() => syncFromServer(false),120000,{ allowWhileEditing:true, initial:false, allowCached:true,
           paths:['/api/worklog/', '/api/weekly-goals/'] });
       }
 
