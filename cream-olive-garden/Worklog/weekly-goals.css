@@ -1,6 +1,6 @@
-/* Goal rendering, numbering and data logic stay unchanged. */
+/* Goal layout shares the read widgets' outer card surface. */
 [data-weekly-goals] {
-  --goal-paper:#FDF6ED; --goal-panel:#FFFCF6; --goal-ink:#45472F; --goal-muted:#75785D;
+  --goal-paper:var(--wr-window,#FDF6ED); --goal-panel:#FFFCF6; --goal-ink:#45472F; --goal-muted:#75785D;
   --goal-olive:#697A43; --goal-border:#EADFCD; --goal-line:#EFEADA;
 }
 [data-weekly-goals] :is(.wr-card, .wg-card) { padding:14px 16px 16px; border:1px solid var(--goal-border); border-radius:18px; background:var(--goal-paper); }

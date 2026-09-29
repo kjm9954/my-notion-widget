@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { taskGoalNumber, nextTaskGoalId, refreshPriorityOrder } from '../cream-olive-garden/Worklog/worklog-task-controls.mjs';
+import { taskGoalNumber, nextTaskGoalId, goalNumberAppearance, refreshPriorityOrder } from '../cream-olive-garden/Worklog/worklog-task-controls.mjs';
+
+test('목표 번호의 표시 색은 기존 팔레트의 올리브·노랑·갈색이며 공유 값은 변경할 수 없다', () => {
+  assert.deepEqual([1,2,3].map(goalNumberAppearance),[
+    {color:'#697A43',ink:'#FFFFFF'}, {color:'#F4DDA0',ink:'#665C2F'}, {color:'#9A6B52',ink:'#FFFFFF'}
+  ]);
+  for(const number of [0,4,null,undefined,'__proto__']) assert.equal(goalNumberAppearance(number),null);
+  assert.ok(Object.isFrozen(goalNumberAppearance(1)));
+});
 
 test('목표 번호는 미선택 → 1 → 2 → 3 → 미선택으로 순환한다', () => {
   const task = {id:'task-a', goalId:null};

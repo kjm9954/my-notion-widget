@@ -265,6 +265,31 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
       }
     });
 
+    await t.test('priority choices update the visible number using actual taps and keyboard Enter', async () => {
+      for(const [width,height,touch] of [[768,1024,true],[390,844,true],[1440,1000,false]]) {
+        const {context,db,errors}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
+        try {
+          const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+          await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+          const cell=writer.locator('[data-cell-task="t0"][data-cell-field="q"]');
+          await cell.waitFor();
+          for(const q of [1,2,3,4,null]) {
+            if(touch) await cell.tap(); else await cell.press('Enter');
+            const choice=writer.locator(`[data-q-choice="${q ?? ''}"]`);
+            assert.equal(await choice.locator('.q-badge').textContent(),q?String(q):'–');
+            await Promise.all([
+              writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.upserts?.some(task=>task.id==='t0'&&task.q===q),{timeout:3000}),
+              touch?choice.tap():choice.press('Enter')
+            ]);
+            await writer.waitForFunction(expected=>document.querySelector('[data-cell-task="t0"][data-cell-field="q"] .q-badge')?.textContent===expected,q?String(q):'–',{timeout:3000});
+            assert.equal(db.worklog.tasks.find(task=>task.id==='t0').q,q);
+          }
+          await writer.reload(); await cell.waitFor();
+          assert.equal(await cell.textContent(),'–'); assert.deepEqual(errors,[]);
+        } finally {await context.close();}
+      }
+    });
+
     await t.test('manual dragging survives goal edits; full-form Q edits and added tasks restore priority order', async () => {
       const {context,db,errors}=await setup(browser);
       try {
@@ -353,6 +378,51 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         assert.deepEqual(db.goals.items,[],'no secondary goal save or sample goal');
         assert.ok(db.writes.every(r=>r.instance===instance && r.path==='/api/worklog/patch'));
         assert.deepEqual(originalDb,original); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('goal number colors agree across worklog and all four read widgets without color writes', async () => {
+      const {context,db,originalDb,errors,openAll}=await setup(browser);
+      try {
+        const original=structuredClone(originalDb);
+        db.goals={week:'2026-9-28',items:[{id:'saved',text:'기존 색 보존',m:'work',color:'#75785D'}]};
+        db.worklog.tasks.slice(0,4).forEach((task,i)=>{task.goalId=`worklog:goal:${[1,2,3,1][i]}`;});
+        db.worklog.tasks[5].goalId='saved';
+        const [goals,due,week,month]=await openAll();
+        assert.deepEqual(db.writes,[],'opening the read widgets cannot persist display colors');
+        const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+        await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        await writer.locator('[data-goal-task="t0"]').waitFor();
+        const colors=['rgb(105, 122, 67)','rgb(244, 221, 160)','rgb(154, 107, 82)'];
+        const background=locator=>locator.evaluate(n=>getComputedStyle(n).backgroundColor);
+        for(let i=0;i<4;i++) {
+          const expected=colors[[0,1,2,0][i]];
+          for(const marker of [writer.locator(`[data-goal-task="t${i}"] .goal-dot`),goals.locator(`[data-goal-id="t${i}"] .wg-number`),due.locator(`[data-task-id="t${i}"] .wr-dot`),week.locator(`[data-task-id="t${i}"] .wr-dot`),month.locator('[data-date="2026-09-29"] .wr-dot').nth(i)]) assert.equal(await background(marker),expected);
+        }
+        assert.equal(await background(goals.locator('[data-goal-id="saved"] .wg-number')),'rgb(117, 120, 93)');
+        assert.equal(await background(week.locator('[data-task-id="t5"] .wr-dot')),'rgb(117, 120, 93)');
+        assert.equal(await background(due.locator('[data-task-id="t4"] .wr-dot')),'rgba(0, 0, 0, 0)');
+        assert.equal(await writer.locator('[data-goal-task="t1"] .goal-dot').evaluate(n=>getComputedStyle(n).color),await goals.locator('[data-goal-id="t1"] .wg-number').evaluate(n=>getComputedStyle(n).color));
+        for(const number of [2,3,0,1]) {
+          await writer.locator('[data-goal-task="t0"]').click();
+          await goals.waitForFunction(number=>number?document.querySelector('[data-goal-id="t0"] .wg-number')?.textContent===String(number):!document.querySelector('[data-goal-id="t0"]'),number);
+          const expected=number?colors[number-1]:'rgba(0, 0, 0, 0)';
+          for(const [page,selector] of [[due,'[data-task-id="t0"] .wr-dot'],[week,'[data-task-id="t0"] .wr-dot'],[month,'[data-date="2026-09-29"] .wr-dot']]) {
+            await page.waitForFunction(({selector,expected})=>getComputedStyle(document.querySelector(selector)).backgroundColor===expected,{selector,expected});
+          }
+          assert.equal(await background(writer.locator('[data-goal-task="t0"] .goal-dot')),expected);
+        }
+        await writer.reload(); await goals.reload();
+        await writer.locator('[data-goal-task="t0"]').waitFor(); await goals.locator('[data-goal-id="t0"]').waitFor();
+        assert.equal(await background(goals.locator('[data-goal-id="t0"] .wg-number')),colors[0]);
+        assert.equal(await background(writer.locator('[data-goal-task="t0"] .goal-dot')),colors[0]);
+        assert.ok(db.worklog.tasks.every(task=>!Object.hasOwn(task,'color')));
+        assert.deepEqual(db.goals.items,[{id:'saved',text:'기존 색 보존',m:'work',color:'#75785D'}]);
+        assert.deepEqual(originalDb,original); assert.deepEqual(errors,[]);
+        if(process.env.TEST_SCREENSHOT_DIR) for(const [name,page] of [['worklog',writer],['goals',goals],['deadlines',due],['week',week],['month',month]]) {
+          await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
+          await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,`goal-colors-${name}.png`),fullPage:false});
+        }
       } finally {await context.close();}
     });
 
@@ -526,6 +596,26 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           if (!touch) assert.equal(await text(due, '.wr-tooltip'), db.worklog.tasks[0].title);
           assert.deepEqual(db.writes, []); assert.deepEqual(errors, []);
         } finally { await context.close(); }
+      }
+    });
+
+    await t.test('all five companion widgets share the outer card background and keep transparent surrounds', async () => {
+      for(const [width,height,touch] of [[1440,1000,false],[768,1024,true],[390,844,true]]) {
+        const {context,errors,openAll}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
+        try {
+          const pages=await openAll(), notes=await context.newPage(); await notes.clock.setFixedTime(now);
+          await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
+          await notes.locator('[data-note-id="n1"]').waitFor(); pages.push(notes);
+          for(const page of pages) {
+            const actual=await page.evaluate(()=>({
+              card:getComputedStyle(document.querySelector('.wr-card, .notes-card')).backgroundColor,
+              body:getComputedStyle(document.body).backgroundColor,
+              host:getComputedStyle(document.querySelector('[data-widget-host]')).backgroundColor
+            }));
+            assert.deepEqual(actual,{card:'rgb(253, 246, 237)',body:'rgba(0, 0, 0, 0)',host:'rgba(0, 0, 0, 0)'});
+          }
+          assert.deepEqual(errors,[]);
+        } finally {await context.close();}
       }
     });
 

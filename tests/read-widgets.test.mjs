@@ -124,6 +124,16 @@ test('번호 목표와 기존 독립 목표 연결·색·집계가 함께 유지
   assert.deepEqual(rows.map(g=>[g.id,g.done,g.total]),[['saved',1,1],['b',0,1]]);
 });
 
+test('업무 목표 1·2·3은 모든 읽기 화면에서 동일한 색을 얻되 원본 기록과 저장 목표는 바꾸지 않는다', () => {
+  const worklog={tasks:[task('a',{goalId:'worklog:goal:1'}),task('b',{goalId:'worklog:goal:2'}),
+    task('c',{goalId:'worklog:goal:3'}),task('legacy',{goalId:'legacy'}),task('none',{goalId:null})]};
+  const goals={items:[]}, before=structuredClone({worklog,goals});
+  const state=normalizeSnapshot(worklog,goals);
+  assert.deepEqual(state.tasks.map(task=>goalForTask(state,task)?.color ?? null),['#697A43','#F4DDA0','#9A6B52','#697A43',null]);
+  assert.deepEqual({worklog,goals},before);
+  assert.ok(state.tasks.every(task=>!Object.hasOwn(task,'color')));
+});
+
 test('한 일은 doneAt 대신 date, 하루 8개와 미완료를 모두 유지한다', () => {
   const state = snapshot(Array.from({ length:8 }, (_, i) => task(i, { done:i === 0, doneAt:'2026-10-02' })));
   const days = weekDays(state, monday);

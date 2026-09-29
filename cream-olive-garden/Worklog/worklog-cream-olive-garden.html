@@ -461,7 +461,7 @@
     .inline-editor textarea:focus { border-color:var(--action); }
     .goal-button { display:grid; place-items:center; width:28px; min-height:26px; padding:0; border:0; background:transparent; }
     .goal-dot { display:grid; place-items:center; width:18px; height:18px; border:1px dashed var(--inactive); border-radius:999px; font-size:9px; font-weight:800; }
-    .goal-dot.is-linked { border:1px solid var(--goal-color,var(--action)); background:var(--goal-color,var(--action)); color:#fff; }
+    .goal-dot.is-linked { border:1px solid var(--goal-color,var(--action)); background:var(--goal-color,var(--action)); color:var(--goal-number-ink,#fff); }
     .due-badge { display:inline-block; width:44px; text-align:center; padding:3px 5px; border-radius:999px; background:var(--action-soft); color:var(--deep); font-size:10px; font-weight:700; white-space:nowrap; }
     .due-badge.is-today { background:var(--action); color:#fff; }
     .due-badge.is-tomorrow { background:var(--today); color:var(--today-ink); }
@@ -552,7 +552,7 @@
   </div>
 
   <script type="module">
-    import { taskGoalNumber, nextTaskGoalId, refreshPriorityOrder } from './worklog-task-controls.mjs?v=20260929-priority-goals';
+    import { taskGoalNumber, nextTaskGoalId, goalNumberAppearance, refreshPriorityOrder } from './worklog-task-controls.mjs?v=20260929-goal-colors';
     (() => {
       'use strict';
 
@@ -1327,7 +1327,7 @@
       }
 
       function qBadge(q) {
-        return q ? `<span class="q-badge q-${q}">Q${q}</span>` : '<span class="q-badge q-none">–</span>';
+        return q ? `<span class="q-badge q-${q}">${q}</span>` : '<span class="q-badge q-none">–</span>';
       }
 
       function qDescription(q) {
@@ -1497,9 +1497,10 @@
         const index = goals.findIndex(goal => goal.id === task.goalId);
         const goal = goals[index];
         const number = taskGoalNumber(task);
+        const appearance = goalNumberAppearance(number);
         const selected = task.goalId != null && task.goalId !== '';
         const label = number === 3 ? '목표 3번, 클릭하면 선택 해제' : `목표 ${number ? `${number}번` : selected ? '연결됨' : '미선택'}, 클릭하면 ${number + 1}번`;
-        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="${label}: ${escapeHtml(task.title)}" aria-pressed="${selected}"><span class="goal-dot ${selected ? 'is-linked' : ''}" ${selected ? `style="--goal-color:${escapeHtml(goal?.color || 'var(--action)')}"` : ''}>${number || (selected ? (goal ? index + 1 : '✓') : '')}</span></button>`;
+        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="${label}: ${escapeHtml(task.title)}" aria-pressed="${selected}"><span class="goal-dot ${selected ? 'is-linked' : ''}" ${selected ? `style="--goal-color:${escapeHtml(goal?.color || appearance?.color || 'var(--action)')};--goal-number-ink:${goal ? '#fff' : appearance?.ink || '#fff'}"` : ''}>${number || (selected ? (goal ? index + 1 : '✓') : '')}</span></button>`;
       }
 
       function timeCell(task, field) {
@@ -2535,7 +2536,8 @@
           adjustHours(event.key === 'ArrowUp' ? 0.5 : -0.5);
           return;
         }
-        if (ui.popover && (event.key === 'Enter' || event.key === 'Escape')) {
+        // Let a focused choice button receive its native Enter activation.
+        if (ui.popover && (event.key === 'Escape' || (event.key === 'Enter' && !event.target.closest('#cellPopover button')))) {
           event.preventDefault();
           closeCellPopover();
           return;

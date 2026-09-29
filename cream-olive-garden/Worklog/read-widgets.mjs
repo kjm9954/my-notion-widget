@@ -1,6 +1,7 @@
 import { calendarToday, worklogToday, mondayOf, addDays, normalizeWeek, summarizeGoals,
-  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-read-theme-v2';
-export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-read-theme-v2';
+  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-goal-colors';
+import { goalNumberAppearance } from './worklog-task-controls.mjs?v=20260929-goal-colors';
+export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-goal-colors';
 
 const titles = { goals:'이번 주 목표', deadlines:'3일 안 마감', week:'이번 주 한 일', calendar:'월 캘린더' };
 
@@ -105,7 +106,8 @@ export function mount(root, source, now = () => Date.now()) {
           context.fillStyle = color; context.fillRect(0, 0, 1, 1);
           const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
           const luminance = [r, g, b].map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
-          number.style.setProperty('--goal-number-ink', .2126 * luminance[0] + .7152 * luminance[1] + .0722 * luminance[2] > .18 ? '#252a20' : '#fffdf7');
+          const numberedInk = goal.taskId ? goalNumberAppearance(goal.number)?.ink : null;
+          number.style.setProperty('--goal-number-ink', numberedInk || (.2126 * luminance[0] + .7152 * luminance[1] + .0722 * luminance[2] > .18 ? '#252a20' : '#fffdf7'));
         }
         const count = make('span', 'wg-count');
         count.setAttribute('aria-label', `연결된 업무 ${goal.total}개 중 ${goal.done}개 완료`);

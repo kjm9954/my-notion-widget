@@ -1,6 +1,16 @@
 // Persist only through the existing task.goalId field. A numbered selection is
 // local to each task: two tasks with number 1 remain two separate goal rows.
 const GOAL_PREFIX = 'worklog:goal:';
+// Display-only colors from the existing cream/olive palette. Never persist these
+// defaults: goalId remains the source of the task's numbered selection.
+const GOAL_NUMBER_APPEARANCE = Object.freeze({
+  1:Object.freeze({ color:'#697A43', ink:'#FFFFFF' }),
+  2:Object.freeze({ color:'#F4DDA0', ink:'#665C2F' }),
+  3:Object.freeze({ color:'#9A6B52', ink:'#FFFFFF' })
+});
+export function goalNumberAppearance(number) {
+  return Object.hasOwn(GOAL_NUMBER_APPEARANCE, number) ? GOAL_NUMBER_APPEARANCE[number] : null;
+}
 export function taskGoalNumber(task) {
   const match = /^worklog:goal:([123])$/.exec(String(task.goalId ?? ''));
   if (match) return Number(match[1]);

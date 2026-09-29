@@ -1,5 +1,5 @@
 import { seoulDateKey, addDateKeyDays, isDateKey, weekdayOfDateKey } from '../../schedule-core.js';
-import { taskGoalNumber } from './worklog-task-controls.mjs?v=20260929-priority-goals';
+import { taskGoalNumber, goalNumberAppearance } from './worklog-task-controls.mjs?v=20260929-goal-colors';
 
 // Reuse the server's Seoul clock. Due badges use midnight (worklog calendarToday);
 // worklog's business day rolls at 06:00; the existing goals editor rolls at midnight.
@@ -56,7 +56,7 @@ export function normalizeSnapshot(worklog, goals) {
     const id = String(task.id), weekKey = mondayOf(task.date);
     // Keep pre-existing links to independently saved goals unchanged.
     if (String(task.goalId) === id && weeklyGoals.some(goal => goal.id === id && goal.weekKey === weekKey)) continue;
-    weeklyGoals.push({ id, taskId:id, number, name:String(task.title || ''), color:null, weekKey });
+    weeklyGoals.push({ id, taskId:id, number, name:String(task.title || ''), color:goalNumberAppearance(number).color, weekKey });
   }
   return { tasks: ordered, weeklyGoals };
 }
