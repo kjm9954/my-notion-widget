@@ -2,6 +2,9 @@
 // 위젯은 이 파일의 함수만 부른다. 직접 fetch/localStorage 하지 않는다.
 
 const API = "https://notion-widget.wldnjsdkk.workers.dev";
+// New independent sets opt in. Never inherit or publish a legacy instance key.
+const ISOLATED_INSTANCE = document.currentScript?.hasAttribute('data-store-isolated') === true
+  || new URLSearchParams(window.location.search || '').get('isolated') === '1';
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
 const INSTANCE_STORAGE_KEY = "notion-widget-instance-v1";
 const INSTANCE_DISCOVERY_CHANNEL = "notion-widget-instance-discovery-v1";
@@ -28,6 +31,7 @@ function readWorklogInstanceId() {
 }
 
 function readStoredWidgetInstanceId() {
+  if (ISOLATED_INSTANCE) return "";
   try {
     const value = window.localStorage?.getItem(INSTANCE_STORAGE_KEY) || "";
     return INSTANCE_RE.test(value) ? value : "";
@@ -37,6 +41,7 @@ function readStoredWidgetInstanceId() {
 }
 
 function rememberWidgetInstanceId(value) {
+  if (ISOLATED_INSTANCE) return;
   if (!INSTANCE_RE.test(String(value || ""))) return;
   try { window.localStorage?.setItem(INSTANCE_STORAGE_KEY, value); } catch (_) {}
 }
@@ -187,6 +192,7 @@ function applyServerBackoff(error) {
 }
 
 async function readCachedWorklogInstanceId() {
+  if (ISOLATED_INSTANCE) return "";
   if (!("caches" in window)) return "";
   try {
     const response = await (await caches.open(STORE_CACHE)).match(worklogInstanceCacheUrl());
@@ -198,6 +204,7 @@ async function readCachedWorklogInstanceId() {
 }
 
 function rememberCachedWorklogInstanceId(value) {
+  if (ISOLATED_INSTANCE) return;
   const instanceId = String(value || "");
   if (!INSTANCE_RE.test(instanceId) || !("caches" in window)) return;
   void caches.open(STORE_CACHE).then(cache => cache.put(worklogInstanceCacheUrl(), new Response(instanceId, {
@@ -205,7 +212,7 @@ function rememberCachedWorklogInstanceId(value) {
   }))).catch(() => {});
 }
 
-if (INSTANCE_RE.test(URL_INSTANCE_ID)) {
+if (!ISOLATED_INSTANCE && INSTANCE_RE.test(URL_INSTANCE_ID)) {
   if (isWorklogWidgetPath()) {
     rememberCachedWorklogInstanceId(URL_INSTANCE_ID);
     try {
@@ -230,6 +237,7 @@ function instanceContextKey() {
 }
 
 function adoptDiscoveredInstance(value) {
+  if (ISOLATED_INSTANCE) return;
   const instanceId = String(value || "");
   if (URL_INSTANCE_ID || WIDGET_INSTANCE_ID || !INSTANCE_RE.test(instanceId)) return;
   rememberWidgetInstanceId(instanceId);
@@ -243,6 +251,7 @@ function adoptDiscoveredInstance(value) {
 }
 
 function announceWidgetInstance(type = "instance") {
+  if (ISOLATED_INSTANCE) return;
   if (!instanceDiscoveryChannel || isWorklogWidgetPath()) return;
   const context = instanceContextKey();
   if (!context) return;
@@ -252,19 +261,21 @@ function announceWidgetInstance(type = "instance") {
 }
 
 try {
-  instanceDiscoveryChannel = new BroadcastChannel(INSTANCE_DISCOVERY_CHANNEL);
-  instanceDiscoveryChannel.addEventListener("message", event => {
-    const message = event?.data || {};
-    const context = instanceContextKey();
-    if (!context || message.context !== context) return;
-    if (message.type === "request-instance") {
-      if (WIDGET_INSTANCE_ID) announceWidgetInstance();
-      return;
-    }
-    if (message.type === "instance") adoptDiscoveredInstance(message.instanceId);
-  });
-  if (WIDGET_INSTANCE_ID) announceWidgetInstance();
-  else announceWidgetInstance("request-instance");
+  if (!ISOLATED_INSTANCE) {
+    instanceDiscoveryChannel = new BroadcastChannel(INSTANCE_DISCOVERY_CHANNEL);
+    instanceDiscoveryChannel.addEventListener("message", event => {
+      const message = event?.data || {};
+      const context = instanceContextKey();
+      if (!context || message.context !== context) return;
+      if (message.type === "request-instance") {
+        if (WIDGET_INSTANCE_ID) announceWidgetInstance();
+        return;
+      }
+      if (message.type === "instance") adoptDiscoveredInstance(message.instanceId);
+    });
+    if (WIDGET_INSTANCE_ID) announceWidgetInstance();
+    else announceWidgetInstance("request-instance");
+  }
 } catch (_) {}
 
 window.addEventListener("storage", event => {
@@ -279,7 +290,7 @@ function showStoreError(error) {
     ? "서버 요청 한도 초과 · 오전 9시 자동 재시도"
     : error?.serverBackoff
       ? "서버 요청이 많아 잠시 후 자동 재시도"
-      : /인스턴스/.test(detail)
+      : error?.serverUpgradeNeeded || /인스턴스/.test(detail)
         ? detail
         : "서버 연결 실패 · 다시 시도 중";
   const now = Date.now();
@@ -386,6 +397,11 @@ function watch(callback, interval = MIN_WATCH_INTERVAL_MS, options = {}) {
 
 // 공통 요청 헬퍼
 function apiUrl(path, includeInstance = true, instanceId = WIDGET_INSTANCE_ID) {
+  if (ISOLATED_INSTANCE && includeInstance && (!WIDGET_INSTANCE_ID || instanceId !== WIDGET_INSTANCE_ID)) {
+    const error = new Error("새 위젯 세트의 인스턴스 키가 포함된 주소로 열어 주세요.");
+    showStoreError(error);
+    throw error;
+  }
   if (RAW_INSTANCE_ID && !WIDGET_INSTANCE_ID) throw new Error("올바르지 않은 위젯 인스턴스 주소입니다.");
   if (instanceId && !INSTANCE_RE.test(instanceId)) throw new Error("올바르지 않은 위젯 인스턴스 주소입니다.");
   const url = new URL(API + path);
@@ -545,6 +561,10 @@ async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_I
     announceChange(path);
     return data;
   } catch (error) {
+    if (path === "/api/notes/patch" && error.status === 200 && /notion-widget API 서버/.test(error.responseText || "")) {
+      error.serverUpgradeNeeded = true;
+      error.message = "메모 저장 기능을 사용하려면 서버 업데이트가 필요합니다.";
+    }
     applyServerBackoff(error);
     showStoreError(error);
     throw error;
@@ -733,6 +753,7 @@ async function deleteIndexItem(id) {
 
 // ───────── 업무일지 ─────────
 async function resolveWorklogInstanceId() {
+  if (ISOLATED_INSTANCE) return WIDGET_INSTANCE_ID;
   if (URL_WORKLOG_INSTANCE_ID) {
     if (!INSTANCE_RE.test(URL_WORKLOG_INSTANCE_ID)) throw new Error("올바르지 않은 업무일지 연결 주소입니다.");
     return URL_WORKLOG_INSTANCE_ID;
@@ -789,7 +810,14 @@ async function saveImportantCalendarState(state) {
 }
 
 // ───────── 이번 주 목표 ─────────
-async function loadWeeklyGoalsState() {
+async function loadWeeklyGoalsState(options = {}) {
+  // Read views need a confirmed response: a cached empty list must not hide an outage.
+  // opt-in only; existing goal editors retain their cache/instance behavior.
+  if (options?.fresh === true) {
+    const instanceId = options.worklogInstance === true
+      ? WIDGET_INSTANCE_ID || await resolveWorklogInstanceId() : WIDGET_INSTANCE_ID;
+    return (await apiGetFresh("/api/weekly-goals/state", instanceId)).data;
+  }
   return (await apiGet("/api/weekly-goals/state")).data;
 }
 async function saveWeeklyGoalsState(state) {
@@ -802,6 +830,11 @@ async function loadNotesState() {
 }
 async function saveNotesState(state) {
   return (await apiPost("/api/notes/state", state)).data;
+}
+async function patchNotesState(patch) {
+  const data = (await apiPost("/api/notes/patch", patch)).data;
+  writeCached(apiUrl("/api/notes/state"), { ok: true, data });
+  return data;
 }
 
 // ───────── 업무 관리 예약 ─────────
@@ -883,7 +916,7 @@ window.Store = {
   loadWorklogState, saveWorklogState, patchWorklogState, saveWorklogView, saveWorklogColumnSplit,
   loadImportantCalendarState, saveImportantCalendarState,
   loadWeeklyGoalsState, saveWeeklyGoalsState,
-  loadNotesState, saveNotesState,
+  loadNotesState, saveNotesState, patchNotesState,
   loadSchedules, createSchedule, updateSchedule, skipScheduleOccurrence, deleteSchedule,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
   watch,

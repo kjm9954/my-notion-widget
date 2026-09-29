@@ -66,6 +66,7 @@ function createStore(fetchImpl, persisted = new Map(), options = {}) {
     removeEventListener() {},
   };
   const document = options.document || {
+    currentScript: { hasAttribute:name => options.isolated === true && name === 'data-store-isolated' },
     referrer: "https://www.notion.so/work-log-page",
     hidden: false,
     activeElement: null,
@@ -120,6 +121,62 @@ function createTrackedDocument(indicators) {
     },
   };
 }
+
+test("독립 세트는 기존 키·캐시를 가져오지 않고 키 없는 읽기와 쓰기를 차단한다", async () => {
+  const oldId = 'w_abcdefghijklmnopqrstuvwxyz123456';
+  const persisted = new Map([['https://kjm9954.github.io/__notion-widget-worklog-instance-v1__', oldId]]);
+  const instanceStorage = new Map([['notion-widget-instance-v1', oldId]]);
+  const openedChannels = [];
+  const before = [...persisted], beforeStorage = [...instanceStorage];
+  let calls = 0;
+  const store = createStore(async () => { calls++; throw new Error('must not fetch'); }, persisted, {
+    search:`?worklog_w=${oldId}`, instanceStorage, isolated:true,
+    BroadcastChannel:class { constructor(name) { openedChannels.push(name); } addEventListener() {} postMessage() {} }
+  });
+  assert.equal(store.getWidgetInstanceId(), null);
+  for (const read of [() => store.loadWorklogState({fresh:true}), () => store.loadNotesState(),
+    () => store.loadWeeklyGoalsState({fresh:true,worklogInstance:true}), () => store.patchNotesState({cleanupCompleted:true}),
+    () => store.patchWorklogState({upserts:[]})]) await assert.rejects(read(), /인스턴스/);
+  assert.equal(calls, 0);
+  assert.deepEqual([...persisted], before);
+  assert.deepEqual([...instanceStorage], beforeStorage);
+  assert.ok(!openedChannels.includes('notion-widget-instance-discovery-v1'));
+});
+
+test("독립 세트는 명시한 새 키만 사용하고 예전 키와 업무 연결 캐시를 덮어쓰지 않는다", async () => {
+  const oldId = 'w_abcdefghijklmnopqrstuvwxyz123456', newId = 'w_new_set_abcdefghijklmnopqrstuvwxyz';
+  const cacheUrl = 'https://kjm9954.github.io/__notion-widget-worklog-instance-v1__';
+  const persisted = new Map([[cacheUrl, oldId]]);
+  const instanceStorage = new Map([['notion-widget-instance-v1', oldId]]);
+  const urls = [];
+  const store = createStore(async url => {
+    urls.push(String(url)); return Response.json({ok:true,data:{tasks:[],items:[]}});
+  }, persisted, { search:`?w=${newId}&worklog_w=${oldId}`, instanceStorage, isolated:true,
+    href:'https://kjm9954.github.io/my-notion-widget/cream-olive-garden/Worklog/notes.html' });
+  await store.loadWorklogState({fresh:true});
+  await store.loadWeeklyGoalsState({fresh:true,worklogInstance:true});
+  await store.patchNotesState({updates:[]});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(urls.length >= 3 && urls.every(url => new URL(url).searchParams.get('w') === newId));
+  assert.equal(instanceStorage.get('notion-widget-instance-v1'), oldId);
+  assert.equal(persisted.get(cacheUrl), oldId);
+});
+
+test("읽기 위젯의 fresh 목표 조회는 캐시가 있어도 연결 실패를 전달하고 업무 인스턴스를 따른다", async () => {
+  const persisted = new Map();
+  const instanceId = 'w_abcdefghijklmnopqrstuvwxyz123456';
+  const urls = [];
+  const options = { search:`?worklog_w=${instanceId}`, instanceStorage:new Map() };
+  const store = createStore(async url => {
+    urls.push(String(url));
+    return Response.json({ ok:true, data:{ week:'2026-9-28', items:[] } });
+  }, persisted, options);
+  await store.loadWeeklyGoalsState({ fresh:true, worklogInstance:true });
+  assert.equal(new URL(urls[0]).searchParams.get('w'), instanceId);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const offline = createStore(async () => { throw new Error('offline'); }, persisted, options);
+  await assert.rejects(offline.loadWeeklyGoalsState({ fresh:true, worklogInstance:true }), /offline/);
+});
 
 test("같은 노션 페이지의 기존 무키 위젯도 저장된 개인 인스턴스를 이어 쓴다", async () => {
   const instanceStorage = new Map();

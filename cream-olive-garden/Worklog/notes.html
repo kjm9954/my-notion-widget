@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모장</title>
+  <link rel="stylesheet" href="../../widget-frame.css">
+  <link rel="stylesheet" href="../notes-theme.css">
+  <style>
+    #notes-roof-v8 .memo-text { white-space:pre-wrap; overflow-wrap:anywhere; text-overflow:clip; }
+    #notes-roof-v8 textarea.memo-input { display:block; resize:none; overflow:hidden; min-height:30px; height:auto; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+    @media (hover:none) {
+      #notes-roof-v8 .delete-action, #notes-roof-v8 .check-action { min-width:calc(44px * var(--notes-touch-scale,1)); min-height:calc(44px * var(--notes-touch-scale,1)); opacity:1; visibility:visible; }
+      #notes-roof-v8 .memo-input, #notes-roof-v8 .add-row { min-height:calc(44px * var(--notes-touch-scale,1)); }
+    }
+  </style>
+  <script src="../../store.js?v=20260929-isolated-set" data-store-isolated></script>
+</head>
+<body class="widget-page widget-page-centered notes-minimal-page">
+  <div id="notes-roof-v8" class="widget-host" data-widget-host data-widget-key="widget-size-cream-olive-notes-v9" data-widget-max-width="340" data-widget-height="270" data-widget-max-scale="4" style="--widget-max-width:340px;--widget-base-width:340px;--widget-base-height:270px;--widget-visual-height:270px">
+    <div class="notes-size-frame" data-widget-card>
+      <main class="notes-card" id="notesCard" aria-label="메모장 위젯">
+        <section class="notes-area" id="notesArea" data-widget-list data-widget-list-height="224" aria-label="메모 목록"></section>
+        <span class="notes-live" role="status" aria-live="polite"></span>
+        <button class="widget-list-resize-handle" data-widget-list-handle type="button" aria-label="메모 목록 높이 조절" aria-valuemin="110"></button>
+        <span class="widget-size-label" data-widget-size-label aria-hidden="true"></span>
+        <button class="widget-size-handle" data-widget-scale-handle type="button" aria-label="위젯 비율 고정 크기 조절"></button>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const card = document.getElementById('notesCard');
+      const notesArea = document.getElementById('notesArea');
+      let items = [];
+      let editingId = null;
+      let editingOriginal = '';
+      let draftNew = false;
+      let pendingSync = false;
+      let saveQueue = Promise.resolve();
+      let localRevision = 0;
+      let syncRevision = 0;
+      let hasLoaded = false;
+      let hasError = false;
+      let cleanedDay = '';
+      const pendingWrites = [];
+      const todayKey = () => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+
+      // Do not save an apparently empty list before the first server read finishes.
+      notesArea.inert = true;
+      notesArea.setAttribute('aria-busy', 'true');
+
+      const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      })[character]);
+
+      function makeId() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+
+      function normalizeItems(value) {
+        if (!value || typeof value !== 'object' || !Array.isArray(value.items)) return [];
+        return value.items.map((item,index) => {
+          if (!item || typeof item !== 'object') return null;
+          const text = String(item.text || '').trim();
+          if (!text) return null;
+          const done = item.done === true;
+          return { id:String(item.id || `note-${index}`), text, done, doneAt:done ? (item.doneAt || todayKey()) : null };
+        }).filter(Boolean);
+      }
+
+      function readItems() {
+        return normalizeItems({ items });
+      }
+
+      function writeMerged(change) {
+        const latest = readItems();
+        const next = change(latest).filter(item => item.text.trim());
+        const previous = new Map(latest.map(item => [item.id,item]));
+        const ids = new Set(next.map(item => item.id));
+        const updates = next.flatMap(item => {
+          const old = previous.get(item.id);
+          const changes = {};
+          for (const field of ['text','done']) {
+            if (!old || old[field] !== item[field]) changes[field] = item[field];
+          }
+          return Object.keys(changes).length ? [{ id:item.id, create:!old, changes }] : [];
+        });
+        const deleteIds = latest.filter(item => !ids.has(item.id)).map(item => item.id);
+        if (!updates.length && !deleteIds.length) return true;
+        items = next;
+        localRevision += 1;
+        pendingWrites.push({ updates, deleteIds });
+        saveQueue = saveQueue.then(flushWrites).then(() => {
+          pendingSync = true;
+          flushPendingSync();
+        }).catch(error => {
+          hasError = true;
+          console.warn('메모를 저장하지 못했습니다.', error);
+          card.querySelector('.notes-live').textContent = '저장하지 못했습니다. 입력은 유지되며 연결이 돌아오면 다시 저장합니다.';
+        });
+        return true;
+      }
+
+      async function flushWrites() {
+        while (pendingWrites.length) {
+          await Store.patchNotesState(pendingWrites[0]);
+          pendingWrites.shift();
+        }
+      }
+
+      function fitInput() {
+        const input = document.getElementById('activeNoteInput');
+        if (!input) return;
+        input.style.height = 'auto';
+        input.style.height = `${input.scrollHeight + 2}px`;
+      }
+
+      function fitTouchTargets() {
+        const scale = card.getBoundingClientRect().width / card.offsetWidth || 1;
+        card.style.setProperty('--notes-touch-scale', String(1 / scale));
+        fitInput();
+      }
+
+      function isEditing() {
+        return editingId !== null || draftNew;
+      }
+
+      function rowMarkup(item) {
+        const editing = item.id === editingId;
+        const checked = item.done ? 'true' : 'false';
+        return `<div class="memo-row ${item.done ? 'is-done' : ''} ${editing ? 'is-editing' : ''}" data-note-id="${escapeHtml(item.id)}">
+          <button class="check-action" type="button" role="checkbox" aria-checked="${checked}" aria-label="${item.done ? '완료 취소' : '완료 표시'}" data-check="${escapeHtml(item.id)}"><span class="check-mark" aria-hidden="true">${item.done ? '✓' : ''}</span></button>
+          ${editing ? `<textarea class="memo-input" id="activeNoteInput" rows="1" maxlength="1000" aria-label="메모 편집" autocomplete="off">${escapeHtml(item.text)}</textarea>` : `<button class="memo-text" type="button" aria-label="메모 편집: ${escapeHtml(item.text)}">${escapeHtml(item.text)}</button>`}
+          ${editing ? '' : `<button class="delete-action" type="button" aria-label="메모 삭제" data-delete="${escapeHtml(item.id)}">✕</button>`}
+        </div>`;
+      }
+
+      function draftMarkup() {
+        return `<div class="memo-row is-editing" data-new-note><span class="check-action" aria-hidden="true"><span class="check-mark"></span></span><textarea class="memo-input" id="activeNoteInput" rows="1" maxlength="1000" aria-label="새 메모" autocomplete="off"></textarea></div>`;
+      }
+
+      function emptyMarkup() {
+        return `<button class="empty-state" type="button" data-start-first><span class="empty-title">적어둔 메모 없음</span><span class="empty-copy">＋ 눌러서 한 줄 남겨두세요</span></button>`;
+      }
+
+      function render({ focus = false } = {}) {
+        if (!items.length && !draftNew) {
+          notesArea.classList.add('is-empty');
+          notesArea.innerHTML = emptyMarkup();
+          return;
+        }
+        notesArea.classList.remove('is-empty');
+        notesArea.innerHTML = `<div class="notes-scroll" id="notesScroll">${items.filter(item => !item.done).map(rowMarkup).join('')}${draftNew ? draftMarkup() : ''}${items.filter(item => item.done).map(rowMarkup).join('')}</div><button class="add-row" type="button" data-add-note><span class="add-symbol">＋</span><span>메모 추가</span></button>`;
+        fitInput();
+        if (focus) {
+          requestAnimationFrame(() => {
+            const input = document.getElementById('activeNoteInput');
+            if (!input) return;
+            // A delayed render must not steal focus after the user has left the card.
+            if (document.activeElement !== document.body && !card.contains(document.activeElement)) return;
+            input.focus({ preventScroll:true });
+            input.setSelectionRange(input.value.length,input.value.length);
+            input.closest('.memo-row')?.scrollIntoView({ block:'nearest' });
+          });
+        }
+      }
+
+      function performDelete(id, row) {
+        const remove = () => {
+          writeMerged(latest => latest.filter(item => item.id !== id));
+          render();
+        };
+        if (window.widgetMotion?.close && row) window.widgetMotion.close(row,remove);
+        else remove();
+      }
+
+      function beginEdit(id) {
+        if (editingId === id) return;
+        const item = items.find(note => note.id === id);
+        if (!item) return;
+        editingId = id;
+        editingOriginal = item.text;
+        draftNew = false;
+        render({ focus:true });
+      }
+
+      function beginDraft() {
+        if (draftNew) {
+          document.getElementById('activeNoteInput')?.focus();
+          return;
+        }
+        if (editingId) commitEdit(false);
+        editingId = null;
+        editingOriginal = '';
+        draftNew = true;
+        render({ focus:true });
+      }
+
+      function commitEdit(continueDraft) {
+        const input = document.getElementById('activeNoteInput');
+        const text = String(input?.value || '').trim();
+        if (draftNew) {
+          draftNew = false;
+          let newItem = null;
+          if (text) {
+            newItem = { id:makeId(), text, done:false, doneAt:null };
+            writeMerged(latest => latest.some(item => item.id === newItem.id) ? latest : [...latest,newItem]);
+          }
+          if (continueDraft && text) draftNew = true;
+          render({ focus:draftNew });
+          if (newItem) {
+            const row = notesArea.querySelector(`[data-note-id="${CSS.escape(newItem.id)}"]`);
+            if (row) {
+              widgetMotion.popIn(row);
+              row.classList.add('motion-new');
+              setTimeout(() => row.classList.remove('motion-new'), 900);
+            }
+          }
+          flushPendingSync();
+          return;
+        }
+        if (!editingId) return;
+        const id = editingId;
+        editingId = null;
+        editingOriginal = '';
+        if (text) writeMerged(latest => latest.map(item => item.id === id ? { ...item,text } : item));
+        else writeMerged(latest => latest.filter(item => item.id !== id));
+        render();
+        flushPendingSync();
+      }
+
+      function cancelEdit() {
+        if (draftNew) {
+          draftNew = false;
+          render();
+          flushPendingSync();
+          return;
+        }
+        if (!editingId) return;
+        const id = editingId;
+        editingId = null;
+        const original = editingOriginal;
+        editingOriginal = '';
+        const local = items.find(item => item.id === id);
+        if (local) local.text = original;
+        render();
+        flushPendingSync();
+      }
+
+      async function syncFromServer() {
+        if (isEditing()) {
+          pendingSync = true;
+          return;
+        }
+        const revision = localRevision;
+        const request = ++syncRevision;
+        let next;
+        let cleanupError = null;
+        try {
+          await saveQueue;
+          if (pendingWrites.length) {
+            saveQueue = saveQueue.then(flushWrites);
+            await saveQueue;
+          }
+          const day = todayKey();
+          // Reading must not depend on the optional daily cleanup write succeeding.
+          next = normalizeItems(await Store.loadNotesState());
+          // Typing may have started while the read was pending; defer cleanup too.
+          if (request !== syncRevision) return;
+          if (isEditing() || revision !== localRevision) {
+            pendingSync = true;
+            flushPendingSync();
+            return;
+          }
+          if (cleanedDay !== day) {
+            try {
+              next = normalizeItems(await Store.patchNotesState({ cleanupCompleted:true }));
+              cleanedDay = day;
+            } catch (error) {
+              cleanupError = error;
+              console.warn('메모는 불러왔지만 완료 항목을 정리하지 못했습니다.', error);
+            }
+          }
+        } catch (error) {
+          saveQueue = saveQueue.catch(() => {});
+          if (request !== syncRevision) return;
+          if (isEditing() || revision !== localRevision) { pendingSync = true; return; }
+          console.warn('메모를 불러오지 못했습니다.', error);
+          hasError = true;
+          notesArea.inert = false;
+          notesArea.removeAttribute('aria-busy');
+          if (!hasLoaded) notesArea.innerHTML = '<div class="empty-state"><span class="empty-title">불러오지 못했습니다</span><span class="empty-copy">잠시 후 다시 시도해 주세요</span></div>';
+          card.querySelector('.notes-live').textContent = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+          return;
+        }
+        // A request started before typing must not replace the active input.
+        if (request !== syncRevision) return;
+        if (isEditing()) { pendingSync = true; return; }
+        if (revision !== localRevision) { pendingSync = true; flushPendingSync(); return; }
+        const needsRender = !hasLoaded || hasError;
+        hasLoaded = true;
+        hasError = Boolean(cleanupError);
+        card.querySelector('.notes-live').textContent = cleanupError
+          ? (cleanupError.serverUpgradeNeeded ? '메모 저장 기능을 사용하려면 서버 업데이트가 필요합니다.' : '메모는 불러왔지만 완료 항목 정리를 하지 못했습니다. 연결이 돌아오면 다시 시도합니다.')
+          : '';
+        notesArea.inert = false;
+        notesArea.removeAttribute('aria-busy');
+        if (!needsRender && JSON.stringify(next) === JSON.stringify(items)) return;
+        items = next;
+        render();
+      }
+
+      function flushPendingSync() {
+        if (!pendingSync || isEditing()) return;
+        pendingSync = false;
+        syncFromServer();
+      }
+
+      card.addEventListener('click', event => {
+        if (!hasLoaded) return;
+        const activeEditingRow = event.target.closest('.memo-row.is-editing');
+        if (isEditing() && !activeEditingRow) commitEdit(false);
+        const first = event.target.closest('[data-start-first]');
+        if (first) return beginDraft();
+        const add = event.target.closest('[data-add-note]');
+        if (add) return beginDraft();
+        const check = event.target.closest('[data-check]');
+        if (check) {
+          const id = check.dataset.check;
+          const activeText = editingId === id ? String(document.getElementById('activeNoteInput')?.value || '') : null;
+          writeMerged(latest => latest.map(item => item.id === id ? { ...item,done:!item.done,doneAt:item.done ? null : todayKey() } : item));
+          if (activeText !== null) {
+            const local = items.find(item => item.id === id);
+            if (local) local.text = activeText;
+          }
+          const nowDone = items.find(item => item.id === id)?.done === true;
+          render({ focus:editingId === id });
+          if (nowDone) {
+            const mark = notesArea.querySelector(`[data-note-id="${CSS.escape(id)}"] .check-mark`);
+            widgetMotion.pop(mark);
+          }
+          return;
+        }
+        const remove = event.target.closest('[data-delete]');
+        if (remove) return performDelete(remove.dataset.delete,remove.closest('.memo-row'));
+        const row = event.target.closest('[data-note-id]');
+        if (row && !row.classList.contains('is-editing')) beginEdit(row.dataset.noteId);
+      });
+
+      card.addEventListener('keydown', event => {
+        if (!event.target.matches('.memo-input')) return;
+        if (event.isComposing || event.keyCode === 229) return;
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          commitEdit(draftNew);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelEdit();
+        }
+      });
+
+      card.addEventListener('input', event => { if (event.target.matches('.memo-input')) fitInput(); });
+      window.addEventListener('widgetlayoutchange', fitTouchTargets);
+      window.addEventListener('resize', fitTouchTargets);
+      window.addEventListener('load', fitTouchTargets, { once:true });
+
+      card.addEventListener('focusout', event => {
+        if (!event.target.matches('.memo-input')) return;
+        window.setTimeout(() => {
+          if (!isEditing() || card.contains(document.activeElement)) return;
+          commitEdit(false);
+        },0);
+      });
+
+      window.addEventListener('focus',syncFromServer);
+      document.addEventListener('visibilitychange',() => { if (!document.hidden) syncFromServer(); });
+
+      render();
+      syncFromServer();
+      Store.watch(syncFromServer, undefined, { allowWhileEditing:true });
+    })();
+  </script>
+  <script src="../../widget-frame.js"></script>
+</body>
+</html>

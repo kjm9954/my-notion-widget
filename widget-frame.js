@@ -290,6 +290,7 @@
 
   function layoutMode(host, savedWidth) {
     if (!isMobileTabletDevice()) return 'desktop';
+    if (host?.hasAttribute('data-widget-fluid')) return 'reflow';
     const width = viewportWidth();
     if (width >= 640 || savedWidth <= width * 2) return 'scale';
     return host?.hasAttribute('data-widget-mobile') ? 'mobile' : 'reflow';
@@ -548,6 +549,8 @@
 
   const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
   const widthKey = host.dataset.widgetWidthKey || '';
+  const fluidWidth = host.hasAttribute('data-widget-fluid');
+  const autoHeight = host.hasAttribute('data-widget-auto-height');
   const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
   const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
@@ -641,7 +644,7 @@
      card, so a wide or short embed can never leave an empty band around it. */
   function maximumScale() {
     const byWidth = viewportWidth() / contentWidth;
-    const viewportLimit = isMobileTabletDevice() ? byWidth : Number.POSITIVE_INFINITY;
+    const viewportLimit = isMobileTabletDevice() || fluidWidth ? byWidth : Number.POSITIVE_INFINITY;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
       ? configuredMaximumScale
       : Number.POSITIVE_INFINITY;
@@ -665,6 +668,7 @@
       return target / scaleWithoutWidth;
     }
     if (widthLocked) return contentWidth;
+    if (fluidWidth) return Math.min(designWidth, viewportWidth());
     return designWidth;
   }
 
@@ -869,6 +873,14 @@
   }
 
   function applyFrameHeight(value, fromUser = false, scale = renderedScale || requestedScale || 1) {
+    // Read-only overview cards expose every row and grow with their contents.
+    if (autoHeight) {
+      heightLocked = false;
+      card.style.removeProperty('height');
+      naturalHeight = Math.max(1, card.offsetHeight);
+      updateFrame();
+      return;
+    }
     const next = fromUser
       ? clampAxisSize(value, MINIMUM_FRAME_HEIGHT, maximumFrameHeight(scale))
       : Math.max(MINIMUM_FRAME_HEIGHT, number(value, naturalHeight));
