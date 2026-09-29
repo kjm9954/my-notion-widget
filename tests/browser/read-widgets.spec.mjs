@@ -501,8 +501,8 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
             assert.ok(metrics.scroll <= width + 1, `${label} ${files[i]} horizontal scroll ${JSON.stringify(metrics)}`);
             assert.ok(metrics.left >= -1 && metrics.right <= width + 1, `${label} frame outside viewport`);
             assert.ok(Math.abs(metrics.frameH - metrics.cardH - 12) < 3, `${label} ${files[i]} frame content mismatch ${JSON.stringify(metrics)}`);
-            assert.equal(metrics.background, 'rgb(250, 247, 239)');
-            if (touch) assert.equal(metrics.scale, '1');
+            assert.equal(metrics.background, 'rgb(253, 246, 237)');
+            assert.equal(metrics.scale, '1');
             if (process.env.TEST_SCREENSHOT_DIR && ['desktop','ipad','mobile'].includes(label)) {
               await mkdir(process.env.TEST_SCREENSHOT_DIR, { recursive:true });
               // Capture the actual device viewport, without a full-page resize.
@@ -513,10 +513,9 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           const name = await goals.locator('[data-goal-id="2"] .wg-name').evaluate(el => ({ width:el.clientWidth, scroll:el.scrollWidth, height:el.clientHeight, scrollH:el.scrollHeight }));
           assert.ok(name.scroll <= name.width + 1 && name.scrollH <= name.height + 1);
           const columns = await week.locator('.wr-day').evaluateAll(nodes => nodes.map(n => { const r = n.getBoundingClientRect(); return { y:r.y, height:r.height }; }));
-          assert.ok(columns.every(c => Math.abs(c.height - columns[0].height) < 1), `${label} unequal weekday heights`);
-          const media = await week.evaluate(() => ({ width:innerWidth, coarse:matchMedia('(any-pointer:coarse)').matches, small:matchMedia('(max-width:599px)').matches, device:document.body.dataset.widgetLayoutMode }));
-          const phone = touch && Math.min(screen?.width || width, screen?.height || height) < 640;
-          assert.equal(new Set(columns.map(c => Math.round(c.y))).size, phone ? 5 : 1, `${label} ${JSON.stringify(media)}`);
+          const widgetWidth=await week.locator('[data-read-widget]').evaluate(n=>n.clientWidth);
+          if(widgetWidth>=600) assert.ok(columns.every(c => Math.abs(c.height - columns[0].height) < 1), `${label} unequal weekday heights`);
+          assert.equal(new Set(columns.map(c => Math.round(c.y))).size, widgetWidth<600 ? 5 : 1, `${label}: width ${widgetWidth}`);
           assert.equal(await week.locator('[data-date="2026-09-29"] .wr-task').count(), 8);
           const dots = await month.locator('[data-date="2026-09-29"] .wr-dot').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().y));
           assert.equal(dots[0], dots[3]); assert.ok(dots[4] > dots[0]);
@@ -528,6 +527,120 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           assert.deepEqual(db.writes, []); assert.deepEqual(errors, []);
         } finally { await context.close(); }
       }
+    });
+
+    await t.test('read theme sorts deadline ties and completed weekdays without changing stored records', async () => {
+      const {context,db,errors,open,notify}=await setup(browser);
+      try {
+        db.worklog.tasks.slice(0,7).forEach((task,i)=>{task.q=[4,1,2,3,null,4,null][i];task.due='2026-09-29';});
+        const original=structuredClone(db.worklog);
+        const due=await open('deadlines');
+        const ids=(page,selector)=>page.locator(selector).evaluateAll(nodes=>nodes.map(n=>n.dataset.taskId));
+        assert.deepEqual(await ids(due,'.wr-deadline'),['t1','t2','t3','t0','t5']);
+        assert.deepEqual(db.worklog,original);
+        db.worklog.tasks[1].done=true; db.worklog.revision++; await notify(due);
+        await due.waitForFunction(()=>!document.querySelector('[data-task-id="t1"]'));
+        assert.deepEqual(await ids(due,'.wr-deadline'),['t2','t3','t0','t5','t4']);
+        assert.equal(await due.locator('[data-task-id="t7"]').count(),0);
+        db.worklog.tasks[0].done=true; db.worklog.tasks[3].done=true;
+        const week=await open('week-review');
+        assert.deepEqual(await ids(week,'[data-date="2026-09-29"] .wr-task'),['t1','t3','t0','t2','t5','t4','t6','t7']);
+        assert.equal(await week.locator('.is-first-open').count(),1);
+        assert.equal(await week.locator('.is-first-open').getAttribute('data-task-id'),'t2');
+        assert.equal(await text(week,'.wr-day.is-today .wr-today-tag'),'오늘');
+        assert.equal(await week.locator('.wr-day.is-today .wr-day-header').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(244, 221, 160)');
+        const heights=await week.locator('.wr-day').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().height));
+        assert.ok(heights.every(h=>Math.abs(h-heights[0])<1));
+        const saved=structuredClone(db.worklog); await week.locator('.wr-check').first().click();
+        assert.deepEqual(db.worklog,saved); assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('260px deadline labels clamp to two lines and the four badge colors and widths match the supplied design', async () => {
+      for(const touch of [false,true]) {
+        const {context,db,errors,open}=await setup(browser,{viewport:{width:260,height:800},hasTouch:touch,isMobile:touch});
+        try {
+          db.worklog.tasks=db.worklog.tasks.slice(0,4).map((task,i)=>({...task,due:['2026-09-29','2026-09-30','2026-10-01','2026-10-02'][i]}));
+          const page=await open('deadlines');
+          const badges=await page.locator('.wr-dday').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,background:getComputedStyle(n).backgroundColor,color:getComputedStyle(n).color,radius:getComputedStyle(n).borderRadius,font:getComputedStyle(n).fontSize,weight:getComputedStyle(n).fontWeight})));
+          assert.deepEqual(badges.map(b=>b.width),[48,48,48,48]);
+          assert.deepEqual(badges.map(b=>b.background),['rgb(105, 122, 67)','rgb(244, 221, 160)','rgb(233, 236, 220)','rgb(233, 236, 220)']);
+          assert.equal(badges[0].color,'rgb(255, 255, 255)'); assert.ok(badges.every(b=>b.radius==='999px'&&b.font==='10px'&&b.weight==='800'));
+          const label=page.locator('[data-task-id="t0"] .wr-ellipsis');
+          const size=await label.evaluate(n=>({height:n.clientHeight,scroll:n.scrollHeight,line:parseFloat(getComputedStyle(n).lineHeight),clamp:getComputedStyle(n).webkitLineClamp,font:getComputedStyle(n).fontSize}));
+          assert.equal(size.clamp,'2'); assert.equal(size.font,'12px'); assert.ok(Math.abs(size.height-size.line*2)<=1); assert.ok(size.scroll>size.height);
+          await label.dispatchEvent('pointerover',{pointerType:touch?'touch':'mouse'});
+          assert.equal(await page.locator('.wr-tooltip').isVisible(),!touch);
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+          if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,`260-${touch?'touch':'mouse'}-deadlines.png`)});
+          assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+        } finally {await context.close();}
+      }
+    });
+
+    await t.test('widget-width breakpoints and calendar tiles work at 375px even with old scale settings', async () => {
+      for(const touch of [false,true]) {
+        const {context,db,errors,openAll}=await setup(browser,{viewport:{width:375,height:900},hasTouch:touch,isMobile:touch,screen:{width:768,height:1024}});
+        try {
+          await context.addInitScript(()=>{
+            if(location.origin!=='http://127.0.0.1:4179') return;
+            for(const name of ['weekly-goals','deadlines','week-review','month-calendar']) {
+              localStorage.setItem(`widget-size-cream-olive-${name}-read-v1`,JSON.stringify({scale:.5,scaleLocked:true,contentW:1100,widthLocked:true,heightLocked:false}));
+            }
+          });
+          db.worklog.tasks[5].due='2026-09-29';
+          const [goals,due,week,month]=await openAll();
+          for(const page of [goals,due,week,month]) {
+            const style=await page.locator('[data-widget-card]').evaluate(n=>({matrix:new DOMMatrixReadOnly(getComputedStyle(n).transform).a,zoom:getComputedStyle(n).zoom,right:n.getBoundingClientRect().right}));
+            assert.equal(style.matrix,1); assert.equal(style.zoom,'1'); assert.ok(style.right<=375);
+            assert.equal(await page.locator('.wr-card').evaluate(n=>getComputedStyle(n).borderRadius),'18px');
+          }
+          assert.equal(await week.locator('.wr-week').evaluate(n=>getComputedStyle(n).flexDirection),'column');
+          assert.equal(await week.locator('.wr-task').first().evaluate(n=>getComputedStyle(n).fontSize),'13px');
+          const goal=goals.locator('[data-goal-id="2"] .wg-name');
+          assert.equal(await goal.textContent(),longName);
+          assert.equal(await goal.evaluate(n=>n.scrollHeight<=n.clientHeight+1&&n.scrollWidth<=n.clientWidth+1),true);
+          assert.equal(await goals.locator('.wg-count strong').first().evaluate(n=>getComputedStyle(n).color),'rgb(105, 122, 67)');
+          const today=month.locator('.wr-date.is-today');
+          assert.equal(await today.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(244, 221, 160)');
+          assert.equal(await today.locator('.wr-today-tag').isVisible(),false);
+          assert.equal(await month.locator('.wr-date.in-last-row').count(),0);
+          const cells=await month.locator('.wr-date').evaluateAll(nodes=>nodes.map(n=>({x:n.getBoundingClientRect().x,y:n.getBoundingClientRect().y,border:getComputedStyle(n).borderRightWidth})));
+          assert.equal(new Set(cells.slice(0,7).map(c=>c.y)).size,1); assert.equal(new Set(cells.slice(0,7).map(c=>c.x)).size,7); assert.ok(cells.every(c=>c.border==='0px'));
+          const dots=await today.locator('.wr-dot').evaluateAll(nodes=>nodes.map(n=>({y:n.getBoundingClientRect().y,width:n.getBoundingClientRect().width})));
+          assert.equal(dots.length,6); assert.equal(dots[0].y,dots[3].y); assert.equal(dots[4].y,dots[5].y); assert.ok(dots[4].y>dots[0].y); assert.ok(dots.every(d=>d.width===6));
+          assert.equal(await month.locator('.wr-date.is-weekend:not(.is-other-month)').first().evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(245, 237, 223)');
+          const other=await month.locator('.wr-date.is-other-month').first().evaluate(n=>({bg:getComputedStyle(n).backgroundColor,shadow:getComputedStyle(n).boxShadow}));
+          assert.equal(other.bg,'rgba(0, 0, 0, 0)'); assert.match(other.shadow,/inset/);
+          for(const [width,direction,font] of [[612,'row','12px'],[611,'column','13px'],[768,'row','12px'],[375,'column','13px']]) {
+            await week.setViewportSize({width,height:900});
+            await week.waitForFunction(expected=>getComputedStyle(document.querySelector('.wr-week')).flexDirection===expected,direction);
+            assert.equal(await week.locator('.wr-task').first().evaluate(n=>getComputedStyle(n).fontSize),font);
+            assert.equal(await week.locator('[data-widget-host]').evaluate(n=>n.style.getPropertyValue('--widget-content-scale')),'1');
+          }
+          if(process.env.TEST_SCREENSHOT_DIR) for(const [name,page] of [['goals',goals],['week',week],['calendar',month]]) await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,`375-${touch?'ipad':'desktop'}-${name}.png`)});
+          assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+        } finally {await context.close();}
+      }
+    });
+
+    await t.test('read widget corner resizing changes layout without scaling type or writing user data', async () => {
+      const {context,db,errors,open}=await setup(browser);
+      try {
+        const page=await open('week-review');
+        const metrics=()=>page.locator('[data-widget-card]').evaluate(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height,scale:new DOMMatrixReadOnly(getComputedStyle(n).transform).a,font:getComputedStyle(n.querySelector('.wr-task')).fontSize}));
+        const before=await metrics(), handle=page.locator('.widget-size-handle-bottom-right');
+        await handle.focus(); await handle.press('ArrowLeft');
+        let after=await metrics(); assert.ok(after.width<before.width); assert.equal(after.scale,1); assert.equal(after.font,before.font);
+        await page.waitForFunction(()=>Math.abs(document.querySelector('.widget-size-handle-bottom-right').getBoundingClientRect().left-(document.querySelector('[data-widget-card]').getBoundingClientRect().right-20))<2);
+        const box=await handle.boundingBox();
+        await page.mouse.move(box.x+7,box.y+7); await page.mouse.down();
+        await page.mouse.move(box.x-43,box.y-8,{steps:8}); await page.mouse.up();
+        const resized=await metrics(); assert.ok(resized.width<after.width-40); assert.equal(resized.scale,1); assert.equal(resized.font,before.font);
+        await page.reload(); await page.locator('.wr-task').first().waitFor();
+        assert.ok(Math.abs((await metrics()).width-resized.width)<1); assert.equal((await metrics()).scale,1);
+        assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
     });
 
     await t.test('new worklog and v9 notes retain their desktop/tablet/phone layout and assets', async () => {

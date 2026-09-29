@@ -74,14 +74,19 @@ export function summarizeGoals(state, monday) {
   }).sort((a, b) => a.number - b.number);
 }
 export function deadlines(state, today) {
-  return state.tasks.filter(task => task.mode === 'work' && task.done === false && isDateKey(task.due) && task.due >= today && task.due <= addDays(today, 3))
-    .map((task, index) => ({ ...task, index, days: (Date.parse(task.due) - Date.parse(today)) / 86400000 }))
-    .sort((a, b) => a.days - b.days || a.index - b.index).slice(0, 5);
+  return state.tasks.map((task, originalIndex) => ({ ...task, originalIndex }))
+    .filter(task => task.mode === 'work' && task.done === false && isDateKey(task.due) && task.due >= today && task.due <= addDays(today, 3))
+    .map(task => ({ ...task, days: (Date.parse(task.due) - Date.parse(today)) / 86400000 }))
+    .sort((a, b) => a.days - b.days || byPriority(a, b)).slice(0, 5);
 }
+export const qOf = task => Number.isFinite(task.q) ? task.q : 5;
+export const byPriority = (a, b) => qOf(a) - qOf(b) || a.originalIndex - b.originalIndex;
 export function weekDays(state, monday) {
   return ['월', '화', '수', '목', '금'].map((label, index) => {
     const date = addDays(monday, index);
-    const tasks = state.tasks.filter(task => task.mode === 'work' && task.date === date);
+    const tasks = state.tasks.map((task, originalIndex) => ({ ...task, originalIndex }))
+      .filter(task => task.mode === 'work' && task.date === date)
+      .sort((a, b) => Number(b.done === true) - Number(a.done === true) || byPriority(a, b));
     return { label, date, tasks, total: tasks.length, done: tasks.filter(task => task.done === true).length };
   });
 }
@@ -121,3 +126,5 @@ export function createSource(store) {
     }
   };
 }
+// Pure display helpers only; no persistence or additional Store API.
+export const api = { qOf, byPriority, deadlines, weekDays };

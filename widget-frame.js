@@ -289,6 +289,8 @@
   }
 
   function layoutMode(host, savedWidth) {
+    // Width-responsive read widgets resize layout on every device, never text.
+    if (host?.hasAttribute('data-widget-layout-resize')) return 'desktop';
     if (!isMobileTabletDevice()) return 'desktop';
     if (host?.hasAttribute('data-widget-fluid')) return 'reflow';
     const width = viewportWidth();
@@ -551,6 +553,7 @@
   const widthKey = host.dataset.widgetWidthKey || '';
   const fluidWidth = host.hasAttribute('data-widget-fluid');
   const autoHeight = host.hasAttribute('data-widget-auto-height');
+  const layoutResize = host.hasAttribute('data-widget-layout-resize');
   const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
   const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
   const configuredMaximumScale = Number(host.dataset.widgetMaxScale);
@@ -568,6 +571,7 @@
   const isFluidMobile = () => ['reflow','mobile'].includes(currentLayoutMode());
 
   let contentWidth = designWidth;
+  let layoutRequestedWidth = designWidth;
   host.style.setProperty('--widget-content-width', `${contentWidth}px`);
   card.style.setProperty('--widget-content-width', `${contentWidth}px`);
 
@@ -644,6 +648,7 @@
   /* The widget never letterboxes: the white frame is always exactly the scaled
      card, so a wide or short embed can never leave an empty band around it. */
   function maximumScale() {
+    if (layoutResize) return 1;
     const byWidth = viewportWidth() / contentWidth;
     const viewportLimit = isMobileTabletDevice() || fluidWidth ? byWidth : Number.POSITIVE_INFINITY;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
@@ -653,10 +658,12 @@
   }
 
   function minimumScale() {
+    if (layoutResize) return 1;
     return Math.min(ABSOLUTE_MINIMUM_SCALE, maximumScale());
   }
 
   function measureContentWidth() {
+    if (layoutResize) return Math.min(viewportWidth(), widthLocked ? layoutRequestedWidth : designWidth);
     if (sizeDrag) return contentWidth;
     if (isFluidMobile()) return viewportWidth();
     if (widthKey) {
@@ -808,6 +815,15 @@
 
   function applyScale(value, fromUser = false) {
     if (!Number.isFinite(value)) return;
+    if (layoutResize) {
+      requestedScale = 1;
+      if (fromUser) {
+        applyContentWidth(contentWidth * value, true, 1);
+        applyFrameHeight(naturalHeight * value, true, 1);
+      }
+      updateFrame();
+      return;
+    }
     requestedScale = fromUser
       ? Math.max(minimumScale(), Math.min(maximumScale(), value))
       : Math.max(ABSOLUTE_MINIMUM_SCALE, value);
@@ -835,6 +851,7 @@
     const next = fromUser
       ? clampAxisSize(value, MINIMUM_CONTENT_WIDTH, maximumContentWidth(scale))
       : Math.max(MINIMUM_CONTENT_WIDTH, number(value, designWidth));
+    if (layoutResize) layoutRequestedWidth = next;
     if (fromUser) widthLocked = true;
     if (Math.abs(next - contentWidth) < .5) return;
     contentWidth = next;
@@ -943,7 +960,10 @@
         const widthRatio = widthDelta / Math.max(1, sizeDrag.width);
         const heightRatio = heightDelta / Math.max(1, sizeDrag.height);
         const ratio = Math.abs(widthRatio) >= Math.abs(heightRatio) ? widthRatio : heightRatio;
-        applyScale(sizeDrag.scale * Math.max(.05, 1 + ratio), true);
+        if (layoutResize) {
+          applyContentWidth(sizeDrag.contentWidth * Math.max(.05, 1 + ratio), true, 1);
+          applyFrameHeight(sizeDrag.naturalHeight * Math.max(.05, 1 + ratio), true, 1);
+        } else applyScale(sizeDrag.scale * Math.max(.05, 1 + ratio), true);
       }
     });
 

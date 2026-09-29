@@ -1,0 +1,24 @@
+/* Goal rendering, numbering and data logic stay unchanged. */
+[data-weekly-goals] {
+  --goal-paper:#FDF6ED; --goal-panel:#FFFCF6; --goal-ink:#45472F; --goal-muted:#75785D;
+  --goal-olive:#697A43; --goal-border:#EADFCD; --goal-line:#EFEADA;
+}
+[data-weekly-goals] :is(.wr-card, .wg-card) { padding:14px 16px 16px; border:1px solid var(--goal-border); border-radius:18px; background:var(--goal-paper); }
+[data-weekly-goals] .wr-header { min-height:0; margin-bottom:9px; }
+[data-weekly-goals] :is(.wr-title, .wg-title) { font-size:12px; font-weight:800; letter-spacing:.02em; color:var(--goal-muted); }
+[data-weekly-goals] :is(.wr-message, .wg-message) { border:1px solid var(--goal-line); background:var(--goal-panel); color:var(--goal-muted); }
+[data-weekly-goals] .wg-list { display:block; width:100%; margin:0; padding:0 12px; list-style:none; background:var(--goal-panel); border:1px solid var(--goal-line); border-radius:10px; }
+[data-weekly-goals] .wg-row { display:grid; grid-template-columns:20px minmax(0,1fr) max-content; align-items:start; gap:0 10px; margin:0; padding:10px 0; border-bottom:1px solid var(--goal-line); }
+[data-weekly-goals] .wg-row:last-child { border-bottom:0; }
+[data-weekly-goals] .wg-number { display:grid; place-items:center; width:20px; height:20px; margin-top:1px; border-radius:50%; background:var(--goal-color); color:var(--goal-number-ink,#FFFFFF); font-size:11px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; }
+[data-weekly-goals] .wg-number.is-empty { background:transparent; border:1px solid var(--goal-muted); color:var(--goal-muted); }
+[data-weekly-goals] .wg-name { display:block; min-width:0; margin:0; color:var(--goal-ink); white-space:pre-wrap; word-break:keep-all; overflow-wrap:anywhere; }
+[data-weekly-goals] .wg-count { margin:1px 0 0 10px; color:var(--goal-muted); white-space:nowrap; font-size:12px; line-height:20px; font-variant-numeric:tabular-nums; }
+[data-weekly-goals] .wg-count strong { color:var(--goal-olive); font-weight:800; }
+[data-weekly-goals] .wg-slash { padding:0 4px; }
+@container wr-widget (max-width:410px) {
+  [data-weekly-goals] :is(.wr-card, .wg-card) { padding:12px; }
+  [data-weekly-goals] .wg-list { padding:0 10px; }
+  [data-weekly-goals] .wg-row { grid-template-columns:20px minmax(0,1fr); gap:2px 8px; }
+  [data-weekly-goals] .wg-count { grid-column:2; margin:0; }
+}

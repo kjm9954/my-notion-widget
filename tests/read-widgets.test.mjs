@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeWorklogState, normalizeWeeklyGoalsState } from '../worker.js';
 import { calendarToday, worklogToday, normalizeWeek, normalizeGoals, normalizeSnapshot, summarizeGoals,
-  deadlines, weekDays, monthCells, goalForTask, createSource, shiftMonth } from '../cream-olive-garden/Worklog/read-widgets-model.mjs';
+  deadlines, weekDays, monthCells, goalForTask, createSource, shiftMonth, qOf, byPriority, api } from '../cream-olive-garden/Worklog/read-widgets-model.mjs';
 
 const today = '2026-09-29', monday = '2026-09-28';
 const goal = { id:1, text:'이번 주 목표 '.repeat(12), m:'work', done:false };
@@ -62,6 +62,21 @@ test('오늘~+3일 포함 최대 5건, 완료 뒤 6번째 진입, +4일/지난�
   assert.deepEqual(deadlines(state, today).map(t => t.id), ['1','2','3','4','5']);
   const range = snapshot([task(1), task(2, { due:'2026-09-30' }), task(3, { due:'2026-10-01' }), task(4, { due:'2026-10-02' })]);
   assert.deepEqual(deadlines(range, today).map(t => t.days), [0,1,2,3]);
+});
+
+test('마감은 날짜 뒤 Q순, 주간은 완료 뒤 Q순으로 정렬하며 원본을 수정하지 않는다', () => {
+  const state=snapshot([task('q3',{q:3}),task('q1',{q:1}),task('done4',{q:4,done:true}),
+    task('none',{q:null}),task('done1',{q:1,done:true}),task('tie',{q:1}),
+    task('q4',{q:4}),task('q2',{q:2}),task('next',{q:1,due:'2026-09-30'})]);
+  const before=structuredClone(state);
+  assert.equal(api.qOf,qOf); assert.equal(qOf({q:1}),1); assert.equal(qOf({q:'1'}),5);
+  assert.equal(qOf({q:null}),5); assert.equal(qOf({q:NaN}),5);
+  assert.equal(byPriority({q:1,originalIndex:0},{q:1,originalIndex:1}),-1);
+  assert.deepEqual(deadlines(state,today).map(t=>t.id),['q1','tie','q2','q3','q4']);
+  assert.deepEqual(weekDays(state,monday)[1].tasks.map(t=>t.id),['done1','done4','q1','tie','next','q2','q3','q4','none']);
+  assert.deepEqual(state,before); assert.ok(state.tasks.every(t=>!Object.hasOwn(t,'originalIndex')));
+  state.tasks.find(t=>t.id==='q1').done=true;
+  assert.deepEqual(deadlines(state,today).map(t=>t.id),['tie','q2','q3','q4','none']);
 });
 
 test('WORK LOG에서 선택한 업무는 별도 목표 등록 없이 자동 표시되고 선택 해제·수정·완료를 반영한다', () => {

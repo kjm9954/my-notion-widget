@@ -1,21 +1,12 @@
 import { calendarToday, worklogToday, mondayOf, addDays, normalizeWeek, summarizeGoals,
-  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-priority-goals';
+  deadlines, weekDays, monthCells, shiftMonth, goalForTask, createSource } from './read-widgets-model.mjs?v=20260929-read-theme-v2';
+export { qOf, byPriority, api } from './read-widgets-model.mjs?v=20260929-read-theme-v2';
 
 const titles = { goals:'이번 주 목표', deadlines:'3일 안 마감', week:'이번 주 한 일', calendar:'월 캘린더' };
 
 export function mount(root, source, now = () => Date.now()) {
   const kind = root.dataset.readWidget;
   const doc = root.ownerDocument, view = doc.defaultView;
-  const touchMedia = view.matchMedia('(any-pointer:coarse)');
-  function updateDeviceLayout() {
-    // Physical CSS screen size preserves iPad's five columns in a narrow embed,
-    // and phone's vertical list in landscape. Desktop embeds remain five columns.
-    const shortSide = Math.min(view.screen.width || view.innerWidth, view.screen.height || view.innerHeight);
-    doc.body.classList.toggle('read-widget-phone', touchMedia.matches && shortSide < 640);
-  }
-  updateDeviceLayout();
-  view.addEventListener('resize', updateDeviceLayout);
-  touchMedia.addEventListener('change', updateDeviceLayout);
   const make = (tag, cls, text) => {
     const node = doc.createElement(tag); node.className = cls;
     if (text != null) node.textContent = text;
@@ -126,7 +117,7 @@ export function mount(root, source, now = () => Date.now()) {
       const rows = deadlines(state, today), list = make('ul', 'wr-deadlines');
       for (const task of rows) {
         const row = make('li', 'wr-deadline'); row.dataset.taskId = task.id;
-        row.append(make('span', `wr-dday${task.days === 0 ? ' is-today' : ''}`, task.days === 0 ? 'D-DAY' : `D-${task.days}`), dot(task), title(task));
+        row.append(make('span', `wr-dday${task.days === 0 ? ' is-today' : task.days === 1 ? ' is-tomorrow' : ''}`, task.days === 0 ? 'D-DAY' : `D-${task.days}`), dot(task), title(task));
         list.append(row);
       }
       fragment.append(rows.length ? list : make('p', 'wr-message', '3일 안에 마감할 업무가 없어요.'));
@@ -138,10 +129,17 @@ export function mount(root, source, now = () => Date.now()) {
         if (day.date === today) column.setAttribute('aria-current', 'date');
         const dayHeader = make('div', 'wr-day-header'), count = make('span', 'wr-day-count', `${day.done} / ${day.total}`);
         count.setAttribute('aria-label', `${day.total}개 중 ${day.done}개 완료`);
-        dayHeader.append(make('h3', 'wr-day-title', day.label), count); column.append(dayHeader);
+        const dayTitle = make('h3', 'wr-day-title', day.label);
+        if (day.date === today) dayTitle.append(make('span', 'wr-today-tag', '오늘'));
+        dayHeader.append(dayTitle, count); column.append(dayHeader);
         const list = make('ul', 'wr-task-list');
+        let firstOpen = true;
         for (const task of day.tasks) {
           const row = make('li', `wr-task ${task.done === true ? 'is-done' : 'is-open'}`); row.dataset.taskId = task.id;
+          if (task.done !== true && firstOpen) {
+            if (day.done > 0) row.classList.add('is-first-open');
+            firstOpen = false;
+          }
           const check = make('span', 'wr-check', task.done === true ? '✓' : '');
           check.setAttribute('role', 'img'); check.setAttribute('aria-label', task.done === true ? '완료' : '미완료');
           row.append(dot(task), check, title(task, 'wr-task-name')); list.append(row);
@@ -155,11 +153,14 @@ export function mount(root, source, now = () => Date.now()) {
       ['월','화','수','목','금','토','일'].forEach((label, i) => weekdays.append(make('span', `wr-weekday${i > 4 ? ' is-weekend' : ''}`, label)));
       const grid = make('div', 'wr-month-grid'); grid.setAttribute('role', 'list'); grid.setAttribute('aria-label', `${period.textContent} 마감 달력`);
       for (const cell of monthCells(state, selectedMonth)) {
-        const tile = make('div', `wr-date${cell.otherMonth ? ' is-other-month' : ''}${cell.weekend ? ' is-weekend' : ''}${cell.date === today ? ' is-today' : ''}${cell.lastRow ? ' in-last-row' : ''}`);
+        const tile = make('div', `wr-date${cell.otherMonth ? ' is-other-month' : ''}${cell.weekend ? ' is-weekend' : ''}${cell.date === today ? ' is-today' : ''}`);
         tile.dataset.date = cell.date; tile.setAttribute('role', 'listitem');
         tile.setAttribute('aria-label', `${cell.date}${cell.date === today ? ', 오늘' : ''}, 미완료 마감 ${cell.tasks.length}개`);
         if (cell.date === today) tile.setAttribute('aria-current', 'date');
-        tile.append(make('span', 'wr-date-number', cell.day));
+        const dateTop = make('div', 'wr-date-top');
+        dateTop.append(make('span', 'wr-date-number', cell.day));
+        if (cell.date === today) dateTop.append(make('span', 'wr-today-tag', '오늘'));
+        tile.append(dateTop);
         if (cell.tasks.length) {
           const dots = make('div', 'wr-date-dots'); cell.tasks.forEach(task => dots.append(dot(task, false))); tile.append(dots);
         }
@@ -204,7 +205,7 @@ export function mount(root, source, now = () => Date.now()) {
     hideTooltip();
     if (event.pointerType !== 'mouse' || view.matchMedia('(any-pointer:coarse)').matches || !view.matchMedia('(hover:hover) and (pointer:fine)').matches) return;
     const label = event.target.closest?.('[data-full-text]');
-    if (!label || !root.contains(label) || label.scrollWidth <= label.clientWidth) return;
+    if (!label || !root.contains(label) || (label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight)) return;
     tooltipLabel = label; label.setAttribute('aria-describedby', tooltip.id);
     tooltip.textContent = label.dataset.fullText; tooltip.hidden = false;
     const box = label.getBoundingClientRect(), width = Math.min(320, view.innerWidth - 16);
@@ -230,7 +231,6 @@ export function mount(root, source, now = () => Date.now()) {
     root.removeEventListener('pointerover', showTooltip); root.removeEventListener('pointerout', hideTooltip);
     view.removeEventListener('resize', hideTooltip); doc.removeEventListener('scroll', hideTooltip, true);
     view.removeEventListener('widgetlayoutchange', hideTooltip); view.removeEventListener('pagehide', pagehide);
-    view.removeEventListener('resize', updateDeviceLayout); touchMedia.removeEventListener('change', updateDeviceLayout);
   }
   void refresh();
   return { refresh, destroy };
