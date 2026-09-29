@@ -1,4 +1,5 @@
 import { seoulDateKey, addDateKeyDays, isDateKey, weekdayOfDateKey } from '../../schedule-core.js';
+import { taskGoalNumber } from './worklog-task-controls.mjs?v=20260929-priority-goals';
 
 // Reuse the server's Seoul clock. Due badges use midnight (worklog calendarToday);
 // worklog's business day rolls at 06:00; the existing goals editor rolls at midnight.
@@ -47,27 +48,30 @@ export function normalizeSnapshot(worklog, goals) {
     slots.forEach((slot, i) => { ordered[slot] = values[i]; });
   }
   const weeklyGoals = normalizeGoals(goals);
-  // Selecting a task as a goal stores its own ID in the existing goalId field.
-  // Derive its name/week from the task, so edits, completion and removal stay in
-  // sync without a second write or the legacy goal editor's five-item limit.
+  // Numbered task selections are independent rows, even with the same number.
+  // Derive name/week/completion from each task; never duplicate user data.
   for (const task of ordered) {
-    if (task.id == null || !String(task.id) || String(task.goalId ?? '') !== String(task.id) || !isDateKey(task.date)) continue;
+    const number = taskGoalNumber(task);
+    if (!number || task.id == null || !String(task.id) || !isDateKey(task.date)) continue;
     const id = String(task.id), weekKey = mondayOf(task.date);
-    if (weeklyGoals.some(goal => goal.id === id && goal.weekKey === weekKey)) continue;
-    weeklyGoals.push({ id, name:String(task.title || ''), color:null, weekKey });
+    // Keep pre-existing links to independently saved goals unchanged.
+    if (String(task.goalId) === id && weeklyGoals.some(goal => goal.id === id && goal.weekKey === weekKey)) continue;
+    weeklyGoals.push({ id, taskId:id, number, name:String(task.title || ''), color:null, weekKey });
   }
   return { tasks: ordered, weeklyGoals };
 }
 export function goalForTask(state, task) {
   if (task.goalId == null || !isDateKey(task.date)) return null;
+  const ownGoal = taskGoalNumber(task) && state.weeklyGoals.find(goal => goal.taskId === String(task.id) && goal.weekKey === mondayOf(task.date));
+  if (ownGoal) return ownGoal;
   return state.weeklyGoals.find(goal => goal.id === String(task.goalId) && goal.weekKey === mondayOf(task.date)) || null;
 }
 export function summarizeGoals(state, monday) {
   const end = addDays(monday, 6);
   return state.weeklyGoals.filter(goal => goal.weekKey === monday).map((goal, index) => {
-    const tasks = state.tasks.filter(task => task.mode === 'work' && isDateKey(task.date) && task.date >= monday && task.date <= end && task.goalId != null && String(task.goalId) === goal.id);
-    return { ...goal, number: index + 1, total: tasks.length, done: tasks.filter(task => task.done === true).length };
-  });
+    const tasks = state.tasks.filter(task => task.mode === 'work' && isDateKey(task.date) && task.date >= monday && task.date <= end && goalForTask(state, task) === goal);
+    return { ...goal, number: goal.number ?? index + 1, total: tasks.length, done: tasks.filter(task => task.done === true).length };
+  }).sort((a, b) => a.number - b.number);
 }
 export function deadlines(state, today) {
   return state.tasks.filter(task => task.mode === 'work' && task.done === false && isDateKey(task.due) && task.due >= today && task.due <= addDays(today, 3))

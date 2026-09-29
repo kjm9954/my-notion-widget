@@ -551,7 +551,8 @@
     </main>
   </div>
 
-  <script>
+  <script type="module">
+    import { taskGoalNumber, nextTaskGoalId, refreshPriorityOrder } from './worklog-task-controls.mjs?v=20260929-priority-goals';
     (() => {
       'use strict';
 
@@ -835,6 +836,7 @@
       function persist(next) {
         const previous = normalizeState(state);
         const normalized = normalizeState(next);
+        refreshPriorityOrder(previous, normalized);
         state = normalized;
         const snapshot = normalizeState(normalized);
         const patch = buildWorklogPatch(previous,snapshot);
@@ -1494,9 +1496,10 @@
         const goals = goalsForTask(task);
         const index = goals.findIndex(goal => goal.id === task.goalId);
         const goal = goals[index];
+        const number = taskGoalNumber(task);
         const selected = task.goalId != null && task.goalId !== '';
-        const label = selected ? '이번 주 목표 선택 해제' : '이번 주 목표로 선택';
-        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="${label}: ${escapeHtml(task.title)}" aria-pressed="${selected}"><span class="goal-dot ${selected ? 'is-linked' : ''}" ${selected ? `style="--goal-color:${escapeHtml(goal?.color || 'var(--action)')}"` : ''}>${selected ? (goal ? index + 1 : '✓') : ''}</span></button>`;
+        const label = number === 3 ? '목표 3번, 클릭하면 선택 해제' : `목표 ${number ? `${number}번` : selected ? '연결됨' : '미선택'}, 클릭하면 ${number + 1}번`;
+        return `<button class="goal-button" type="button" data-goal-task="${escapeHtml(task.id)}" aria-label="${label}: ${escapeHtml(task.title)}" aria-pressed="${selected}"><span class="goal-dot ${selected ? 'is-linked' : ''}" ${selected ? `style="--goal-color:${escapeHtml(goal?.color || 'var(--action)')}"` : ''}>${number || (selected ? (goal ? index + 1 : '✓') : '')}</span></button>`;
       }
 
       function timeCell(task, field) {
@@ -1629,7 +1632,8 @@
       }
 
       function renderList(items) {
-        if (isMobileLayout()) items = [...items].sort((a,b) => Number(a.done) - Number(b.done) || a.order - b.order);
+        // Stable sort retains Q/manual order within the open and completed groups.
+        if (isMobileLayout()) items = [...items].sort((a,b) => Number(a.done) - Number(b.done));
         const hasQuickRow = ui.adding && ui.draftTask;
         taskList.classList.toggle('is-empty', items.length === 0 && !ui.editingId && !hasQuickRow);
         if (!items.length && !ui.editingId && !hasQuickRow) {
@@ -2301,8 +2305,7 @@
         if (goalControl) {
           const task = taskById(goalControl.dataset.goalTask);
           if (!task || task.mode !== 'work') return;
-          const selected = task.goalId != null && task.goalId !== '';
-          if (updateTask(task.id, item => { item.goalId = selected ? null : String(item.id); }, selected ? '이번 주 목표에서 해제했습니다.' : '이번 주 목표로 선택했습니다.')) {
+          if (updateTask(task.id, item => { item.goalId = nextTaskGoalId(item); }, taskGoalNumber(task) === 3 ? '이번 주 목표에서 해제했습니다.' : `이번 주 목표 ${taskGoalNumber(task) + 1}번으로 선택했습니다.`)) {
             taskList.querySelector(`[data-goal-task="${CSS.escape(task.id)}"]`)?.focus({ preventScroll:true });
           }
           return;

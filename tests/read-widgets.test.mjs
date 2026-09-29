@@ -82,6 +82,33 @@ test('WORK LOG에서 선택한 업무는 별도 목표 등록 없이 자동 표�
   assert.equal(summarizeGoals(read(),'2026-10-05').length,1);
 });
 
+test('번호를 지정한 업무를 1·2·3 순으로 모두 표시하며 같은 번호라도 개별 완료 수를 유지한다', () => {
+  const tasks=[task('third',{goalId:'worklog:goal:3'}),task('first',{goalId:'worklog:goal:1'}),
+    task('second',{goalId:'worklog:goal:2',done:true}),task('another-first',{goalId:'worklog:goal:1'}),
+    task('old-check',{goalId:'old-check'}),task('later',{goalId:'worklog:goal:1',date:'2026-10-05'}),
+    task('life',{goalId:'worklog:goal:1',mode:'life'})];
+  const read=()=>normalizeSnapshot({tasks},{week:'',items:[]});
+  const rows=summarizeGoals(read(),monday);
+  assert.deepEqual(rows.map(g=>[g.id,g.number,g.done,g.total]),[
+    ['first',1,0,1],['another-first',1,0,1],['old-check',1,0,1],['second',2,1,1],['third',3,0,1]
+  ]);
+  assert.equal(goalForTask(read(),tasks[0]).name,'업무 third');
+  tasks[1].title=goal.text; tasks[1].done=true;
+  const updated=summarizeGoals(read(),monday);
+  assert.equal(updated[0].name,goal.text); assert.equal(updated[0].done,1); assert.equal(updated[1].done,0);
+  tasks[1].goalId=null;
+  assert.deepEqual(summarizeGoals(read(),monday).map(g=>g.id),['another-first','old-check','second','third']);
+  assert.equal(summarizeGoals(read(),'2026-10-05').length,1);
+});
+
+test('번호 목표와 기존 독립 목표 연결·색·집계가 함께 유지된다', () => {
+  const saved=[{id:'saved',name:'기존 목표',color:'#6b7b49',weekKey:monday}];
+  const tasks=[task('a',{goalId:'saved',done:true}),task('b',{goalId:'worklog:goal:1'})];
+  const state=normalizeSnapshot({tasks},saved), rows=summarizeGoals(state,monday);
+  assert.equal(goalForTask(state,tasks[0]).color,'#6b7b49');
+  assert.deepEqual(rows.map(g=>[g.id,g.done,g.total]),[['saved',1,1],['b',0,1]]);
+});
+
 test('한 일은 doneAt 대신 date, 하루 8개와 미완료를 모두 유지한다', () => {
   const state = snapshot(Array.from({ length:8 }, (_, i) => task(i, { done:i === 0, doneAt:'2026-10-02' })));
   const days = weekDays(state, monday);

@@ -64,7 +64,9 @@ async function setup(browser, options = {}) {
           for (const update of body.upserts || []) {
             const target = targetDb.worklog.tasks.find(task => task.id === update.id);
             if (target) Object.assign(target, update);
+            else targetDb.worklog.tasks.push(structuredClone(update));
           }
+          targetDb.worklog.tasks=targetDb.worklog.tasks.filter(task=>!(body.deleteIds || []).includes(task.id));
           if (body.meta) Object.assign(targetDb.worklog, body.meta);
           targetDb.worklog.revision += 1; data = targetDb.worklog;
         } else if (url.pathname === '/api/weekly-goals/state') { targetDb.goals = body; data = targetDb.goals; }
@@ -166,7 +168,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         await writer.locator('[data-goal-task="t4"]').click();
         await goals.waitForSelector('[data-goal-id="t4"]');
         assert.equal(await text(goals,'[data-goal-id="t4"] .wg-name'),'업무 4');
-        assert.equal(db.worklog.tasks.find(t => t.id === 't4').goalId, 't4');
+        assert.equal(db.worklog.tasks.find(t => t.id === 't4').goalId, 'worklog:goal:1');
         const notes = await context.newPage(); await notes.clock.setFixedTime(now);
         await notes.goto(`${origin}${prefix}notes.html?w=${instance}`);
         await notes.locator('[data-note-id="n1"]').waitFor();
@@ -226,7 +228,86 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
       } finally { await context.close(); }
     });
 
-    await t.test('worklog goal selection works with no pre-created goals and follows completion, reload and deselection', async () => {
+    await t.test('priority changes reorder saved manual rows immediately and persist without changing other days or instances', async () => {
+      for(const [label,width,height,touch] of [['desktop',1440,1000,false],['ipad',768,1024,true],['phone',390,844,true]]) {
+        const {context,db,originalDb,errors}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
+        try {
+          db.worklog.tasks.slice(0,8).forEach((task,i)=>{task.q=[4,2,1,3,2,null,null,null][i];});
+          const manual=['t4','t0','t1','t3','t2','t5','t6','t7'];
+          db.worklog.manualOrder={'work:2026-09-29':manual,'work:2026-09-28':['monday'],'life:2026-09-29':['life']};
+          const original=structuredClone(originalDb);
+          const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+          await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+          const rows=()=>writer.locator('.task-row[data-task-id]').evaluateAll(nodes=>nodes.map(n=>n.dataset.taskId));
+          await writer.locator('[data-cell-task="t0"][data-cell-field="q"]').waitFor();
+          assert.deepEqual(await rows(),manual,`${label}: preserve manual drag order before a Q change`);
+          await writer.locator('[data-cell-task="t0"][data-cell-field="q"]').click();
+          await Promise.all([
+            writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.upserts?.some(t=>t.id==='t0' && t.q===1)),
+            writer.locator('[data-q-choice="1"]').click()
+          ]);
+          const priorityOrder=['t0','t2','t4','t1','t3','t5','t6','t7'];
+          assert.deepEqual(await rows(),priorityOrder,`${label}: Q1 first, then Q2/Q3/Q4/unset`);
+          assert.deepEqual(db.worklog.manualOrder['work:2026-09-29'],priorityOrder);
+          await writer.reload(); await writer.locator('[data-cell-task="t0"][data-cell-field="q"]').waitFor();
+          assert.deepEqual(await rows(),priorityOrder,`${label}: order survives reload`);
+          await writer.locator('[data-cell-task="t0"][data-cell-field="q"]').click();
+          await Promise.all([
+            writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.upserts?.some(t=>t.id==='t0' && t.q===null)),
+            writer.locator('[data-q-choice=""]').click()
+          ]);
+          assert.deepEqual(await rows(),['t2','t4','t1','t3','t0','t5','t6','t7'],`${label}: unset priority follows assigned priorities`);
+          assert.deepEqual(db.worklog.manualOrder['work:2026-09-28'],['monday']);
+          assert.deepEqual(db.worklog.manualOrder['life:2026-09-29'],['life']);
+          assert.deepEqual(originalDb,original); assert.deepEqual(errors,[]);
+          assert.ok(db.writes.every(r=>r.instance===instance && r.path==='/api/worklog/patch'));
+        } finally {await context.close();}
+      }
+    });
+
+    await t.test('manual dragging survives goal edits; full-form Q edits and added tasks restore priority order', async () => {
+      const {context,db,errors}=await setup(browser);
+      try {
+        db.worklog.tasks=db.worklog.tasks.slice(0,4);
+        db.worklog.tasks.forEach((task,i)=>{task.q=i+1; task.goalId=null;});
+        const writer=await context.newPage(); await writer.clock.setFixedTime(now);
+        await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        const rows=()=>writer.locator('.task-row[data-task-id]:not(.quick-add-row)').evaluateAll(nodes=>nodes.map(n=>n.dataset.taskId));
+        await writer.locator('[data-cell-task="t0"][data-cell-field="q"]').waitFor();
+        const from=await writer.locator('[data-inline-start="title"][data-task-id="t0"]').boundingBox();
+        const to=await writer.locator('.task-row[data-task-id="t2"]').boundingBox();
+        await writer.mouse.move(from.x+from.width/2,from.y+from.height/2); await writer.mouse.down();
+        await writer.mouse.move(from.x+from.width/2,to.y+to.height-3,{steps:8});
+        await Promise.all([writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.meta?.manualOrder),writer.mouse.up()]);
+        await writer.clock.setFixedTime(new Date(now.getTime()+1000));
+        const manual=['t1','t2','t0','t3']; assert.deepEqual(await rows(),manual);
+        await writer.locator('[data-goal-task="t0"]').click();
+        assert.deepEqual(await rows(),manual,'goal selection does not undo a drag');
+        await writer.locator('[data-inline-start="title"][data-task-id="t2"]').click({modifiers:['Shift']});
+        await writer.locator('[data-task-form] [name="q"]').selectOption('1');
+        await Promise.all([
+          writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.upserts?.some(t=>t.id==='t2'&&t.q===1)),
+          writer.locator('[data-task-form] button[type="submit"]').click()
+        ]);
+        assert.deepEqual(await rows(),['t2','t0','t1','t3']);
+        await writer.locator('[data-add-task]').click();
+        await writer.locator('[data-quick-add-form] [data-cell-field="q"]').click();
+        await writer.locator('[data-q-choice="1"]').click();
+        await writer.locator('[data-quick-add-form] [name="title"]').fill('우선순위 추가 테스트');
+        await Promise.all([
+          writer.waitForResponse(r=>r.url().includes('/api/worklog/patch') && r.request().postDataJSON()?.upserts?.some(t=>t.title==='우선순위 추가 테스트')),
+          writer.locator('[data-quick-add-form] [name="title"]').press('Enter')
+        ]);
+        const added=db.worklog.tasks.find(t=>t.title==='우선순위 추가 테스트');
+        assert.ok(added); assert.deepEqual(await rows(),['t2','t0',added.id,'t1','t3']);
+        await writer.reload(); await writer.locator('[data-goal-task="t0"]').waitFor();
+        assert.deepEqual(await rows(),['t2','t0',added.id,'t1','t3']);
+        assert.equal(db.worklog.tasks.find(t=>t.id==='t0').goalId,'worklog:goal:1');
+        assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
+    await t.test('worklog goal numbers cycle through 1/2/3, sort duplicates, and follow completion and reload', async () => {
       const {context,db,originalDb,errors,openAll}=await setup(browser);
       try {
         db.goals={week:'',items:[],seq:0,carryHandledWeek:''};
@@ -240,6 +321,17 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         assert.equal(await text(goals,'[data-goal-id="t0"] .wg-name'),db.worklog.tasks[0].title);
         assert.equal(await text(goals,'[data-goal-id="t0"] .wg-count'),'업무 0/1');
         assert.equal(await writer.locator('[data-goal-task="t0"]').getAttribute('aria-pressed'),'true');
+        const cycle=async(id,number)=>{
+          await writer.locator(`[data-goal-task="${id}"]`).click();
+          await goals.waitForFunction(({id,number})=>document.querySelector(`[data-goal-id="${id}"] .wg-number`)?.textContent===String(number),{id,number});
+          assert.equal(await text(writer,`[data-goal-task="${id}"] .goal-dot`),String(number));
+        };
+        await cycle('t0',2); await cycle('t0',3);
+        await cycle('t1',1); await cycle('t1',2);
+        await cycle('t2',1); await cycle('t3',1);
+        assert.deepEqual(await goals.locator('.wg-row').evaluateAll(nodes=>nodes.map(n=>[n.dataset.goalId,n.querySelector('.wg-number').textContent])),[['t2','1'],['t3','1'],['t1','2'],['t0','3']]);
+        assert.equal(await text(goals,'[data-goal-id="t2"] .wg-count'),'업무 0/1');
+        assert.equal(await text(goals,'[data-goal-id="t3"] .wg-count'),'업무 0/1');
         if(process.env.TEST_SCREENSHOT_DIR) {
           await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
           await goals.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,'selected-task-goal.png'),fullPage:false});
@@ -252,15 +344,37 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
         await writer.locator('[data-goal-task="t0"][aria-pressed="true"]').waitFor();
         await goals.locator('[data-goal-id="t0"]').waitFor();
         assert.equal(await text(goals,'[data-goal-id="t0"] .wg-count'),'업무 1/1');
+        assert.equal(await text(writer,'[data-goal-task="t0"] .goal-dot'),'3');
         await writer.locator('[data-goal-task="t0"]').click();
-        await goals.waitForFunction(()=>document.querySelectorAll('.wg-row').length===0);
-        assert.match(await text(goals,'.wr-message'),/목표가 없/);
+        await goals.waitForFunction(()=>!document.querySelector('[data-goal-id="t0"]'));
+        assert.deepEqual(await goals.locator('.wg-number').allTextContents(),['1','1','2']);
         assert.equal(db.worklog.tasks[0].done,true,'deselecting a goal must not change completion');
         assert.equal(db.worklog.tasks[0].goalId,null);
         assert.deepEqual(db.goals.items,[],'no secondary goal save or sample goal');
         assert.ok(db.writes.every(r=>r.instance===instance && r.path==='/api/worklog/patch'));
         assert.deepEqual(originalDb,original); assert.deepEqual(errors,[]);
       } finally {await context.close();}
+    });
+
+    await t.test('goal cycling supports touch and keyboard and preserves legacy checkbox selections', async () => {
+      for(const [width,height,touch] of [[1440,1000,false],[768,1024,true],[390,844,true]]) {
+        const {context,db,errors,open}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch});
+        try {
+          db.goals={week:'',items:[]}; db.worklog.tasks.forEach(task=>{task.goalId=null;});
+          db.worklog.tasks[0].goalId='t0';
+          const goals=await open('weekly-goals'), writer=await context.newPage(); await writer.clock.setFixedTime(now);
+          await writer.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+          const button=writer.locator('[data-goal-task="t0"]'); await button.waitFor();
+          assert.equal(await button.locator('.goal-dot').textContent(),'1');
+          for(const number of [2,3,0,1]) {
+            if(touch) await button.tap(); else {await button.focus(); await button.press(number===3?'Space':'Enter');}
+            await goals.waitForFunction(number=>number===0?!document.querySelector('[data-goal-id="t0"]'):document.querySelector('[data-goal-id="t0"] .wg-number')?.textContent===String(number),number);
+            assert.equal(await button.locator('.goal-dot').textContent(),number?String(number):'');
+            if(!number) assert.match(await text(goals,'.wr-message'),/목표가 없/);
+          }
+          assert.deepEqual(errors,[]);
+        } finally {await context.close();}
+      }
     });
 
     await t.test('deadline vertical handles resize only height and persist through reload and live updates', async () => {
@@ -313,6 +427,49 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
       } finally {await context.close();}
     });
 
+    await t.test('week-review height handles preserve width, five equal columns, navigation and saved height', async () => {
+      const {context,db,errors,open,notify}=await setup(browser);
+      try {
+        const page=await open('week-review'), handle=page.locator('.widget-height-handle-bottom');
+        const metrics=()=>page.evaluate(()=>{
+          const frame=document.querySelector('[data-widget-card]').getBoundingClientRect();
+          const list=document.querySelector('.wr-content');
+          return {width:frame.width,height:frame.height,font:getComputedStyle(document.querySelector('.wr-title')).fontSize,
+            scroll:list.scrollHeight,client:list.clientHeight,headerTop:document.querySelector('.wr-header').getBoundingClientRect().top};
+        });
+        const before=await metrics(); assert.equal(await handle.isVisible(),true);
+        await handle.focus(); for(let i=0;i<8;i++) await handle.press('ArrowDown');
+        const tall=await metrics(); assert.ok(tall.height>before.height+50); assert.equal(tall.width,before.width); assert.equal(tall.font,before.font);
+        await page.waitForFunction(h=>Number(document.querySelector('.widget-height-handle-bottom').getAttribute('aria-valuenow'))===Math.round(h),tall.height);
+        const box=await handle.boundingBox();
+        await page.mouse.move(box.x+box.width/2,box.y+box.height/2); await page.mouse.down();
+        await page.mouse.move(box.x+box.width/2,box.y+box.height/2-70,{steps:8}); await page.mouse.up();
+        assert.ok((await metrics()).height<tall.height-40,'pointer drag changes height');
+        await handle.focus(); for(let i=0;i<40;i++) await handle.press('ArrowUp');
+        const short=await metrics(); assert.equal(short.height,180); assert.equal(short.width,before.width); assert.equal(short.font,before.font);
+        assert.ok(short.scroll>short.client);
+        const columns=await page.locator('.wr-day').evaluateAll(nodes=>nodes.map(n=>({y:n.getBoundingClientRect().y,height:n.getBoundingClientRect().height})));
+        assert.equal(new Set(columns.map(c=>Math.round(c.y))).size,1);
+        assert.ok(columns.every(c=>Math.abs(c.height-columns[0].height)<1));
+        assert.equal(await page.locator('[data-date="2026-09-29"] .wr-task').count(),8);
+        await page.locator('.wr-content').evaluate(n=>{n.scrollTop=60;});
+        assert.equal((await metrics()).headerTop,short.headerTop);
+        await page.getByRole('button',{name:'이전 주',exact:true}).click();
+        const period=await text(page,'.wr-period'); db.worklog.revision++; await notify(page);
+        await page.reload(); await page.waitForFunction(()=>document.querySelector('#read-widget').dataset.status==='ready');
+        assert.equal((await metrics()).height,180); assert.equal(await text(page,'.wr-period'),period);
+        await page.getByRole('button',{name:'다음 주',exact:true}).click();
+        await page.locator('[data-date="2026-09-29"] .wr-task').first().waitFor();
+        assert.equal((await metrics()).height,180);
+        if(process.env.TEST_SCREENSHOT_DIR) {
+          await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
+          await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,'week-height-handle.png'),fullPage:false});
+        }
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        assert.deepEqual(db.writes,[]); assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
+
     await t.test('desktop/iPad/mobile: wrapping, equal weekday heights, dot rows, no overflow, mouse-only tooltip', async () => {
       for (const [label, width, height, touch, screen] of [['desktop',1440,1000,false], ['ipad',768,1024,true], ['mobile',390,844,true], ['small-mobile',320,740,true], ['narrow-desktop',480,900,false], ['ipad-split',480,900,true,{width:768,height:1024}], ['phone-landscape',844,390,true,{width:390,height:844}]]) {
         const { context, db, errors, openAll } = await setup(browser, { viewport:{ width, height }, hasTouch:touch, isMobile:touch, ...(screen ? { screen } : {}) });
@@ -321,7 +478,7 @@ test('offline read-widget browser acceptance', { timeout:120000 }, async t => {
           db.goals.items.forEach((g, i) => { g.color = ['#6b7b49','#bd9671','#8298a0','#e4d18b'][i]; });
           const pages = await openAll();
           const [goals, due, week, month] = pages;
-          assert.equal(await due.locator('.widget-height-handle-bottom').isVisible(),!touch,`${label} vertical handle visibility`);
+          for(const resizable of [due,week]) assert.equal(await resizable.locator('.widget-height-handle-bottom').isVisible(),!touch,`${label} vertical handle visibility`);
           for (let i = 0; i < pages.length; i++) {
             const page = pages[i];
             const metrics = await page.evaluate(() => {
