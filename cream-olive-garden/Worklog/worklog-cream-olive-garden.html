@@ -337,7 +337,7 @@
       position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
       clip:rect(0,0,0,0); white-space:nowrap; border:0;
     }
-    body.is-widget-mobile .card { min-height:520px; height:auto; padding:12px; gap:10px; }
+    body.is-widget-mobile .card { min-height:0; height:auto; padding:12px; gap:10px; }
     body.is-widget-mobile .worklog-top { gap:10px; }
     body.is-widget-mobile .day-nav { order:1; grid-template-columns:44px minmax(0,1fr) 44px; gap:0; }
     body.is-widget-mobile .nav-arrow { width:44px; height:56px; border:0; background:transparent; color:var(--secondary); font-size:18px; }
@@ -354,7 +354,7 @@
     body.is-widget-mobile .roll-banner { order:3; }
     body.is-widget-mobile .banner-dismiss { width:44px; height:44px; right:2px; top:2px; border-radius:12px; }
     body.is-widget-mobile .card-header { display:none; }
-    body.is-widget-mobile .list-shell { min-height:300px; flex:1 1 300px; padding:4px; overflow:hidden; background:var(--surface-soft); border:1px solid var(--border-pale); border-radius:12px; }
+    body.is-widget-mobile .list-shell { min-height:40px; flex:1 1 300px; padding:4px; overflow:hidden; background:var(--surface-soft); border:1px solid var(--border-pale); border-radius:12px; }
     body.is-widget-mobile .rows-scroll { gap:4px; }
     body.is-widget-mobile .column-head { display:none; }
     body.is-widget-mobile .task-row.work,
@@ -445,7 +445,7 @@
     @media (max-width:800px) { .wl-grass { --wl-scene-height:82px; height:82px; } }
     @media (max-width:480px) { .wl-grass { --wl-scene-height:68px; height:68px; } }
   </style>
-  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-size-sync">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
   <style>
     /* Functional cells only; the existing palette, frame and garden are unchanged. */
     /* Only reorder feedback is smaller; shared and garden animations stay unchanged. */
@@ -576,7 +576,6 @@
       const addArea = document.getElementById('addArea');
       const cellPopover = document.getElementById('cellPopover');
       const liveRegion = document.getElementById('liveRegion');
-      const mobileQuery = window.matchMedia('(any-pointer: coarse) and (max-width: 999px)');
       const narrowQuery = window.matchMedia('(max-width: 320px)');
       const isMobileLayout = () => document.body.classList.contains('is-widget-mobile');
       let weeklyGoalsState = null;
@@ -609,9 +608,8 @@
       }
 
       function updateCompactLayout() {
-        document.body.classList.toggle('is-worklog-compact', mobileQuery.matches);
-        const scale = card.getBoundingClientRect().width / card.offsetWidth || 1;
-        document.body.style.setProperty('--compact-scale', String(mobileQuery.matches ? 1 / scale : 1));
+        document.body.classList.toggle('is-worklog-compact', isMobileLayout());
+        document.body.style.setProperty('--compact-scale', '1');
         fitTextareas();
       }
       const ui = {
@@ -1012,7 +1010,7 @@
         const lifeWeight = life / (1 - life);
         card.style.setProperty('--work-title-track',`${workWeight.toFixed(3)}fr`);
         card.style.setProperty('--life-title-track',`${lifeWeight.toFixed(3)}fr`);
-        if (state.mode === 'work' && state.workView === 'memo' && !mobileQuery.matches) {
+        if (state.mode === 'work' && state.workView === 'memo' && !isMobileLayout()) {
           const memoHead = taskList.querySelector('.column-head.work.view-memo');
           const measurement = timeTitleMeasurement?.headWidth === memoHead?.offsetWidth
             ? timeTitleMeasurement : measuredTimeColumns(memoHead);
@@ -1115,7 +1113,7 @@
       }
 
       function beginColumnResize(event, handle) {
-        if (mobileQuery.matches || event.button !== 0) return;
+        if (isMobileLayout() || event.button !== 0) return;
         const mode = handle.dataset.columnResize === 'life' ? 'life' : 'work';
         const metrics = columnMetrics(mode);
         if (!metrics) return;
@@ -1446,7 +1444,7 @@
       function renderHeader(items) {
         const info = dateHeader(ui.selectedDate);
         const today = ui.selectedDate === localDateKey(todayDate());
-        const compact = mobileQuery.matches;
+        const compact = isMobileLayout();
         const caption = weekCaption(ui.selectedDate);
         const datePieces = `<span class="date-title">${info.title}</span><span class="weekday-label">${info.weekday}</span>${today ? '<span class="today-pill">오늘</span>' : ''}${caption ? `<span class="week-caption">${caption}</span>` : ''}`;
         const viewToggle = state.mode === 'work' ? `<div class="view-toggle" role="group" aria-label="업무 보기 전환"><button class="view-toggle-button ${state.workView === 'time' ? 'is-selected' : ''}" type="button" data-work-view="time" aria-pressed="${state.workView === 'time'}">시간</button><button class="view-toggle-button ${state.workView === 'memo' ? 'is-selected' : ''}" type="button" data-work-view="memo" aria-pressed="${state.workView === 'memo'}">메모</button></div>` : '';
@@ -1584,7 +1582,7 @@
           <span class="q-slot">${qButton(task)}</span>
           ${titleCell(task, draft)}
           ${dueCell(task)}
-          ${memoView || mobileQuery.matches ? memoCell(task) : `${timeCell(task, 'start')}${timeCell(task, 'end')}${hourButton(task, 'progress', progress)}${hourButton(task, 'est', task.est)}`}
+          ${memoView || isMobileLayout() ? memoCell(task) : `${timeCell(task, 'start')}${timeCell(task, 'end')}${hourButton(task, 'progress', progress)}${hourButton(task, 'est', task.est)}`}
           ${statusButton(task, status)}
           ${completionButton(task)}
           ${deleteButton(task)}
@@ -1666,7 +1664,7 @@
         }
         const rows = items.map(task => ui.editingId === task.id ? editorHtml(task, 'edit') : (state.mode === 'work' ? workRow(task) : lifeRow(task)));
         if (hasQuickRow) rows.push(state.mode === 'work' ? quickWorkRow(ui.draftTask) : quickLifeRow(ui.draftTask));
-        const head = state.mode === 'work' && mobileQuery.matches ? '' : columnHead(state.mode);
+        const head = state.mode === 'work' && isMobileLayout() ? '' : columnHead(state.mode);
         taskList.innerHTML = `${head}<div class="rows-scroll">${rows.join('')}</div>`;
       }
 
@@ -2129,7 +2127,7 @@
         const nextView = button.dataset.workView;
         if (!['time','memo'].includes(nextView) || nextView === state.workView) return;
         if (!drainPendingSync()) return;
-        if (state.workView === 'time' && nextView === 'memo' && !mobileQuery.matches) {
+        if (state.workView === 'time' && nextView === 'memo' && !isMobileLayout()) {
           const head = taskList.querySelector('.column-head.work.view-time');
           const title = head?.querySelector('[data-column-title]');
           const goal = head?.querySelector('[data-column-goal]');
@@ -2651,9 +2649,6 @@
       window.addEventListener('focus', () => syncFromServer(true));
       window.addEventListener('pageshow', () => syncFromServer(true));
       document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(true); });
-      mobileQuery.addEventListener?.('change', () => {
-        if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderAll();
-      });
       narrowQuery.addEventListener?.('change', () => {
         if (!ui.adding && !ui.editingId && !ui.inlineEdit && !ui.popover) renderDays();
       });
@@ -2879,7 +2874,7 @@
     })();
   </script>
   <script>document.querySelector('[data-widget-host]').dataset.widgetSync = 'worklog';</script>
-  <script src="../../widget-frame.js?v=20260930-size-sync"></script>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
   <script src="../../widget-layout-sync.js?v=20260930-size-sync"></script>
 </body>
 </html>

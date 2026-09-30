@@ -37,6 +37,12 @@ body.widget-page.widget-page-centered.is-widget-overflowing {
   align-items: flex-start !important;
 }
 
+/* New shared-size embeds stay at the top on touch devices, even when Notion
+   keeps a taller iframe. Existing, non-opted-in widgets keep their alignment. */
+body.widget-page.widget-page-centered.is-mobile-tablet-device:has([data-widget-sync]) {
+  align-items: flex-start !important;
+}
+
 /* The frame always matches the card. Corner handles use a shared scale, while
    axis handles change the card's layout width or height without stretching its
    controls. The fallbacks keep the frame fitted before the script runs. */

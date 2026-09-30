@@ -19,7 +19,7 @@ test('v9 notes isolates the size key and keeps resize handles with a 270px defau
   assert.match(html, /data-widget-height="270"/);
   assert.match(html, /data-widget-list-height="224"/);
   for (const handle of ['data-widget-list-handle', 'data-widget-scale-handle', 'data-widget-size-label']) assert.ok(html.includes(handle));
-  assert.match(html, /src="\.\.\/\.\.\/widget-frame\.js\?v=20260930-size-sync"/);
+  assert.match(html, /src="\.\.\/\.\.\/widget-frame\.js\?v=20260930-mobile-layout"/);
   assert.match(css, /\.notes-size-frame \{ height:270px; padding:6px; \}/);
 });
 

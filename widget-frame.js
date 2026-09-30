@@ -294,6 +294,13 @@
     if (!isMobileTabletDevice()) return 'desktop';
     if (host?.hasAttribute('data-widget-fluid')) return 'reflow';
     const width = viewportWidth();
+    if (host?.hasAttribute('data-widget-sync')) {
+      // An iPad's narrow Notion column is not a phone. Keep its saved logical
+      // layout; phones use readable rows regardless of the saved PC zoom.
+      const screenEdge = Math.min(window.screen?.width || width, window.screen?.height || viewportHeight());
+      if (screenEdge >= 600) return 'scale';
+      if (host.hasAttribute('data-widget-mobile')) return 'mobile';
+    }
     if (width >= 640 || savedWidth <= width * 2) return 'scale';
     return host?.hasAttribute('data-widget-mobile') ? 'mobile' : 'reflow';
   }
@@ -727,7 +734,11 @@
       if (list) {
         const offset = listOffset();
         const maximum = Math.max(40, viewportHeight() - offset);
-        const desired = number(reflowListHeight, defaultListHeight || list.offsetHeight || maximum);
+        // Reflow changes the header/controls, not the user's chosen visual
+        // height. Keep that height where possible and scroll only the list.
+        const desired = syncSize && (heightLocked || listLocked || scaleLocked)
+          ? requestedFrameHeight * requestedScale - offset
+          : number(reflowListHeight, defaultListHeight || list.offsetHeight || maximum);
         renderedListHeight = Math.max(40, Math.min(maximum, desired));
         list.style.flex = `0 0 ${renderedListHeight}px`;
         list.style.height = `${renderedListHeight}px`;
@@ -882,7 +893,8 @@
       const gap = parseFloat(style.rowGap || style.gap);
       const visibleParts = fixedParts.filter(part => part.offsetParent !== null);
       const fixedHeight = visibleParts.reduce((sum, part) => sum + part.offsetHeight, 0);
-      return fixedHeight + padding + gap * visibleParts.length;
+      const border = syncSize ? parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) : 0;
+      return fixedHeight + padding + border + gap * visibleParts.length;
     }
     return Math.max(0, card.offsetHeight - list.offsetHeight);
   }
@@ -891,7 +903,8 @@
     if (!list) return;
     if (fromUser) listLocked = true;
     const offset = listOffset();
-    const maximum = Math.max(40, (isFluidMobile() ? viewportHeight() : viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, renderedScale)) - offset);
+    const fitScale = syncSize ? Math.min(requestedScale, maximumScale()) : renderedScale;
+    const maximum = Math.max(40, (isFluidMobile() ? viewportHeight() : viewportHeight() / Math.max(ABSOLUTE_MINIMUM_SCALE, fitScale)) - offset);
     const desired = number(value, requestedListHeight ?? list.offsetHeight);
     requestedListHeight = fromUser ? Math.max(Math.min(160, maximum), Math.min(maximum, desired)) : Math.max(40, desired);
     renderedListHeight = Math.max(40, Math.min(maximum, requestedListHeight));
@@ -919,6 +932,8 @@
       : Math.max(MINIMUM_FRAME_HEIGHT, number(value, naturalHeight));
     if (list) {
       applyListHeight(next - listOffset(), fromUser);
+      // A temporarily short/offscreen iframe must not become the new target.
+      if (syncSize) requestedFrameHeight = next;
       heightLocked = listLocked;
       return;
     }
@@ -1094,7 +1109,7 @@
     const fixedObserver = new ResizeObserver(() => {
       if (listDrag) return;
       if (isReflow()) { updateFrame(); return; }
-      if (heightLocked) applyFrameHeight(naturalHeight);
+      if (heightLocked) applyFrameHeight(syncSize ? requestedFrameHeight : naturalHeight);
       else applyListHeight(requestedListHeight ?? list.offsetHeight);
     });
     fixedParts.forEach(part => fixedObserver.observe(part));
@@ -1159,7 +1174,10 @@
         else if (heightLocked) applyFrameHeight(number(next.frameH, naturalHeight), false, requestedScale);
       }
     }
-    updateFrame();
+    // Shared restores can arrive after the first paint or while rAF is parked.
+    // Commit before the sync loader reports ready (and before mobile can zoom).
+    if (syncSize) commitFrame();
+    else updateFrame();
   };
   window.addEventListener('storage', restoreSize);
   window.addEventListener('widgetlayoutrestore', event => restoreSize(event.detail));

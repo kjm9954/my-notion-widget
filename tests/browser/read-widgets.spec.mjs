@@ -157,6 +157,102 @@ async function expectPretendard(page, selector) {
   } finally {await session.detach();}
 }
 
+test('mobile layout restores rendered dimensions, keeps tablet rows and survives viewport changes', {timeout:60000}, async () => {
+  const browser = await chromium.launch({ headless:true, ...(process.env.TEST_BROWSER_CHANNEL ? { channel:process.env.TEST_BROWSER_CHANNEL } : {}) });
+  try {
+      const db=fixture();
+      db.notes.items=db.notes.items.filter(n=>!n.done);
+      const records=structuredClone({worklog:db.worklog,notes:db.notes,goals:db.goals});
+      const sizes={
+        worklog:{contentW:1100,frameH:600,listH:373,scale:.8},
+        notes:{contentW:500,frameH:500,listH:454,scale:.8},
+        deadlines:{contentW:300,frameH:240,scale:1},
+      };
+      db.layouts={[instance]:Object.fromEntries(Object.entries(sizes).map(([widget,size])=>[widget,{size:{...size,
+        widthLocked:true,heightLocked:true,scaleLocked:true,listLocked:true},updatedAt:now.toISOString()}]))};
+      const measurements=[];
+      for(const [label,width,height,touch,screen] of [
+        ['desktop',1440,1000,false],['ipad',768,1024,true],
+        ['ipad-split',480,900,true,{width:768,height:1024}],['phone',390,844,true],
+        ['small-phone',320,740,true],['phone-landscape',844,390,true,{width:390,height:844}],
+      ]) {
+        const {context,errors}=await setup(browser,{viewport:{width,height},hasTouch:touch,isMobile:touch,...(screen?{screen}:{})},db);
+        try {
+          for(const [widget,file] of [['worklog','worklog-cream-olive-garden'],['notes','notes'],['deadlines','deadlines']]) {
+            const page=await context.newPage();await page.clock.setFixedTime(now);
+            await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+            await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+            await page.locator(widget==='worklog'?'[data-toggle-task="t0"]':widget==='notes'?'[data-note-id="n1"]':'.wr-deadline').first().waitFor();
+            await page.evaluate(()=>document.fonts.ready);
+            await page.waitForTimeout(300);
+            const writesBeforeResize=db.writes.length;
+            const measure=()=>page.evaluate(()=>{
+              const card=document.querySelector('[data-widget-card]'),host=document.querySelector('[data-widget-host]');
+              const box=card.getBoundingClientRect();
+              return {width:box.width,height:box.height,hostHeight:host.getBoundingClientRect().height,
+                logicalHeight:card.offsetHeight,scale:Number(host.style.getPropertyValue('--widget-content-scale')),
+                mode:document.body.dataset.widgetLayoutMode,compact:document.body.classList.contains('is-worklog-compact'),
+                top:box.top,scroll:document.documentElement.scrollWidth,viewport:innerWidth,viewportHeight:innerHeight};
+            });
+            const before=await measure();measurements.push({label,widget,...before});
+            if(process.env.TEST_SCREENSHOT_DIR) {
+              await mkdir(process.env.TEST_SCREENSHOT_DIR,{recursive:true});
+              await page.screenshot({path:resolve(process.env.TEST_SCREENSHOT_DIR,`size-${label}-${widget}.png`)});
+            }
+            // Changing an iframe's viewport does not change the device screen.
+            // Playwright setViewportSize does, so preserve screen metrics here.
+            const session=await context.newCDPSession(page);
+            const resize=h=>session.send('Emulation.setDeviceMetricsOverride',{
+              width,height:h,deviceScaleFactor:1,mobile:touch,
+              screenWidth:screen?.width||width,screenHeight:screen?.height||height,
+            });
+            await resize(180);
+            await page.waitForTimeout(150);
+            await resize(height);
+            await page.waitForTimeout(300);
+            const after=await measure();
+            await session.detach();
+            assert.equal(db.writes.length,writesBeforeResize,'viewport changes must not write records');
+            assert.ok(Math.abs(after.height-before.height)<2,`${label} ${widget}: height lost after short embed: ${JSON.stringify({before,after})}`);
+            assert.ok(before.scroll<=width+1,`${label} ${widget}: horizontal overflow`);
+            if(touch)assert.ok(before.top<7,`${label} ${widget}: blank space above the widget`);
+          }
+          assert.deepEqual(errors,[]);
+        } finally {await context.close();}
+      }
+      for(const m of measurements) {
+        const saved=sizes[m.widget];
+        const phone=m.label.includes('phone')&&m.widget==='worklog';
+        const expectedScale=phone||m.widget==='deadlines'?1:Math.min(saved.scale,m.viewport/saved.contentW);
+        const expectedHeight=Math.min(m.viewportHeight,saved.frameH*(phone?saved.scale:expectedScale));
+        assert.ok(Math.abs(m.height-expectedHeight)<2,`rendered size ${JSON.stringify(m)}, expected height ${expectedHeight}`);
+        assert.ok(Math.abs(m.hostHeight-m.height)<2,`frame mismatch ${JSON.stringify(m)}`);
+        if(m.widget==='worklog')assert.equal(m.compact,phone,`tablet must not inflate phone cards: ${JSON.stringify(m)}`);
+      }
+      assert.equal(db.layoutRequests.filter(r=>r.method==='POST').length,0,'restoring never changes shared sizes');
+      assert.deepEqual({worklog:db.worklog,notes:db.notes,goals:db.goals},records,'user records are unchanged');
+      // The corner handle can save only scaleLocked, without an axis lock.
+      db.layouts[instance].worklog.size={contentW:1350,frameH:595,listH:368,scale:.6,
+        scaleLocked:true,widthLocked:true,heightLocked:false,listLocked:false};
+      const phone=await setup(browser,{viewport:{width:390,height:844},hasTouch:true,isMobile:true},db);
+      try {
+        const page=await phone.context.newPage();await page.clock.setFixedTime(now);
+        await page.goto(`${origin}${prefix}worklog-cream-olive-garden.html?w=${instance}`);
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+        await page.waitForTimeout(300);
+        const height=await page.locator('[data-widget-card]').evaluate(n=>n.getBoundingClientRect().height);
+        assert.ok(Math.abs(height-595*.6)<2,`corner-only saved height ignored: ${height}`);
+        await page.reload();
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+        await page.waitForTimeout(300);
+        assert.ok(Math.abs((await page.locator('[data-widget-card]').boundingBox()).height-height)<2);
+        assert.deepEqual(phone.errors,[]);
+      } finally {await phone.context.close();}
+      assert.equal(db.layoutRequests.filter(r=>r.method==='GET').length,7,'one bounded read per device storage, including reload');
+      assert.equal(db.layoutRequests.filter(r=>r.method==='POST').length,0,'mobile restoration never uploads fitted sizes');
+  } finally {await browser.close();}
+});
+
 test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
   const browser = await chromium.launch({ headless:true, ...(process.env.TEST_BROWSER_CHANNEL ? { channel:process.env.TEST_BROWSER_CHANNEL } : {}) });
   try {

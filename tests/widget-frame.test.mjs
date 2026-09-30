@@ -74,3 +74,21 @@ test("팝오버는 카드 안으로 보정되고 모바일에서는 하단 시�
   assert.match(source, /window\.widgetFrame = Object\.assign\([\s\S]*clampToCard/);
   assert.match(css, /body\.is-widget-mobile \.cell-popover[\s\S]*?bottom: 8px !important/);
 });
+
+test("새 세트만 화면 기기로 태블릿 배치를 지키고 저장 높이와 임시 표시 높이를 구분한다", async () => {
+  assert.match(source,/host\?\.hasAttribute\('data-widget-sync'\)[\s\S]*screenEdge >= 600/);
+  assert.match(source,/requestedFrameHeight \* requestedScale - offset/);
+  assert.match(source,/if \(syncSize\) requestedFrameHeight = next/);
+  assert.match(source,/applyFrameHeight\(syncSize \? requestedFrameHeight : naturalHeight\)/);
+  assert.match(css,/is-mobile-tablet-device:has\(\[data-widget-sync\]\)/);
+  const html=await readFile(new URL('../cream-olive-garden/Worklog/worklog-cream-olive-garden.html',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/mobileQuery|1 \/ scale/);
+  assert.match(html,/classList\.toggle\('is-worklog-compact', isMobileLayout\(\)\)/);
+});
+
+test("여섯 위젯의 크기 프레임 자산은 같은 갱신 버전을 사용한다", async () => {
+  for(const file of ['worklog-cream-olive-garden','notes','weekly-goals','deadlines','week-review','month-calendar']) {
+    const html=await readFile(new URL(`../cream-olive-garden/Worklog/${file}.html`,import.meta.url),'utf8');
+    for(const extension of ['css','js'])assert.ok(html.includes(`widget-frame.${extension}?v=20260930-mobile-layout`));
+  }
+});
