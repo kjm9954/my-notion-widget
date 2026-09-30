@@ -353,6 +353,14 @@
 
   window.widgetFrame = Object.assign(window.widgetFrame || {}, { clampToCard, viewportWidth, viewportHeight });
 
+  function sizeStorageKey(host) {
+    const base = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+    return host.hasAttribute('data-widget-sync') ? `${base}:${window.Store?.getWidgetInstanceId() || 'unconnected'}` : base;
+  }
+  function publishSize(host, key, size) {
+    if (host.hasAttribute('data-widget-sync')) window.dispatchEvent(new CustomEvent('widgetsizechange', {detail:{key,size}}));
+  }
+
   function setupListOnlyFrame(host, card) {
     const list = card?.querySelector('[data-widget-list]');
     const listHandle = card?.querySelector('[data-widget-list-handle]');
@@ -362,7 +370,7 @@
     const designWidth = Number(host.dataset.widgetMaxWidth || host.dataset.widgetWidth) || card.offsetWidth || 320;
     const declaredHeight = Number(host.dataset.widgetHeight) || card.offsetHeight || 200;
     const defaultListHeight = Number(list.dataset.widgetListHeight) || list.offsetHeight || 160;
-    const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+    const key = sizeStorageKey(host);
     let savedWidth = designWidth;
     const currentLayoutMode = () => layoutMode(host, savedWidth);
     const isReflow = () => ['reflow','mobile'].includes(currentLayoutMode());
@@ -378,7 +386,7 @@
 
     function readSize() {
       try {
-        const parsed = JSON.parse(localStorage.getItem(key));
+        const parsed = JSON.parse(localStorage.getItem(key) || (host.hasAttribute('data-widget-sync') ? localStorage.getItem(host.dataset.widgetKey) : null));
         return withQuerySize(parsed && typeof parsed === 'object' ? parsed : {});
       } catch (_) {
         return withQuerySize({});
@@ -388,7 +396,7 @@
     function saveSize() {
       if (isMobileTabletDevice()) return;
       try {
-        localStorage.setItem(key, JSON.stringify({
+        const size = {
           scale: 1,
           scaleLocked: true,
           contentW: designWidth,
@@ -397,7 +405,9 @@
           heightLocked: true,
           listH: Math.round(requestedListHeight),
           listLocked,
-        }));
+        };
+        localStorage.setItem(key, JSON.stringify(size));
+        publishSize(host, key, size);
       } catch (_) {}
     }
 
@@ -496,13 +506,16 @@
     window.addEventListener('focus', settleFrame);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) settleFrame(); });
     new ResizeObserver(settleFrame).observe(document.documentElement);
-    window.addEventListener('storage', event => {
+    const restoreSize = event => {
       if (event.key !== key) return;
-      const next = readSize();
+      if (drag) return;
+      const next = event.size ? withQuerySize(event.size) : readSize();
       listLocked = next.listLocked === true;
       requestedListHeight = Math.max(120, number(next.listH, requestedListHeight));
       commit();
-    });
+    };
+    window.addEventListener('storage', restoreSize);
+    window.addEventListener('widgetlayoutrestore', event => restoreSize(event.detail));
   }
 
   const host = document.querySelector('[data-widget-host]');
@@ -549,7 +562,8 @@
   const bottomHeightHandle = viewportAxisHandle('bottom', 'vertical', 'widget-height-handle widget-height-handle-bottom', '아래쪽에서 위젯 세로 크기 조절');
   const sizeHandles = [scaleHandle, topLeftHandle, leftWidthHandle, rightWidthHandle, topHeightHandle, bottomHeightHandle];
 
-  const key = host.dataset.widgetKey || `widget-size-${location.pathname.split('/').pop() || 'index.html'}`;
+  const key = sizeStorageKey(host);
+  const syncSize = host.hasAttribute('data-widget-sync');
   const widthKey = host.dataset.widgetWidthKey || '';
   const fluidWidth = host.hasAttribute('data-widget-fluid');
   const autoHeight = host.hasAttribute('data-widget-auto-height');
@@ -599,7 +613,7 @@
 
   function readStoredSize(storageKey) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(storageKey));
+      const parsed = JSON.parse(localStorage.getItem(storageKey) || (syncSize && storageKey === key ? localStorage.getItem(host.dataset.widgetKey) : null));
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (_) {
       return {};
@@ -643,6 +657,7 @@
         }));
       }
     } catch (_) {}
+    publishSize(host, key, value);
   }
 
   /* The widget never letterboxes: the white frame is always exactly the scaled
@@ -650,7 +665,7 @@
   function maximumScale() {
     if (layoutResize) return 1;
     const byWidth = viewportWidth() / contentWidth;
-    const viewportLimit = isMobileTabletDevice() || fluidWidth ? byWidth : Number.POSITIVE_INFINITY;
+    const viewportLimit = isMobileTabletDevice() || fluidWidth || syncSize ? byWidth : Number.POSITIVE_INFINITY;
     const configured = Number.isFinite(configuredMaximumScale) && configuredMaximumScale > 0
       ? configuredMaximumScale
       : Number.POSITIVE_INFINITY;
@@ -1109,12 +1124,13 @@
 
   settleFrame();
 
-  window.addEventListener('storage', event => {
+  const restoreSize = event => {
+    if (sizeDrag || listDrag) return;
     const localChanged = event.key === key;
     const sharedWidthChanged = Boolean(widthKey) && event.key === widthKey;
     if (!localChanged && !sharedWidthChanged) return;
     if (sharedWidthChanged || (!widthKey && localChanged)) {
-      const nextHorizontal = widthKey ? readWidthSize() : readSize();
+      const nextHorizontal = event.size ? withQuerySize(event.size) : widthKey ? readWidthSize() : readSize();
       const ownsHorizontal = property => Object.prototype.hasOwnProperty.call(nextHorizontal, property);
       scaleLocked = nextHorizontal.scaleLocked === true || (!ownsHorizontal('scaleLocked') && ['scale', 'scaleX', 'scaleY', 'width', 'height'].some(ownsHorizontal));
       requestedScale = Math.max(ABSOLUTE_MINIMUM_SCALE, scaleFromSaved(nextHorizontal, 1));
@@ -1131,7 +1147,7 @@
       }
     }
     if (localChanged) {
-      const next = readSize();
+      const next = event.size ? withQuerySize(event.size) : readSize();
       const owns = property => Object.prototype.hasOwnProperty.call(next, property);
       heightLocked = next.heightLocked === true || (!owns('heightLocked') && owns('frameH'));
       listLocked = next.listLocked === true || (Object.prototype.hasOwnProperty.call(next, 'listH') && !Object.prototype.hasOwnProperty.call(next, 'listLocked'));
@@ -1144,5 +1160,7 @@
       }
     }
     updateFrame();
-  });
+  };
+  window.addEventListener('storage', restoreSize);
+  window.addEventListener('widgetlayoutrestore', event => restoreSize(event.detail));
 })();

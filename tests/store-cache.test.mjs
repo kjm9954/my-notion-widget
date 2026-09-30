@@ -418,6 +418,55 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 const fixtureDay = '2026-09-29';
 const fixtureTime = Date.parse('2026-09-29T12:00:00+09:00');
 
+test('크기는 여섯 화면에서 한 번만 조회하고 10분 동안 공유하며 타이머를 만들지 않는다', async () => {
+  const persisted=new Map(), locks=sharedLocks(), BroadcastChannel=sharedChannels();
+  let now=fixtureTime, count=0;
+  const fetch=async()=>{count++;return Response.json({ok:true,data:{layouts:{}}});};
+  const stores=Array.from({length:6},()=>createStore(fetch,persisted,{isolated:true,coalesce:true,locks,BroadcastChannel,now:()=>now}));
+  await Promise.all(stores.map(s=>s.loadWidgetLayouts()));assert.equal(count,1);
+  now+=599999;await Promise.all(stores.map(s=>s.loadWidgetLayouts()));assert.equal(count,1);
+  stores.forEach(s=>s.__runIntervals());assert.equal(count,1);
+  now+=2;await Promise.all(stores.map(s=>s.loadWidgetLayouts()));assert.equal(count,2);
+  const other=createStore(fetch,persisted,{isolated:true,locks,now:()=>now,search:'?w=w_other_size_instance_123456789'});
+  await other.loadWidgetLayouts();assert.equal(count,3);
+  assert.ok(stores.every(s=>s.__intervalDurations.length===0));
+});
+test('크기 저장은 성공 응답만 공유하고 다른 위젯 크기를 보존하며 같은 값은 쓰지 않는다', async () => {
+  const persisted=new Map(),locks=sharedLocks();let now=fixtureTime,reads=0,writes=0;
+  const size={scale:1,contentW:500,frameH:350};
+  const fetch=async(url,options={})=>{
+    if(options.method==='POST'){writes++;const b=JSON.parse(options.body);return Response.json({ok:true,data:{...b,updatedAt:'confirmed'}});}
+    reads++;return Response.json({ok:true,data:{layouts:{notes:{size,updatedAt:'old'}}}});
+  };
+  const store=createStore(fetch,persisted,{locks,isolated:true,now:()=>now});
+  await store.loadWidgetLayouts();now+=599000;
+  await store.saveWidgetLayout('deadlines',size);await store.saveWidgetLayout('deadlines',size);
+  assert.equal(writes,1);assert.equal(reads,1);
+  assert.equal((await store.cachedWidgetLayouts()).layouts.notes.updatedAt,'old');
+  now+=1001;await store.loadWidgetLayouts();assert.equal(reads,2,'saving one widget did not extend all six TTLs');
+});
+test('크기 조회 실패는 1분 동안 합쳐지고 이전 크기를 유지하며 한도 중 쓰지 않는다', async () => {
+  const persisted=new Map(),locks=sharedLocks();let now=fixtureTime,requests=0,fail=false;
+  const fetch=async()=>{requests++;return fail?Response.json({ok:false,error:'offline'},{status:503}):Response.json({ok:true,data:{layouts:{notes:{size:{scale:1,contentW:400,frameH:300},updatedAt:'old'}}}});};
+  const make=()=>createStore(fetch,persisted,{locks,isolated:true,now:()=>now});
+  await make().loadWidgetLayouts();now+=600001;fail=true;
+  const readers=Array.from({length:6},make);
+  const results=await Promise.allSettled(readers.map(s=>s.loadWidgetLayouts()));
+  assert.equal(requests,2);assert.ok(results.every(r=>r.status==='rejected'&&r.reason.cachedData.layouts.notes.size.frameH===300));
+  now+=60001;
+  const limited=createStore(async()=>{requests++;return Response.json({ok:false,error:"D1_ERROR: Your account has exceeded D1's free tier daily row read limit"},{status:503});},persisted,{locks,isolated:true,now:()=>now});
+  await assert.rejects(limited.loadWidgetLayouts());const before=requests;
+  await assert.rejects(limited.saveWidgetLayout('notes',{scale:1,contentW:500,frameH:300}));assert.equal(requests,before);
+});
+test('크기 권한 오류는 이전 응답으로 숨기지 않으며 잘못된 서버 응답도 실패한다',async()=>{
+  const persisted=new Map(),locks=sharedLocks();let now=fixtureTime;
+  await createStore(async()=>Response.json({ok:true,data:{layouts:{}}}),persisted,{locks,now:()=>now}).loadWidgetLayouts();
+  now+=600001;
+  await assert.rejects(createStore(async()=>Response.json({ok:false,error:'denied'},{status:403}),persisted,{locks,now:()=>now}).loadWidgetLayouts(),error=>!error.cachedData&&error.status===403);
+  await assert.rejects(createStore(async()=>{throw new Error('must not request again');},persisted,{locks,now:()=>now}).loadWidgetLayouts(),error=>!error.cachedData&&error.status===403);
+  await assert.rejects(createStore(async()=>Response.json({ok:true,data:{tasks:[]}}),new Map(),{locks}).loadWidgetLayouts(),/서버 응답/);
+});
+
 test('다섯 위젯의 업무/목표 동시 조회를 각각 한 번으로 합치고 변경 없으면 revision만 읽는다', async () => {
   const persisted = new Map(), locks = sharedLocks(), BroadcastChannel = sharedChannels();
   let now = fixtureTime, revision = 1;

@@ -6,6 +6,8 @@ const API = "https://notion-widget.wldnjsdkk.workers.dev";
 const COALESCE_READS = document.currentScript?.hasAttribute('data-store-coalesce') === true;
 const SHARED_READ_INTERVAL_MS = 120000;
 const GOALS_READ_INTERVAL_MS = 300000;
+const WIDGET_LAYOUT_CACHE_MS = 600000;
+const WIDGET_LAYOUT_PATH = '/api/widget-layout';
 // New independent sets opt in. Never inherit or publish a legacy instance key.
 const ISOLATED_INSTANCE = document.currentScript?.hasAttribute('data-store-isolated') === true
   || new URLSearchParams(window.location.search || '').get('isolated') === '1';
@@ -950,6 +952,80 @@ async function patchNotesState(patch) {
   return data;
 }
 
+// Sizes share one bounded read across the six embeds. No polling/watch timer.
+function subscribeWidgetLayouts(callback) {
+  const listener = change => { if (change?.path === WIDGET_LAYOUT_PATH) callback(); };
+  storeListeners.add(listener);
+  return () => storeListeners.delete(listener);
+}
+function widgetLayoutUrl() {
+  if (!WIDGET_INSTANCE_ID) throw new Error('크기를 공유하려면 인스턴스 키가 필요합니다.');
+  return apiUrl(WIDGET_LAYOUT_PATH);
+}
+function validateWidgetLayouts(data) {
+  if (!data?.layouts || typeof data.layouts !== 'object' || Array.isArray(data.layouts)) throw new Error('크기 설정 서버 응답을 확인하지 못했습니다.');
+  return data;
+}
+async function cachedWidgetLayouts() {
+  return cloneData((await readCached(widgetLayoutUrl(), true))?.data?.data || {layouts:{}});
+}
+async function loadWidgetLayouts() {
+  const url = widgetLayoutUrl();
+  return withReadLock(url, async () => {
+    const cached = await readCached(url, true);
+    const age = Date.now() - (cached?.validatedAt || 0);
+    if (cached?.validatedAt > 0 && age >= 0 && age < WIDGET_LAYOUT_CACHE_MS) return cloneData(cached.data.data);
+    try {
+      await assertServerAvailable();
+      const retry = await readCached(url + '&local-retry=1', true);
+      if (retry?.data?.data?.until > Date.now()) {
+        const error = new Error('크기 설정 연결을 잠시 기다리는 중입니다.');
+        error.status = retry.data.data.status || 0;
+        throw error;
+      }
+      const result = await fetchSharedRead(url);
+      validateWidgetLayouts(result.data);
+      await writeCached(url, result);
+      await deleteCachedUrl(url + '&local-retry=1');
+      announceChange(WIDGET_LAYOUT_PATH);
+      return cloneData(result.data);
+    } catch (error) {
+      applyServerBackoff(error);
+      if (!error.serverBackoff) {
+        const retry = await readCached(url + '&local-retry=1', true);
+        if (!(retry?.data?.data?.until > Date.now())) await writeCached(url + '&local-retry=1', {ok:true,data:{until:Date.now()+60000,status:error.status || 0}});
+      }
+      if (cached && (!error.status || error.status >= 500 || error.status === 429)) error.cachedData = cloneData(cached.data.data);
+      throw error;
+    }
+  });
+}
+async function saveWidgetLayout(widget, size, options = {}) {
+  const url = widgetLayoutUrl();
+  return withReadLock(url, async () => {
+    try {
+      await assertServerAvailable();
+      const cached = await readCached(url, true);
+      const previous = cached?.data?.data?.layouts?.[widget];
+      if (previous && JSON.stringify(previous.size) === JSON.stringify(size)) return cloneData(previous);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let result;
+      try {
+        result = await parseApiResponse(await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({widget,size}), signal:controller.signal, keepalive:options.keepalive === true}));
+      } finally { clearTimeout(timeout); }
+      if (result.data?.widget !== widget || !result.data?.size || !result.data?.updatedAt) throw new Error('크기 저장 결과를 확인하지 못했습니다.');
+      const entry = {size:result.data.size, updatedAt:result.data.updatedAt};
+      const layouts = {...(cached?.data?.data?.layouts || {}), [widget]:entry};
+      // Saving one widget must not refresh the freshness of the other five.
+      await writeCached(url, {ok:true,data:{layouts}}, undefined, cached?.validatedAt || 0);
+      announceChange(WIDGET_LAYOUT_PATH);
+      return cloneData(entry);
+    } catch (error) { applyServerBackoff(error); throw error; }
+  });
+}
+
 // ───────── 업무 관리 예약 ─────────
 async function loadSchedules() {
   return (await apiGet("/api/schedules/list")).data;
@@ -1015,6 +1091,7 @@ async function getMoodOfDate(date) {
 
 // 위젯에서 window.Store.saveDiary(...)처럼 씀
 window.Store = {
+  loadWidgetLayouts, cachedWidgetLayouts, saveWidgetLayout, subscribeWidgetLayouts,
   READING_SYNC_INTERVAL_MS, MIN_WATCH_INTERVAL_MS,
   createWidgetInstance, getWidgetInstanceId,
   saveDiary, loadDiary, loadDiaryRange, getWrittenDates, deleteDiary,

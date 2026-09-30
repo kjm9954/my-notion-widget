@@ -685,3 +685,13 @@ body.is-widget-mobile #dayOverlay .modal-panel button {
     display: none !important;
   }
 }
+/* Size synchronization notices use the widget's existing typography and color. */
+[data-widget-sync] > .widget-layout-status {
+  margin: 4px 0 0;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+[data-widget-sync] > .widget-layout-status[hidden] { display: none; }

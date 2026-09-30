@@ -6,7 +6,7 @@
   <title>메모장</title>
   <link rel="preload" href="../assets/fonts/pretendard-1.3.9/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../pretendard.css?v=20260929-selfhost-font">
-  <link rel="stylesheet" href="../../widget-frame.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-size-sync">
   <link rel="stylesheet" href="../notes-theme.css?v=20260929-selfhost-font">
   <style>
     /* Match the read widgets' outer card; keep the v9 list and controls intact. */
@@ -19,7 +19,7 @@
       #notes-roof-v8 .memo-input, #notes-roof-v8 .add-row { min-height:calc(44px * var(--notes-touch-scale,1)); }
     }
   </style>
-  <script src="../../store.js?v=20260929-last-known" data-store-isolated data-store-coalesce></script>
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
 </head>
 <body class="widget-page widget-page-centered notes-minimal-page">
   <div id="notes-roof-v8" class="widget-host" data-widget-host data-widget-key="widget-size-cream-olive-notes-v9" data-widget-max-width="340" data-widget-height="270" data-widget-max-scale="4" style="--widget-max-width:340px;--widget-base-width:340px;--widget-base-height:270px;--widget-visual-height:270px">
@@ -400,6 +400,8 @@
       Store.watch(syncFromServer, 120000, { allowWhileEditing:true, initial:false, allowCached:true, paths:['/api/notes/'] });
     })();
   </script>
-  <script src="../../widget-frame.js"></script>
+  <script>document.querySelector('[data-widget-host]').dataset.widgetSync = 'notes';</script>
+  <script src="../../widget-frame.js?v=20260930-size-sync"></script>
+  <script src="../../widget-layout-sync.js?v=20260930-size-sync"></script>
 </body>
 </html>

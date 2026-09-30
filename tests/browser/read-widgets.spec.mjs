@@ -30,8 +30,10 @@ function fixture() {
       {id:'old-done',text:'이전 날 완료',done:true,doneAt:'2026-09-28'}]}, fail:null, requests:[], writes:[] };
 }
 
-async function setup(browser, options = {}) {
-  const db = fixture();
+async function setup(browser, options = {}, sharedDb = null) {
+  const db = sharedDb || fixture();
+  db.layouts ||= {};
+  db.layoutRequests ||= [];
   const originalDb = fixture();
   const context = await browser.newContext({ viewport:{ width:1440, height:1000 }, timezoneId:'Asia/Seoul', serviceWorkers:'block', ...options });
   const errors = [];
@@ -48,6 +50,21 @@ async function setup(browser, options = {}) {
     }
     if (url.hostname === 'notion-widget.wldnjsdkk.workers.dev') {
       const entry = { path:url.pathname, method:req.method(), page:req.frame().url(), instance:url.searchParams.get('w') };
+      if (url.pathname === '/api/widget-layout') {
+        db.layoutRequests.push(entry);
+        const headers = { 'access-control-allow-origin':'*', 'access-control-allow-headers':'*', 'access-control-allow-methods':'GET, POST, OPTIONS', 'access-control-max-age':'86400' };
+        if (req.method() === 'OPTIONS') return route.fulfill({status:204,headers});
+        if (![instance,originalInstance].includes(entry.instance)) return route.fulfill({status:404,headers,json:{ok:false,error:'unknown fixture instance'}});
+        if (db.layoutFail || db.fail === 'all' || db.fail === 'd1') return route.fulfill({status:503,headers,json:{ok:false,error:db.fail === 'd1' ? "D1_ERROR: Your account has exceeded D1's free tier daily row read limit" : 'size offline'}});
+        const layouts = db.layouts[entry.instance] ||= {};
+        if (req.method() === 'POST') {
+          const body = req.postDataJSON();
+          assert.deepEqual(Object.keys(body).sort(), ['size','widget']);
+          layouts[body.widget] = {size:body.size,updatedAt:new Date().toISOString()};
+          return route.fulfill({headers,json:{ok:true,data:{widget:body.widget,...layouts[body.widget]}}});
+        }
+        return route.fulfill({headers,json:{ok:true,data:{layouts}}});
+      }
       db.requests.push(entry);
       const headers = { 'access-control-allow-origin':'*', 'access-control-allow-headers':'*', 'access-control-allow-methods':'GET, POST, OPTIONS' };
       if (req.method() === 'OPTIONS') return route.fulfill({ status:204, headers });
@@ -143,6 +160,75 @@ async function expectPretendard(page, selector) {
 test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
   const browser = await chromium.launch({ headless:true, ...(process.env.TEST_BROWSER_CHANNEL ? { channel:process.env.TEST_BROWSER_CHANNEL } : {}) });
   try {
+    await t.test('sizes sync across separate PC, iPad and phone storage without writes on restore or repeated focus GETs',async()=>{
+      const source=await setup(browser);
+      const all=[...files,'worklog-cream-olive-garden','notes'];
+      try {
+        for(const file of all) {
+          const page=await source.context.newPage();await page.clock.setFixedTime(now);
+          await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+          await page.waitForFunction(()=>document.querySelector('[data-widget-host]')?.dataset.widgetSyncState==='ready');
+          const handle=page.locator('.widget-width-handle-right');
+          await handle.focus();
+          for(let i=0;i<4;i++)await handle.press('ArrowLeft');
+          await page.waitForFunction(()=>document.querySelector('[data-widget-host]')?.dataset.widgetSyncState==='ready');
+        }
+        const counted=method=>source.db.layoutRequests.filter(r=>r.method===method).length;
+        assert.equal(counted('GET'),1,'one read for all six');
+        assert.equal(counted('POST'),6,'four keyboard adjustments merge to one write per widget');
+        const saved=structuredClone(source.db.layouts[instance]);
+        for(const page of source.context.pages()) await page.evaluate(()=>{for(let i=0;i<12;i++)window.dispatchEvent(new Event('focus'));});
+        assert.equal(counted('GET'),1);
+        for(const options of [{viewport:{width:1000,height:900}},{viewport:{width:768,height:1000},isMobile:true,hasTouch:true},{viewport:{width:390,height:844},isMobile:true,hasTouch:true}]) {
+          const target=await setup(browser,options,source.db);
+          const before=counted('GET');
+          try {
+            for(const file of all) {
+              const page=await target.context.newPage();await page.clock.setFixedTime(now);
+              await page.goto(`${origin}${prefix}${file}.html?w=${instance}`);
+              await page.waitForFunction(()=>document.querySelector('[data-widget-host]')?.dataset.widgetSyncState==='ready');
+              const restored=await page.evaluate(()=>{
+                const host=document.querySelector('[data-widget-host]');
+                return {widget:host.dataset.widgetSync,size:JSON.parse(localStorage.getItem(`${host.dataset.widgetKey}:${Store.getWidgetInstanceId()}`)),
+                  width:host.getBoundingClientRect().width,viewport:window.innerWidth,scroll:document.documentElement.scrollWidth};
+              });
+              assert.deepEqual(restored.size,saved[restored.widget].size);
+              assert.ok(restored.width<=restored.viewport+2,`${file} overflow ${JSON.stringify(restored)}`);
+              assert.ok(restored.scroll<=restored.viewport+2,`${file} page overflow`);
+            }
+            assert.equal(counted('GET')-before,1,'one read in the fresh device storage');
+            assert.equal(counted('POST'),6,'restoring or shrinking to a phone must never save');
+            assert.deepEqual(target.errors,[]);
+          } finally {await target.context.close();}
+        }
+        assert.deepEqual(source.db.layouts[instance],saved,'small screens did not replace the shared dimensions');
+        assert.deepEqual(source.errors,[]);
+      } finally {await source.context.close();}
+    });
+    await t.test('size failure retains local dimensions and warning without automatic retries or cross-key writes',async()=>{
+      const {context,db,open,errors}=await setup(browser);
+      try {
+        const page=await open('deadlines');
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+        db.layoutFail=true;
+        await page.locator('.widget-height-handle-bottom').press('ArrowDown');
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='unsaved');
+        const before=db.layoutRequests.length;
+        for(let i=0;i<10;i++)await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        await page.reload();
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='unsaved');
+        assert.equal(db.layoutRequests.length,before);
+        assert.match(await page.locator('.widget-layout-status').textContent(),/이 기기에만/);
+        db.layoutFail=false;
+        await page.locator('.widget-height-handle-bottom').press('ArrowDown');
+        await page.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+        const isolated=await open('deadlines',`?w=${originalInstance}`);
+        await isolated.waitForFunction(()=>document.querySelector('[data-widget-host]').dataset.widgetSyncState==='ready');
+        assert.equal(await isolated.evaluate(()=>localStorage.getItem(`${document.querySelector('[data-widget-host]').dataset.widgetKey}:${Store.getWidgetInstanceId()}`)),null);
+        assert.deepEqual(db.layouts[originalInstance],{});
+        assert.deepEqual(errors,[]);
+      } finally {await context.close();}
+    });
     await t.test('shared reads collapse focus bursts, reuse successful writes and poll only revision while unchanged',async()=>{
       const {context,db,errors,openAll}=await setup(browser);
       try {
@@ -680,7 +766,7 @@ test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
         assert.equal(await page.locator('body').evaluate(el=>el.classList.contains('is-widget-scaling')),true);
         await page.mouse.move(box.x+box.width/2,box.y+box.height/2+80,{steps:5}); await page.mouse.up();
         await page.waitForFunction(h=>document.querySelector('[data-widget-card]').getBoundingClientRect().height>h+60,current.height);
-        const key='widget-size-cream-olive-deadlines-read-v1';
+        const key=`widget-size-cream-olive-deadlines-read-v1:${instance}`;
         const saved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
         assert.equal(saved.heightLocked,true); assert.equal(saved.contentW,before.width);
         await page.reload(); await page.locator('.wr-deadline').first().waitFor();
@@ -1028,7 +1114,7 @@ test('offline read-widget browser acceptance', { timeout:180000 }, async t => {
         const before = await page.locator('.wr-card').boundingBox();
         const handle = page.locator('.widget-width-handle-right');
         await handle.focus(); await handle.press('ArrowLeft');
-        const key = 'widget-size-cream-olive-weekly-goals-read-v1';
+        const key = `widget-size-cream-olive-weekly-goals-read-v1:${instance}`;
         await page.waitForFunction(k => !!localStorage.getItem(k), key);
         const saved = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), key);
         assert.ok(saved.contentW < before.width + 12);

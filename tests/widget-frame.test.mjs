@@ -46,7 +46,7 @@ test("저장 폭과 기기 유형으로 축소·아이폰 배치·일반 재배�
   assert.match(source, /if \(!isMobileTabletDevice\(\)\) return 'desktop'/);
   assert.match(source, /if \(width >= 640 \|\| savedWidth <= width \* 2\) return 'scale'/);
   assert.match(source, /host\?\.hasAttribute\('data-widget-mobile'\) \? 'mobile' : 'reflow'/);
-  assert.match(source, /const viewportLimit = isMobileTabletDevice\(\) \|\| fluidWidth \? byWidth : Number\.POSITIVE_INFINITY/);
+  assert.match(source, /const viewportLimit = isMobileTabletDevice\(\) \|\| fluidWidth \|\| syncSize \? byWidth : Number\.POSITIVE_INFINITY/);
   assert.match(source, /const reflowWidth = viewportWidth\(\);\s*renderedScale = 1;/);
   assert.match(source, /--widget-content-width', `\$\{reflowWidth\}px`/);
   assert.match(source, /card\.style\.removeProperty\('height'\)/);

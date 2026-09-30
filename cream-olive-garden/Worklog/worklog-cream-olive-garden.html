@@ -445,7 +445,7 @@
     @media (max-width:800px) { .wl-grass { --wl-scene-height:82px; height:82px; } }
     @media (max-width:480px) { .wl-grass { --wl-scene-height:68px; height:68px; } }
   </style>
-  <link rel="stylesheet" href="../../widget-frame.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-size-sync">
   <style>
     /* Functional cells only; the existing palette, frame and garden are unchanged. */
     /* Only reorder feedback is smaller; shared and garden animations stay unchanged. */
@@ -523,7 +523,7 @@
     body.is-worklog-compact .mini-calendar-grid { gap:0; }
     body.is-worklog-compact .mobile-add-form { height:auto; min-height:48px; }
   </style>
-  <script src="../../store.js?v=20260929-last-known" data-store-isolated data-store-coalesce></script>
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
   <script src="../grass-field-renderer.js"></script>
 </head>
 <body class="widget-page widget-page-centered">
@@ -2878,6 +2878,8 @@
       });
     })();
   </script>
-  <script src="../../widget-frame.js"></script>
+  <script>document.querySelector('[data-widget-host]').dataset.widgetSync = 'worklog';</script>
+  <script src="../../widget-frame.js?v=20260930-size-sync"></script>
+  <script src="../../widget-layout-sync.js?v=20260930-size-sync"></script>
 </body>
 </html>
