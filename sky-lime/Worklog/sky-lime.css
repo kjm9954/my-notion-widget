@@ -1,0 +1,179 @@
+/* sky-lime 테마 — WORK LOG 페이지 위젯 4종. 수치는 디자인 시안 소스 값.
+   공통 파일(widget-frame.css)은 수정하지 않고, 이 테마 안에서만 덮어쓴다. */
+:root {
+  --sl-font: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Helvetica Neue", sans-serif;
+
+  /* 글자 */
+  --sl-ink: #1F1F1D;
+  --sl-text: #2B2B29;
+  --sl-strong: #3F3F3C;
+  --sl-deep: #4A4A47;
+  --sl-sub: #5E5E5A;
+  --sl-secondary: #6B6B67;
+  --sl-label: #7A7A76;
+  --sl-muted: #8E8E8A;
+  --sl-faint: #9A9A96;
+  --sl-arrow: #A3A39F;
+  --sl-hint: #ADADA9;
+  --sl-quiet: #B4B4B0;
+  --sl-empty: #BDBDB9;
+  --sl-delete: #C4C4C0;
+
+  /* 면·선 */
+  --sl-surface: #FFFFFF;
+  --sl-line: #ECECE9;
+  --sl-line-panel: #EAEAE7;
+  --sl-line-tip: #E8E8E5;
+  --sl-line-focus: #E2E2DF;
+  --sl-line-dash: #DCDCD8;
+  --sl-sep: #CFCFCB;
+  --sl-check: #D0D0CC;
+  --sl-dot: #C8C8C4;
+  --sl-seg: #F3F3F1;
+  --sl-hover: #EBEBE8;
+  --sl-field: #F6F6F4;
+  --sl-card: #F7F7F5;
+  --sl-card-hover: #F1F1EF;
+  --sl-cell: #F8F8F7;
+  --sl-more: #FAFAF9;
+  --sl-track: #F0F0EE;
+  --sl-drop: #F4F4F2;
+  --sl-overlay: rgba(30,30,28,.10);
+  --sl-chip-on: #2B2B29;
+
+  /* 포인트: 하늘색(진행 바·완료 체크·오늘·추가 버튼), 초록(번호 원), 빨강(마감 지남) */
+  --sl-sky: oklch(0.68 0.14 236);
+  --sl-sky-button: oklch(0.64 0.14 238);
+  --sl-sky-button-hover: oklch(0.6 0.14 238);
+  --sl-sky-today: oklch(0.97 0.018 235);
+  --sl-badge-bg: oklch(0.95 0.035 235);
+  --sl-badge-ink: oklch(0.5 0.13 240);
+  --sl-lime: #CEF18C;
+  --sl-lime-ink: #33520A;
+  --sl-num-done: #EAEAE7;
+  --sl-num-done-ink: #9A9A96;
+  --sl-red: #D93B3B;
+
+  /* 형태 */
+  --sl-r-root: 20px;
+  --sl-r-panel: 16px;
+  --sl-r-lane: 14px;
+  --sl-r-card: 12px;
+  --sl-r-field: 12px;
+  --sl-r-row: 10px;
+  --sl-r-seg: 9px;
+  --sl-r-chip: 8px;
+  --sl-r-seg-button: 7px;
+  --sl-r-check: 5px;
+  --sl-shadow-seg: 0 1px 2px rgba(0,0,0,.06);
+  --sl-shadow-panel: 0 10px 30px rgba(0,0,0,.08);
+  --sl-shadow-tip: 0 4px 14px rgba(0,0,0,.05);
+  --sl-shadow-ghost: 0 6px 18px rgba(0,0,0,.08);
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body {
+  color: var(--sl-text);
+  font-family: var(--sl-font);
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+input::placeholder { color: var(--sl-hint); }
+/* widget-frame.css의 공통 hover 보더색이 이 테마의 테두리 없는 버튼·입력에 비치지 않게 한다. */
+@media (hover: hover) {
+  .sl-root button:hover, .sl-root input:hover { border-color: transparent; }
+}
+.sl-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 루트 카드: 임베드 상자를 가로·세로 100% 채운다. 스크롤 없음. */
+.sl-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sl-surface);
+  border: 1px solid var(--sl-line);
+  border-radius: var(--sl-r-root);
+}
+.sl-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.sl-title-wrap { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sl-notice { min-width: 0; overflow: hidden; color: var(--sl-hint); font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.sl-message { margin: 0; color: var(--sl-quiet); font-size: 13px; line-height: 1.5; }
+
+/* 업무/일상 전환 */
+.sl-seg { flex: none; display: flex; gap: 2px; padding: 2px; background: var(--sl-seg); border-radius: var(--sl-r-seg); }
+.sl-seg-button {
+  position: relative; border: 0; border-radius: var(--sl-r-seg-button); padding: 4px 11px;
+  background: transparent; color: var(--sl-muted); font-size: 12px; font-weight: 600; line-height: 1.5;
+}
+.sl-seg-button::after { content: ''; position: absolute; inset: -4px -1px; }
+.sl-seg-button.is-on { background: var(--sl-surface); color: var(--sl-ink); box-shadow: var(--sl-shadow-seg); }
+
+/* 이전/다음 화살표 */
+.sl-nav { display: flex; align-items: center; margin-left: -7px; min-width: 0; }
+.sl-arrow {
+  position: relative; flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--sl-r-chip);
+  background: transparent; color: var(--sl-arrow); font-size: 17px; line-height: 1;
+}
+.sl-arrow::after { content: ''; position: absolute; inset: -2px; }
+.sl-nav-label { color: var(--sl-secondary); font-size: 13px; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sl-today-button {
+  margin-left: 2px; height: 28px; padding: 0 8px; border: 0; border-radius: var(--sl-r-seg-button);
+  background: transparent; color: var(--sl-arrow); font-size: 12px; font-weight: 500;
+}
+@media (hover: hover) {
+  .sl-arrow:hover, .sl-today-button:hover { background: var(--sl-seg); color: var(--sl-deep); }
+}
+
+/* 번호 원: 초록은 여기에만 */
+.sl-num {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+  background: var(--sl-lime); color: var(--sl-lime-ink); font-weight: 700; line-height: 1;
+}
+.sl-num.is-done { background: var(--sl-num-done); color: var(--sl-num-done-ink); }
+
+/* 체크박스 (보이는 칸 18px, 누르는 영역 28px) */
+.sl-check {
+  flex: none; width: 28px; height: 28px; margin: -5px; padding: 0; border: 0; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+}
+.sl-check-box {
+  width: 18px; height: 18px; border-radius: var(--sl-r-check); border: 1.5px solid var(--sl-check); background: var(--sl-surface);
+  display: flex; align-items: center; justify-content: center;
+}
+.sl-check.is-on .sl-check-box { border-color: var(--sl-sky); background: var(--sl-sky); }
+.sl-check.is-on .sl-check-box::after {
+  content: ''; width: 4px; height: 8px; margin-top: -2px; border-right: 2px solid #FFFFFF; border-bottom: 2px solid #FFFFFF; transform: rotate(45deg);
+}
+
+/* 행 삭제 ✕ (보이는 칸 20px, 누르는 영역 28px) */
+.sl-delete {
+  position: relative; flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--sl-empty); font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.sl-delete::after { content: ''; position: absolute; inset: -4px; }
+@media (hover: hover) {
+  .sl-delete:hover { color: var(--sl-secondary); background: #EDEDEB; }
+}
+
+/* 추가 입력 + 추가 버튼 */
+.sl-add { flex: none; display: flex; gap: 8px; }
+.sl-input {
+  flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--sl-r-field);
+  background: var(--sl-field); color: var(--sl-text); font-size: 14px; outline: none;
+}
+.sl-root .sl-input:focus { background: var(--sl-surface); border-color: var(--sl-line-focus); }
+.sl-add-button {
+  flex: none; height: 42px; padding: 0 18px; border: 0; border-radius: var(--sl-r-field);
+  background: var(--sl-sky-button); color: #FFFFFF; font-size: 14px; font-weight: 600;
+}
+.sl-add-button:disabled { cursor: default; }
+@media (hover: hover) { .sl-add-button:hover { background: var(--sl-sky-button-hover); } }
+.sl-add-button:active { transform: scale(.985); transition: transform var(--t-press, 90ms) var(--ease, ease); }
+
+.sl-loading .sl-board, .sl-loading .sl-add { visibility: hidden; }

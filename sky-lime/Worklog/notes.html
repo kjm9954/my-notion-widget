@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261014-sky-lime">
+  <style>
+    .sl-notes { --sl-px: 22px; }
+    .sl-notes.is-narrow { --sl-px: 18px; }
+    .sl-notes-head { flex: none; padding: 16px calc(var(--sl-px) - 4px) 8px var(--sl-px); }
+    .sl-notes-head .sl-head-row { height: 28px; }
+    .sl-notes-title { margin: 0; color: var(--sl-ink); font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
+    .sl-notes-list { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 var(--sl-px) 8px; display: flex; flex-direction: column; }
+    .sl-note { flex: none; height: 30px; display: flex; align-items: center; gap: 8px; }
+    .sl-note .sl-check { margin: 0 -5px; }
+    .sl-note-text {
+      flex: 1; min-width: 0; margin-left: 4px; overflow: hidden; color: var(--sl-text); font-size: 14px; line-height: 1.4;
+      white-space: nowrap; text-overflow: ellipsis;
+    }
+    .sl-note.is-done .sl-note-text { color: var(--sl-faint); text-decoration: line-through; opacity: .6; }
+    .sl-note .sl-delete { width: 28px; height: 28px; margin-right: -6px; border-radius: var(--sl-r-chip); color: var(--sl-delete); font-size: 13px; }
+    .sl-note .sl-delete::after { inset: 0; }
+    @media (hover: hover) { .sl-note .sl-delete:hover { color: var(--sl-secondary); background: var(--sl-seg); } }
+    .sl-notes-list > .sl-message { padding: 16px 0; }
+    .sl-notes-full { flex: none; height: 38px; margin: 0; display: flex; align-items: center; padding: 8px var(--sl-px) 18px; box-sizing: content-box; color: var(--sl-quiet); font-size: 13px; }
+    .sl-notes.is-narrow .sl-notes-full { padding-bottom: 16px; }
+    .sl-notes-full[hidden], .sl-notes-add[hidden] { display: none; }
+    .sl-notes-add { gap: 6px; padding: 8px var(--sl-px) 18px; }
+    .sl-notes.is-narrow .sl-notes-add { padding-bottom: 16px; }
+    .sl-notes-add .sl-input { height: 38px; padding: 0 12px; border-radius: 11px; }
+    .sl-notes-add .sl-add-button { height: 38px; padding: 0 14px; border-radius: 11px; }
+  </style>
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <main class="sl-root sl-notes" id="app" data-status="loading" aria-label="메모">
+    <div class="sl-notes-head">
+      <div class="sl-head-row">
+        <div class="sl-title-wrap"><h1 class="sl-notes-title">메모</h1><span class="sl-notice" id="notice"></span></div>
+        <div id="modeToggle"></div>
+      </div>
+    </div>
+    <div class="sl-notes-list" id="list" aria-label="메모 목록"><p class="sl-message">불러오는 중이에요</p></div>
+    <p class="sl-notes-full" id="full" hidden>완료한 메모를 지우면 추가할 수 있어요</p>
+    <form class="sl-add sl-notes-add" id="addForm" hidden>
+      <input class="sl-input" id="addInput" maxlength="1000" placeholder="메모 추가..." aria-label="메모 추가" autocomplete="off">
+      <button class="sl-add-button" type="submit">추가</button>
+    </form>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="notes.mjs?v=20261014-sky-lime"></script>
+</body>
+</html>

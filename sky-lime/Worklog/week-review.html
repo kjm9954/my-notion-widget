@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>이번 주 한 일</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261014-sky-lime">
+  <style>
+    .sl-week { padding: 22px 24px 20px; }
+    .sl-week-head { flex: none; }
+    .sl-week-titlebar { flex: none; margin-top: 18px; }
+    .sl-week-title { margin: 0; color: var(--sl-ink); font-size: 26px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; }
+    .sl-week-grid { flex: 1 1 auto; min-height: 0; margin-top: 14px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 8px; }
+    .sl-week-grid > .sl-message { grid-column: 1 / -1; }
+    .sl-day {
+      min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px; overflow: hidden;
+      border-radius: var(--sl-r-lane); background: var(--sl-cell);
+    }
+    .sl-day.is-today { background: var(--sl-sky-today); }
+    .sl-day-head { flex: none; height: 24px; margin-bottom: 2px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .sl-day-name { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--sl-text); font-size: 13px; font-weight: 700; }
+    .sl-today-badge { padding: 1px 7px; border-radius: 999px; background: var(--sl-sky); color: #FFFFFF; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .sl-day-count { flex: none; color: var(--sl-muted); font-size: 12px; white-space: nowrap; }
+    .sl-day-item { flex: none; height: 28px; display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .sl-dot-button {
+      flex: none; width: 28px; height: 28px; margin-left: -9px; padding: 0; border: 0; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sl-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--sl-dot); background: var(--sl-surface); }
+    .sl-dot-button.is-on .sl-dot { border-color: var(--sl-sky); background: var(--sl-sky); }
+    .sl-day-item .sl-num { width: 16px; height: 16px; margin-left: -4px; font-size: 10px; }
+    .sl-day-text { flex: 1; min-width: 0; margin-left: -4px; overflow: hidden; color: var(--sl-muted); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-day-item .sl-num + .sl-day-text { margin-left: 2px; }
+    .sl-day-item.is-done .sl-day-text { color: var(--sl-text); }
+    .sl-day-more { flex: none; height: 24px; display: flex; align-items: center; color: var(--sl-quiet); font-size: 12px; }
+    .sl-day-empty { flex: none; height: 28px; display: flex; align-items: center; color: var(--sl-empty); font-size: 13px; }
+  </style>
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <main class="sl-root sl-week" id="app" data-status="loading" aria-label="이번 주 한 일">
+    <div class="sl-head-row sl-week-head">
+      <nav class="sl-nav" aria-label="주 이동">
+        <button class="sl-arrow" type="button" data-week="-1" aria-label="이전 주">‹</button>
+        <span class="sl-nav-label" id="range"></span>
+        <button class="sl-arrow" type="button" data-week="1" aria-label="다음 주">›</button>
+      </nav>
+      <div id="modeToggle"></div>
+    </div>
+    <div class="sl-title-wrap sl-week-titlebar"><h1 class="sl-week-title">이번 주 한 일</h1><span class="sl-notice" id="notice"></span></div>
+    <div class="sl-week-grid" id="days"><p class="sl-message">불러오는 중이에요</p></div>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="week-review.mjs?v=20261014-sky-lime"></script>
+</body>
+</html>

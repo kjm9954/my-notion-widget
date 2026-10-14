@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>업무일지</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261014-sky-lime">
+  <style>
+    .sl-worklog { --sl-px: 28px; }
+    .sl-worklog.is-narrow { --sl-px: 22px; }
+    .sl-worklog.is-drag { user-select: none; }
+
+    /* 머리: 날짜 이동 · 제목 · n개 남음 · 진행 바 */
+    .sl-wl-head { flex: none; padding: 22px var(--sl-px) 0; }
+    .sl-worklog.is-narrow .sl-wl-head { padding-top: 18px; }
+    .sl-wl-titlebar { margin-top: 18px; }
+    .sl-worklog.is-narrow .sl-wl-titlebar { margin-top: 14px; }
+    .sl-wl-title { margin: 0; color: var(--sl-ink); font-size: 26px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; }
+    .sl-worklog.is-narrow .sl-wl-title { font-size: 22px; }
+    .sl-badge { flex: none; padding: 5px 11px; border-radius: 999px; background: var(--sl-badge-bg); color: var(--sl-badge-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .sl-progress { margin-top: 14px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--sl-track); }
+    .sl-progress-fill { width: 0; height: 100%; border-radius: 3px; background: var(--sl-sky); transition: width .3s ease; }
+
+    /* 보드 */
+    .sl-board { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 20px var(--sl-px) 8px; }
+    .sl-worklog.is-narrow .sl-board { padding: 16px var(--sl-px) 6px; }
+    .sl-board > .sl-message { padding: 32px 0; text-align: center; color: var(--sl-hint); font-size: 14px; }
+    .sl-lanes { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 10px; }
+    .sl-worklog.is-narrow .sl-lanes { display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+    .sl-lane {
+      min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
+      margin: 0 -6px; padding: 0 6px 6px; border-radius: var(--sl-r-lane); transition: background .15s;
+    }
+    .sl-worklog.is-narrow .sl-lane { flex: none; }
+    .sl-lane.is-tight { gap: 4px; }
+    .sl-lane.is-over, .sl-done.is-over { background: var(--sl-drop); }
+    .sl-lane-head { flex: none; display: flex; align-items: baseline; gap: 6px; padding: 6px 2px 2px; }
+    .sl-lane-label { font-size: 12px; font-weight: 600; }
+    .sl-lane[data-lane="doing"] .sl-lane-label { color: var(--sl-strong); }
+    .sl-lane[data-lane="review"] .sl-lane-label { color: var(--sl-sub); }
+    .sl-lane[data-lane="wait"] .sl-lane-label { color: var(--sl-muted); }
+    .sl-lane-count { color: var(--sl-quiet); font-size: 12px; }
+    .sl-lane-empty { flex: none; padding: 6px 4px; color: var(--sl-empty); font-size: 12px; }
+    .sl-board-empty { margin: 0; padding: 32px 0; text-align: center; color: var(--sl-hint); font-size: 14px; }
+
+    /* 카드: 왼쪽 칸(체크박스·번호) / 오른쪽 칸(업무명·구분·마감·메모) */
+    .sl-card {
+      flex: none; position: relative; display: flex; flex-direction: column; gap: 4px; padding: 10px 11px;
+      border-radius: var(--sl-r-card); background: var(--sl-card); cursor: pointer; transition: background .12s; outline: none;
+    }
+    .sl-card-grid { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 9px; row-gap: 2px; align-items: start; }
+    .sl-card-check { width: 18px; height: 20px; display: flex; align-items: center; justify-content: center; }
+    .sl-card-title {
+      min-width: 0; padding-right: 14px; margin-bottom: 2px; color: var(--sl-ink); font-size: 14px; font-weight: 600; line-height: 1.4;
+      letter-spacing: -.01em; text-wrap: pretty; word-break: keep-all; overflow-wrap: anywhere;
+    }
+    .sl-card-numcell { height: 17px; display: flex; align-items: center; justify-content: center; }
+    .sl-num-sm, .sl-card-numcell .sl-num { width: 14px; height: 14px; font-size: 9px; }
+    .sl-card-meta { min-width: 0; height: 17px; display: flex; align-items: center; gap: 5px; overflow: hidden; color: var(--sl-faint); font-size: 12px; line-height: 1.4; white-space: nowrap; }
+    .sl-sep { color: var(--sl-sep); }
+    .sl-due.is-over { color: var(--sl-red); font-weight: 600; }
+    .sl-due.is-dday { color: var(--sl-ink); font-weight: 700; }
+    .sl-card-memo { min-width: 0; overflow: hidden; color: var(--sl-muted); font-size: 12px; line-height: 1.45; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-card-delete { position: absolute; top: 6px; right: 5px; }
+    .sl-compact {
+      flex: none; position: relative; height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px;
+      border-radius: var(--sl-r-row); background: var(--sl-card); cursor: pointer; outline: none;
+    }
+    .sl-compact-title { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-compact .sl-due { flex: none; color: var(--sl-faint); font-size: 12px; white-space: nowrap; }
+    .sl-compact .sl-due.is-over { color: var(--sl-red); }
+    .sl-compact .sl-due.is-dday { color: var(--sl-ink); }
+    .sl-grip { position: absolute; right: 6px; bottom: 6px; display: grid; grid-template-columns: 3px 3px; gap: 3px; padding: 5px 4px; touch-action: none; }
+    .sl-grip > span { width: 3px; height: 3px; border-radius: 50%; background: var(--sl-sep); }
+    .sl-card:focus-visible, .sl-compact:focus-visible, .sl-done-row:focus-visible { box-shadow: inset 0 0 0 1.5px var(--sl-dot); }
+    .is-dragging { opacity: .35; }
+    .sl-more {
+      flex: none; height: 30px; margin: 0; padding: 0 10px; border: 0; border-radius: var(--sl-r-row);
+      background: transparent; color: var(--sl-hint); font-size: 12px; font-weight: 500; text-align: left;
+    }
+
+    /* 완료 줄 */
+    .sl-done { flex: none; margin: 12px -8px 0; padding: 4px 8px; border-radius: var(--sl-r-card); transition: background .15s; }
+    .sl-done-head { display: flex; align-items: baseline; gap: 6px; padding: 0 0 2px; opacity: .5; }
+    .sl-done-label { color: var(--sl-label); font-size: 12px; font-weight: 600; }
+    .sl-done-row { position: relative; height: 28px; display: flex; align-items: center; gap: 9px; padding-left: 11px; cursor: pointer; outline: none; }
+    .sl-done-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; opacity: .5; white-space: nowrap; }
+    .sl-done-title { flex: 0 1 auto; min-width: 0; overflow: hidden; color: var(--sl-faint); font-size: 14px; font-weight: 600; text-decoration: line-through; text-overflow: ellipsis; }
+    .sl-done-part { flex: none; color: var(--sl-faint); font-size: 12px; }
+    .sl-done-part.is-memo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sl-done .sl-more { height: 28px; margin-left: -6px; padding: 0 6px; border-radius: var(--sl-r-chip); }
+    .sl-done-empty { padding: 4px 0; color: var(--sl-empty); font-size: 12px; }
+    .sl-wl-add { padding: 12px var(--sl-px) 22px; }
+    .sl-worklog.is-narrow .sl-wl-add { padding: 10px var(--sl-px) 18px; }
+
+    /* 마우스 기기: ✕는 행에 올렸을 때만. 터치 기기: 항상 보이고 끌기 손잡이 표시. */
+    @media (hover: hover) {
+      .sl-card:hover, .sl-compact:hover { background: var(--sl-card-hover); }
+      .sl-card .sl-delete, .sl-done-row .sl-delete { opacity: 0; pointer-events: none; }
+      .sl-card:hover .sl-delete, .sl-card:focus-within .sl-delete,
+      .sl-done-row:hover .sl-delete, .sl-done-row:focus-within .sl-delete { opacity: 1; pointer-events: auto; }
+      .sl-worklog:not(.is-touch) .sl-card, .sl-worklog:not(.is-touch) .sl-compact { cursor: grab; }
+      .sl-more:hover { background: var(--sl-field); color: var(--sl-secondary); }
+      .sl-panel-row:hover { background: var(--sl-field); }
+      .sl-close:hover, .sl-cal-today:hover { background: var(--sl-hover); }
+      .sl-text-button:hover, .sl-back:hover, .sl-cal-arrow:hover, .sl-small-button:hover { background: var(--sl-seg); color: var(--sl-sub); }
+      .sl-root .sl-chip-add:hover { border-color: var(--sl-line-dash); background: var(--sl-field); color: var(--sl-deep); }
+    }
+
+    /* 창: 그 열 전체 목록 / 세부 정보 */
+    .sl-overlay { position: absolute; inset: 0; z-index: 44; background: var(--sl-overlay); }
+    .sl-overlay.is-detail { z-index: 45; }
+    .sl-panel {
+      position: absolute; z-index: 44; left: 50%; top: 64px; transform: translateX(-50%);
+      width: 460px; max-width: calc(100% - 24px); max-height: calc(100% - 80px); overflow: auto;
+      display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 14px;
+      background: var(--sl-surface); border: 1px solid var(--sl-line-panel); border-radius: var(--sl-r-panel); box-shadow: var(--sl-shadow-panel);
+    }
+    .sl-worklog.is-narrow .sl-lane-panel { width: 92%; max-width: none; }
+    .sl-detail { z-index: 46; width: 420px; gap: 14px; padding: 18px 20px 16px; overflow: visible; }
+    .sl-worklog.is-narrow .sl-detail {
+      left: 0; right: 0; top: auto; bottom: 0; transform: none; width: auto; max-width: none; max-height: calc(100% - 16px);
+      overflow: auto; border-radius: 18px 18px 0 0;
+    }
+    .sl-panel-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .sl-lane-panel .sl-panel-head { margin-bottom: 4px; }
+    .sl-panel-heading { display: flex; align-items: baseline; gap: 6px; }
+    .sl-panel-title { color: var(--sl-ink); font-size: 14px; font-weight: 700; }
+    .sl-panel-count { color: var(--sl-hint); font-size: 13px; }
+    .sl-panel-kicker { color: var(--sl-muted); font-size: 13px; font-weight: 600; }
+    .sl-close { flex: none; height: 28px; padding: 0 10px; border: 0; border-radius: var(--sl-r-chip); background: var(--sl-seg); color: var(--sl-deep); font-size: 13px; font-weight: 600; }
+    .sl-panel-row { flex: none; height: 32px; display: flex; align-items: center; gap: 9px; margin: 0 -8px; padding: 0 8px; border-radius: var(--sl-r-chip); cursor: pointer; }
+    .sl-panel-row-title { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-panel-row.is-done .sl-panel-row-title { color: var(--sl-faint); text-decoration: line-through; }
+    .sl-panel-row .sl-due { flex: none; color: var(--sl-faint); font-size: 12px; }
+    .sl-panel-row .sl-due.is-over { color: var(--sl-red); }
+    .sl-panel-row .sl-due.is-dday { color: var(--sl-ink); }
+
+    .sl-detail-main { display: flex; flex-direction: column; gap: 14px; }
+    .sl-detail-title, .sl-detail-memo {
+      width: 100%; border: 1px solid transparent; border-radius: var(--sl-r-row); background: var(--sl-field); padding: 0 12px; outline: none;
+    }
+    .sl-detail-title { height: 42px; color: var(--sl-ink); font-size: 16px; font-weight: 600; }
+    .sl-detail-memo { height: 38px; color: var(--sl-text); font-size: 14px; }
+    .sl-root .sl-detail-title:focus, .sl-root .sl-detail-memo:focus { background: var(--sl-surface); border-color: var(--sl-line-focus); }
+    .sl-field { display: flex; flex-direction: column; gap: 6px; }
+    .sl-field-head { display: flex; align-items: center; justify-content: space-between; }
+    .sl-field-label { color: var(--sl-muted); font-size: 12px; font-weight: 600; }
+    .sl-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .sl-chip {
+      min-width: 30px; height: 30px; padding: 0 10px; border: 0; border-radius: var(--sl-r-chip); background: var(--sl-seg);
+      color: var(--sl-secondary); font-size: 13px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .sl-chip.is-on { background: var(--sl-chip-on); color: #FFFFFF; font-weight: 600; }
+    .sl-chip-x { color: var(--sl-hint); font-size: 11px; }
+    .sl-chip-add { height: 30px; padding: 0 10px; border: 1px dashed var(--sl-line-dash); border-radius: var(--sl-r-chip); background: transparent; color: var(--sl-faint); font-size: 13px; }
+    .sl-cat-input { width: 88px; height: 30px; padding: 0 10px; border: 1px solid var(--sl-line-focus); border-radius: var(--sl-r-chip); background: var(--sl-surface); color: var(--sl-text); font-size: 13px; outline: none; }
+    .sl-root .sl-cat-input:hover, .sl-root .sl-cat-input:focus { border-color: var(--sl-line-focus); }
+    .sl-cat-count { color: var(--sl-quiet); font-size: 12px; }
+    .sl-small-button { position: relative; height: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--sl-hint); font-size: 12px; }
+    .sl-small-button::after { content: ''; position: absolute; inset: -3px 0; }
+    .sl-cal-button { width: 34px; height: 30px; padding: 0; border: 0; border-radius: var(--sl-r-chip); background: var(--sl-seg); color: var(--sl-secondary); display: flex; align-items: center; justify-content: center; }
+    .sl-cal-button.is-on { background: var(--sl-chip-on); color: #FFFFFF; }
+    .sl-cal-icon { width: 14px; height: 13px; border: 1.5px solid currentColor; border-top-width: 3.5px; border-radius: 3px; }
+    .sl-detail-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 2px; }
+    .sl-text-button { height: 28px; margin-left: -8px; padding: 0 8px; border: 0; border-radius: var(--sl-r-chip); background: transparent; color: var(--sl-hint); font-size: 13px; }
+
+    .sl-cal { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+    .sl-back { height: 28px; margin-left: -8px; padding: 0 8px; border: 0; border-radius: var(--sl-r-chip); background: transparent; color: var(--sl-sub); font-size: 13px; font-weight: 600; }
+    .sl-cal-nav { display: flex; align-items: center; justify-content: center; gap: 2px; }
+    .sl-cal-today { height: 28px; margin-right: 4px; padding: 0 9px; border: 0; border-radius: var(--sl-r-chip); background: var(--sl-seg); color: var(--sl-deep); font-size: 12px; font-weight: 600; }
+    .sl-cal-arrow { width: 28px; height: 28px; border: 0; border-radius: var(--sl-r-chip); background: transparent; color: var(--sl-arrow); font-size: 16px; }
+    .sl-cal-month { min-width: 84px; text-align: center; color: var(--sl-text); font-size: 14px; font-weight: 600; }
+    .sl-cal-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: 24px; grid-auto-rows: minmax(0, 1fr); row-gap: 2px; }
+    .sl-cal-week { height: 24px; display: flex; align-items: center; justify-content: center; color: var(--sl-hint); font-size: 12px; }
+    .sl-cal-day {
+      width: 100%; max-width: 44px; height: 100%; min-height: 28px; max-height: 44px; margin: auto; padding: 0; border: 0;
+      border-radius: var(--sl-r-row); background: transparent; color: var(--sl-strong); font-size: 13px; font-weight: 400;
+    }
+    .sl-cal-day.is-past { color: var(--sl-empty); }
+    .sl-cal-day.is-sunday { color: var(--sl-muted); }
+    .sl-cal-day.is-today { font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--sl-chip-on); }
+    .sl-cal-day.is-on { background: var(--sl-chip-on); color: #FFFFFF; font-weight: 700; }
+    .sl-cal-day.is-on.is-today { box-shadow: inset 0 0 0 2px #FFFFFF, 0 0 0 1.5px var(--sl-chip-on); }
+    .sl-cal-day.is-blank { visibility: hidden; }
+
+    /* 말줄임된 메모 말풍선 · 끄는 중 표시 */
+    .sl-tip {
+      position: absolute; z-index: 58; max-width: 280px; padding: 10px 12px; pointer-events: none;
+      background: var(--sl-surface); border: 1px solid var(--sl-line-tip); border-radius: var(--sl-r-card); box-shadow: var(--sl-shadow-tip);
+      color: var(--sl-deep); font-size: 13px; line-height: 1.55; white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+      opacity: 0; transition: opacity .15s ease;
+    }
+    .sl-tip.is-on { opacity: 1; }
+    .sl-tip[hidden], .sl-ghost[hidden] { display: none; }
+    .sl-ghost {
+      position: absolute; z-index: 60; max-width: 220px; padding: 7px 11px; pointer-events: none; overflow: hidden;
+      background: var(--sl-surface); border: 1px solid #E6E6E3; border-radius: var(--sl-r-row); box-shadow: var(--sl-shadow-ghost);
+      color: var(--sl-text); font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis;
+    }
+  </style>
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <main class="sl-root sl-worklog" id="app" data-status="loading" aria-label="업무일지">
+    <header class="sl-wl-head">
+      <div class="sl-head-row">
+        <nav class="sl-nav" aria-label="날짜 이동">
+          <button class="sl-arrow" type="button" data-day="-1" aria-label="이전 날">‹</button>
+          <span class="sl-nav-label" id="dayLabel"></span>
+          <button class="sl-arrow" type="button" data-day="1" aria-label="다음 날">›</button>
+          <button class="sl-today-button" type="button" data-go-today hidden>오늘로</button>
+        </nav>
+        <div id="modeToggle"></div>
+      </div>
+      <div class="sl-head-row sl-wl-titlebar">
+        <div class="sl-title-wrap"><h1 class="sl-wl-title" id="title">오늘의 업무</h1><span class="sl-notice" id="notice"></span></div>
+        <span class="sl-badge" id="remain">0개 남음</span>
+      </div>
+      <div class="sl-progress" role="presentation"><div class="sl-progress-fill" id="progress"></div></div>
+    </header>
+    <section class="sl-board" id="board" aria-label="업무 보드"><p class="sl-message">불러오는 중이에요</p></section>
+    <form class="sl-add sl-wl-add" id="addForm">
+      <input class="sl-input" id="addInput" maxlength="240" placeholder="업무 추가..." aria-label="업무 추가" autocomplete="off">
+      <button class="sl-add-button" type="submit">추가</button>
+    </form>
+    <div id="laneLayer"></div>
+    <div id="detailLayer"></div>
+    <div class="sl-tip" id="tip" hidden></div>
+    <div class="sl-ghost" id="ghost" hidden></div>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="worklog-sky-lime.mjs?v=20261014-sky-lime"></script>
+</body>
+</html>
