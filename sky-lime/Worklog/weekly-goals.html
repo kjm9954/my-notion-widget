@@ -22,11 +22,15 @@
     .sl-goals { flex: 1 1 auto; height: auto; min-height: 0; gap: 10px; padding: 14px 18px 12px 22px; }
     .sl-goals-head { flex: none; height: 28px; }
     .sl-goals-title { margin: 0; color: var(--sl-ink); font-size: 16px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
-    .sl-goals-grid { flex: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    /* 남은 목표 카드가 가로 폭을 나눠 채운다(3개 3등분 · 2개 반씩 · 1개 전체, 최대 5칸). 칸 수는 스크립트가 정한다. */
+    .sl-goals-grid { flex: none; display: grid; grid-template-columns: repeat(var(--goal-columns, 5), minmax(0, 1fr)); gap: 8px; }
     .sl-goal {
       min-width: 0; height: 64px; display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px;
       border-radius: var(--sl-r-card); background: var(--sl-cell);
+      transition: opacity var(--t-close, 160ms) var(--ease, ease);
     }
+    /* 완료한 목표: 회색(is-done)으로 1.5초 둔 뒤 흐려지며 사라진다. 데이터는 지우지 않는다. */
+    .sl-goal.is-leaving { opacity: 0; }
     .sl-goal .sl-num { width: 18px; height: 18px; margin-top: 1px; font-size: 11px; }
     .sl-goal-text {
       flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 13px; font-weight: 600; line-height: 20px;
@@ -63,6 +67,6 @@
     </section>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="weekly-goals.mjs?v=20261015-sky-lime"></script>
+  <script type="module" src="weekly-goals.mjs?v=20261015-hide-done"></script>
 </body>
 </html>

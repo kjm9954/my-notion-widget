@@ -373,7 +373,7 @@ test('세부 정보: 번호·구분·마감·상태·메모·삭제와 이번 �
   await shot(page, 'worklog-1050-detail');
   // 번호 1 → 3
   await page.locator('[data-pick-number="3"]').click();
-  await goals.waitForFunction(() => [...document.querySelectorAll('.sl-goal[data-goal-id]')].map(node => node.dataset.goalId).join(',') === 'a8,a2,a1,a4');
+  await goals.waitForFunction(() => [...document.querySelectorAll('.sl-goal[data-goal-id]')].map(node => node.dataset.goalId).join(',') === 'a2,a1,a4');
   // 구분 추가(최대 6개)
   await page.locator('[data-cat-add]').click();
   await page.locator('[data-cat-input]').fill('검토');
