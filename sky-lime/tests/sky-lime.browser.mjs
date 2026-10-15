@@ -19,7 +19,7 @@ const OTHER_KEY = 'w_skylime_other_instance_98765432';
 const NOW = new Date('2026-10-14T10:00:00+09:00');
 const TODAY = '2026-10-14';
 const FILES = { goals:'weekly-goals', worklog:'worklog-sky-lime', week:'week-review', notes:'notes' };
-const HEIGHTS = { goals:180, worklog:900, week:330, notes:370 };
+const HEIGHTS = { goals:214, worklog:900, week:330, notes:370 };
 const FONT_CSS = `@font-face{font-family:"Pretendard Variable";font-weight:45 920;font-style:normal;font-display:block;src:url("${origin}/cream-olive-garden/assets/fonts/pretendard-1.3.9/PretendardVariable.woff2") format("woff2-variations");}`;
 
 // 시안 예시와 다른, 테스트 전용 데이터.

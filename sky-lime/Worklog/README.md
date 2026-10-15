@@ -9,7 +9,7 @@ GitHub Pages에 반영된 뒤 아래 형식으로 임베드합니다. 네 주소
 
 | 위젯 | 주소 | Notion 배치 · 높이 |
 | --- | --- | --- |
-| 이번 주 목표 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/weekly-goals.html?w=[인스턴스 키]` | 전체 폭 · 약 180px |
+| 이번 주 목표 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/weekly-goals.html?w=[인스턴스 키]` | 전체 폭 · 약 214px (캐릭터 자리 84px + 카드 130px) |
 | 업무일지 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/worklog-sky-lime.html?w=[인스턴스 키]` | 전체 폭 · 약 900px |
 | 이번 주 한 일 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/week-review.html?w=[인스턴스 키]` | 전체 폭 · 약 330px |
 | 메모 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/notes.html?w=[인스턴스 키]` | 오른쪽 35% 칸 · 약 370px |
