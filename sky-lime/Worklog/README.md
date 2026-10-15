@@ -37,7 +37,7 @@ store.js·worker.js는 바꾸지 않았고, 아래 기능은 서버가 지원한
 | 기능 | 지금(운영 서버 그대로) | 자동으로 켜지는 조건 |
 | --- | --- | --- |
 | 상태 변경 | 기존 `patchWorklogState`로 status 저장 | `Store.updateWorklogTaskStatus`가 생기면 그 함수 사용 |
-| 검토 대기 | `review`를 서버에 보내지 않고 예정(`wait`)으로 저장·표시. 이미 예정이면 저장 요청 없음 | `Store.updateWorklogTaskStatus`가 있거나, 업무 응답에 `review` 상태·`prevStatus: review`·`statusChangedAt` 필드가 보일 때 |
+| 검토 대기 | `review`를 그대로 보내고 서버가 돌려준 상태를 표시. 지금 서버는 예정(`wait`)으로 바꿔 저장하므로 예정 열(오류 없음) | 서버가 `review`를 저장해 돌려주면 바로 검토 대기 열. 그 뒤로는 저장 전 화면도 바로 검토 대기 |
 | 체크 해제 | `prevStatus`가 없으면 진행중 | 응답에 `prevStatus`가 오면 그 상태로 복원(기존 저장 방식으로 완료할 때도 `prevStatus`를 함께 보냄) |
 | 메모 업무/일상 | 메모에 `mode`가 없으면 업무·일상 모두 같은 목록(전환 버튼은 유지) | 메모 응답에 `mode` 필드가 하나라도 있으면 나눠 보여줌(`mode` 없는 기존 메모는 업무). 새 메모에는 항상 `mode`를 함께 보냄 |
 

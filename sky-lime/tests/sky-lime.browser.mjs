@@ -63,10 +63,12 @@ function fixture() {
 const emptyFixture = () => ({ ...fixture(), worklog:{ ...fixture().worklog, tasks:[] }, notes:{ items:[] } });
 
 // legacy=true: review·prevStatus·메모 mode를 모르는 기존 서버처럼 응답한다.
+// legacy='review': 그 서버에서 상태 목록에 review만 더한 경우(저장된 업무에는 아직 review가 없다).
 function normalizeTask(raw, legacy) {
   const next = { ...raw };
   if (legacy) {
-    if (!['doing', 'done', 'wait'].includes(next.status)) next.status = 'wait';
+    const statuses = legacy === 'review' ? ['doing', 'done', 'wait', 'review'] : ['doing', 'done', 'wait'];
+    if (!statuses.includes(next.status)) next.status = 'wait';
     delete next.prevStatus;
     delete next.statusChangedAt;
   }
@@ -312,21 +314,21 @@ test('현재 운영 서버(review·prevStatus·메모 mode 미지원)에서 오�
   const db = h.dbs[KEY];
   const page = await h.open('worklog', { width:1450 });
   assert.equal(await page.locator('[data-lane="review"] [data-task]').count(), 0);
-  // 진행중 업무를 검토 대기로 → 서버에는 예정(wait)으로 저장, 화면도 바로 예정 열
+  // 진행중 업무를 검토 대기로 → 서버가 예정(wait)으로 바꿔 저장, 화면도 바로 예정 열(오류 없음)
   await page.locator('[data-task="a1"] .sl-card-title').click();
   await page.locator('[data-pick-status="review"]').click();
   await page.waitForFunction(() => document.querySelector('[data-pick-status="wait"]')?.classList.contains('is-on'));
   await new Promise(done => setTimeout(done, 400));
   assert.equal(db.worklog.tasks.find(item => item.id === 'a1').status, 'wait');
-  assert.ok(db.writes.every(entry => !entry.body.includes('"review"')), 'review를 서버에 보내지 않는다');
+  assert.ok(await page.locator('[data-pick-status="wait"]').evaluate(node => node.classList.contains('is-on')));
   await page.locator('.sl-close[data-close-detail]').click();
   await page.waitForFunction(() => document.querySelector('[data-lane="wait"] [data-task="a1"]'));
-  // 이미 예정인 업무에서 검토 대기 → 바뀌는 것이 없으므로 저장 요청 없음
-  const writes = db.writes.length;
+  // 이미 예정인 업무에서 검토 대기 → 서버가 받지 않으므로 그대로 예정
   await page.locator('[data-task="a5"]').click();
   await page.locator('[data-pick-status="review"]').click();
   await new Promise(done => setTimeout(done, 400));
-  assert.equal(db.writes.length, writes);
+  assert.equal(db.worklog.tasks.find(item => item.id === 'a5').status, 'wait');
+  assert.ok(await page.locator('[data-pick-status="wait"]').evaluate(node => node.classList.contains('is-on')));
   await page.locator('.sl-close[data-close-detail]').click();
   // 끌어서 검토 대기 열에 놓아도 예정으로
   const card = await page.locator('[data-task="a2"]').boundingBox();
@@ -400,6 +402,31 @@ test('세부 정보: 번호·구분·마감·상태·메모·삭제와 이번 �
   await page.waitForFunction(() => !document.querySelector('[data-task="a7"]'));
   await new Promise(done => setTimeout(done, 300));
   assert.ok(!h.dbs[KEY].worklog.tasks.some(item => item.id === 'a7'));
+  assert.deepEqual(h.errors, []);
+  await h.context.close();
+});
+
+test('서버가 review를 받기 시작하면 코드 수정 없이 검토 대기로 저장·표시', { timeout:60000 }, async () => {
+  const h = await setup(browser, { legacy:'review' });
+  const db = h.dbs[KEY];
+  const page = await h.open('worklog', { width:1450 });
+  assert.equal(await page.locator('[data-lane="review"] [data-task]').count(), 0, '저장된 업무에 review가 아직 없다');
+  // 세부 정보에서 검토 대기
+  await page.locator('[data-task="a1"] .sl-card-title').click();
+  await page.locator('[data-pick-status="review"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-pick-status="review"]')?.classList.contains('is-on'));
+  assert.equal(db.worklog.tasks.find(item => item.id === 'a1').status, 'review');
+  await page.locator('.sl-close[data-close-detail]').click();
+  await page.waitForFunction(() => document.querySelector('[data-lane="review"] [data-task="a1"]'));
+  // 예정 업무를 검토 대기 열로 끌어 놓기
+  const card = await page.locator('[data-task="a5"]').boundingBox();
+  const lane = await page.locator('[data-lane="review"]').boundingBox();
+  await page.mouse.move(card.x + 120, card.y + 12); await page.mouse.down();
+  await page.mouse.move(card.x + 100, card.y + 30, { steps:4 }); await page.mouse.move(lane.x + 80, lane.y + 300, { steps:8 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('[data-lane="review"] [data-task="a5"]'));
+  await new Promise(done => setTimeout(done, 300));
+  assert.equal(db.worklog.tasks.find(item => item.id === 'a5').status, 'review');
   assert.deepEqual(h.errors, []);
   await h.context.close();
 });

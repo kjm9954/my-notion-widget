@@ -123,16 +123,17 @@ export const taskOps = {
       send:async state => { const task = findTask(state, id); return task ? upsertTask({ ...task, ...patch }) : state; }
     };
   },
-  // review를 모르는 서버에는 예정으로 저장하고 화면도 예정 열에 둔다(서버가 지원하면 자동으로 review).
+  // 검토 대기(review)는 서버에 그대로 보내고, 화면은 서버가 돌려준 상태를 따른다.
+  // review를 모르는 서버는 예정으로 바꿔 저장하므로 오류 없이 예정 열에 남고,
+  // 서버가 review를 받기 시작하면 코드 수정 없이 바로 검토 대기 열로 간다.
+  // 저장 전 미리 보여주는 화면은 서버 지원이 확인된 뒤에만 review, 그 전에는 예정.
   status(id, status) {
-    const target = state => storableStatus(status, supportsReview(state, typeof Store.updateWorklogTaskStatus === 'function'));
+    const shown = state => storableStatus(status, supportsReview(state, typeof Store.updateWorklogTaskStatus === 'function'));
     return {
-      apply:state => mapTask(state, id, task => withStatus(task, target(state))),
+      apply:state => mapTask(state, id, task => withStatus(task, shown(state))),
       send:async state => {
         const task = findTask(state, id);
-        const next = target(state);
-        // 서버에 review가 없어 결국 같은 상태가 되는 경우 등, 바뀌는 게 없으면 저장하지 않는다.
-        return task && statusOf(task) !== next ? changeTaskStatus(task, next) : state;
+        return task && statusOf(task) !== status ? changeTaskStatus(task, status) : state;
       }
     };
   },
