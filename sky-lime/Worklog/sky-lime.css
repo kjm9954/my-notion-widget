@@ -108,7 +108,7 @@ input::placeholder { color: var(--sl-hint); }
 .sl-seg { flex: none; display: flex; gap: 2px; padding: 2px; background: var(--sl-seg); border-radius: var(--sl-r-seg); }
 .sl-seg-button {
   position: relative; border: 0; border-radius: var(--sl-r-seg-button); padding: 4px 11px;
-  background: transparent; color: var(--sl-muted); font-size: 12px; font-weight: 600; line-height: 1.5;
+  background: transparent; color: var(--sl-muted); font-size: 12px; font-weight: 600; line-height: normal;
 }
 .sl-seg-button::after { content: ''; position: absolute; inset: -4px -1px; }
 .sl-seg-button.is-on { background: var(--sl-surface); color: var(--sl-ink); box-shadow: var(--sl-shadow-seg); }
@@ -120,7 +120,7 @@ input::placeholder { color: var(--sl-hint); }
   background: transparent; color: var(--sl-arrow); font-size: 17px; line-height: 1;
 }
 .sl-arrow::after { content: ''; position: absolute; inset: -2px; }
-.sl-nav-label { color: var(--sl-secondary); font-size: 13px; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sl-nav-label { color: var(--sl-secondary); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .sl-today-button {
   margin-left: 2px; height: 28px; padding: 0 8px; border: 0; border-radius: var(--sl-r-seg-button);
   background: transparent; color: var(--sl-arrow); font-size: 12px; font-weight: 500;

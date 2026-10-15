@@ -1,8 +1,8 @@
 // ④ 메모: 기존 메모 데이터(Store.loadNotesState / patchNotesState) 재사용.
 // 항목의 mode(work/life)로 나누며, mode가 없는 기존 메모는 업무로 본다.
 import { getMode, onModeChange, modeToggleHtml, bindModeToggle, readNotes, watchNotes, patchNotes,
-  makeId, escapeHtml, staleText, failureText, Store } from './sky-lime-common.mjs?v=20261014-sky-lime';
-import { notesFor, MAX_NOTES, calendarToday } from './sky-lime-model.mjs?v=20261014-sky-lime';
+  makeId, escapeHtml, staleText, failureText, Store } from './sky-lime-common.mjs?v=20261015-sky-lime';
+import { notesFor, MAX_NOTES, calendarToday } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const app = document.getElementById('app');
 const listEl = document.getElementById('list');

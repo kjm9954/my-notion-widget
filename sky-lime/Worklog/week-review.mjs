@@ -1,7 +1,7 @@
 // ③ 이번 주 한 일: 업무일지 데이터를 월~금 5칸으로 모은다. 직접 입력 없음(완료 원 체크만).
 import { getMode, onModeChange, modeToggleHtml, bindModeToggle, watchWorklog, createWorklogController,
-  taskOps, toggleTarget, escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261014-sky-lime';
-import { weekDays, dayCountLabel, worklogToday, mondayOf, addDays, weekRangeLabel, goalNumber, isDone } from './sky-lime-model.mjs?v=20261014-sky-lime';
+  taskOps, toggleTarget, escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
+import { weekDays, dayCountLabel, worklogToday, mondayOf, addDays, weekRangeLabel, goalNumber, isDone } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const MAX_PER_DAY = 6;
 const ROW = 28;

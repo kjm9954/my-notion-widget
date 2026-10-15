@@ -1,10 +1,10 @@
 // ② 업무일지: 진행중 / 검토 대기 / 예정 3열 보드 + 완료 줄 + 업무 추가.
 // 저장은 기존 Store API(patchWorklogState, 있으면 updateWorklogTaskStatus)만 쓴다.
 import { getMode, onModeChange, modeToggleHtml, bindModeToggle, watchWorklog, createWorklogController, taskOps,
-  toggleTarget, escapeHtml, canHover, makeId, staleText, failureText } from './sky-lime-common.mjs?v=20261014-sky-lime';
+  toggleTarget, escapeHtml, canHover, makeId, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
 import { worklogToday, addDays, daysBetween, dayLabel, tasksForDay, board, statusOf, isDone, goalNumber, goalIdFor,
   categoryOf, categoryValue, categoriesFor, dueInfo, STATUS_LABEL, LANE_ORDER, STATUS_CHOICES, OTHER_CATEGORY,
-  MAX_CATEGORIES, isDate } from './sky-lime-model.mjs?v=20261014-sky-lime';
+  MAX_CATEGORIES, isDate } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const WIDE_MIN = 900;
 const DONE_ROWS = 2;

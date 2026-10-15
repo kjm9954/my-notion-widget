@@ -1,7 +1,7 @@
 // ① 이번 주 목표: 이번 주 번호(1·2·3)가 있는 업무만 자동 표시. 읽기 전용.
 import { getMode, onModeChange, modeToggleHtml, bindModeToggle, watchWorklog, createWorklogController,
-  escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261014-sky-lime';
-import { weeklyGoals, worklogToday, isDone } from './sky-lime-model.mjs?v=20261014-sky-lime';
+  escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
+import { weeklyGoals, worklogToday, isDone } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const CELLS = 5;
 const app = document.getElementById('app');

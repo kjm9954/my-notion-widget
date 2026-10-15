@@ -1,6 +1,6 @@
 // sky-lime 위젯 공통: 업무/일상 전환 동기화, 기존 Store API 연결, 공통 마크업.
 // 실제 데이터는 window.Store만 사용한다. localStorage에는 업무/일상 선택값만 둔다.
-import { withStatus, uncheckStatus, statusOf } from './sky-lime-model.mjs?v=20261014-sky-lime';
+import { withStatus, uncheckStatus, statusOf } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 export const Store = window.Store;
 
