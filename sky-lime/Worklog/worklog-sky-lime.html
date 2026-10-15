@@ -20,8 +20,44 @@
     .sl-wl-title { margin: 0; color: var(--sl-ink); font-size: 26px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; }
     .sl-worklog.is-narrow .sl-wl-title { font-size: 22px; }
     .sl-badge { flex: none; padding: 5px 11px; border-radius: 999px; background: var(--sl-badge-bg); color: var(--sl-badge-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
-    .sl-progress { margin-top: 14px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--sl-track); }
-    .sl-progress-fill { width: 0; height: 100%; border-radius: 3px; background: var(--sl-sky); transition: width .3s ease; }
+    /* 진행 게이지 + 캐릭터. 제목 줄과 게이지 사이(넓은 폭 42px, 좁은 폭 38px)가 캐릭터 자리다. 늘어난 높이는 보드가 흡수한다. */
+    .sl-progress { --face-size: 38px; --gauge-ratio: 0; position: relative; margin-top: 42px; height: 6px; border-radius: 3px; background: var(--sl-track); }
+    .sl-worklog.is-narrow .sl-progress { margin-top: 38px; }
+    .sl-progress-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 3px; background: var(--sl-sky); transition: width .3s ease; }
+    /* 캐릭터는 게이지 위에 앉는다(얼굴 아래가 게이지 윗면에 닿고, 게이지 선이 얼굴을 지나가지 않는다).
+       가로 = (게이지 폭 - 크기) * 완료 비율. 0%면 왼쪽 끝, 100%면 오른쪽 끝 안쪽. 위치를 정하기 전에는 숨긴다. */
+    .sl-face {
+      position: absolute; left: calc((100% - var(--face-size)) * var(--gauge-ratio)); bottom: calc(100% - 1px);
+      width: var(--face-size); height: var(--face-size); pointer-events: none; visibility: hidden; transition: left .3s ease;
+    }
+    .sl-face.is-ready { visibility: visible; }
+    .sl-face-body { position: relative; width: 100%; height: 100%; }
+    /* 세 표정을 겹쳐 두고 교차한다(같은 비율로 줄인 이미지라 얼굴 크기가 튀지 않는다). */
+    .sl-face-img {
+      position: absolute; left: 50%; bottom: 0; height: auto; display: block; opacity: 0;
+      transform: translateX(-50%) scale(.86); transform-origin: 50% 100%; transition: opacity .18s ease, transform .24s ease;
+    }
+    .sl-face-img[data-face="v"] { width: 95%; }
+    .sl-face-img[data-face="wave"] { width: 92.5%; }
+    .sl-face-img[data-face="smile"] { width: 100%; }
+    /* 좁은 폭: 간격 38px 안에서 튀어 올라도 "모두 완료" 알약과 8px 이상 떨어지도록 그림만 94%로(칸 크기·위치 계산은 32px 그대로). */
+    .sl-worklog.is-narrow .sl-face-img[data-face="v"] { width: 89.3%; }
+    .sl-worklog.is-narrow .sl-face-img[data-face="wave"] { width: 87%; }
+    .sl-worklog.is-narrow .sl-face-img[data-face="smile"] { width: 94%; }
+    .sl-face-img.is-on { opacity: 1; transform: translateX(-50%) scale(1); }
+    .sl-face-spark { position: absolute; left: -10px; top: 60%; width: 5px; height: 5px; border-radius: 50%; background: var(--sl-sky); opacity: 0; }
+    .sl-face-spark.is-second { left: calc(100% + 5px); top: 45%; width: 4px; height: 4px; }
+    /* 전부 완료되는 순간 한 번: 통통 튀기(0.6초) + 양옆 작은 점(0.9초, 두 번째는 0.12초 늦게) */
+    .sl-face.is-cheer .sl-face-body { animation: sl-face-hop 600ms ease; }
+    .sl-face.is-cheer .sl-face-spark { animation: sl-face-spark 900ms ease-out forwards; }
+    .sl-face.is-cheer .sl-face-spark.is-second { animation-delay: 120ms; }
+    .sl-progress.is-instant .sl-progress-fill, .sl-progress.is-instant .sl-face, .sl-progress.is-instant .sl-face-img { transition: none; }
+    @keyframes sl-face-hop { 0% { transform: translateY(0); } 30% { transform: translateY(-5px); } 60% { transform: translateY(0); } 80% { transform: translateY(-2px); } 100% { transform: translateY(0); } }
+    @keyframes sl-face-spark { 0% { opacity: 0; transform: scale(.3); } 40% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }
+    /* 모션 끄기 설정에서는 공통 규칙이 opacity를 1로 고정하므로, 지금 표정만 보이고 점은 숨긴다. */
+    @media (prefers-reduced-motion: reduce) {
+      .sl-face-img:not(.is-on), .sl-face-spark { visibility: hidden; }
+    }
 
     /* 보드 */
     .sl-board { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 20px var(--sl-px) 8px; }
@@ -224,7 +260,17 @@
         <div class="sl-title-wrap"><h1 class="sl-wl-title" id="title">오늘의 업무</h1><span class="sl-notice" id="notice"></span></div>
         <span class="sl-badge" id="remain">0개 남음</span>
       </div>
-      <div class="sl-progress" role="presentation"><div class="sl-progress-fill" id="progress"></div></div>
+      <div class="sl-progress" id="gauge" role="presentation">
+        <div class="sl-progress-fill" id="progress"></div>
+        <div class="sl-face" id="face" aria-hidden="true">
+          <div class="sl-face-body">
+            <img class="sl-face-img" data-face="v" src="assets/face-v.png?v=20261015-face" width="114" height="106" alt="">
+            <img class="sl-face-img" data-face="wave" src="assets/face-wave.png?v=20261015-face" width="111" height="105" alt="">
+            <img class="sl-face-img" data-face="smile" src="assets/face-smile.png?v=20261015-face" width="120" height="104" alt="">
+            <span class="sl-face-spark"></span><span class="sl-face-spark is-second"></span>
+          </div>
+        </div>
+      </div>
     </header>
     <section class="sl-board" id="board" aria-label="업무 보드"><p class="sl-message">불러오는 중이에요</p></section>
     <form class="sl-add sl-wl-add" id="addForm">
@@ -238,6 +284,6 @@
     <div class="sl-sr" id="live" aria-live="polite"></div>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="worklog-sky-lime.mjs?v=20261015-carry"></script>
+  <script type="module" src="worklog-sky-lime.mjs?v=20261015-face"></script>
 </body>
 </html>

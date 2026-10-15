@@ -17,6 +17,9 @@ const titleEl = document.getElementById('title');
 const noticeEl = document.getElementById('notice');
 const remainEl = document.getElementById('remain');
 const progressEl = document.getElementById('progress');
+const gaugeEl = document.getElementById('gauge');
+const faceEl = document.getElementById('face');
+const faceImgs = [...faceEl.querySelectorAll('[data-face]')];
 const toggleEl = document.getElementById('modeToggle');
 const formEl = document.getElementById('addForm');
 const inputEl = document.getElementById('addInput');
@@ -201,10 +204,53 @@ function renderHeader(model) {
   titleEl.textContent = ({ 0:'오늘의 ', [-1]:'어제의 ', 1:'내일의 ' }[offset] ?? '') + (mode === 'life' ? '일상' : '업무');
   inputEl.placeholder = mode === 'life' ? '일상 추가...' : '업무 추가...';
   inputEl.setAttribute('aria-label', mode === 'life' ? '일상 추가' : '업무 추가');
-  remainEl.textContent = `${model ? model.remaining : 0}개 남음`;
-  progressEl.style.width = model && model.total ? `${(model.done / model.total) * 100}%` : '0%';
+  remainEl.textContent = model && model.total && !model.remaining ? '모두 완료' : `${model ? model.remaining : 0}개 남음`;
+  renderGauge(model);
   const error = controller.error;
   noticeEl.textContent = controller.view() && error ? staleText(error) : '';
+}
+
+// ───────── 진행 게이지 + 캐릭터 ─────────
+// 완료 비율은 기존 그대로 model.done / model.total(그날 업무). 표정: 완료 0개·업무 없음 = 손 흔들기,
+// 1개 이상 = 브이, 전부 완료 = 웃음. 같은 화면(모드·날짜)에서 값이 바뀔 때만 0.3초 이동하고,
+// 처음 그릴 때·화면이 바뀔 때·크기가 바뀔 때는 바로 그 자리에 둔다.
+const FACE_SIZES = [[1300, 38], [900, 36], [0, 32]];
+let gaugeScreen = null;
+let gaugeSize = 0;
+let gaugeFull = false;
+let cheerTimer = 0;
+function cheer() {
+  faceEl.classList.remove('is-cheer');
+  void faceEl.offsetWidth; // 다시 완료될 때도 처음부터 한 번 재생
+  faceEl.classList.add('is-cheer');
+  clearTimeout(cheerTimer);
+  cheerTimer = setTimeout(() => faceEl.classList.remove('is-cheer'), 1100);
+}
+function renderGauge(model) {
+  const total = model?.total || 0;
+  const done = model?.done || 0;
+  const ratio = total ? done / total : 0;
+  const full = total > 0 && done >= total;
+  const size = FACE_SIZES.find(([min]) => app.clientWidth >= min)[1];
+  const screen = model ? `${getMode()}|${ui.date}` : null;
+  const live = screen !== null && screen === gaugeScreen && size === gaugeSize;
+  gaugeEl.classList.toggle('is-instant', !live);
+  gaugeEl.style.setProperty('--face-size', `${size}px`);
+  gaugeEl.style.setProperty('--gauge-ratio', String(ratio));
+  // 하늘색 채움은 캐릭터 가운데까지(0개면 없음, 전부 완료면 끝까지).
+  progressEl.style.width = !done ? '0px' : full ? '100%' : `calc((100% - ${size}px) * ${ratio} + ${size / 2}px)`;
+  const face = full ? 'smile' : done ? 'v' : 'wave';
+  faceImgs.forEach(img => img.classList.toggle('is-on', img.dataset.face === face));
+  faceEl.classList.toggle('is-ready', Boolean(model));
+  if (live && full && !gaugeFull) cheer();
+  if (!full && faceEl.classList.contains('is-cheer')) { clearTimeout(cheerTimer); faceEl.classList.remove('is-cheer'); }
+  gaugeScreen = screen;
+  gaugeSize = size;
+  gaugeFull = full;
+  if (!live) {
+    void gaugeEl.offsetWidth; // 이동 없이 바로 적용한 뒤 모션을 다시 켠다
+    gaugeEl.classList.remove('is-instant');
+  }
 }
 
 function renderBoard(model) {
