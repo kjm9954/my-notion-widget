@@ -53,6 +53,12 @@ export function modeToggleHtml(mode) {
   const button = (value, label) => `<button class="sl-seg-button${mode === value ? ' is-on' : ''}" type="button" data-mode="${value}" aria-pressed="${mode === value}">${label}</button>`;
   return `<div class="sl-seg" role="group" aria-label="업무/일상 전환">${button('work', '업무')}${button('life', '일상')}</div>`;
 }
+// 같은 모드면 다시 그리지 않는다(누르는 도중에 버튼이 바뀌어 클릭이 사라지지 않게).
+export function paintModeToggle(element, mode) {
+  if (element.dataset.paintedMode === mode && element.firstElementChild) return;
+  element.innerHTML = modeToggleHtml(mode);
+  element.dataset.paintedMode = mode;
+}
 export function bindModeToggle(root) {
   root.addEventListener('click', event => {
     const button = event.target.closest('[data-mode]');

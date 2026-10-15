@@ -1,5 +1,5 @@
 // ③ 이번 주 한 일: 업무일지 데이터를 월~금 5칸으로 모은다. 직접 입력 없음(완료 원 체크만).
-import { getMode, onModeChange, modeToggleHtml, bindModeToggle, watchWorklog, createWorklogController,
+import { getMode, onModeChange, paintModeToggle, bindModeToggle, watchWorklog, createWorklogController,
   taskOps, toggleTarget, escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
 import { weekDays, dayCountLabel, worklogToday, mondayOf, addDays, weekRangeLabel, goalNumber, isDone } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
@@ -57,7 +57,7 @@ function fitDay(column, day, emptyLabel) {
 
 function render() {
   const mode = getMode();
-  toggleEl.innerHTML = modeToggleHtml(mode);
+  paintModeToggle(toggleEl, mode);
   rangeEl.textContent = weekRangeLabel(monday);
   rangeEl.setAttribute('aria-label', `${monday}부터 ${addDays(monday, 4)}까지`);
   const state = controller.view();

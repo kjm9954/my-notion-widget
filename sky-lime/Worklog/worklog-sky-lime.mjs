@@ -1,6 +1,6 @@
 // ② 업무일지: 진행중 / 검토 대기 / 예정 3열 보드 + 완료 줄 + 업무 추가.
 // 저장은 기존 Store API(patchWorklogState, 있으면 updateWorklogTaskStatus)만 쓴다.
-import { getMode, onModeChange, modeToggleHtml, bindModeToggle, watchWorklog, createWorklogController, taskOps,
+import { getMode, onModeChange, paintModeToggle, bindModeToggle, watchWorklog, createWorklogController, taskOps,
   toggleTarget, escapeHtml, canHover, makeId, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
 import { worklogToday, addDays, daysBetween, dayLabel, tasksForDay, board, statusOf, isDone, goalNumber, goalIdFor,
   categoryOf, categoryValue, categoriesFor, dueInfo, STATUS_LABEL, LANE_ORDER, STATUS_CHOICES, OTHER_CATEGORY,
@@ -144,7 +144,7 @@ function fitStacked(container, model) {
 // ───────── 렌더 ─────────
 function renderHeader(model) {
   const mode = getMode();
-  toggleEl.innerHTML = modeToggleHtml(mode);
+  paintModeToggle(toggleEl, mode);
   dayLabelEl.textContent = dayLabel(ui.date);
   goTodayEl.hidden = ui.date === today;
   const offset = daysBetween(today, ui.date);
@@ -173,6 +173,16 @@ function renderBoard(model) {
   } else fitStacked(lanesEl, model);
 }
 
+// 보드에 보이는 값이 같으면 다시 그리지 않는다. 노션에서 처음 누를 때 포커스로 다시 읽기가 일어나도
+// 누르는 중인 카드가 바뀌지 않아 세부 정보 창이 바로 열린다.
+let boardSignature = '';
+function boardKey(model) {
+  if (!model) return JSON.stringify(['empty', controller.loaded, failureText(controller.error)]);
+  const pick = task => [task.id, task.title, statusOf(task), task.due, task.proj, task.goalId, task.memo, task.order];
+  return JSON.stringify([ui.wide, ui.touch, today, app.clientWidth, app.clientHeight,
+    LANE_ORDER.map(status => model.lanes[status].map(pick)), model.lanes.done.map(pick)]);
+}
+
 function render() {
   const state = controller.view();
   const model = state ? dayModel() : null;
@@ -181,7 +191,10 @@ function render() {
   app.classList.toggle('is-narrow', !ui.wide);
   app.classList.toggle('is-touch', ui.touch);
   renderHeader(model);
-  if (!ui.drag) renderBoard(model);
+  if (!ui.drag) {
+    const key = boardKey(model);
+    if (key !== boardSignature) { renderBoard(model); boardSignature = key; }
+  }
   if (ui.lanePanel) renderLanePanel();
   if (ui.detail) renderDetail(false);
 }
@@ -421,11 +434,12 @@ function startDrag(item, event) {
     window.removeEventListener('pointercancel', end);
     const { id, over } = ui.drag;
     ui.drag = null;
+    boardSignature = ''; // 끌던 표시(흐린 카드·열 강조)를 지우도록 보드를 다시 그린다.
     ghostEl.hidden = true;
     app.classList.remove('is-drag');
-    // 끌기를 마친 직후의 클릭은 세부 정보 창을 열지 않는다.
+    // 끌기를 마친 그 동작의 클릭만 막는다. 다음에 누르면(또는 잠시 뒤) 바로 풀린다.
     ui.suppressClick = true;
-    setTimeout(() => { ui.suppressClick = false; }, 80);
+    setTimeout(() => { ui.suppressClick = false; }, 300);
     const latest = findTask(id);
     if (latest && over && statusOf(latest) !== over) controller.submit(taskOps.status(id, over));
     else render();
@@ -434,6 +448,7 @@ function startDrag(item, event) {
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
 }
+window.addEventListener('pointerdown', () => { ui.suppressClick = false; }, true);
 app.addEventListener('pointerdown', event => {
   const item = event.target.closest('[data-drag]');
   if (!item || controller.readOnly()) return;
@@ -442,7 +457,7 @@ app.addEventListener('pointerdown', event => {
   const startX = event.clientX;
   const startY = event.clientY;
   const move = moveEvent => {
-    if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) <= 5) return;
+    if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) <= 8) return;
     stop();
     startDrag(item, moveEvent);
   };
