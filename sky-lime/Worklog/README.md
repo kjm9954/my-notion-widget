@@ -61,7 +61,7 @@ store.js·worker.js는 바꾸지 않았고, 아래 기능은 서버가 지원한
 | `sky-lime-model.mjs` | 날짜·정렬·집계 순수 함수 |
 | `sky-lime-common.mjs` | 업무/일상 전환 동기화, Store 연결, 저장 순서 관리 |
 | `weekly-goals.*`, `worklog-sky-lime.*`, `week-review.*`, `notes.*` | 위젯 4종 |
-| `../assets/character.png` | 이번 주 목표 캐릭터 |
+| `../assets/character.gif` | 이번 주 목표 캐릭터(눈 깜빡임·꼬리 살랑 gif) |
 | `../tests/` | 계산 함수 테스트, 오프라인 브라우저 테스트 |
 
 ## 테스트

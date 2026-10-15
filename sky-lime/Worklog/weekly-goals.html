@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
   <style>
     /* 시안 배치: 위쪽 84px은 캐릭터 자리, 카드 130px(목표 칸이 잘리지 않는 높이 214px). 앞발이 카드 윗변에 걸친다.
-       캐릭터 이미지(840 x 529)는 투명 여백을 감안해, 보이는 캐릭터가 시안과 같은 자리·크기(높이 약 77px)가 되게 놓는다. */
+       캐릭터 gif(840 x 529, 눈 깜빡임·꼬리 살랑 6초 반복)는 투명 여백을 감안해, 보이는 캐릭터가 시안과 같은 자리·크기(높이 약 77px)가 되게 놓는다. */
     .sl-goals-page { position: relative; height: 100%; display: flex; flex-direction: column; padding-top: 84px; }
     .sl-character {
       position: absolute; right: 43.4px; top: 2.5px; z-index: 2; display: block; width: auto; height: 97px;
@@ -37,7 +37,7 @@
 </head>
 <body>
   <main class="sl-goals-page">
-    <img class="sl-character" src="../assets/character.png?v=20261015-character" alt="" aria-hidden="true">
+    <img class="sl-character" src="../assets/character.gif?v=20261015-blink" alt="" aria-hidden="true">
     <section class="sl-root sl-goals" id="app" data-status="loading" aria-label="이번 주 목표">
       <div class="sl-head-row sl-goals-head">
         <div class="sl-title-wrap"><h1 class="sl-goals-title">이번 주 목표</h1><span class="sl-notice" id="notice"></span></div>
