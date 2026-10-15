@@ -29,7 +29,7 @@ const liveEl = document.getElementById('live');
 let today = worklogToday();
 const ui = {
   date:today, followToday:true, wide:true, touch:!canHover(),
-  lanePanel:null, detail:null, drag:null, suppressClickUntil:0
+  lanePanel:null, detail:null, drag:null, suppressClick:false
 };
 const controller = createWorklogController(event => {
   if (event.type === 'save-error') announce('저장하지 못했어요. 다시 시도해 주세요.');
@@ -423,7 +423,9 @@ function startDrag(item, event) {
     ui.drag = null;
     ghostEl.hidden = true;
     app.classList.remove('is-drag');
-    ui.suppressClickUntil = Date.now() + 80;
+    // 끌기를 마친 직후의 클릭은 세부 정보 창을 열지 않는다.
+    ui.suppressClick = true;
+    setTimeout(() => { ui.suppressClick = false; }, 80);
     const latest = findTask(id);
     if (latest && over && statusOf(latest) !== over) controller.submit(taskOps.status(id, over));
     else render();
@@ -468,7 +470,7 @@ function deleteTask(id, row) {
 }
 
 app.addEventListener('click', event => {
-  if (Date.now() < ui.suppressClickUntil) return;
+  if (ui.suppressClick) return;
   const target = event.target;
   const day = target.closest('[data-day]');
   if (day) { moveDay(addDays(ui.date, Number(day.dataset.day))); return; }

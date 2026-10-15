@@ -2,7 +2,7 @@
 // 항목의 mode(work/life)로 나누며, mode가 없는 기존 메모는 업무로 본다.
 import { getMode, onModeChange, modeToggleHtml, bindModeToggle, readNotes, watchNotes, patchNotes,
   makeId, escapeHtml, staleText, failureText, Store } from './sky-lime-common.mjs?v=20261015-sky-lime';
-import { notesFor, MAX_NOTES, calendarToday } from './sky-lime-model.mjs?v=20261015-sky-lime';
+import { notesFor, notesHaveMode, MAX_NOTES, calendarToday } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const app = document.getElementById('app');
 const listEl = document.getElementById('list');
@@ -103,7 +103,7 @@ function render() {
   let hidden = 0;
   if (!state) html = `<p class="sl-message">${escapeHtml(loaded ? failureText(error) : '불러오는 중이에요')}</p>`;
   else {
-    const items = notesFor(state, mode);
+    const items = notesFor(state, mode, notesHaveMode(serverState));
     full = items.length >= MAX_NOTES;
     hidden = Math.max(0, items.length - MAX_NOTES);
     html = items.length ? items.slice(0, MAX_NOTES).map(rowHtml).join('') : '<p class="sl-message">메모가 없어요</p>';
@@ -119,7 +119,7 @@ function addNote() {
   const text = inputEl.value.trim();
   if (!text) return;
   const mode = getMode();
-  const current = notesFor(view(), mode);
+  const current = notesFor(view(), mode, notesHaveMode(serverState));
   if (current.length >= MAX_NOTES) return;
   const item = { id:makeId(), text, done:false, doneAt:null, mode };
   const accepted = submit({

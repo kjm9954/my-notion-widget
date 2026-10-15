@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { worklogToday, calendarToday, mondayOf, dayLabel, weekRangeLabel, statusOf, uncheckStatus, withStatus,
   goalNumber, goalIdFor, categoryOf, categoryValue, categoriesFor, dueInfo, board, tasksForDay, weeklyGoals,
-  weekDays, dayCountLabel, effectiveDay, notesFor } from '../Worklog/sky-lime-model.mjs';
+  weekDays, dayCountLabel, effectiveDay, notesFor, notesHaveMode, supportsReview, storableStatus } from '../Worklog/sky-lime-model.mjs';
 
 const today = '2026-10-14';
 const task = (id, extra = {}) => ({ id, mode:'work', date:today, title:`업무 ${id}`, status:'wait', done:false, due:null, proj:'', goalId:null, ...extra });
@@ -95,8 +95,25 @@ test('이번 주 한 일: 완료는 doneAt 요일, 없으면 date', () => {
   assert.equal(dayCountLabel(days[0]), '');
 });
 
-test('메모: mode가 없으면 업무', () => {
+test('메모: 서버가 mode를 주면 나누고(mode 없으면 업무), 안 주면 두 모드가 같은 목록', () => {
   const state = { items:[{ id:'a', text:'기존' }, { id:'b', text:'일상', mode:'life' }, { id:'c', text:'  ' }] };
-  assert.deepEqual(notesFor(state, 'work').map(item => item.id), ['a']);
-  assert.deepEqual(notesFor(state, 'life').map(item => item.id), ['b']);
+  assert.equal(notesHaveMode(state), true);
+  assert.deepEqual(notesFor(state, 'work', notesHaveMode(state)).map(item => item.id), ['a']);
+  assert.deepEqual(notesFor(state, 'life', notesHaveMode(state)).map(item => item.id), ['b']);
+  const current = { items:[{ id:'a', text:'기존' }, { id:'b', text:'둘째' }] };
+  assert.equal(notesHaveMode(current), false);
+  assert.deepEqual(notesFor(current, 'life', notesHaveMode(current)).map(item => item.id), ['a', 'b']);
+  assert.deepEqual(notesFor(current, 'work', notesHaveMode(current)).map(item => item.id), ['a', 'b']);
+});
+
+test('검토 대기: 서버 지원 신호가 있을 때만 review, 아니면 예정으로 저장', () => {
+  const current = { tasks:[task(1, { status:'doing' })] };
+  assert.equal(supportsReview(current), false);
+  assert.equal(storableStatus('review', supportsReview(current)), 'wait');
+  assert.equal(storableStatus('doing', false), 'doing');
+  assert.equal(supportsReview(current, true), true, '상태 전용 Store 함수가 있으면 지원');
+  assert.equal(supportsReview({ tasks:[task(1, { statusChangedAt:null })] }), true, '응답에 statusChangedAt 필드');
+  assert.equal(supportsReview({ tasks:[task(1, { status:'review' })] }), true, '응답에 review 상태');
+  assert.equal(supportsReview({ tasks:[task(1, { status:'done', done:true, prevStatus:'review' })] }), true, '완료 업무의 이전 상태가 review');
+  assert.equal(supportsReview({ tasks:[task(1, { status:'done', done:true, prevStatus:'doing' })] }), false);
 });

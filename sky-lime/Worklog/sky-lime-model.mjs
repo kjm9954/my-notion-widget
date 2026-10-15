@@ -37,6 +37,15 @@ export function statusOf(task) {
 }
 export const modeOf = item => item?.mode === 'life' ? 'life' : 'work';
 
+// 검토 대기(review)는 서버가 지원할 때만 저장한다. 지원 신호: 상태 전용 Store 함수가 있거나,
+// 서버 응답에 review 상태·prevStatus review·statusChangedAt 필드가 보일 때. 그 전에는 예정(wait)으로 저장·표시한다.
+export function supportsReview(state, hasStatusApi = false) {
+  if (hasStatusApi) return true;
+  return (state?.tasks || []).some(task => task
+    && (task.status === 'review' || task.prevStatus === 'review' || Object.hasOwn(task, 'statusChangedAt')));
+}
+export const storableStatus = (status, reviewSupported) => status === 'review' && !reviewSupported ? 'wait' : status;
+
 // 체크 해제: 서버가 준 prevStatus로 되돌리고, 없거나 알 수 없으면 진행중.
 export function uncheckStatus(task) {
   return OPEN_STATUSES.has(task?.prevStatus) ? task.prevStatus : 'doing';
@@ -170,7 +179,9 @@ export function dayCountLabel(day) {
 
 // ───────── 메모 ─────────
 export const MAX_NOTES = 8;
-export function notesFor(state, mode) {
+// 서버가 메모 mode를 저장해 돌려줄 때만 업무/일상으로 나눈다. 그 전에는 두 모드가 같은 목록을 본다.
+export const notesHaveMode = state => (Array.isArray(state?.items) ? state.items : []).some(item => item && Object.hasOwn(item, 'mode'));
+export function notesFor(state, mode, byMode = true) {
   const items = Array.isArray(state?.items) ? state.items : [];
-  return items.filter(item => item && item.id != null && String(item.text || '').trim() && modeOf(item) === mode);
+  return items.filter(item => item && item.id != null && String(item.text || '').trim() && (!byMode || modeOf(item) === mode));
 }

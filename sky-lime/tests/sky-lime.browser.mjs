@@ -75,6 +75,13 @@ function normalizeTask(raw, legacy) {
 }
 
 async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }, legacy = false, viewport = { width:1450, height:900 } } = {}) {
+  if (legacy) {
+    // 현재 운영 서버처럼: 저장된 기록에도 review·prevStatus·statusChangedAt·메모 mode가 없다.
+    for (const db of Object.values(dbs)) {
+      db.worklog.tasks = db.worklog.tasks.map(item => normalizeTask(item, true));
+      db.notes.items = db.notes.items.map(({ mode, ...item }) => item);
+    }
+  }
   const context = await browser.newContext({ viewport, timezoneId:'Asia/Seoul', serviceWorkers:'block' });
   const errors = [];
   const external = [];
@@ -106,6 +113,7 @@ async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }
       if (db.fail) return route.fulfill({ status:503, headers, json:{ ok:false, error:'offline fixture' } });
       let data;
       if (request.method() === 'POST') {
+        entry.body = request.postData() || '';
         db.writes.push(entry);
         const body = request.postDataJSON();
         if (url.pathname === '/api/worklog/patch') {
@@ -299,20 +307,56 @@ test('상태 전용 함수(updateWorklogTaskStatus)가 있으면 그것으로 �
   await h.context.close();
 });
 
-test('review를 모르는 기존 서버에서도 오류 없이 동작', { timeout:60000 }, async () => {
+test('현재 운영 서버(review·prevStatus·메모 mode 미지원)에서 오류 없이 동작', { timeout:90000 }, async () => {
   const h = await setup(browser, { legacy:true });
+  const db = h.dbs[KEY];
   const page = await h.open('worklog', { width:1450 });
+  assert.equal(await page.locator('[data-lane="review"] [data-task]').count(), 0);
+  // 진행중 업무를 검토 대기로 → 서버에는 예정(wait)으로 저장, 화면도 바로 예정 열
+  await page.locator('[data-task="a1"] .sl-card-title').click();
+  await page.locator('[data-pick-status="review"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-pick-status="wait"]')?.classList.contains('is-on'));
+  await new Promise(done => setTimeout(done, 400));
+  assert.equal(db.worklog.tasks.find(item => item.id === 'a1').status, 'wait');
+  assert.ok(db.writes.every(entry => !entry.body.includes('"review"')), 'review를 서버에 보내지 않는다');
+  await page.locator('.sl-close[data-close-detail]').click();
+  await page.waitForFunction(() => document.querySelector('[data-lane="wait"] [data-task="a1"]'));
+  // 이미 예정인 업무에서 검토 대기 → 바뀌는 것이 없으므로 저장 요청 없음
+  const writes = db.writes.length;
   await page.locator('[data-task="a5"]').click();
   await page.locator('[data-pick-status="review"]').click();
   await new Promise(done => setTimeout(done, 400));
-  // 서버가 review를 예정(wait)으로 돌려주면 화면도 그 값을 따른다.
-  assert.equal(h.dbs[KEY].worklog.tasks.find(item => item.id === 'a5').status, 'wait');
+  assert.equal(db.writes.length, writes);
   await page.locator('.sl-close[data-close-detail]').click();
-  await page.waitForFunction(() => document.querySelector('[data-lane="wait"] [data-task="a5"]'));
+  // 끌어서 검토 대기 열에 놓아도 예정으로
+  const card = await page.locator('[data-task="a2"]').boundingBox();
+  const lane = await page.locator('[data-lane="review"]').boundingBox();
+  await page.mouse.move(card.x + 120, card.y + 12); await page.mouse.down();
+  await page.mouse.move(card.x + 100, card.y + 30, { steps:4 }); await page.mouse.move(lane.x + 80, lane.y + 300, { steps:8 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('[data-lane="wait"] [data-task="a2"]'));
+  // prevStatus가 없으면 체크 해제 시 진행중
   await page.locator('[data-toggle="a6"]').click();
-  await new Promise(done => setTimeout(done, 300));
+  await page.waitForFunction(() => document.querySelector('.sl-done [data-task="a6"]'));
+  await new Promise(done => setTimeout(done, 400));
+  assert.equal(Object.hasOwn(db.worklog.tasks.find(item => item.id === 'a6'), 'prevStatus'), false);
   await page.locator('.sl-done [data-toggle="a6"]').click();
   await page.waitForFunction(() => document.querySelector('[data-lane="doing"] [data-task="a6"]'));
+  // 메모 mode 없음 → 업무/일상이 같은 목록, 전환 버튼은 그대로
+  const notes = await h.open('notes', { width:500 });
+  const ids = () => notes.locator('.sl-note').evaluateAll(nodes => nodes.map(node => node.dataset.noteId));
+  const work = await ids();
+  assert.deepEqual(work, ['n1', 'n2', 'n3', 'n4']);
+  assert.equal(await notes.locator('.sl-seg [data-mode]').count(), 2);
+  await notes.locator('[data-mode="life"]').click();
+  await notes.waitForFunction(() => document.getElementById('app').dataset.mode === 'life');
+  assert.deepEqual(await ids(), work);
+  await notes.locator('#addInput').fill('일상에서 적은 메모');
+  await notes.locator('#addInput').press('Enter');
+  await new Promise(done => setTimeout(done, 400));
+  await notes.locator('[data-mode="work"]').click();
+  await notes.waitForFunction(() => document.querySelectorAll('.sl-note').length === 5);
+  assert.equal(Object.hasOwn(db.notes.items.at(-1), 'mode'), false);
   assert.deepEqual(h.errors, []);
   await h.context.close();
 });
@@ -518,7 +562,7 @@ test('데이터가 없을 때 빈 상태 문구와 높이 유지', { timeout:600
   if (shots) {
     const preview = await h.context.newPage();
     await preview.clock.setFixedTime(NOW);
-    await preview.setViewportSize({ width:1450 + 48, height:1880 });
+    await preview.setViewportSize({ width:1450 + 48, height:1920 });
     await preview.goto(`${origin}/__preview/page.html?width=1450`);
     await preview.waitForTimeout(1500);
     await shot(preview, 'page-1450-empty');
@@ -550,13 +594,26 @@ test('기존 cream-olive-garden 업무일지와 같은 키·같은 데이터', {
   await h.context.close();
 });
 
-test('스크린샷: 1450px · 1050px 페이지 배치', { timeout:90000, skip:!shots }, async () => {
+test('스크린샷: 1450px · 1050px 페이지 배치', { timeout:120000, skip:!shots }, async () => {
+  const current = await setup(browser, { legacy:true });
+  for (const width of [1450, 1050]) {
+    const page = await current.context.newPage();
+    await page.clock.setFixedTime(NOW);
+    await page.setViewportSize({ width:width + 48, height:1920 });
+    await page.goto(`${origin}/__preview/page.html?width=${width}&mode=work`);
+    for (const frame of page.frames().slice(1)) await frame.waitForFunction(() => document.getElementById('app')?.dataset.status === 'ready');
+    await page.waitForTimeout(400);
+    await shot(page, `page-${width}-current-server`);
+    await page.close();
+  }
+  assert.deepEqual(current.errors, []);
+  await current.context.close();
   const h = await setup(browser);
   for (const width of [1450, 1050]) {
     for (const mode of ['work', 'life']) {
       const page = await h.context.newPage();
       await page.clock.setFixedTime(NOW);
-      await page.setViewportSize({ width:width + 48, height:1880 });
+      await page.setViewportSize({ width:width + 48, height:1920 });
       await page.goto(`${origin}/__preview/page.html?width=${width}&mode=${mode}`);
       for (const frame of page.frames().slice(1)) await frame.waitForFunction(() => document.getElementById('app')?.dataset.status === 'ready');
       await page.waitForTimeout(400);

@@ -1,6 +1,6 @@
 // sky-lime 위젯 공통: 업무/일상 전환 동기화, 기존 Store API 연결, 공통 마크업.
 // 실제 데이터는 window.Store만 사용한다. localStorage에는 업무/일상 선택값만 둔다.
-import { withStatus, uncheckStatus, statusOf } from './sky-lime-model.mjs?v=20261015-sky-lime';
+import { withStatus, uncheckStatus, statusOf, supportsReview, storableStatus } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 export const Store = window.Store;
 
@@ -117,10 +117,17 @@ export const taskOps = {
       send:async state => { const task = findTask(state, id); return task ? upsertTask({ ...task, ...patch }) : state; }
     };
   },
+  // review를 모르는 서버에는 예정으로 저장하고 화면도 예정 열에 둔다(서버가 지원하면 자동으로 review).
   status(id, status) {
+    const target = state => storableStatus(status, supportsReview(state, typeof Store.updateWorklogTaskStatus === 'function'));
     return {
-      apply:state => mapTask(state, id, task => withStatus(task, status)),
-      send:async state => { const task = findTask(state, id); return task ? changeTaskStatus(task, status) : state; }
+      apply:state => mapTask(state, id, task => withStatus(task, target(state))),
+      send:async state => {
+        const task = findTask(state, id);
+        const next = target(state);
+        // 서버에 review가 없어 결국 같은 상태가 되는 경우 등, 바뀌는 게 없으면 저장하지 않는다.
+        return task && statusOf(task) !== next ? changeTaskStatus(task, next) : state;
+      }
     };
   },
   remove(id) {

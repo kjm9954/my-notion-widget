@@ -28,9 +28,20 @@ GitHub Pages에 반영된 뒤 아래 형식으로 임베드합니다. 네 주소
 | 다른 위젯 반영 | `Store.watch` (`/api/worklog/`, `/api/notes/`) | 저장 성공 응답을 바로 화면에 반영 |
 
 - 업무 필드: 업무명 `title`, 구분 `proj`(빈 값·`미분류` = 기타), 마감 `due`, 상태 `status`, 메모 `memo`, 완료 `done`·`doneAt`, 번호 `goalId`(`worklog:goal:1~3`, 예전 `goalId === id`는 1번), 업무/일상 `mode`.
-- 상태: `wait` 예정 · `doing` 진행중 · `review` 검토 대기 · `done` 완료. `review`를 모르는 서버가 다른 값으로 돌려주면 화면도 그 값을 따릅니다.
-- 체크 해제: 서버가 주는 `prevStatus`로 되돌리고, 없으면 진행중. 기존 저장 방식으로 완료할 때는 `prevStatus`를 함께 보냅니다(서버가 지원하면 남고, 아니면 무시됨).
-- 메모 `mode`가 없으면 업무로 봅니다. 기존 메모 위젯과 같은 규칙으로 하루 한 번 지난날 완료한 메모를 정리(`cleanupCompleted`)합니다.
+- 상태: `wait` 예정 · `doing` 진행중 · `review` 검토 대기 · `done` 완료.
+
+### 현재 운영 서버에서의 동작과 서버 업데이트 후 자동 전환
+
+store.js·worker.js는 바꾸지 않았고, 아래 기능은 서버가 지원한다는 신호가 보이면 코드 수정 없이 켜집니다.
+
+| 기능 | 지금(운영 서버 그대로) | 자동으로 켜지는 조건 |
+| --- | --- | --- |
+| 상태 변경 | 기존 `patchWorklogState`로 status 저장 | `Store.updateWorklogTaskStatus`가 생기면 그 함수 사용 |
+| 검토 대기 | `review`를 서버에 보내지 않고 예정(`wait`)으로 저장·표시. 이미 예정이면 저장 요청 없음 | `Store.updateWorklogTaskStatus`가 있거나, 업무 응답에 `review` 상태·`prevStatus: review`·`statusChangedAt` 필드가 보일 때 |
+| 체크 해제 | `prevStatus`가 없으면 진행중 | 응답에 `prevStatus`가 오면 그 상태로 복원(기존 저장 방식으로 완료할 때도 `prevStatus`를 함께 보냄) |
+| 메모 업무/일상 | 메모에 `mode`가 없으면 업무·일상 모두 같은 목록(전환 버튼은 유지) | 메모 응답에 `mode` 필드가 하나라도 있으면 나눠 보여줌(`mode` 없는 기존 메모는 업무). 새 메모에는 항상 `mode`를 함께 보냄 |
+
+- 메모는 기존 메모 위젯과 같은 규칙으로 하루 한 번 지난날 완료한 메모를 정리(`cleanupCompleted`)합니다.
 - 저장은 하나씩 순서대로 보내고, 각 저장은 직전 서버 상태를 기준으로 만듭니다. 실패하면 화면을 되돌리고 Store 공통 오류 표시를 띄웁니다. 연결 실패로 이전 자료를 보여주는 동안에는 저장을 막습니다.
 - 브라우저 저장소에는 업무/일상 선택값(`sky-lime-worklog-mode-v1:<키>`)만 둡니다. 실제 데이터는 저장하지 않습니다.
 
