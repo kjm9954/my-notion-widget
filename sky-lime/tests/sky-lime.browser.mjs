@@ -214,7 +214,8 @@ test('4개 위젯이 키 주소로 테스트 데이터를 읽고, 고정 높이 
       assert.equal(await page.locator('#app').getAttribute('data-status'), 'ready', kind);
       const { scroll, rootHeight } = await noOverflow(page);
       assert.equal(scroll, false, `${kind} ${width} 스크롤`);
-      assert.equal(Math.round(rootHeight), HEIGHTS[kind], `${kind} 높이`);
+      // 소수점 임베드에서 끝선이 잘리지 않도록 오른쪽·아래 1px 여유
+      assert.equal(Math.round(rootHeight), HEIGHTS[kind] - 1, `${kind} 높이`);
       await page.close();
     }
   }
@@ -584,7 +585,7 @@ test('데이터가 없을 때 빈 상태 문구와 높이 유지', { timeout:600
   for (const [kind, page] of Object.entries({ goals, notes, week, worklog })) {
     const { scroll, rootHeight } = await noOverflow(page);
     assert.equal(scroll, false);
-    assert.equal(Math.round(rootHeight), HEIGHTS[kind]);
+    assert.equal(Math.round(rootHeight), HEIGHTS[kind] - 1);
   }
   if (shots) {
     const preview = await h.context.newPage();
