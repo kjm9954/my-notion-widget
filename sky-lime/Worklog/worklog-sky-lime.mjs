@@ -1,10 +1,10 @@
 // ② 업무일지: 진행중 / 검토 대기 / 예정 3열 보드 + 완료 줄 + 업무 추가.
 // 저장은 기존 Store API(patchWorklogState, 있으면 updateWorklogTaskStatus)만 쓴다.
 import { getMode, onModeChange, paintModeToggle, bindModeToggle, watchWorklog, createWorklogController, taskOps,
-  toggleTarget, escapeHtml, canHover, makeId, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
+  toggleTarget, escapeHtml, canHover, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
 import { worklogToday, addDays, daysBetween, dayLabel, tasksForDay, board, statusOf, isDone, goalNumber, goalIdFor,
   categoryOf, categoryValue, categoriesFor, dueInfo, STATUS_LABEL, LANE_ORDER, STATUS_CHOICES, OTHER_CATEGORY,
-  MAX_CATEGORIES, isDate } from './sky-lime-model.mjs?v=20261015-sky-lime';
+  MAX_CATEGORIES, isDate, orderedTasks, modeOf, weekdayLabel } from './sky-lime-model.mjs?v=20261015-sky-lime';
 
 const WIDE_MIN = 900;
 const DONE_ROWS = 2;
@@ -41,7 +41,57 @@ const announce = text => { liveEl.textContent = ''; liveEl.textContent = text; }
 const esc = escapeHtml;
 const currentTasks = () => controller.view()?.tasks || [];
 const findTask = id => currentTasks().find(task => String(task.id) === String(id)) || null;
-const dayModel = () => board(tasksForDay(controller.view(), getMode(), ui.date));
+
+// ───────── 이월 업무 (화면 계산만 한다. 업무의 date·status는 바꾸거나 저장하지 않는다) ─────────
+// 보이는 기간 = 처음 만든 날 ~ 끝난 날(완료: doneAt, 없으면 date / 미완료: 오늘). 일 모드는 주말 제외.
+// 처음 만든 날은 업무 id에 든 생성 시각(UUID v7, "밀리초-…" 형식)으로만 안다. 모르면 지금처럼 date에만 보인다.
+const MIN_CREATED_MS = Date.UTC(2020, 0, 1);
+function createdDay(task) {
+  const id = String(task?.id ?? '');
+  const v7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.exec(id);
+  const stamp = /^(\d{13})-/.exec(id);
+  const ms = v7 ? parseInt(v7[1] + v7[2], 16) : stamp ? Number(stamp[1]) : NaN;
+  return Number.isFinite(ms) && ms >= MIN_CREATED_MS ? worklogToday(ms) : null;
+}
+// date(지난 날)에 이월 업무로 보이는지. ownDay는 그 업무가 원래 보이는 날(업무일지는 task.date).
+function carriedOn(task, date, ownDay) {
+  if (date >= today || date === ownDay) return false;
+  if (modeOf(task) === 'work' && ['토', '일'].includes(weekdayLabel(date))) return false;
+  const created = createdDay(task);
+  if (!created) return false;
+  const end = isDone(task) ? (isDate(task.doneAt) ? task.doneAt : task.date) : today;
+  const start = [created, task.rolledFrom, task.date].filter(isDate).sort()[0];
+  return task.date <= end && start <= date && date <= end;
+}
+// 이월 업무 id. 화면을 그릴 때마다 dayModel()이 새로 계산한다.
+let carryIds = new Set();
+const isCarry = task => carryIds.has(String(task.id));
+// 그날 업무 + (지난 날이면) 이월 업무. 남은 개수·진행 바(total·done·remaining)는 그날 업무로만 센다.
+function dayModel() {
+  const state = controller.view();
+  const mode = getMode();
+  const model = board(tasksForDay(state, mode, ui.date));
+  const carry = ui.date < today
+    ? orderedTasks(state).filter(task => modeOf(task) === mode && carriedOn(task, ui.date, task.date)) : [];
+  carryIds = new Set(carry.map(task => String(task.id)));
+  if (carry.length) {
+    const extra = board(carry);
+    for (const status of [...LANE_ORDER, 'done']) model.lanes[status] = [...model.lanes[status], ...extra.lanes[status]];
+  }
+  return model;
+}
+// 새 업무 id: UUID v7(앞 48비트가 생성 시각). 형식은 기존 UUID와 같아 다른 위젯·서버가 그대로 받는다.
+function timeId(now = Date.now()) {
+  const bytes = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) window.crypto.getRandomValues(bytes);
+  else for (let index = 0; index < 16; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  let ms = Math.floor(now);
+  for (let index = 5; index >= 0; index -= 1) { bytes[index] = ms % 256; ms = Math.floor(ms / 256); }
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 // ───────── 마크업 ─────────
 function checkHtml(task) {
@@ -58,7 +108,7 @@ function cardHtml(task, showMemo) {
   const number = goalNumber(task);
   const due = dueHtml(task);
   const memo = String(task.memo || '').trim();
-  return `<article class="sl-card" data-task="${esc(task.id)}" data-drag tabindex="0" aria-label="${esc(task.title)} 세부 정보">`
+  return `<article class="sl-card${isCarry(task) ? ' is-carry' : ''}" data-task="${esc(task.id)}" data-drag tabindex="0" aria-label="${esc(task.title)} 세부 정보">`
     + '<div class="sl-card-grid">'
     + `<div class="sl-card-check">${checkHtml(task)}</div>`
     + `<div class="sl-card-title">${esc(task.title)}</div>`
@@ -71,7 +121,7 @@ function cardHtml(task, showMemo) {
     + '</article>';
 }
 function compactHtml(task) {
-  return `<article class="sl-compact" data-task="${esc(task.id)}" data-drag tabindex="0" aria-label="${esc(task.title)} 세부 정보">`
+  return `<article class="sl-compact${isCarry(task) ? ' is-carry' : ''}" data-task="${esc(task.id)}" data-drag tabindex="0" aria-label="${esc(task.title)} 세부 정보">`
     + checkHtml(task)
     + `<span class="sl-compact-title" title="${esc(task.title)}">${esc(task.title)}</span>${dueHtml(task)}</article>`;
 }
@@ -91,7 +141,7 @@ function doneRowHtml(task) {
   parts.push({ html:`<span class="sl-done-part">${esc(categoryOf(task))}</span>` });
   if (memo) parts.push({ html:`<span class="sl-done-part is-memo">${esc(memo)}</span>` });
   const body = parts.map((part, index) => (index === 0 || !parts[index - 1].num ? '<span class="sl-sep">·</span>' : '') + part.html).join('');
-  return `<div class="sl-done-row" data-task="${esc(task.id)}" tabindex="0" aria-label="${esc(task.title)} 세부 정보">${checkHtml(task)}`
+  return `<div class="sl-done-row${isCarry(task) ? ' is-carry' : ''}" data-task="${esc(task.id)}" tabindex="0" aria-label="${esc(task.title)} 세부 정보">${checkHtml(task)}`
     + `<div class="sl-done-body"><span class="sl-done-title">${esc(task.title)}</span>${body}</div>`
     + `<button class="sl-delete" type="button" data-delete="${esc(task.id)}" aria-label="업무 삭제: ${esc(task.title)}">✕</button></div>`;
 }
@@ -178,7 +228,7 @@ function renderBoard(model) {
 let boardSignature = '';
 function boardKey(model) {
   if (!model) return JSON.stringify(['empty', controller.loaded, failureText(controller.error)]);
-  const pick = task => [task.id, task.title, statusOf(task), task.due, task.proj, task.goalId, task.memo, task.order];
+  const pick = task => [task.id, task.title, statusOf(task), task.due, task.proj, task.goalId, task.memo, task.order, isCarry(task)];
   return JSON.stringify([ui.wide, ui.touch, today, app.clientWidth, app.clientHeight,
     LANE_ORDER.map(status => model.lanes[status].map(pick)), model.lanes.done.map(pick)]);
 }
@@ -209,7 +259,7 @@ function renderLanePanel() {
   laneLayer.innerHTML = '<div class="sl-overlay" data-close-lane></div>'
     + `<section class="sl-panel sl-lane-panel" role="dialog" aria-modal="true" aria-label="${label} 전체 목록">`
     + `<div class="sl-panel-head"><div class="sl-panel-heading"><span class="sl-panel-title">${label}</span><span class="sl-panel-count">${rows.length}</span></div><button class="sl-close" type="button" data-close-lane>닫기</button></div>`
-    + rows.map(task => `<div class="sl-panel-row${isDone(task) ? ' is-done' : ''}" data-panel-task="${esc(task.id)}">${checkHtml(task)}<span class="sl-panel-row-title">${esc(task.title)}</span>${dueHtml(task)}</div>`).join('')
+    + rows.map(task => `<div class="sl-panel-row${isDone(task) ? ' is-done' : ''}${isCarry(task) ? ' is-carry' : ''}" data-panel-task="${esc(task.id)}">${checkHtml(task)}<span class="sl-panel-row-title">${esc(task.title)}</span>${dueHtml(task)}</div>`).join('')
     + '</section>';
 }
 function openLanePanel(status) { ui.lanePanel = status; renderLanePanel(); }
@@ -605,7 +655,7 @@ function addTask() {
   const title = inputEl.value.trim();
   if (!title || !controller.view()) return;
   const task = {
-    id:makeId(), mode:getMode(), date:ui.date, proj:'', q:null, title, due:null, start:null, end:null,
+    id:timeId(), mode:getMode(), date:ui.date, proj:'', q:null, title, due:null, start:null, end:null,
     progress:null, est:null, status:'wait', done:false, doneAt:null, goalId:null, memo:'', rolledFrom:null, progressTouched:false
   };
   if (controller.submit(taskOps.add(task))) {

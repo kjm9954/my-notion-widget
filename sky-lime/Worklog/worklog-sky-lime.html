@@ -200,6 +200,11 @@
       background: var(--sl-surface); border: 1px solid #E6E6E3; border-radius: var(--sl-r-row); box-shadow: var(--sl-shadow-ghost);
       color: var(--sl-text); font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis;
     }
+    /* 지난 날짜에 보이는 이월 업무: 원래 업무를 그 업무의 현재 상태 열에, 글자만 흐리게 */
+    .sl-card.is-carry .sl-card-title, .sl-card.is-carry .sl-card-meta, .sl-card.is-carry .sl-card-memo, .sl-card.is-carry .sl-due,
+    .sl-compact.is-carry .sl-compact-title, .sl-compact.is-carry .sl-due,
+    .sl-panel-row.is-carry .sl-panel-row-title, .sl-panel-row.is-carry .sl-due,
+    .sl-done-row.is-carry .sl-done-title, .sl-done-row.is-carry .sl-done-part { color: var(--sl-quiet); }
   </style>
   <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
 </head>
@@ -233,6 +238,6 @@
     <div class="sl-sr" id="live" aria-live="polite"></div>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="worklog-sky-lime.mjs?v=20261015-sky-lime"></script>
+  <script type="module" src="worklog-sky-lime.mjs?v=20261015-carry"></script>
 </body>
 </html>

@@ -37,6 +37,9 @@
     .sl-day-item.is-done .sl-day-text { color: var(--sl-text); }
     .sl-day-more { flex: none; height: 24px; display: flex; align-items: center; color: var(--sl-quiet); font-size: 12px; }
     .sl-day-empty { flex: none; height: 28px; display: flex; align-items: center; color: var(--sl-empty); font-size: 13px; }
+    /* 지난 요일의 이월 업무: 흐린 글자 + 빈 원(누를 수 없음) */
+    .sl-day-item.is-carry .sl-day-text { color: var(--sl-quiet); }
+    .sl-day-item.is-carry .sl-dot-button { cursor: default; }
   </style>
   <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
 </head>
@@ -55,6 +58,6 @@
     <div class="sl-sr" id="live" aria-live="polite"></div>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="week-review.mjs?v=20261015-sky-lime"></script>
+  <script type="module" src="week-review.mjs?v=20261015-carry"></script>
 </body>
 </html>
