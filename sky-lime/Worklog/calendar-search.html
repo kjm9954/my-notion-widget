@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>캘린더 검색</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <style>
+    /* 시안 수치: 바깥 여백 14/18/10, 결과 한 건 46px + 간격 6px. 하늘색은 검색창 포커스에만. */
+    .sl-search { padding: 14px 18px 10px; }
+    .sl-search-head { flex: none; height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .sl-search-title { margin: 0; color: var(--sl-ink); font-size: 15px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+    .sl-search-busy { flex: none; color: var(--sl-hint); font-size: 12px; font-weight: 500; opacity: 0; transition: opacity var(--t-color, 120ms) var(--ease, ease); }
+    .sl-search.is-busy .sl-search-busy { opacity: 1; }
+    .sl-search-field { flex: none; position: relative; margin: 8px 0 0; }
+    .sl-search-input {
+      display: block; width: 100%; height: 36px; padding: 0 36px 0 12px; border: 1px solid transparent; border-radius: var(--sl-r-row);
+      background: var(--sl-field); color: var(--sl-text); font-size: 14px; outline: none;
+      transition: background var(--t-color, 120ms) var(--ease, ease), border-color var(--t-color, 120ms) var(--ease, ease);
+    }
+    .sl-search-input::placeholder { color: var(--sl-hint); opacity: 1; }
+    .sl-search-input:focus { background: var(--sl-surface); border-color: var(--sl-sky); }
+    .sl-search-input:disabled { cursor: default; }
+    .sl-search-clear {
+      position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--sl-r-chip);
+      background: transparent; color: var(--sl-empty); font-size: 13px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sl-search-clear[hidden] { display: none; }
+    @media (hover: hover) { .sl-search-clear:hover { background: var(--sl-seg); color: var(--sl-secondary); } }
+    .sl-search-list { flex: 1 1 auto; min-height: 0; margin-top: 8px; overflow: hidden; }
+    .sl-search-rows { display: flex; flex-direction: column; gap: 6px; }
+    .sl-search-row {
+      flex: none; height: 46px; margin: 0 -8px; padding: 0 8px; border-radius: var(--sl-r-row);
+      display: flex; flex-direction: column; justify-content: center; gap: 2px; color: var(--sl-text); text-decoration: none; outline: none;
+    }
+    @media (hover: hover) { .sl-search-row:hover { background: var(--sl-field); } }
+    .sl-search-row:focus-visible { box-shadow: inset 0 0 0 1.5px var(--sl-dot); }
+    .sl-search-line1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .sl-search-date { flex: none; color: var(--sl-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .sl-search-name { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-search-name b { font-weight: 800; }
+    .sl-search-line2 { display: block; min-width: 0; min-height: 17px; overflow: hidden; color: var(--sl-arrow); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+    .sl-search-line2 b { color: var(--sl-deep); font-weight: 700; }
+    .sl-search-message { margin: 0; padding: 14px 2px; color: var(--sl-quiet); font-size: 13px; line-height: 1.5; }
+    .sl-search-more { margin: 0; padding: 8px 0 0; color: var(--sl-quiet); font-size: 12px; line-height: 18px; }
+  </style>
+</head>
+<body>
+  <main class="sl-root sl-search" id="app" data-status="idle" aria-label="캘린더 검색">
+    <div class="sl-search-head">
+      <h1 class="sl-search-title">캘린더 검색</h1>
+      <span class="sl-search-busy" aria-hidden="true">찾는 중</span>
+    </div>
+    <form class="sl-search-field" id="form" role="search" autocomplete="off">
+      <input class="sl-search-input" id="query" type="text" maxlength="100" enterkeyhint="search" spellcheck="false"
+        placeholder="회의록 제목이나 내용 검색" aria-label="회의록 제목이나 내용 검색">
+      <button class="sl-search-clear" id="clear" type="button" aria-label="지우기" hidden>✕</button>
+    </form>
+    <div class="sl-search-list" id="list"><p class="sl-search-message">회의 제목이나 내용으로 찾아보세요</p></div>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module">
+    // 캘린더 검색: 노션 회의록 검색 Worker(notion-search)를 부르는 예외 위젯. 기존 Store·서버는 쓰지 않는다.
+    // 검색 Worker 주소는 여기 한 곳에만 둔다. 배포 후 주소가 다르면 이 값만 바꾼다(notion-search-worker/README.md).
+    const SEARCH_API = 'https://notion-search.wldnjsdkk.workers.dev';
+    const DEBOUNCE_MS = 300;
+    const BUSY_DELAY_MS = 200;
+    const ROW = 46 + 6;   // 결과 한 건 + 간격
+    const MORE = 26;      // "더 정확한 단어로 찾아보세요" 줄
+    const MESSAGES = {
+      idle:'회의 제목이나 내용으로 찾아보세요',
+      none:'찾는 내용이 없어요',
+      error:'검색 서버에 연결할 수 없어요',
+      address:'위젯 주소를 확인해 주세요'
+    };
+
+    // 주소의 ?w= 값을 그대로 검색 Worker에 넘긴다. 화면·오류 문구에는 쓰지 않는다.
+    const instanceKey = (new URLSearchParams(location.search).get('w') || '').trim();
+
+    // 검색 Worker 호출은 이 함수 하나로 모은다.
+    async function searchMeetings(query, signal) {
+      const url = `${SEARCH_API}/search?q=${encodeURIComponent(query)}&w=${encodeURIComponent(instanceKey)}`;
+      const response = await fetch(url, { signal, cache:'no-store', credentials:'omit' });
+      if (response.status === 403) throw Object.assign(new Error('forbidden'), { forbidden:true });
+      if (!response.ok) throw new Error(`search ${response.status}`);
+      const data = await response.json();
+      if (!data?.ok || !Array.isArray(data.results)) throw new Error('search response');
+      return data;
+    }
+
+    const app = document.getElementById('app');
+    const form = document.getElementById('form');
+    const input = document.getElementById('query');
+    const clearButton = document.getElementById('clear');
+    const list = document.getElementById('list');
+    const live = document.getElementById('live');
+    const view = { status:instanceKey ? 'idle' : 'address', results:[], total:0 };
+    let lastQuery = '';
+    let sequence = 0;
+    let pending = null;
+    let debounce = 0;
+    let busyTimer = 0;
+
+    const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]);
+    // 찾은 위치 [시작, 끝)만 굵게. 범위가 이상하면 무시한다.
+    function marked(text, ranges) {
+      const value = String(text || '');
+      const valid = (Array.isArray(ranges) ? ranges : [])
+        .filter(range => Array.isArray(range) && Number.isInteger(range[0]) && Number.isInteger(range[1]) && range[0] >= 0 && range[0] < range[1] && range[1] <= value.length)
+        .sort((a, b) => a[0] - b[0]);
+      let html = '';
+      let at = 0;
+      for (const [from, to] of valid) {
+        if (from < at) continue;
+        html += escapeHtml(value.slice(at, from)) + `<b>${escapeHtml(value.slice(from, to))}</b>`;
+        at = to;
+      }
+      return html + escapeHtml(value.slice(at));
+    }
+    const shortDate = date => /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? `${date.slice(5, 7)}/${date.slice(8, 10)}` : '';
+    const safeUrl = url => /^https:\/\//.test(String(url || '')) ? String(url) : '#';
+
+    function rowHtml(result) {
+      return `<a class="sl-search-row" href="${escapeHtml(safeUrl(result.url))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(result.title)}">`
+        + `<span class="sl-search-line1"><span class="sl-search-date">${shortDate(result.date)}</span>`
+        + `<span class="sl-search-name">${marked(result.title, result.titleMatches)}</span></span>`
+        + `<span class="sl-search-line2">${marked(result.line, result.lineMatches)}</span></a>`;
+    }
+
+    // 높이 안에 들어가는 만큼만. 다 들어가지 않으면 마지막 줄에 안내 문구.
+    function render() {
+      app.dataset.status = view.status;
+      clearButton.hidden = !input.value;
+      input.disabled = view.status === 'address';
+      if (view.status !== 'results') {
+        list.innerHTML = `<p class="sl-search-message">${MESSAGES[view.status]}</p>`;
+        return;
+      }
+      const height = list.clientHeight;
+      const fitsAll = view.total <= view.results.length && view.results.length <= Math.floor((height + 6) / ROW);
+      const count = fitsAll ? view.results.length : Math.max(0, Math.min(view.results.length, Math.floor((height + 6 - MORE) / ROW)));
+      list.innerHTML = `<div class="sl-search-rows">${view.results.slice(0, count).map(rowHtml).join('')}</div>`
+        + (fitsAll ? '' : '<p class="sl-search-more">더 정확한 단어로 찾아보세요</p>');
+    }
+
+    // 찾는 동안 기존 결과는 그대로 두고, 오래 걸릴 때만 작은 표시를 띄운다.
+    function setBusy(busy) {
+      clearTimeout(busyTimer);
+      if (busy) busyTimer = setTimeout(() => app.classList.add('is-busy'), BUSY_DELAY_MS);
+      else app.classList.remove('is-busy');
+    }
+    function cancel() {
+      clearTimeout(debounce);
+      pending?.abort();
+      pending = null;
+      sequence += 1;
+      setBusy(false);
+    }
+
+    async function run() {
+      clearTimeout(debounce);
+      if (!instanceKey) return;
+      const query = input.value.trim();
+      if (!query) {
+        cancel();
+        lastQuery = '';
+        Object.assign(view, { status:'idle', results:[], total:0 });
+        render();
+        return;
+      }
+      if (query === lastQuery && pending) return;
+      cancel();
+      const id = sequence;
+      pending = new AbortController();
+      lastQuery = query;
+      setBusy(true);
+      try {
+        const data = await searchMeetings(query, pending.signal);
+        if (id !== sequence) return;
+        Object.assign(view, { status:data.results.length ? 'results' : 'none', results:data.results, total:Number(data.total) || data.results.length });
+        live.textContent = data.results.length ? `${Number(data.total) || data.results.length}건 찾았어요` : MESSAGES.none;
+      } catch (error) {
+        if (id !== sequence || error?.name === 'AbortError') return;
+        lastQuery = '';
+        Object.assign(view, { status:error?.forbidden ? 'address' : 'error', results:[], total:0 });
+        live.textContent = MESSAGES[view.status];
+      } finally {
+        if (id === sequence) { pending = null; setBusy(false); }
+      }
+      if (view.status === 'address') input.blur();
+      render();
+    }
+
+    input.addEventListener('input', () => {
+      clearButton.hidden = !input.value;
+      clearTimeout(debounce);
+      if (!input.value.trim()) { run(); return; }
+      debounce = setTimeout(run, DEBOUNCE_MS);
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      run();
+    });
+    form.addEventListener('submit', event => event.preventDefault());
+    clearButton.addEventListener('click', () => {
+      input.value = '';
+      run();
+      input.focus();
+    });
+    new ResizeObserver(() => { if (view.status === 'results') render(); }).observe(list);
+    render();
+  </script>
+</body>
+</html>

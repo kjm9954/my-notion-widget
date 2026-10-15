@@ -1,0 +1,19 @@
+# 노션 회의록 검색 전용 Worker. 저장소 루트의 notion-widget Worker·D1과는 별개다.
+name = "notion-search"
+main = "worker.js"
+compatibility_date = "2026-07-26"
+workers_dev = true
+
+# 비밀값(NOTION_TOKEN, ALLOWED_W)은 여기에 쓰지 않는다. `npx wrangler secret put`으로만 넣는다.
+[vars]
+NOTION_DATABASE_ID = "3f9b993c8a6180a180c7dbc6927835e3"
+NOTION_DATA_SOURCE_ID = "3f9b993c-8a61-80bd-851e-000bf5cc87ab"
+
+# 30분마다 색인 갱신
+[triggers]
+crons = ["*/30 * * * *"]
+
+# 색인 저장소. `npx wrangler kv namespace create SEARCH_INDEX`가 알려주는 id로 바꾼다.
+[[kv_namespaces]]
+binding = "SEARCH_INDEX"
+id = "REPLACE_WITH_SEARCH_INDEX_KV_ID"
