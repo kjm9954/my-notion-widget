@@ -41,40 +41,26 @@
     .sl-day-item.is-carry .sl-day-text { color: var(--sl-quiet); }
     .sl-day-item.is-carry .sl-dot-button { cursor: default; }
 
-    /* 좁은 폭(640px 미만, AGENTS.md 반응형 기준): 요일 칩 한 줄 + 선택한 요일 목록. 위의 넓은 폭 규칙은 그대로. */
-    .sl-week-compact { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    /* 좁은 폭(640px 미만, AGENTS.md 반응형 기준): 요일 5줄(완료 점 + 숫자) + 이번 주 요약. 위의 넓은 폭 규칙은 그대로. */
+    .sl-week-compact { flex: 1 1 auto; min-height: 0; margin-top: 12px; display: flex; flex-direction: column; }
     .sl-week-compact[hidden], .sl-week.is-compact .sl-week-grid { display: none; }
     .sl-week.is-compact { padding: 18px 18px 16px; }
     .sl-week.is-compact .sl-week-titlebar { margin-top: 12px; }
     .sl-week.is-compact .sl-week-title { font-size: 22px; }
-    .sl-chips { flex: none; margin-top: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-    .sl-chip {
-      min-width: 0; height: 52px; padding: 0 2px; border: 1.5px solid transparent; border-radius: var(--sl-r-card); background: var(--sl-cell);
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-      transition: border-color var(--t-color, 120ms) var(--ease, ease);
-    }
-    .sl-chip.is-today { background: var(--sl-sky-today); }
-    .sl-chip.is-selected { border-color: var(--sl-text); }
-    .sl-chip-dow { display: flex; align-items: center; gap: 3px; color: var(--sl-text); font-size: 13px; font-weight: 700; line-height: 16px; }
-    .sl-chip-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--sl-sky); }
-    .sl-chip-sub { color: var(--sl-muted); font-size: 11px; line-height: 13px; white-space: nowrap; }
-    .sl-chip-sub.is-empty { color: var(--sl-empty); }
-    .sl-sel-head { flex: none; height: 22px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .sl-sel-name { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--sl-ink); font-size: 14px; font-weight: 700; white-space: nowrap; }
-    .sl-sel-count { flex: none; color: var(--sl-muted); font-size: 12px; white-space: nowrap; }
-    .sl-sel-list { flex: 1 1 auto; min-height: 0; margin-top: 6px; display: flex; flex-direction: column; overflow: hidden; }
-    .sl-sel-list > .sl-message { padding-top: 8px; }
-    .sl-m-item { flex: none; height: 30px; display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .sl-m-item .sl-dot-button { margin: 0 -9px; }
-    .sl-m-item .sl-num { width: 17px; height: 17px; font-size: 10px; }
-    .sl-m-text { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-muted); font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
-    .sl-m-item.is-done .sl-m-text { color: var(--sl-text); }
-    .sl-m-item.is-late .sl-m-text { color: var(--sl-red); }
-    .sl-m-item.is-carry .sl-dot { border-color: var(--sl-line-focus); }
-    .sl-m-item.is-carry .sl-m-text { color: var(--sl-empty); }
-    .sl-m-item.is-carry .sl-dot-button { cursor: default; }
-    .sl-m-empty { flex: none; height: 30px; display: flex; align-items: center; color: var(--sl-empty); font-size: 14px; }
-    .sl-m-more { flex: none; height: 24px; display: flex; align-items: center; padding-left: 18px; color: var(--sl-quiet); font-size: 12px; }
+    /* 한 줄 44px, 남는 높이는 줄 사이에 고르게(낮은 임베드에서는 줄이 줄어든다) */
+    .sl-wk-rows { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; }
+    .sl-wk-rows > .sl-message { padding-top: 8px; }
+    .sl-wk-row { flex: 0 1 44px; min-height: 30px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; display: flex; align-items: center; gap: 14px; }
+    .sl-wk-row.is-today { background: var(--sl-sky-today); }
+    .sl-wk-dow { flex: none; width: 16px; color: var(--sl-text); font-size: 14px; font-weight: 700; }
+    .sl-wk-row.is-empty .sl-wk-dow { color: var(--sl-empty); }
+    .sl-wk-dots { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+    .sl-wk-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--sl-sky); }
+    .sl-wk-dot.is-open { border: 1.5px solid var(--sl-check); background: var(--sl-surface); }
+    .sl-wk-plus { flex: none; margin-left: 1px; color: var(--sl-muted); font-size: 11px; white-space: nowrap; }
+    .sl-wk-count { flex: none; color: var(--sl-muted); font-size: 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sl-wk-sum { flex: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sl-line); display: flex; justify-content: space-between; gap: 12px; color: var(--sl-muted); font-size: 13px; white-space: nowrap; }
+    .sl-wk-sum b { color: var(--sl-ink); font-weight: 700; }
   </style>
   <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
 </head>
@@ -91,13 +77,12 @@
     <div class="sl-title-wrap sl-week-titlebar"><h1 class="sl-week-title">이번 주 한 일</h1><span class="sl-notice" id="notice"></span></div>
     <div class="sl-week-grid" id="days"><p class="sl-message">불러오는 중이에요</p></div>
     <div class="sl-week-compact" id="compact" hidden>
-      <div class="sl-chips" id="chips" role="group" aria-label="요일 선택"></div>
-      <div class="sl-sel-head" id="selHead"></div>
-      <div class="sl-sel-list" id="selList"></div>
+      <div class="sl-wk-rows" id="weekRows"></div>
+      <div class="sl-wk-sum" id="weekSum"></div>
     </div>
     <div class="sl-sr" id="live" aria-live="polite"></div>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="week-review.mjs?v=20261015-mobile"></script>
+  <script type="module" src="week-review.mjs?v=20261015-dots"></script>
 </body>
 </html>
