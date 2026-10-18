@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>습관 점검</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="goal-check.css?v=20261018-goal-check">
+  <style>
+    /* 시안: PC 184px(카드 가로 5개) · 모바일 324px(세로 목록, 한 줄 44px). 기호 3개는 분기의 1·2·3번째 달. */
+    .gc-habits { --gc-h-pc: 184px; --gc-h-m: 324px; }
+    .gc-habits .sl-head-row { justify-content: flex-start; gap: 10px; }
+    .gc-habits .sl-title-wrap { flex: 1; }
+    .gc-limit { flex: none; color: var(--sl-hint); font-size: 12px; }
+    .gc-empty { flex: none; margin: 0; padding: 14px 2px 6px; color: var(--sl-hint); font-size: 13.5px; }
+    .gc-board { flex: 1; min-height: 0; margin-top: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .gc-cards { display: contents; }
+    .gc-habit {
+      position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+      padding: 12px 10px 6px 12px; border-radius: var(--sl-r-lane); background: var(--sl-cell);
+    }
+    .gc-habit-head { min-width: 0; }
+    .gc-name {
+      min-width: 0; padding: 0; border: 0; background: none; color: var(--sl-ink); text-align: left;
+      font-size: 14px; font-weight: 600; line-height: 1.4; letter-spacing: -.01em;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere;
+    }
+    .gc-name:disabled { cursor: default; }
+    .gc-edit { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .gc-edit-input {
+      flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 0; border-radius: var(--sl-r-chip);
+      background: var(--sl-surface); color: var(--sl-ink); font-size: 13.5px; font-weight: 600; outline: none;
+    }
+    .gc-text-button { flex: none; padding: 0; border: 0; background: none; color: var(--sl-arrow); font-size: 12px; }
+    @media (hover: hover) { .gc-text-button:hover { color: var(--sl-deep); } }
+    .gc-marks { display: flex; align-items: center; gap: 3px; margin-left: -2px; }
+    .gc-month { display: flex; align-items: center; }
+    .gc-mark {
+      width: 19px; height: 30px; padding: 0; border: 0; background: none; color: var(--sl-deep);
+      font-size: 15px; line-height: 1; transition: color .12s;
+    }
+    .gc-mark:disabled { cursor: default; }
+    .gc-mark.is-bad { color: var(--sl-muted); }
+    .gc-mark.is-faint { color: var(--sl-dot); }
+    .gc-mark.is-dot { font-size: 17px; color: var(--sl-arrow); }
+    .gc-mark.is-dot:disabled { color: var(--sl-check); }
+    @media (hover: hover) {
+      .gc-mark:not(:disabled):hover { color: var(--sl-deep); }
+    }
+    .gc-slot { min-width: 0; display: flex; align-items: center; padding: 0 6px; }
+    .gc-plus { padding: 4px 0; border: 0; background: none; color: var(--sl-arrow); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+    @media (hover: hover) { .gc-plus:hover { color: var(--sl-badge-ink); } }
+    .gc-add-input {
+      width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: var(--sl-r-chip);
+      background: var(--sl-field); color: var(--sl-ink); font-size: 13px; outline: none;
+    }
+    .gc-slot:not(.is-adding) .gc-add-input, .gc-slot.is-adding .gc-plus { display: none; }
+    .gc-board > .gc-message { grid-column: 1 / -1; }
+
+    @media (max-width: 699.98px) {
+      .gc-board { margin-top: 8px; display: flex; flex-direction: column; gap: 0; }
+      .gc-habit { flex: none; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; height: 44px; padding: 0; background: none; border-radius: 0; }
+      .gc-habit-head { flex: 1; display: flex; align-items: center; }
+      .gc-name { max-width: 100%; display: block; white-space: nowrap; text-overflow: ellipsis; line-height: normal; }
+      .gc-edit { gap: 8px; }
+      .gc-marks { flex: none; gap: 6px; margin-left: 0; }
+      .gc-slot { flex: none; height: 30px; margin-top: auto; padding: 0; }
+    }
+  </style>
+  <script src="../../store.js?v=20261018-quarter-goals" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root gc-root gc-habits" id="app" data-status="loading" aria-label="습관 점검">
+    <div class="sl-head-row gc-head">
+      <div class="sl-title-wrap"><h1 class="gc-title">습관 점검</h1><span class="sl-notice" id="notice"></span></div>
+      <span class="gc-limit" id="limit" hidden>습관은 5개까지</span>
+    </div>
+    <p class="gc-empty" id="empty" hidden>지키고 싶은 습관을 적어 두고 월말에 한 번 돌아봐요</p>
+    <div class="gc-board" id="board">
+      <div class="gc-cards" id="cards"><p class="gc-message">불러오는 중이에요</p></div>
+      <div class="gc-slot" id="slot" hidden>
+        <button class="gc-plus" type="button" id="plus">+ 습관</button>
+        <input class="gc-add-input" id="habitInput" type="text" placeholder="습관 이름 · Enter" maxlength="60" aria-label="습관 추가" autocomplete="off">
+      </div>
+    </div>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="habit-check.mjs?v=20261018-goal-check"></script>
+</body>
+</html>

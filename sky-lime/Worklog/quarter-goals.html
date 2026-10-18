@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>분기 목표</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="goal-check.css?v=20261018-goal-check">
+  <style>
+    /* 시안: PC·모바일 404px. 목표 5개 + 입력 줄이 펼침·스크롤 없이 들어간다. 팝업은 위젯 안에서 열린다. */
+    .gc-goals { --gc-h-pc: 404px; --gc-h-m: 404px; }
+    .gc-list { flex: 1; min-height: 0; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+    .gc-list > .gc-message { padding: 20px 2px; }
+    .gc-goal {
+      flex: none; width: 100%; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 14px;
+      border: 0; border-radius: var(--sl-r-lane); background: var(--sl-cell); text-align: left; transition: background .12s;
+    }
+    .gc-goal:disabled { cursor: default; }
+    @media (hover: hover) { .gc-goal:not(:disabled):hover { background: var(--sl-seg); } }
+    .gc-goal.is-hold { opacity: .45; }
+    .gc-goal.is-stalled { opacity: .6; }
+    .gc-goal .sl-num, .gc-pop .sl-num { width: 22px; height: 22px; font-size: 12px; }
+    .sl-num.is-gray { background: var(--sl-num-done); color: var(--sl-muted); }
+    .gc-goal-title { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 14px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
+    .gc-goal.is-done .gc-goal-title, .gc-goal.is-stalled .gc-goal-title { color: var(--sl-arrow); }
+    .gc-goal-right { flex: none; color: var(--sl-secondary); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gc-goal.is-done .gc-goal-right { color: var(--sl-arrow); }
+    .gc-goal.is-hold .gc-goal-right, .gc-goal.is-stalled .gc-goal-right { color: var(--sl-arrow); font-weight: 500; }
+
+    .gc-add { flex: none; margin-top: 14px; height: 40px; display: flex; align-items: center; gap: 8px; }
+    .gc-add-input {
+      flex: 1; min-width: 0; height: 100%; padding: 0 14px; border: 0; border-radius: var(--sl-r-row);
+      background: var(--sl-field); color: var(--sl-ink); font-size: 14px; outline: none;
+    }
+    .gc-add-button {
+      flex: none; height: 100%; padding: 0 16px; border: 0; border-radius: var(--sl-r-row);
+      background: var(--sl-sky-button); color: #FFFFFF; font-size: 13px; font-weight: 600;
+    }
+    @media (hover: hover) { .gc-add-button:hover { background: var(--sl-sky-button-hover); } }
+    .gc-add-button:active { transform: scale(.985); transition: transform var(--t-press, 90ms) var(--ease, ease); }
+    .gc-full { padding: 0 2px; color: var(--sl-hint); font-size: 13px; }
+    .gc-add:not(.is-open) > .gc-add-input, .gc-add:not(.is-open) > .gc-add-button, .gc-add:not(.is-full) > .gc-full { display: none; }
+
+    /* 목표 팝업: 위젯 안에서 열림. PC 최대 폭 560px, 모바일은 위젯 전체를 덮는다. */
+    .gc-layer { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--sl-overlay); }
+    .gc-layer[hidden] { display: none; }
+    .gc-pop {
+      width: 100%; max-width: 560px; max-height: 100%; overflow: hidden; display: flex; flex-direction: column;
+      padding: 22px 24px 18px; border-radius: var(--sl-r-root); background: var(--sl-surface); box-shadow: var(--sl-shadow-panel);
+    }
+    .gc-pop-head { flex: none; display: flex; align-items: center; gap: 10px; }
+    .gc-pop-title {
+      flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--sl-ink);
+      font-size: 17px; font-weight: 700; letter-spacing: -.02em; outline: none; text-overflow: ellipsis;
+    }
+    .gc-pop-pct { flex: none; color: var(--sl-secondary); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gc-close {
+      flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--sl-r-chip);
+      background: transparent; color: var(--sl-arrow); font-size: 15px; line-height: 1;
+    }
+    @media (hover: hover) { .gc-close:hover { background: var(--sl-seg); color: var(--sl-deep); } }
+    .gc-pop-body { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 14px; }
+    .gc-step { flex: none; display: flex; align-items: center; gap: 10px; height: 32px; cursor: pointer; }
+    .gc-step .sl-check { margin: -5px; }
+    .gc-step-text { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-text); font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
+    .gc-step.is-done .gc-step-text { color: var(--sl-arrow); }
+    .gc-cells { display: flex; gap: 3px; padding: 6px 0 10px; }
+    .gc-cell { flex: 1; min-width: 0; height: 10px; padding: 0; border: 0; border-radius: 3px; background: var(--sl-line-focus); }
+    .gc-cell.is-on { background: var(--sl-sky); }
+    .gc-step-input {
+      flex: none; margin-top: 6px; height: 36px; padding: 0 12px; border: 0; border-radius: var(--sl-r-row);
+      background: var(--sl-field); color: var(--sl-ink); font-size: 13px; outline: none;
+    }
+    .gc-pop-foot { flex: none; display: flex; justify-content: flex-end; gap: 14px; margin-top: 12px; }
+    .gc-text-button { padding: 0; border: 0; background: none; color: var(--sl-arrow); font-size: 12px; }
+    @media (hover: hover) { .gc-text-button:hover { color: var(--sl-deep); } }
+
+    @media (max-width: 699.98px) {
+      .gc-add { height: 44px; }
+      .gc-layer { padding: 0; }
+      .gc-pop { max-width: 100%; height: 100%; padding: 18px 16px; }
+      .gc-step { height: 40px; }
+    }
+  </style>
+  <script src="../../store.js?v=20261018-quarter-goals" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root gc-root gc-goals" id="app" data-status="loading" aria-label="분기 목표">
+    <div class="sl-head-row gc-head">
+      <div class="sl-title-wrap"><h1 class="gc-title">분기 목표</h1><span class="sl-notice" id="notice"></span></div>
+    </div>
+    <div class="gc-list" id="list"><p class="gc-message">불러오는 중이에요</p></div>
+    <div class="gc-add" id="addRow">
+      <input class="gc-add-input" id="goalInput" type="text" placeholder="목표 추가…" maxlength="120" aria-label="분기 목표 추가" autocomplete="off">
+      <button class="gc-add-button" id="goalAdd" type="button">추가</button>
+      <span class="gc-full">분기 목표는 5개까지</span>
+    </div>
+    <div class="gc-layer" id="layer" hidden>
+      <section class="gc-pop" id="pop" role="dialog" aria-modal="true" aria-label="분기 목표 자세히">
+        <div class="gc-pop-head">
+          <span class="sl-num" id="popNum"></span>
+          <input class="gc-pop-title" id="popTitle" type="text" maxlength="120" aria-label="목표 이름" autocomplete="off">
+          <span class="gc-pop-pct" id="popPct"></span>
+          <button class="gc-close" type="button" data-close aria-label="닫기">✕</button>
+        </div>
+        <div class="gc-pop-body">
+          <div id="popSteps"></div>
+          <input class="gc-step-input" id="stepInput" type="text" placeholder="+ 세부 단계" maxlength="100" aria-label="세부 단계 추가" autocomplete="off">
+        </div>
+        <div class="gc-pop-foot">
+          <button class="gc-text-button" type="button" id="popHold"></button>
+          <button class="gc-text-button" type="button" id="popDelete">삭제</button>
+        </div>
+      </section>
+    </div>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="quarter-goals.mjs?v=20261018-goal-check"></script>
+</body>
+</html>
