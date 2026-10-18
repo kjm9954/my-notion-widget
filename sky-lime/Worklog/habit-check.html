@@ -7,15 +7,17 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
   <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
-  <link rel="stylesheet" href="goal-check.css?v=20261018-goal-check">
+  <link rel="stylesheet" href="goal-check.css?v=20261019-fill">
   <style>
-    /* 시안: PC 184px(카드 가로 5개) · 모바일 324px(세로 목록, 한 줄 44px). 기호 3개는 분기의 1·2·3번째 달. */
+    /* 최소 높이 PC 184px(카드 가로 5개) · 모바일 324px(세로 목록, 한 줄 44px). 기호 3개는 분기의 1·2·3번째 달.
+       임베드가 더 높으면 카드가 같이 늘어난다. PC 습관 카드는 시안 높이(101px)로 위에 붙고 "+ 습관"은 그 옆 칸,
+       모바일은 목록이 위에 붙고 "+ 습관"이 맨 아래. */
     .gc-habits { --gc-h-pc: 184px; --gc-h-m: 324px; }
     .gc-habits .sl-head-row { justify-content: flex-start; gap: 10px; }
     .gc-habits .sl-title-wrap { flex: 1; }
     .gc-limit { flex: none; color: var(--sl-hint); font-size: 12px; }
     .gc-empty { flex: none; margin: 0; padding: 14px 2px 6px; color: var(--sl-hint); font-size: 13.5px; }
-    .gc-board { flex: 1; min-height: 0; margin-top: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .gc-board { flex: 0 1 101px; min-height: 0; margin-top: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
     .gc-cards { display: contents; }
     .gc-habit {
       position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
@@ -60,7 +62,7 @@
     .gc-board > .gc-message { grid-column: 1 / -1; }
 
     @media (max-width: 699.98px) {
-      .gc-board { margin-top: 8px; display: flex; flex-direction: column; gap: 0; }
+      .gc-board { flex: 1 1 auto; margin-top: 8px; display: flex; flex-direction: column; gap: 0; }
       .gc-habit { flex: none; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; height: 44px; padding: 0; background: none; border-radius: 0; }
       .gc-habit-head { flex: 1; display: flex; align-items: center; }
       .gc-name { max-width: 100%; display: block; white-space: nowrap; text-overflow: ellipsis; line-height: normal; }
@@ -72,7 +74,7 @@
   <script src="../../store.js?v=20261018-quarter-goals" data-store-isolated data-store-coalesce></script>
 </head>
 <body>
-  <section class="sl-root gc-root gc-habits" id="app" data-status="loading" aria-label="습관 점검">
+  <section class="sl-root gc-root gc-fill gc-habits" id="app" data-status="loading" aria-label="습관 점검">
     <div class="sl-head-row gc-head">
       <div class="sl-title-wrap"><h1 class="gc-title">습관 점검</h1><span class="sl-notice" id="notice"></span></div>
       <span class="gc-limit" id="limit" hidden>습관은 5개까지</span>

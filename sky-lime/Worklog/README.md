@@ -79,18 +79,23 @@ PLAYWRIGHT_MODULE=<playwright 경로> SKY_LIME_SHOTS=<스크린샷 폴더> node 
 
 노션 하위 페이지 "목표 체크"에 위에서 아래로 따로 임베드합니다. 업무일지·이번 주 목표 데이터는 읽지도 쓰지도 않습니다(`weekly-goals.*` 등 기존 위젯 수정 없음).
 
-## 주소 · 노션 임베드 높이
+## 주소 · 노션 임베드 높이(최소 높이 기준)
 
 세 주소 모두 업무일지와 같은 `?w=` 키를 붙입니다.
 
-| 위젯 | 주소 | 카드 높이 (PC / 모바일) | 노션 임베드 높이 |
+| 위젯 | 주소 | 높이 | 노션 임베드 높이 |
 | --- | --- | --- | --- |
-| 분기 진행도 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/quarter-progress.html?w=[인스턴스 키]` | 124 / 112px | 124px |
-| 분기 목표 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/quarter-goals.html?w=[인스턴스 키]` | 404 / 404px | 404px |
-| 습관 점검 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/habit-check.html?w=[인스턴스 키]` | 184 / 324px | PC만 보면 184px, 모바일도 보면 324px |
+| 분기 진행도 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/quarter-progress.html?w=[인스턴스 키]` | 고정 PC 124 / 모바일 112px | 124px |
+| 분기 목표 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/quarter-goals.html?w=[인스턴스 키]` | 임베드 높이 100% · 최소 404px | 404px 이상 |
+| 습관 점검 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/habit-check.html?w=[인스턴스 키]` | 임베드 높이 100% · 최소 PC 184 / 모바일 324px | PC만 보면 184px 이상, 모바일도 보면 324px 이상 |
 
-- 폭 700px 이상은 PC 배치, 그보다 좁으면 모바일 배치입니다. 카드 높이는 고정이고 위젯 안 스크롤·펼침이 없습니다.
-- 노션 임베드가 카드보다 높으면 카드는 위에 붙고 아래는 투명합니다. 습관 점검을 324px로 두면 PC에서는 184px 카드 아래 140px이 빈칸(페이지 맨 끝)입니다.
+- 폭 700px 이상은 PC 배치, 그보다 좁으면 모바일 배치입니다. 위젯 안 스크롤·펼침은 없습니다.
+- 분기 진행도는 고정 높이입니다. 임베드가 더 높으면 카드는 위에 붙고 아래는 투명합니다.
+- 분기 목표·습관 점검은 임베드 높이를 꽉 채웁니다. 노션에서 임베드를 늘리면 카드도 같이 늘어납니다.
+  - 최소 높이에서 최대 개수(5개)가 잘림 없이 들어갑니다. 최소 높이보다 낮게 두면 아래가 잘립니다.
+  - 남는 공간: 목표 목록·습관 카드는 위에 붙고, 분기 목표 입력 줄(5개면 안내 문구)은 맨 아래입니다.
+  - 습관 점검 모바일은 "+ 습관"이 맨 아래입니다. PC는 시안대로 습관 카드 옆 칸에 있습니다(최소 높이 184px에 아래 줄을 둘 자리가 없음).
+  - 분기 목표 팝업은 위젯 높이 전체를 씁니다(PC는 둘레 20px · 최대 폭 560px, 모바일은 위젯 전체).
 
 ## 데이터
 

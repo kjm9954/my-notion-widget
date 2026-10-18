@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
   <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
-  <link rel="stylesheet" href="goal-check.css?v=20261018-goal-check">
+  <link rel="stylesheet" href="goal-check.css?v=20261019-fill">
   <style>
-    /* 시안: PC·모바일 404px. 목표 5개 + 입력 줄이 펼침·스크롤 없이 들어간다. 팝업은 위젯 안에서 열린다. */
+    /* 최소 높이 404px(PC·모바일): 목표 5개 + 입력 줄이 펼침·스크롤 없이 들어간다. 임베드가 더 높으면 카드가 같이 늘어나고,
+       목록은 위에 붙고 입력 줄은 맨 아래. 팝업은 위젯 안에서 열리고 위젯 높이 전체를 쓴다. */
     .gc-goals { --gc-h-pc: 404px; --gc-h-m: 404px; }
     .gc-list { flex: 1; min-height: 0; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
     .gc-list > .gc-message { padding: 20px 2px; }
@@ -43,11 +44,11 @@
     .gc-full { padding: 0 2px; color: var(--sl-hint); font-size: 13px; }
     .gc-add:not(.is-open) > .gc-add-input, .gc-add:not(.is-open) > .gc-add-button, .gc-add:not(.is-full) > .gc-full { display: none; }
 
-    /* 목표 팝업: 위젯 안에서 열림. PC 최대 폭 560px, 모바일은 위젯 전체를 덮는다. */
+    /* 목표 팝업: 위젯 안에서 열림. 위젯 높이 전체를 쓴다(PC 최대 폭 560px · 둘레 20px, 모바일은 위젯 전체를 덮음). */
     .gc-layer { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--sl-overlay); }
     .gc-layer[hidden] { display: none; }
     .gc-pop {
-      width: 100%; max-width: 560px; max-height: 100%; overflow: hidden; display: flex; flex-direction: column;
+      width: 100%; max-width: 560px; height: 100%; overflow: hidden; display: flex; flex-direction: column;
       padding: 22px 24px 18px; border-radius: var(--sl-r-root); background: var(--sl-surface); box-shadow: var(--sl-shadow-panel);
     }
     .gc-pop-head { flex: none; display: flex; align-items: center; gap: 10px; }
@@ -87,7 +88,7 @@
   <script src="../../store.js?v=20261018-quarter-goals" data-store-isolated data-store-coalesce></script>
 </head>
 <body>
-  <section class="sl-root gc-root gc-goals" id="app" data-status="loading" aria-label="분기 목표">
+  <section class="sl-root gc-root gc-fill gc-goals" id="app" data-status="loading" aria-label="분기 목표">
     <div class="sl-head-row gc-head">
       <div class="sl-title-wrap"><h1 class="gc-title">분기 목표</h1><span class="sl-notice" id="notice"></span></div>
     </div>
