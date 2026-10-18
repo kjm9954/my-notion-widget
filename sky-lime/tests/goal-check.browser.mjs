@@ -276,12 +276,81 @@ test('세 위젯이 고정 높이(PC·모바일) 안에 0·3·5개 모두 잘림
         await page.close();
       }
     }
-    // 모바일 높이로 둔 습관 임베드(324px)를 PC에서 열면 카드는 184px로 위에 붙는다.
-    const tall = await h.open('habits', { width:1320, height:324 });
-    assert.equal((await fits(tall)).height, 184);
+    // 분기 진행도는 고정: 더 높은 임베드에서도 124px 카드가 위에 붙는다.
+    const tall = await h.open('progress', { width:1320, height:300 });
+    assert.equal((await fits(tall)).height, 124);
     assert.deepEqual(h.errors, []);
     assert.deepEqual(h.external, []);
     await h.context.close();
+  }
+});
+
+// 분기 목표·습관 점검은 임베드 높이 100%를 채운다(최소 높이 = 시안 높이). 목록·카드는 위, 입력 줄·"+ 습관"(모바일)은 맨 아래.
+test('임베드 높이 100% 채움: 404·700·1000px에서 잘림·스크롤 없음, 목록은 위·입력 줄은 아래, 팝업은 위젯 높이 전체', { timeout:240000 }, async () => {
+  const near = (a, b, label) => assert.ok(Math.abs(a - b) <= 1, `${label}: ${a} ≠ ${b}`);
+  for (const [width, mobile] of [[1320, false], [390, true]]) {
+    for (const count of [0, 5]) {
+      const h = await setup(browser, { dbs:{ [KEY]:fixture({ goals:count, habits:count }) }, mobile, viewport:{ width, height:404 } });
+      for (const height of [404, 700, 1000]) {
+        const tag = `${width}-h${height}-${count}`;
+        // 분기 목표
+        const goals = await h.open('goals', { width, height });
+        let result = await fits(goals);
+        assert.equal(result.height, height - 1, `goals ${tag} 카드 높이`);
+        assert.deepEqual([result.scroll, result.inner, result.clipped], [false, false, []], `goals ${tag} ${JSON.stringify(result)}`);
+        const box = await goals.evaluate(() => {
+          const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+          const card = rect('#app'), list = rect('#list'), add = rect('#addRow'), head = rect('.gc-head');
+          const first = rect('#list > *');
+          return { card:{ top:card.top, bottom:card.bottom }, listTop:list.top, firstTop:first?.top, addBottom:add.bottom, headBottom:head.bottom,
+            pad:parseFloat(getComputedStyle(document.getElementById('app')).paddingBottom) };
+        });
+        near(box.firstTop, box.listTop, `goals ${tag} 목록 위쪽 정렬`);
+        near(box.addBottom, box.card.bottom - 1 - box.pad, `goals ${tag} 입력 줄 맨 아래`);
+        await shot(goals, `fill-goals-${tag}`);
+        if (count) {
+          await goals.locator('[data-goal]').first().click();
+          await goals.waitForSelector('#layer:not([hidden])');
+          result = await fits(goals);
+          assert.deepEqual([result.scroll, result.inner, result.clipped], [false, false, []], `popup ${tag}`);
+          const pop = await goals.evaluate(() => {
+            const layer = document.getElementById('layer').getBoundingClientRect(), panel = document.getElementById('pop').getBoundingClientRect();
+            const foot = document.querySelector('.gc-pop-foot').getBoundingClientRect();
+            const pad = parseFloat(getComputedStyle(document.getElementById('layer')).paddingTop);
+            return { layer:layer.height, panel:panel.height, pad, footBottom:foot.bottom, panelBottom:panel.bottom,
+              panelPad:parseFloat(getComputedStyle(document.getElementById('pop')).paddingBottom) };
+          });
+          near(pop.panel, pop.layer - pop.pad * 2, `popup ${tag} 위젯 높이 전체`);
+          near(pop.footBottom, pop.panelBottom - pop.panelPad, `popup ${tag} 보류·삭제 맨 아래`);
+          await shot(goals, `fill-goals-popup-${tag}`);
+        }
+        await goals.close();
+        // 습관 점검
+        const habits = await h.open('habits', { width, height });
+        result = await fits(habits);
+        assert.equal(result.height, height - 1, `habits ${tag} 카드 높이`);
+        assert.deepEqual([result.scroll, result.inner, result.clipped], [false, false, []], `habits ${tag} ${JSON.stringify(result)}`);
+        const layout = await habits.evaluate(() => {
+          const card = document.getElementById('app').getBoundingClientRect();
+          const pad = parseFloat(getComputedStyle(document.getElementById('app')).paddingBottom);
+          const cards = [...document.querySelectorAll('.gc-habit')].map(node => node.getBoundingClientRect());
+          const slot = document.getElementById('slot');
+          return { cardBottom:card.bottom, pad, heights:cards.map(rect => Math.round(rect.height)), tops:cards.map(rect => Math.round(rect.top)),
+            slotBottom:slot.hidden ? null : slot.getBoundingClientRect().bottom };
+        });
+        if (mobile) {
+          assert.ok(layout.heights.every(value => value === 44), `habits ${tag} 줄 44px`);
+          if (layout.slotBottom !== null) near(layout.slotBottom, layout.cardBottom - 1 - layout.pad, `habits ${tag} + 습관 맨 아래`);
+        } else {
+          assert.ok(layout.heights.every(value => value === 101), `habits ${tag} 카드 시안 높이 ${layout.heights}`);
+          assert.equal(new Set(layout.tops).size <= 1, true, `habits ${tag} 카드 위쪽 한 줄`);
+        }
+        await shot(habits, `fill-habits-${tag}`);
+        await habits.close();
+      }
+      assert.deepEqual(h.errors, []);
+      await h.context.close();
+    }
   }
 });
 
@@ -407,8 +476,8 @@ test('분기 목표: 순서·달성·보류·멈춤 표시, 팝업에서 단계�
   await page.locator('[data-pct="100"]').click();
   await waitSaved(h, 10);
   assert.equal(h.state().goals.find(item => item.id === 'g3').status, 'done', 'pct 100이면 달성');
-  // 닫기: 바깥(어두운 곳) 클릭
-  await page.mouse.click(660, 30);
+  // 닫기: 바깥(어두운 곳) 클릭 — 팝업이 위젯 높이 전체라 옆쪽을 누른다
+  await page.mouse.click(40, 200);
   assert.equal(await page.locator('#layer').isHidden(), true);
   // 삭제 → 4개 → 입력 줄 다시 보임 · 추가(Enter·버튼)
   await row('g5').click();

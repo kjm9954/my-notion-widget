@@ -1,5 +1,6 @@
 /* 목표 체크 위젯 3종 공통(분기 진행도 · 분기 목표 · 습관 점검). 수치는 시안 값, 색은 sky-lime 기존 변수.
-   카드 높이는 고정: PC(700px 이상)와 모바일 값이 다르다. 임베드가 더 높으면 카드는 위에 붙고 아래는 투명. */
+   분기 진행도: 카드 높이 고정(PC 124 · 모바일 112px). 임베드가 더 높으면 카드는 위에 붙고 아래는 투명.
+   분기 목표·습관 점검(gc-fill): 임베드 높이 100%를 채운다. 시안 높이(PC·모바일 값)가 최소 높이다. */
 :root {
   /* 시안의 경과율 띠(LAG) 색 */
   --gc-lag: oklch(0.93 0.035 235);
@@ -19,6 +20,11 @@
 }
 @media (max-width: 699.98px) {
   .gc-root { height: min(100%, var(--gc-h-m)); padding: 18px 16px; }
+}
+/* 임베드 높이 100% 채움. 최소 높이는 시안 높이(아래 1px은 소수점 임베드 여유, 기존 sky-lime 규칙). */
+.gc-root.gc-fill { height: 100%; min-height: calc(var(--gc-h-pc) - 1px); }
+@media (max-width: 699.98px) {
+  .gc-root.gc-fill { min-height: calc(var(--gc-h-m) - 1px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .gc-root *, .gc-root *::before, .gc-root *::after { transition: none !important; }
