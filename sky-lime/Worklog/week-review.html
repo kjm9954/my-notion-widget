@@ -14,6 +14,7 @@
     .sl-week-titlebar { flex: none; margin-top: 18px; }
     .sl-week-title { margin: 0; color: var(--sl-ink); font-size: 26px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; }
     .sl-week-grid { flex: 1 1 auto; min-height: 0; margin-top: 14px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 8px; }
+    .sl-week[data-mode="life"] .sl-week-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .sl-week-grid > .sl-message { grid-column: 1 / -1; }
     .sl-day {
       min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px; overflow: hidden;
@@ -22,6 +23,7 @@
     .sl-day.is-today { background: var(--sl-sky-today); }
     .sl-day-head { flex: none; height: 24px; margin-bottom: 2px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .sl-day-name { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--sl-text); font-size: 13px; font-weight: 700; }
+    .sl-day.is-weekend .sl-day-name { color: var(--sl-muted); }
     .sl-today-badge { padding: 1px 7px; border-radius: 999px; background: var(--sl-sky); color: #FFFFFF; font-size: 11px; font-weight: 600; white-space: nowrap; }
     .sl-day-count { flex: none; color: var(--sl-muted); font-size: 12px; white-space: nowrap; }
     .sl-day-item { flex: none; height: 28px; display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -41,7 +43,7 @@
     .sl-day-item.is-carry .sl-day-text { color: var(--sl-quiet); }
     .sl-day-item.is-carry .sl-dot-button { cursor: default; }
 
-    /* 좁은 폭(640px 미만, AGENTS.md 반응형 기준): 요일 5줄(완료 점 + 숫자) + 이번 주 요약. 위의 넓은 폭 규칙은 그대로. */
+    /* 좁은 폭(640px 미만, 일상은 7열이라 700px 미만. AGENTS.md 반응형 기준): 요일 줄(완료 점 + 숫자, 업무 5줄·일상 7줄) + 이번 주 요약. 위의 넓은 폭 규칙은 그대로. */
     .sl-week-compact { flex: 1 1 auto; min-height: 0; margin-top: 12px; display: flex; flex-direction: column; }
     .sl-week-compact[hidden], .sl-week.is-compact .sl-week-grid { display: none; }
     .sl-week.is-compact { padding: 18px 18px 16px; }
@@ -51,8 +53,11 @@
     .sl-wk-rows { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; }
     .sl-wk-rows > .sl-message { padding-top: 8px; }
     .sl-wk-row { flex: 0 1 44px; min-height: 30px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; display: flex; align-items: center; gap: 14px; }
+    /* 일상 7줄: 위젯 높이는 그대로, 줄 최소 높이만 낮춰 같은 자리에 맞춘다 */
+    .sl-week[data-mode="life"] .sl-wk-row { min-height: 20px; }
     .sl-wk-row.is-today { background: var(--sl-sky-today); }
     .sl-wk-dow { flex: none; width: 16px; color: var(--sl-text); font-size: 14px; font-weight: 700; }
+    .sl-wk-row.is-weekend .sl-wk-dow { color: var(--sl-muted); }
     .sl-wk-row.is-empty .sl-wk-dow { color: var(--sl-empty); }
     .sl-wk-dots { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
     .sl-wk-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--sl-sky); }
@@ -83,6 +88,6 @@
     <div class="sl-sr" id="live" aria-live="polite"></div>
   </main>
   <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
-  <script type="module" src="week-review.mjs?v=20261015-dots"></script>
+  <script type="module" src="week-review.mjs?v=20261018-life-week"></script>
 </body>
 </html>

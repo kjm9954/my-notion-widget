@@ -1,4 +1,4 @@
-// ③ 이번 주 한 일: 업무일지 데이터를 월~금 5칸으로 모은다. 직접 입력 없음(완료 원 체크만).
+// ③ 이번 주 한 일: 업무일지 데이터를 업무는 월~금 5칸, 일상은 월~일 7칸으로 모은다. 직접 입력 없음(완료 원 체크만).
 import { getMode, onModeChange, paintModeToggle, bindModeToggle, watchWorklog, createWorklogController,
   taskOps, toggleTarget, escapeHtml, staleText, failureText } from './sky-lime-common.mjs?v=20261015-sky-lime';
 import { weekDays, dayCountLabel, worklogToday, mondayOf, addDays, weekRangeLabel, goalNumber, isDone,
@@ -27,14 +27,16 @@ let followThisWeek = true;
 let lastSignature = '';
 
 // ───────── 좁은 폭(모바일) 레이아웃: 숫자·점 요약 ─────────
-// AGENTS.md 반응형 기준: 위젯 폭 640px 미만이면 요일 5줄(완료 점 + 숫자) + 이번 주 요약 한 줄. 그 이상은 기존 5열 그대로.
+// AGENTS.md 반응형 기준: 위젯 폭 640px 미만이면 요일 줄(완료 점 + 숫자, 업무 5줄·일상 7줄) + 이번 주 요약 한 줄. 그 이상은 요일 열.
+// 일상은 7열이라 칸이 좁아지므로 700px 미만부터 요일 줄을 쓴다.
 // 업무명·번호 원은 그리지 않는다(읽기 전용). 완료·남은 개수는 넓은 레이아웃과 같은 요일 계산(그날 업무, 이월 제외)을 쓴다.
 const COMPACT_BELOW = 640;
+const LIFE_COMPACT_BELOW = 700;
 const DOT = 12;
 const DOT_GAP = 5;
 let compact = false;
 let compactSignature = '';
-const isCompactWidth = () => document.documentElement.clientWidth < COMPACT_BELOW;
+const isCompactWidth = mode => document.documentElement.clientWidth < (mode === 'life' ? LIFE_COMPACT_BELOW : COMPACT_BELOW);
 
 // ───────── 이월 업무 (화면 계산만 한다. 업무의 date·status는 바꾸거나 저장하지 않는다) ─────────
 // 보이는 기간 = 처음 만든 날 ~ 끝난 날(완료: doneAt, 없으면 date / 미완료: 오늘). 일 모드는 주말 제외.
@@ -63,6 +65,20 @@ function withCarry(day, tasks) {
   const carry = tasks.filter(task => carriedOn(task, day.date, effectiveDay(task)))
     .sort((a, b) => (goalNumber(a) || 9) - (goalNumber(b) || 9) || qOf(a) - qOf(b) || a.order - b.order);
   return { ...day, rows:[...day.items, ...carry], carry:new Set(carry.map(task => String(task.id))) };
+}
+
+// ───────── 보이는 요일: 업무 월~금 5칸, 일상 월~일 7칸 ─────────
+// 일상의 토·일은 모델의 weekDays(시작일부터 5칸)를 토요일부터 한 번 더 불러 앞 2칸만 붙인다(같은 정렬·개수 규칙).
+const lastDayOf = mode => addDays(monday, mode === 'life' ? 6 : 4);
+function visibleDays(state, mode) {
+  const days = weekDays(state, mode, monday);
+  return mode === 'life' ? [...days, ...weekDays(state, mode, addDays(monday, 5)).slice(0, 2)] : days;
+}
+const isWeekend = day => ['토', '일'].includes(day.label);
+function rangeLabel(mode) {
+  if (mode !== 'life') return weekRangeLabel(monday);
+  const short = date => `${Number(date.slice(5, 7))}.${date.slice(8)}`;
+  return `${short(monday)} – ${short(lastDayOf(mode))}`;
 }
 
 // 이월 업무는 그 요일에 아직 끝나지 않았던 업무라 흐린 글자 + 빈 원. 원은 누를 수 없다(지난 요일에서 상태를 바꾸지 않게).
@@ -100,6 +116,14 @@ function fitDay(column, day, emptyLabel) {
     column.innerHTML = dayInner(day, limit, emptyLabel);
   }
 }
+// 칸이 좁아 머리줄이 넘칠 때만 "오늘" 배지 → 그래도 넘치면 개수 글자 순서로 화면에서 숨긴다.
+// 오늘 칸은 하늘색 배경, 완료 여부는 업무마다 채운 원·빈 원으로 보이고, 읽기 도구에는 그대로 읽힌다.
+function fitHead(column) {
+  const name = column.querySelector('.sl-day-name');
+  for (const part of [name.querySelector('.sl-today-badge'), column.querySelector('.sl-day-count')]) {
+    if (part?.textContent && name.scrollWidth > name.clientWidth + .5) part.classList.add('sl-sr');
+  }
+}
 
 // 요일 한 줄: 지난 요일은 완료 점만, 오늘은 완료 점 + 남은 업무 흰 점, 미래 요일은 점 없음.
 function compactRow(day) {
@@ -134,7 +158,7 @@ function renderCompact(state, days, mode) {
     rows.map(row => [row.done, row.open, row.count, row.day.total]), weekDone, goals.length, goalsDone]);
   if (signature === compactSignature) return;
   compactSignature = signature;
-  weekRowsEl.innerHTML = rows.map(row => `<div class="sl-wk-row is-${row.when}${row.day.total ? '' : ' is-empty'}" data-date="${row.day.date}" aria-label="${row.label}">`
+  weekRowsEl.innerHTML = rows.map(row => `<div class="sl-wk-row is-${row.when}${row.day.total ? '' : ' is-empty'}${isWeekend(row.day) ? ' is-weekend' : ''}" data-date="${row.day.date}" aria-label="${row.label}">`
     + `<span class="sl-wk-dow" aria-hidden="true">${row.day.label}</span><span class="sl-wk-dots" aria-hidden="true"></span>`
     + `<span class="sl-wk-count" aria-hidden="true">${row.count}</span></div>`).join('');
   rows.forEach((row, index) => paintDots(weekRowsEl.children[index].querySelector('.sl-wk-dots'), row.dots, row.open));
@@ -153,9 +177,10 @@ function setCompact(next) {
 
 function render() {
   const mode = getMode();
+  setCompact(isCompactWidth(mode));
   paintModeToggle(toggleEl, mode);
-  rangeEl.textContent = weekRangeLabel(monday);
-  rangeEl.setAttribute('aria-label', `${monday}부터 ${addDays(monday, 4)}까지`);
+  rangeEl.textContent = rangeLabel(mode);
+  rangeEl.setAttribute('aria-label', `${monday}부터 ${lastDayOf(mode)}까지`);
   const state = controller.view();
   const error = controller.error;
   noticeEl.textContent = state && error ? staleText(error) : '';
@@ -173,15 +198,18 @@ function render() {
     return;
   }
   const tasks = orderedTasks(state).filter(task => modeOf(task) === mode);
-  const days = weekDays(state, mode, monday).map(day => withCarry(day, tasks));
+  const days = visibleDays(state, mode).map(day => withCarry(day, tasks));
   if (compact) { renderCompact(state, days, mode); return; }
   const signature = JSON.stringify([mode, today, monday, daysEl.clientHeight,
     days.map(day => day.rows.map(task => [task.id, task.title, isDone(task), goalNumber(task), day.carry.has(String(task.id))]))]);
   if (signature === lastSignature) return;
   lastSignature = signature;
-  daysEl.innerHTML = days.map(day => `<section class="sl-day${day.date === today ? ' is-today' : ''}" data-date="${day.date}" aria-label="${day.label}요일"></section>`).join('');
+  daysEl.innerHTML = days.map(day => `<section class="sl-day${day.date === today ? ' is-today' : ''}${isWeekend(day) ? ' is-weekend' : ''}" data-date="${day.date}" aria-label="${day.label}요일"></section>`).join('');
   const emptyLabel = mode === 'life' ? '일상 없음' : '업무 없음';
-  days.forEach((day, index) => fitDay(daysEl.children[index], day, emptyLabel));
+  days.forEach((day, index) => {
+    fitDay(daysEl.children[index], day, emptyLabel);
+    fitHead(daysEl.children[index]);
+  });
 }
 
 app.addEventListener('click', event => {
@@ -202,10 +230,11 @@ app.addEventListener('click', event => {
 bindModeToggle(app);
 onModeChange(render);
 new ResizeObserver(() => { lastSignature = ''; render(); }).observe(daysEl);
-// 폭이 바뀌면(창 크기 조절·기기 회전) 새로고침 없이 두 레이아웃을 바꾼다. 줄 폭이 바뀌면 점 개수를 다시 센다.
-new ResizeObserver(() => { setCompact(isCompactWidth()); render(); }).observe(app);
-setCompact(isCompactWidth());
+// 폭이 바뀌면(창 크기 조절·기기 회전) 새로고침 없이 두 레이아웃을 바꾼다(render가 폭·모드로 고른다). 줄 폭이 바뀌면 점 개수를 다시 센다.
+new ResizeObserver(() => render()).observe(app);
 render();
+// 글꼴이 늦게 들어오면 머리줄 폭이 달라지므로 "오늘" 배지·개수 글자 숨김 판단을 다시 한다.
+document.fonts?.ready.then(() => { lastSignature = ''; render(); });
 controller.load();
 watchWorklog(() => controller.load());
 setInterval(() => {
