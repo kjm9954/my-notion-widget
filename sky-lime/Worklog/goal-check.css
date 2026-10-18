@@ -1,0 +1,25 @@
+/* 목표 체크 위젯 3종 공통(분기 진행도 · 분기 목표 · 습관 점검). 수치는 시안 값, 색은 sky-lime 기존 변수.
+   카드 높이는 고정: PC(700px 이상)와 모바일 값이 다르다. 임베드가 더 높으면 카드는 위에 붙고 아래는 투명. */
+:root {
+  /* 시안의 경과율 띠(LAG) 색 */
+  --gc-lag: oklch(0.93 0.035 235);
+}
+.gc-root {
+  height: min(100%, var(--gc-h-pc));
+  padding: 22px 24px 20px;
+}
+/* hidden 속성은 부품의 display 값보다 우선한다. */
+.gc-root [hidden] { display: none !important; }
+.gc-head { flex: none; height: 26px; }
+.gc-title { margin: 0; color: var(--sl-ink); font-size: 17px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+.gc-message { margin: 0; color: var(--sl-hint); font-size: 13.5px; line-height: 1.5; }
+.sl-arrow:disabled { color: var(--sl-line-dash); cursor: default; }
+@media (hover: hover) {
+  .sl-arrow:disabled:hover { background: transparent; color: var(--sl-line-dash); }
+}
+@media (max-width: 699.98px) {
+  .gc-root { height: min(100%, var(--gc-h-m)); padding: 18px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gc-root *, .gc-root *::before, .gc-root *::after { transition: none !important; }
+}

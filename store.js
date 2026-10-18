@@ -8,6 +8,8 @@ const SHARED_READ_INTERVAL_MS = 120000;
 const GOALS_READ_INTERVAL_MS = 300000;
 const WIDGET_LAYOUT_CACHE_MS = 600000;
 const WIDGET_LAYOUT_PATH = '/api/widget-layout';
+const QUARTER_GOALS_STATE_PATH = "/api/quarter-goals/state";
+const QUARTER_GOALS_PATCH_PATH = "/api/quarter-goals/patch";
 // New independent sets opt in. Never inherit or publish a legacy instance key.
 const ISOLATED_INSTANCE = document.currentScript?.hasAttribute('data-store-isolated') === true
   || new URLSearchParams(window.location.search || '').get('isolated') === '1';
@@ -512,6 +514,7 @@ function invalidateApiGet(path) {
 function sharedReadAge(path) {
   if (!COALESCE_READS) return 0;
   if (path === "/api/weekly-goals/state") return GOALS_READ_INTERVAL_MS;
+  if (path.startsWith(QUARTER_GOALS_STATE_PATH + "?")) return SHARED_READ_INTERVAL_MS;
   return ["/api/worklog/state", "/api/notes/state"].includes(path) ? SHARED_READ_INTERVAL_MS : 0;
 }
 
@@ -645,7 +648,8 @@ async function apiPost(path, body, includeInstance = true, instanceId = WIDGET_I
   const url = apiUrl(path, includeInstance, instanceId);
   const statePath = path.startsWith("/api/worklog/") ? "/api/worklog/state"
     : path.startsWith("/api/notes/") ? "/api/notes/state"
-      : path === "/api/weekly-goals/state" ? path : null;
+      : path === "/api/weekly-goals/state" ? path
+        : path === QUARTER_GOALS_PATCH_PATH ? quarterGoalsStatePath(body?.mode, body?.quarter) : null;
   const stateUrl = statePath ? apiUrl(statePath, includeInstance, instanceId) : null;
   const perform = async () => {
     try {
@@ -939,6 +943,18 @@ async function saveWeeklyGoalsState(state) {
   return (await apiPost("/api/weekly-goals/state", state)).data;
 }
 
+// ───────── 분기 목표 · 습관 점검 ─────────
+// 인스턴스 + 업무/일상 + 분기("2026-Q4")마다 한 덩어리. 저장 응답(전체 상태)이 같은 분기 조회 캐시를 바로 갱신한다.
+function quarterGoalsStatePath(mode, quarter) {
+  return `${QUARTER_GOALS_STATE_PATH}?mode=${encodeURIComponent(mode)}&quarter=${encodeURIComponent(quarter)}`;
+}
+async function loadQuarterGoals(mode, quarter) {
+  return (await apiGetFresh(quarterGoalsStatePath(mode, quarter))).data;
+}
+async function patchQuarterGoals(mode, quarter, ops) {
+  return (await apiPost(QUARTER_GOALS_PATCH_PATH, { mode, quarter, ops })).data;
+}
+
 // ───────── 메모장 ─────────
 async function loadNotesState() {
   if (COALESCE_READS) return (await apiGetFresh("/api/notes/state")).data;
@@ -1107,6 +1123,7 @@ window.Store = {
   loadImportantCalendarState, saveImportantCalendarState,
   loadWeeklyGoalsState, saveWeeklyGoalsState,
   loadNotesState, saveNotesState, patchNotesState,
+  loadQuarterGoals, patchQuarterGoals,
   loadSchedules, createSchedule, updateSchedule, skipScheduleOccurrence, deleteSchedule,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
   watch,

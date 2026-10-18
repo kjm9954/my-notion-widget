@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>분기 진행도</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="goal-check.css?v=20261018-goal-check">
+  <style>
+    /* 시안: PC 124px · 모바일 112px. 1줄 ‹ 분기 › | 업무/일상, 2줄 큰 % → 6px 막대 → D-n. 읽기 전용. */
+    .gc-progress { --gc-h-pc: 124px; --gc-h-m: 112px; }
+    .gc-progress .sl-title-wrap { align-items: center; }
+    .gc-row { flex: 1; min-height: 0; display: flex; align-items: center; gap: 16px; }
+    .gc-big { flex: none; color: var(--sl-ink); font-size: 32px; font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .gc-bar { position: relative; flex: 1; min-width: 0; height: 6px; overflow: hidden; border-radius: 3px; background: var(--sl-track); }
+    .gc-lag { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--gc-lag); }
+    .gc-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 3px; background: var(--sl-sky); transition: width .3s ease; }
+    .gc-dday { flex: none; color: var(--sl-muted); font-size: 13px; white-space: nowrap; }
+    .gc-progress[data-status="loading"] .gc-row { visibility: hidden; }
+    .gc-progress .gc-message { flex: 1; display: none; align-items: center; }
+    .gc-progress[data-status="error"] .gc-row { display: none; }
+    .gc-progress[data-status="error"] .gc-message { display: flex; }
+    @media (max-width: 699.98px) {
+      .gc-row { gap: 12px; }
+      .gc-big { font-size: 26px; }
+    }
+  </style>
+  <script src="../../store.js?v=20261018-quarter-goals" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root gc-root gc-progress" id="app" data-status="loading" aria-label="분기 진행도">
+    <div class="sl-head-row gc-head">
+      <div class="sl-title-wrap">
+        <div class="sl-nav">
+          <button class="sl-arrow" type="button" data-shift="-1" aria-label="이전 분기">‹</button>
+          <span class="sl-nav-label" id="quarter"></span>
+          <button class="sl-arrow" type="button" data-shift="1" aria-label="다음 분기">›</button>
+        </div>
+        <span class="sl-notice" id="notice"></span>
+      </div>
+      <div id="modeToggle"></div>
+    </div>
+    <div class="gc-row" id="row">
+      <span class="gc-big" id="percent">0%</span>
+      <div class="gc-bar" role="presentation"><div class="gc-lag" id="lag"></div><div class="gc-fill" id="fill"></div></div>
+      <span class="gc-dday" id="dday"></span>
+    </div>
+    <p class="gc-message" id="message"></p>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="quarter-progress.mjs?v=20261018-goal-check"></script>
+</body>
+</html>
