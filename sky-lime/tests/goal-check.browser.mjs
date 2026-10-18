@@ -47,8 +47,16 @@ const HABITS = () => [
   habit('h4', 4, '테스트 습관 넷', ['bad', null, null]),
   habit('h5', 5, '테스트 습관 다섯', [null, null, null])
 ];
+// 같은 키의 업무일지 위젯(이번 주 목표·업무일지)이 읽는 테스트 업무. 목표 체크 위젯은 이 데이터를 읽거나 쓰지 않는다.
+const workTask = (id, extra = {}) => ({ id, mode:'work', date:'2026-11-27', proj:'', q:null, title:`테스트 업무 ${id}`, due:null, start:null, end:null,
+  progress:null, est:null, status:'doing', done:false, doneAt:null, goalId:null, memo:'', rolledFrom:null, progressTouched:false, ...extra });
+const worklogFixture = () => ({ revision:1, mode:'work', workView:'time', projects:[], lastRollDay:'2026-11-28', lastRollWeek:'2026-W48', lastRollCount:0,
+  bannerDismissedDay:'', bannerDismissedWeek:'', manualOrder:{}, columnSplit:{ work:.73, life:6 / 11 },
+  lastUsed:{ work:{ proj:'미분류', q:null }, life:{ proj:'미분류', q:null } },
+  tasks:[workTask('t1', { goalId:'worklog:goal:1' }), workTask('t2'), workTask('t3', { mode:'life', title:'테스트 일상 업무', goalId:'worklog:goal:1' })] });
 function fixture({ goals = 3, habits = 3 } = {}) {
   return {
+    worklog:worklogFixture(),
     rows:{
       'work:2026-Q4':{ goals:GOALS().slice(0, goals), habits:HABITS().slice(0, habits) },
       'life:2026-Q4':{ goals:[goal('l1', 1, '일상 목표 하나', { pct:60 })], habits:[habit('k1', 1, '일상 습관 하나', ['good', null, null])] },
@@ -115,7 +123,11 @@ async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }
   const context = await browser.newContext({ viewport, timezoneId:'Asia/Seoul', serviceWorkers:'block', ...(mobile ? { isMobile:true, hasTouch:true, deviceScaleFactor:2 } : {}) });
   await context.clock.setFixedTime(now);
   const d1 = {};
-  if (realServer) for (const [key, db] of Object.entries(dbs)) { d1[key] = await realD1(); await seedReal(d1[key], db, key); }
+  // 실제 서버 모듈일 때는 모든 키가 한 표를 함께 쓴다(키별로 행이 나뉘는지까지 확인).
+  if (realServer) {
+    const shared = await realD1();
+    for (const [key, db] of Object.entries(dbs)) { d1[key] = shared; await seedReal(shared, db, key); }
+  }
   const errors = [];
   const external = [];
   context.on('page', page => {
@@ -140,13 +152,22 @@ async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }
       if (request.method() === 'OPTIONS') return route.fulfill({ status:204, headers });
       const instance = url.searchParams.get('w');
       const db = dbs[instance];
-      const entry = { path:url.pathname, method:request.method(), instance, search:url.search };
+      const entry = { path:url.pathname, method:request.method(), instance, search:url.search, page:request.frame()?.url() || '' };
       if (!db) { (dbs.__unknown ||= []).push(entry); return route.fulfill({ status:404, headers, json:{ ok:false, error:'unknown fixture instance' } }); }
       db.requests.push(entry);
       if (db.fail) return route.fulfill({ status:503, headers, json:{ ok:false, error:'offline fixture' } });
       // 저장 기록은 서버 처리가 끝난 뒤에 남긴다(테스트가 기록 수로 저장 완료를 기다린다).
       const post = request.method() === 'POST';
       if (post) entry.body = request.postDataJSON();
+      if (!url.pathname.startsWith('/api/quarter-goals/')) {
+        // 업무일지 위젯용(읽기만). 이 테스트에서 업무일지 쓰기가 오면 실패로 남긴다.
+        if (post) { db.writes.push(entry); return route.fulfill({ status:500, headers, json:{ ok:false, error:'unexpected worklog write' } }); }
+        const data = url.pathname === '/api/worklog/state' ? db.worklog
+          : url.pathname === '/api/worklog/revision' ? { revision:db.worklog.revision, day:'2026-11-28' }
+            : url.pathname === '/api/widget-layout' ? { layouts:{} } : null;
+        if (!data) throw new Error(`예상하지 못한 요청 ${request.method()} ${url.pathname}`);
+        return route.fulfill({ headers, json:{ ok:true, data:structuredClone(data) } });
+      }
       if (realServer) {
         const response = await realServer.handleQuarterGoals(new Request(url, { method:request.method(), body:post ? request.postData() : undefined }), d1[instance], now.getTime());
         const body = await response.text();
@@ -177,11 +198,11 @@ async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }
     await page.evaluate(() => document.fonts.ready);
     return page;
   }
-  async function preview({ width = 1320, key = KEY } = {}) {
+  async function preview({ width = 1320, key = KEY, withWorklog = false } = {}) {
     const page = await context.newPage();
     await page.setViewportSize({ width, height:1000 });
-    await page.goto(`${origin}/__preview?width=${width}&w=${key}`);
-    for (const kind of Object.keys(FILES)) {
+    await page.goto(`${origin}/__preview?width=${width}&w=${key}${withWorklog ? '&with=worklog' : ''}`);
+    for (const kind of [...Object.keys(FILES), ...(withWorklog ? ['weekly', 'worklog'] : [])]) {
       await page.frameLocator(`#${kind}`).locator('#app[data-status="ready"]').waitFor();
     }
     await page.evaluate(() => document.fonts.ready);
@@ -200,14 +221,18 @@ async function setup(browser, { dbs = { [KEY]:fixture(), [OTHER_KEY]:fixture() }
 function previewHtml(url) {
   const width = Number(url.searchParams.get('width')) || 1320;
   const key = url.searchParams.get('w') || KEY;
+  const withWorklog = url.searchParams.get('with') === 'worklog';
   const mobile = width < 700;
   const pad = mobile ? '20px 14px 28px' : '36px 40px 44px';
   const heights = HEIGHTS[mobile ? 'mobile' : 'pc'];
   const frame = kind => `<iframe id="${kind}" title="${kind}" src="${prefix}${FILES[kind]}.html?w=${key}" style="display:block;width:100%;height:${heights[kind]}px;border:0"></iframe>`;
+  // 같은 키의 업무일지 페이지 위젯(이번 주 목표 214px · 업무일지 900px)
+  const worklog = withWorklog ? `<iframe id="weekly" title="weekly" src="${prefix}weekly-goals.html?w=${key}" style="display:block;width:100%;height:214px;border:0"></iframe>`
+    + `<iframe id="worklog" title="worklog" src="${prefix}worklog-sky-lime.html?w=${key}" style="display:block;width:100%;height:900px;border:0"></iframe>` : '';
   return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#FFFFFF;font-family:"Pretendard Variable",sans-serif}
     .page{box-sizing:border-box;width:${width}px;padding:${pad};display:flex;flex-direction:column;gap:16px}
     h1{margin:0;padding:0 4px 4px;font-size:${mobile ? 24 : 30}px;font-weight:700;letter-spacing:-.03em;color:#1F1F1D}</style>
-    <style>${FONT_CSS}</style></head><body><div class="page"><h1>목표 체크</h1>${frame('progress')}${frame('goals')}${frame('habits')}</div></body></html>`;
+    <style>${FONT_CSS}</style></head><body><div class="page"><h1>목표 체크</h1>${frame('progress')}${frame('goals')}${frame('habits')}${worklog}</div></body></html>`;
 }
 
 const browser = await chromium.launch();
@@ -622,6 +647,77 @@ test('세 위젯(서로 다른 iframe) 분기·업무/일상 연동, 저장이 �
   const keys = await frame('progress').locator('body').evaluate(() => Object.keys(localStorage).sort());
   assert.deepEqual(keys, [`sky-lime-goal-quarter-v1:${KEY}`, `sky-lime-worklog-mode-v1:${KEY}`].sort());
   assert.deepEqual(h.external, []);
+  assert.deepEqual(h.errors, []);
+  await h.context.close();
+});
+
+test('같은 키: 업무일지 위젯과 업무/일상 전환이 함께 바뀌고, 데이터는 서로 읽거나 쓰지 않는다', { timeout:120000 }, async () => {
+  const h = await setup(browser);
+  const page = await h.preview({ width:1320, withWorklog:true });
+  const frame = id => page.frameLocator(`#${id}`);
+  const modeOf = id => frame(id).locator('#app').getAttribute('data-mode');
+  const all = ['progress', 'goals', 'habits', 'weekly', 'worklog'];
+  assert.deepEqual(await Promise.all(all.map(modeOf)), ['work', 'work', 'work', 'work', 'work']);
+  // 목표 체크에서 일상으로 → 업무일지 위젯도 일상
+  await frame('progress').locator('[data-mode="life"]').click();
+  for (const id of all) await frame(id).locator('#app[data-mode="life"]').waitFor();
+  // 업무일지에서 업무로 → 목표 체크 세 위젯도 업무
+  await frame('worklog').locator('#modeToggle [data-mode="work"]').click();
+  for (const id of all) await frame(id).locator('#app[data-mode="work"]').waitFor();
+  // 목표 체크에서 저장해도 업무일지 데이터는 그대로
+  const before = JSON.stringify(h.dbs[KEY].worklog);
+  await frame('goals').locator('#goalInput').fill('같은 키 연동 확인 목표');
+  await frame('goals').locator('#goalInput').press('Enter');
+  await waitSaved(h, 1);
+  await frame('progress').locator('#percent').filter({ hasNotText:'52%' }).waitFor();
+  assert.equal(JSON.stringify(h.dbs[KEY].worklog), before, '업무일지 데이터 무변경');
+  // 모든 요청은 같은 키 · 목표 체크는 분기 목표 API만, 업무일지 위젯은 업무일지 API만
+  const requests = h.dbs[KEY].requests;
+  assert.ok(requests.every(entry => entry.instance === KEY));
+  const goalCheck = requests.filter(entry => /quarter-progress|quarter-goals|habit-check/.test(entry.page));
+  const worklog = requests.filter(entry => /weekly-goals|worklog-sky-lime/.test(entry.page));
+  assert.ok(goalCheck.length && goalCheck.every(entry => entry.path.startsWith('/api/quarter-goals/')), JSON.stringify(goalCheck.map(entry => entry.path)));
+  assert.ok(worklog.length && worklog.every(entry => entry.path.startsWith('/api/worklog/') || entry.path === '/api/widget-layout'), JSON.stringify(worklog.map(entry => entry.path)));
+  assert.deepEqual(h.dbs[KEY].writes.map(entry => entry.path), ['/api/quarter-goals/patch']);
+  assert.deepEqual(h.external, []);
+  assert.deepEqual(h.errors, []);
+  await h.context.close();
+});
+
+test('다른 키: 분기 목표·습관 데이터와 분기·업무/일상 선택이 섞이지 않는다', { timeout:120000 }, async () => {
+  const other = fixture({ goals:0, habits:0 });
+  other.rows = { 'work:2026-Q4':{ goals:[goal('o1', 1, '다른 키 목표', { pct:70 })], habits:[habit('oh1', 1, '다른 키 습관', ['good', null, null])] } };
+  const h = await setup(browser, { dbs:{ [KEY]:fixture(), [OTHER_KEY]:other } });
+  const mine = await h.preview({ width:1320, key:KEY });
+  const theirs = await h.preview({ width:1320, key:OTHER_KEY });
+  const ids = (page, kind, selector, attr) => page.frameLocator(`#${kind}`).locator(selector).evaluateAll((nodes, name) => nodes.map(node => node.dataset[name]), attr);
+  assert.deepEqual(await ids(mine, 'goals', '[data-goal]', 'goal'), ['g1', 'g2', 'g3']);
+  assert.deepEqual(await ids(theirs, 'goals', '[data-goal]', 'goal'), ['o1']);
+  assert.deepEqual(await ids(theirs, 'habits', '[data-habit-card]', 'habitCard'), ['oh1']);
+  assert.equal(await theirs.frameLocator('#progress').locator('#percent').textContent(), '85%');
+  // 다른 키에서 추가·체크 → 내 키 데이터는 그대로
+  const mineBefore = JSON.stringify(h.state(KEY));
+  await theirs.frameLocator('#goals').locator('#goalInput').fill('다른 키에만 추가');
+  await theirs.frameLocator('#goals').locator('#goalInput').press('Enter');
+  await theirs.frameLocator('#goals').locator('[data-goal]').nth(1).waitFor();
+  await new Promise(done => setTimeout(done, 300));
+  assert.equal(JSON.stringify(h.state(KEY)), mineBefore, '내 키 무변경');
+  assert.deepEqual(h.state(OTHER_KEY).goals.map(item => item.title), ['다른 키 목표', '다른 키에만 추가']);
+  // 다른 키에서 일상·지난 분기로 바꿔도 내 키 위젯은 업무 · 이번 분기
+  await theirs.frameLocator('#progress').locator('[data-mode="life"]').click();
+  await theirs.frameLocator('#progress').locator('[data-shift="-1"]').click();
+  await theirs.frameLocator('#habits').locator('#app[data-mode="life"][data-quarter="2026-Q3"]').waitFor();
+  await mine.waitForTimeout(400);
+  for (const kind of Object.keys(FILES)) {
+    const app = mine.frameLocator(`#${kind}`).locator('#app');
+    assert.deepEqual([await app.getAttribute('data-mode'), await app.getAttribute('data-quarter')], ['work', '2026-Q4'], kind);
+  }
+  assert.deepEqual(await ids(mine, 'goals', '[data-goal]', 'goal'), ['g1', 'g2', 'g3']);
+  // 요청은 각자 자기 키로만
+  const pagesOf = key => h.dbs[key].requests.map(entry => new URL(entry.page).searchParams.get('w'));
+  assert.ok(pagesOf(KEY).every(value => value === KEY));
+  assert.ok(pagesOf(OTHER_KEY).every(value => value === OTHER_KEY));
+  assert.deepEqual(h.dbs[KEY].writes, []);
   assert.deepEqual(h.errors, []);
   await h.context.close();
 });
