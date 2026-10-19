@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>핵심 모아보기</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="feedback.css?v=20261019-feedback">
+  <style>
+    /* 시안: 고정 300px. PC 3칸 · 모바일 1칸, 한 칸 80px. 높이에 들어가는 만큼만(PC 2줄 = 6개). 읽기 전용. */
+    .fb-keys { --fb-h: 300px; }
+    .fb-keys .fb-message { padding: 16px 2px; }
+    .fb-grid { flex: 1; min-height: 0; margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 80px; gap: 8px; align-content: start; }
+    .fb-key {
+      min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 14px;
+      border: 0; border-radius: var(--sl-r-lane); background: var(--sl-cell); text-align: left; transition: background .12s;
+    }
+    @media (hover: hover) { .fb-key:hover { background: var(--sl-seg); } }
+    .fb-key-text {
+      color: var(--sl-ink); font-size: 14px; font-weight: 600; line-height: 1.45; letter-spacing: -.01em;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere;
+    }
+    .fb-key-meta { overflow: hidden; color: var(--sl-faint); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    @media (max-width: 499.98px) {
+      .fb-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+  <script src="../../store.js?v=20261019-meeting-notes" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root fb-root fb-fixed fb-keys" id="app" data-status="loading" aria-label="핵심 모아보기">
+    <div class="fb-head"><div class="sl-title-wrap"><h1 class="fb-title">핵심 모아보기</h1><span class="sl-notice" id="notice"></span></div></div>
+    <p class="fb-message" id="message">불러오는 중이에요</p>
+    <div class="fb-grid" id="grid"></div>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="feedback-keys.mjs?v=20261019-feedback"></script>
+</body>
+</html>

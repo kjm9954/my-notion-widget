@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>면담 기록</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="feedback.css?v=20261019-feedback">
+  <style>
+    /* 시안: 임베드 높이 100%(권장 최소 360px · 기준 700px). 목록 한 줄 48px + 간격 6px, 들어가는 만큼만.
+       맨 아래 입력 줄 고정. 상세 팝업은 위젯 안에서 열리고 스크롤 없음(PC 최대 폭 560px, 모바일은 위젯 전체). */
+    .fb-notes { height: 100%; }
+    .fb-list { flex: 1; min-height: 0; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+    .fb-row {
+      flex: none; width: 100%; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+      border: 0; border-radius: var(--sl-r-lane); background: var(--sl-cell); text-align: left; transition: background .12s;
+    }
+    @media (hover: hover) { .fb-row:hover { background: var(--sl-seg); } }
+    .fb-row-date { flex: none; width: 38px; color: var(--sl-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .fb-row.is-next .fb-row-date { color: var(--sl-badge-ink); font-weight: 600; }
+    .fb-next { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--sl-badge-bg); color: var(--sl-badge-ink); font-size: 11px; font-weight: 600; }
+    .fb-row-title { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 14px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
+    .fb-row-stars { flex: none; color: var(--sl-faint); font-size: 12px; white-space: nowrap; }
+    .fb-row-todo { flex: none; color: var(--sl-badge-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .fb-add { flex: none; margin-top: 14px; height: 40px; display: flex; gap: 8px; }
+    .fb-add-input {
+      flex: 1; min-width: 0; height: 100%; padding: 0 14px; border: 0; border-radius: var(--sl-r-row);
+      background: var(--sl-field); color: var(--sl-ink); font-size: 14px; outline: none;
+    }
+    .fb-add-button {
+      flex: none; height: 100%; padding: 0 16px; border: 0; border-radius: var(--sl-r-row);
+      background: var(--sl-sky-button); color: #FFFFFF; font-size: 13px; font-weight: 600;
+    }
+    .fb-add-button:disabled, .fb-add-input:disabled { cursor: default; opacity: .6; }
+    @media (hover: hover) { .fb-add-button:not(:disabled):hover { background: var(--sl-sky-button-hover); } }
+
+    /* 상세 팝업 */
+    .fb-layer { position: absolute; inset: 0; z-index: 10; display: flex; justify-content: center; padding: 16px; background: var(--sl-overlay); }
+    .fb-pop {
+      width: 100%; max-width: 560px; height: 100%; overflow: hidden; display: flex; flex-direction: column;
+      padding: 20px 24px 18px; border-radius: var(--sl-r-root); background: var(--sl-surface); box-shadow: var(--sl-shadow-panel);
+    }
+    .fb-pop input { min-width: 0; border: 0; background: transparent; padding: 0; outline: none; text-overflow: ellipsis; }
+    .fb-pop input:read-only { cursor: default; }
+    .fb-pop-head { flex: none; display: flex; align-items: center; gap: 10px; height: 30px; }
+    .fb-pop-title { flex: 1; height: 30px; color: var(--sl-ink); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+    .fb-todo-button { flex: none; padding: 4px 10px; border: 0; border-radius: 999px; background: var(--sl-seg); color: var(--sl-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .fb-todo-button.is-left { background: var(--sl-badge-bg); color: var(--sl-badge-ink); }
+    .fb-close {
+      flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--sl-r-chip);
+      background: transparent; color: var(--sl-arrow); font-size: 15px; line-height: 1;
+    }
+    @media (hover: hover) { .fb-close:hover { background: var(--sl-seg); color: var(--sl-deep); } }
+    .fb-meta { flex: none; display: flex; align-items: center; gap: 6px; height: 22px; margin-top: 4px; color: var(--sl-muted); font-size: 12.5px; }
+    .fb-date-input { flex: none; width: 118px; height: 22px; color: var(--sl-muted); font-size: 12.5px; }
+    .fb-who-wrap { position: relative; flex: 1; min-width: 0; }
+    .fb-who { width: 100%; max-width: 200px; height: 22px; color: var(--sl-secondary); font-size: 12.5px; font-weight: 600; }
+    .fb-sug {
+      position: absolute; left: -8px; top: 26px; z-index: 5; min-width: 160px; padding: 4px; background: var(--sl-surface);
+      border: 1px solid var(--sl-line-panel); border-radius: var(--sl-r-card); box-shadow: var(--sl-shadow-tip);
+    }
+    .fb-sug-item { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: var(--sl-r-chip); background: transparent; color: var(--sl-text); font-size: 13px; text-align: left; white-space: nowrap; }
+    .fb-sug-item.is-first { background: var(--sl-field); }
+    @media (hover: hover) { .fb-sug-item:hover { background: var(--sl-field); } }
+    .fb-topic { flex: none; display: flex; align-items: center; gap: 8px; height: 30px; margin-top: 18px; }
+    .fb-topic-name { flex: 1; height: 30px; color: var(--sl-ink); font-size: 15.5px; font-weight: 700; }
+    .fb-topic-del { flex: none; padding: 0 4px; border: 0; background: none; color: var(--sl-arrow); font-size: 12px; visibility: hidden; }
+    @media (hover: hover) { .fb-topic.can-delete:hover .fb-topic-del { visibility: visible; } }
+    .fb-pager { flex: none; display: flex; align-items: center; color: var(--sl-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    .fb-pager button { width: 24px; height: 26px; padding: 0; border: 0; border-radius: var(--sl-r-seg-button); background: transparent; color: var(--sl-secondary); font-size: 16px; }
+    .fb-pager button:disabled { color: var(--sl-line-dash); cursor: default; }
+    @media (hover: hover) { .fb-pager button:not(:disabled):hover { background: var(--sl-seg); } }
+    .fb-say { flex: none; display: flex; align-items: center; gap: 10px; height: 28px; margin-top: 4px; }
+    .fb-say-label { flex: none; color: var(--sl-faint); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .fb-say-input { flex: 1; height: 28px; color: var(--sl-secondary); font-size: 13.5px; }
+    .fb-lines { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 2px; }
+    .fb-line {
+      flex: none; display: flex; align-items: center; gap: 4px; height: 28px; margin: 0 -6px; padding: 0 6px;
+      border-radius: 6px; background: transparent; transition: background .6s ease; touch-action: pan-y;
+    }
+    .fb-line.is-hl { background: var(--fb-hl); transition: none; }
+    .fb-mark { flex: none; width: 18px; height: 28px; padding: 0; border: 0; background: none; color: var(--sl-quiet); font-size: 20px; line-height: 1; }
+    .fb-line.is-key .fb-mark { color: var(--sl-sky-button); font-size: 12px; }
+    .fb-line-input { flex: 1; height: 28px; color: var(--sl-text); font-size: 14px; }
+    .fb-line.is-key .fb-line-input { color: var(--sl-badge-ink); font-weight: 700; }
+    .fb-x { flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--sl-check); font-size: 12px; line-height: 1; opacity: 0; pointer-events: none; }
+    @media (hover: hover) {
+      .fb-line:hover .fb-x, .fb-todo:hover .fb-x { opacity: 1; pointer-events: auto; }
+      .fb-x:hover { color: var(--sl-secondary); }
+    }
+    .fb-more-line { flex: none; align-self: flex-start; height: 28px; margin-left: 18px; padding: 0; border: 0; background: none; color: var(--sl-arrow); font-size: 12.5px; font-weight: 600; }
+    .fb-more-line.is-full { font-weight: 400; }
+    @media (hover: hover) { .fb-more-line:hover, .fb-plus:hover { color: var(--sl-badge-ink); } }
+    .fb-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 24px; margin-top: 10px; }
+    .fb-plus { flex: none; padding: 0; border: 0; background: none; color: var(--sl-arrow); font-size: 12.5px; font-weight: 600; }
+    .fb-conflict { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-arrow); font-size: 12px; text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+    .fb-delete-note { flex: none; padding: 0; border: 0; background: none; color: var(--sl-delete); font-size: 12px; }
+    .fb-delete-note.is-armed { color: var(--sl-secondary); }
+    @media (hover: hover) { .fb-delete-note:hover { color: var(--sl-secondary); } }
+    /* 할 일 화면 */
+    .fb-back { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--sl-ink); font-size: 17px; font-weight: 700; text-align: left; }
+    .fb-back-arrow { color: var(--sl-muted); font-size: 16px; }
+    .fb-sub { flex: none; margin-top: 4px; overflow: hidden; color: var(--sl-muted); font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; }
+    .fb-todos { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
+    .fb-todo { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; touch-action: pan-y; }
+    .fb-todo .sl-check { margin: -5px; }
+    .fb-todo-input { flex: 1; height: 30px; color: var(--sl-text); font-size: 14px; }
+    .fb-todo.is-done .fb-todo-input { color: var(--sl-arrow); text-decoration: line-through; }
+    .fb-todos .fb-plus { align-self: flex-start; height: 32px; margin-left: 28px; }
+
+    @media (max-width: 499.98px) {
+      .fb-add { height: 44px; }
+      .fb-layer { padding: 0; }
+      .fb-pop { max-width: 100%; padding: 18px 16px 16px; }
+    }
+  </style>
+  <script src="../../store.js?v=20261019-meeting-notes" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root fb-root fb-notes" id="app" data-status="loading" aria-label="면담 기록">
+    <div class="fb-head"><div class="sl-title-wrap"><h1 class="fb-title">면담 기록</h1><span class="sl-notice" id="notice"></span></div></div>
+    <div class="fb-list" id="list"><p class="fb-message">불러오는 중이에요</p></div>
+    <div class="fb-add">
+      <input class="fb-add-input" id="titleInput" type="text" placeholder="면담 제목" maxlength="120" aria-label="면담 제목" autocomplete="off">
+      <button class="fb-add-button" id="addButton" type="button">추가</button>
+    </div>
+    <div class="fb-layer" id="layer" hidden>
+      <section class="fb-pop" id="pop" role="dialog" aria-modal="true" aria-label="면담 기록 자세히"></section>
+    </div>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="meeting-notes.mjs?v=20261019-feedback"></script>
+</body>
+</html>

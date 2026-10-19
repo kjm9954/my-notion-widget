@@ -10,6 +10,8 @@ const WIDGET_LAYOUT_CACHE_MS = 600000;
 const WIDGET_LAYOUT_PATH = '/api/widget-layout';
 const QUARTER_GOALS_STATE_PATH = "/api/quarter-goals/state";
 const QUARTER_GOALS_PATCH_PATH = "/api/quarter-goals/patch";
+const MEETING_NOTES_ALL_PATH = "/api/meeting-notes/all";
+const MEETING_NOTES_REVISION_PATH = "/api/meeting-notes/revision";
 // New independent sets opt in. Never inherit or publish a legacy instance key.
 const ISOLATED_INSTANCE = document.currentScript?.hasAttribute('data-store-isolated') === true
   || new URLSearchParams(window.location.search || '').get('isolated') === '1';
@@ -515,6 +517,7 @@ function sharedReadAge(path) {
   if (!COALESCE_READS) return 0;
   if (path === "/api/weekly-goals/state") return GOALS_READ_INTERVAL_MS;
   if (path.startsWith(QUARTER_GOALS_STATE_PATH + "?")) return SHARED_READ_INTERVAL_MS;
+  if (path === MEETING_NOTES_ALL_PATH) return SHARED_READ_INTERVAL_MS;
   return ["/api/worklog/state", "/api/notes/state"].includes(path) ? SHARED_READ_INTERVAL_MS : 0;
 }
 
@@ -580,6 +583,13 @@ function requestFresh(path, url, cachedPromise, options = {}) {
         rejectQuotaSnapshot(revision?.cached === true);
         const state = cached.data.data;
         if (Number(revision?.revision) === Number(state.revision) && revision?.day === state.lastRollDay) data = cached.data;
+      }
+      // 면담 기록: revision이 같으면 저장해 둔 전체 목록을 그대로 쓴다(전체 목록은 바뀐 때만 읽음).
+      if (shared && path === MEETING_NOTES_ALL_PATH && Number.isInteger(cached?.data?.data?.revision)) {
+        const revisionUrl = new URL(url);
+        revisionUrl.pathname = MEETING_NOTES_REVISION_PATH;
+        const revision = (await read(revisionUrl.toString())).data;
+        if (Number(revision?.revision) === cached.data.data.revision) data = cached.data;
       }
       if (!data) data = await read(url);
       if (shared && path === "/api/worklog/state" && data.cached === true) {
@@ -955,6 +965,36 @@ async function patchQuarterGoals(mode, quarter, ops) {
   return (await apiPost(QUARTER_GOALS_PATCH_PATH, { mode, quarter, ops })).data;
 }
 
+// ───────── 면담 기록 ─────────
+// 전체 목록 한 번(바뀐 때만) + 면담 1개 단위 저장. 저장 응답을 공유 캐시에 바로 합쳐 다른 위젯은 다시 읽지 않는다.
+async function loadMeetingNotes() {
+  return (await apiGetFresh(MEETING_NOTES_ALL_PATH)).data;
+}
+async function mergeMeetingNotes(revision, change) {
+  const url = apiUrl(MEETING_NOTES_ALL_PATH);
+  await withReadLock(url, async () => {
+    const cached = await readCached(url, true);
+    const state = cached?.data?.data;
+    if (!state || !Array.isArray(state.notes)) return;
+    const notes = change(state.notes.filter(Boolean));
+    // 다른 기기 변경이 사이에 있었으면 revision을 올리지 않아 다음 확인 때 전체를 다시 읽는다.
+    const next = { revision:Number(revision) === state.revision + 1 ? Number(revision) : state.revision, notes };
+    await writeCached(url, { ...cached.data, data:next }, undefined, cached.validatedAt);
+  });
+  announceChange(MEETING_NOTES_ALL_PATH);
+}
+async function saveMeetingNote(note, baseRev) {
+  const data = (await apiPost("/api/meeting-notes/save", { note, baseRev })).data;
+  await mergeMeetingNotes(data.revision, notes => [data.note, ...notes.filter(item => item.id !== data.note.id)]
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)));
+  return data;
+}
+async function deleteMeetingNote(id, baseRev) {
+  const data = (await apiPost("/api/meeting-notes/delete", { id, baseRev })).data;
+  if (data.removed) await mergeMeetingNotes(data.revision, notes => notes.filter(item => item.id !== id));
+  return data;
+}
+
 // ───────── 메모장 ─────────
 async function loadNotesState() {
   if (COALESCE_READS) return (await apiGetFresh("/api/notes/state")).data;
@@ -1124,6 +1164,7 @@ window.Store = {
   loadWeeklyGoalsState, saveWeeklyGoalsState,
   loadNotesState, saveNotesState, patchNotesState,
   loadQuarterGoals, patchQuarterGoals,
+  loadMeetingNotes, saveMeetingNote, deleteMeetingNote,
   loadSchedules, createSchedule, updateSchedule, skipScheduleOccurrence, deleteSchedule,
   getHP, getTodayAchievements, getAchievements, getMaterials, getMoodOfDate,
   watch,
