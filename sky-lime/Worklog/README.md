@@ -1,7 +1,7 @@
 # sky-lime · WORK LOG 위젯 4종
 
 WORK LOG 페이지용 새 테마입니다. 기존 업무일지·메모 데이터를 그대로 쓰며, 새 저장 키나 서버 테이블을 만들지 않습니다.
-`sky-lime/` 밖의 파일(store.js, worker.js, widget-frame.*, 다른 테마)은 수정하지 않았습니다. (아래 목표 체크 3종은 store.js에 함수 2개를 더했습니다.)
+`sky-lime/` 밖의 파일(store.js, worker.js, widget-frame.*, 다른 테마)은 수정하지 않았습니다. (아래 목표 체크 3종·피드백 모음 3종은 store.js에 함수를 더했습니다.)
 
 ## 주소
 
@@ -137,6 +137,79 @@ PLAYWRIGHT_MODULE=<playwright 경로> SKY_LIME_SHOTS=<스크린샷 폴더> node 
 node --test sky-lime/tests/goal-check-model.test.mjs
 PLAYWRIGHT_MODULE=<playwright 경로> GOAL_CHECK_SHOTS=<스크린샷 폴더> node --test --test-concurrency=1 sky-lime/tests/goal-check.browser.mjs
 # 서버 모듈과 함께: QUARTER_GOALS_SERVER=<quarter-goals-api.mjs 경로> 를 더하면 목업 대신 그 모듈을 메모리 SQLite 위에서 돌립니다.
+```
+
+브라우저 테스트는 운영 Worker 주소를 브라우저 안에서 가로채 메모리 테스트 데이터로만 응답합니다. 실제 서버·실데이터를 쓰지 않습니다.
+
+---
+
+# 피드백 모음 위젯 3종 (핵심 모아보기 · 피드백 검색 · 면담 기록)
+
+노션 하위 페이지 "피드백 모음"에 위에서 아래로 ① ② ③ 순서로 따로 임베드합니다. 면담 1번 = 기록 1개이고, 업무 전용입니다(업무/일상 전환 없음).
+①②는 ③과 같은 "면담 기록" 데이터를 읽기만 합니다. 업무일지·목표 데이터는 읽거나 쓰지 않습니다.
+
+## 주소 · 노션 임베드 높이
+
+세 주소 모두 업무일지와 같은 `?w=` 키를 붙입니다.
+
+| 위젯 | 주소 | 높이 | 노션 임베드 높이 |
+| --- | --- | --- | --- |
+| ① 핵심 모아보기 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/feedback-keys.html?w=[인스턴스 키]` | 고정 300px | 300px |
+| ② 피드백 검색 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/feedback-search.html?w=[인스턴스 키]` | 고정 216px (PC·모바일 같음) | 216px |
+| ③ 면담 기록 | `https://kjm9954.github.io/my-notion-widget/sky-lime/Worklog/meeting-notes.html?w=[인스턴스 키]` | 임베드 높이 100% · 권장 최소 360px | 700px 권장(360px 이상) |
+
+- 폭 500px 미만은 모바일 배치입니다(핵심 1칸, 면담 팝업이 위젯 전체를 덮음). 위젯 안 스크롤·펼침은 없고, 긴 글자는 말줄임입니다.
+- ③은 높이에 따라 목록 줄 수(한 줄 54px 기준)와 팝업의 들은 말·할 일 줄 수가 늘고 줄어듭니다.
+
+## 데이터
+
+| 화면 | 읽기 | 쓰기 |
+| --- | --- | --- |
+| ①②③ | `Store.loadMeetingNotes()` → `GET /api/meeting-notes/all` (변경 번호 `GET /api/meeting-notes/revision`이 같으면 다시 받지 않음) | ③만: `Store.saveMeetingNote(note, baseRev)`, `Store.deleteMeetingNote(id, baseRev)` |
+| 다른 위젯 반영 | `Store.watch` (`/api/meeting-notes/`), 2분 공유 캐시로 세 위젯 조회를 한 번으로 합침 | 저장 응답을 공유 캐시에 바로 합침(③에서 ★ → ①에 바로 반영) |
+
+- `store.js`에는 위 세 함수와 조회 합치기·변경 번호 확인·저장 캐시 합치기만 더했습니다. 기존 함수 동작은 같습니다.
+- 서버: 기존 Worker를 감싸는 별도 모듈(`meeting-notes-api.mjs`)이 `/api/meeting-notes/*`만 처리합니다. 면담 1개 = 기존 `widget_settings` 행 1개(`instance:<키>:meetingNotes:v1:note:<id>`) + 변경 번호 행 1개(`…:meetingNotes:v1:rev`). D1 migration·KV는 쓰지 않습니다. 서버 파일은 이 저장소에 넣지 않았고 운영 배포는 별도로 진행합니다. **배포 전에는 세 위젯이 "불러오지 못했어요"로 표시됩니다.**
+- 면담 1개: `id, date(YYYY-MM-DD), title, who, topics[{ id, h(주제명), say(내가 할 말), lines[{ id, t, key(★) }] }], todos[{ id, t, done }]` + 서버가 붙이는 `rev`(버전)·`createdAt`·`updatedAt`. 서버 상한: 면담 2,000개, 글자 수 제목 120 · 준 사람 40 · 주제명 80 · 내가 할 말 300 · 들은 말 500 · 할 일 200.
+- 기록이 많아져도: 핵심·검색은 모든 내용이 필요해서 전체를 한 번 받고, 2분마다 변경 번호(2행)만 확인해 바뀐 때만 다시 받습니다. 면담 300개(약 0.6MB, 압축 전송 약 0.15MB)까지 문제없고, 1,000개를 넘기면 "바뀐 면담만 받기"를 추가할 수 있습니다.
+- 브라우저 저장소(localStorage)에는 아무것도 두지 않습니다.
+
+### 자동 저장과 버전 충돌
+
+- 글자는 입력이 1초 멈추면, ★·할 일 체크·줄/할 일 삭제는 바로, 팝업을 닫을 때는 정리(빈 들은 말·빈 할 일, 주제명·내가 할 말·줄이 모두 빈 주제 삭제, 0개가 되면 빈 주제 1개) 후 저장합니다. 면담 전에 적어 둔 "내가 할 말"만 있는 주제는 지우지 않습니다.
+- 저장은 면담의 버전(`rev`)을 함께 보내고, 다른 곳에서 먼저 바뀌었으면 서버가 거부(409)하고 최신 내용을 돌려줍니다. 덮어쓰기는 없습니다.
+- 거부되면 최신 내용을 보여주고, ★·할 일 체크·줄 삭제·할 일 삭제는 그 위에 다시 적용해 저장합니다. 글자 수정은 다시 적용하지 않고 팝업 아래에 "최신 내용으로 바뀌었어요 · 고친 글자는 다시 입력해 주세요"를 6초 보여줍니다. 다른 곳에서 지운 면담이면 팝업을 닫고 목록에서 뺍니다.
+- 기록 삭제는 한 번 누르면 "정말 삭제?"(2초), 그 안에 한 번 더 누르면 삭제합니다.
+
+## 위젯 사이 연결
+
+- ①② 결과를 누르면 같은 키의 ③에 BroadcastChannel로 "열기 요청"을 보냅니다(sky-lime-common과 같은 방식, 별도 채널 `sky-lime-feedback-open-v1:<키>`).
+- ③이 받으면 그 면담 팝업을 열고 그 줄이 있는 주제로 이동해 그 줄을 1.5초 하늘색(시안 LIME_HL)으로 강조하고 응답합니다.
+- 약 1초 안에 응답이 없으면 ②에만 회색 한 줄 "아래 면담 기록에서 열 수 없어요"(①은 아무 표시 없음). ①② 안에서는 팝업을 열지 않습니다.
+
+## 계산 규칙
+
+- 오늘·다음 면담·지난 면담: 업무일(한국 오전 6시) 기준. ③ 목록 맨 위 "다음 면담"은 오늘 이후 중 가장 가까운 1개, 그 아래 지난 면담(오늘 포함) 최신순. 새 기록의 날짜는 오늘.
+- ① 핵심: 오늘 이전·오늘 면담의 ★ 줄만, 최신 면담 순(같은 면담 안에서는 주제·줄 순서). 들어가지 않는 ★는 표시하지 않습니다.
+- ② 검색: 대소문자·공백 차이 무시. 들은 말 → 내가 할 말 → 주제명 → 할 일 → 면담 제목·준 사람 순으로 면담당 첫 번째 1개, 날짜 최신순 최대 3개(넘으면 헤더 오른쪽 "더 정확한 단어로 찾아보세요" — 시안 배치). 2줄째는 찾은 단어 앞 12자부터 80자, 앞이 잘리면 "…", 찾은 단어 굵게, ★ 줄이면 앞에 ★. "내가 할 말 · ", "할 일 · " 접두어는 자르지 않습니다.
+- ③ 준 사람 자동완성: 다른 기록에 쓴 이름을 많이 쓴 순으로 최대 5개, 입력 글자를 포함하는 것만(입력과 같은 이름 제외), Enter = 첫 번째.
+
+## 파일
+
+| 파일 | 내용 |
+| --- | --- |
+| `feedback-model.mjs` | 목록·★·검색·자동완성·정리·충돌 재적용 순수 함수 |
+| `feedback-common.mjs` | Store 읽기·구독, 열기 요청 채널 |
+| `feedback.css` | 세 위젯 공통 |
+| `feedback-keys.*`, `feedback-search.*`, `meeting-notes.*` | 위젯 3종 |
+| `../tests/feedback-model.test.mjs`, `../tests/feedback.browser.mjs` | 계산 테스트, 오프라인 브라우저 테스트 |
+
+## 테스트
+
+```bash
+node --test sky-lime/tests/feedback-model.test.mjs
+PLAYWRIGHT_MODULE=<playwright 경로> FEEDBACK_SHOTS=<스크린샷 폴더> node --test --test-concurrency=1 sky-lime/tests/feedback.browser.mjs
+# 서버 모듈과 함께: MEETING_NOTES_SERVER=<meeting-notes-api.mjs 경로> 를 더하면 목업 대신 그 모듈을 메모리 SQLite 위에서 돌립니다.
 ```
 
 브라우저 테스트는 운영 Worker 주소를 브라우저 안에서 가로채 메모리 테스트 데이터로만 응답합니다. 실제 서버·실데이터를 쓰지 않습니다.

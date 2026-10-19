@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>피드백 검색</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../../widget-frame.css?v=20260930-mobile-layout">
+  <link rel="stylesheet" href="sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="feedback.css?v=20261019-feedback">
+  <style>
+    /* 시안: 고정 216px(PC·모바일 같음), 바깥 여백 12/18/10. 결과 한 건 38px, 최대 3개. */
+    .fb-search { --fb-h: 216px; padding: 12px 18px 10px; }
+    .fb-search .fb-head { height: 24px; justify-content: space-between; }
+    .fb-search .fb-title { font-size: 15px; }
+    .fb-more { flex: none; color: var(--sl-quiet); font-size: 12px; white-space: nowrap; }
+    .fb-field { flex: none; position: relative; margin-top: 8px; }
+    .fb-input {
+      display: block; width: 100%; height: 36px; padding: 0 36px 0 12px; border: 1px solid transparent; border-radius: var(--sl-r-row);
+      background: var(--sl-field); color: var(--sl-text); font-size: 14px; outline: none;
+    }
+    .fb-search .fb-input:focus { background: var(--sl-surface); border-color: var(--sl-line-focus); }
+    .fb-clear {
+      position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--sl-r-chip);
+      background: transparent; color: var(--sl-empty); font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    }
+    @media (hover: hover) { .fb-clear:hover { background: var(--sl-seg); color: var(--sl-secondary); } }
+    .fb-results { flex: 1; min-height: 0; margin-top: 6px; display: flex; flex-direction: column; }
+    .fb-results > .fb-message { padding: 10px 2px; color: var(--sl-quiet); font-size: 13px; }
+    .fb-results > .fb-message.is-nolink { color: var(--sl-arrow); }
+    .fb-result {
+      flex: none; width: auto; height: 38px; margin: 0 -8px; padding: 0 8px; border: 0; border-radius: var(--sl-r-row); background: transparent;
+      display: flex; flex-direction: column; justify-content: center; gap: 1px; text-align: left; transition: background .12s;
+    }
+    @media (hover: hover) { .fb-result:hover { background: var(--sl-field); } }
+    .fb-line1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .fb-date { flex: none; color: var(--sl-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .fb-name { flex: 1; min-width: 0; overflow: hidden; color: var(--sl-ink); font-size: 13.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+    .fb-name b { font-weight: 800; }
+    .fb-line2 { min-width: 0; overflow: hidden; color: var(--sl-arrow); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+    .fb-line2 b { color: var(--sl-ink); font-weight: 800; }
+    .fb-star { color: var(--sl-sky-button); }
+    @media (max-width: 499.98px) {
+      .fb-search { padding: 12px 18px 10px; }
+    }
+  </style>
+  <script src="../../store.js?v=20261019-meeting-notes" data-store-isolated data-store-coalesce></script>
+</head>
+<body>
+  <section class="sl-root fb-root fb-fixed fb-search" id="app" data-status="loading" aria-label="피드백 검색">
+    <div class="fb-head">
+      <div class="sl-title-wrap"><h1 class="fb-title">피드백 검색</h1><span class="sl-notice" id="notice"></span></div>
+      <span class="fb-more" id="more" hidden>더 정확한 단어로 찾아보세요</span>
+    </div>
+    <form class="fb-field" id="form" role="search" autocomplete="off">
+      <input class="fb-input" id="query" type="text" maxlength="100" enterkeyhint="search" spellcheck="false"
+        placeholder="면담 내용이나 준 사람" aria-label="면담 내용이나 준 사람 검색">
+      <button class="fb-clear" id="clear" type="button" aria-label="지우기" hidden>✕</button>
+    </form>
+    <div class="fb-results" id="results"><p class="fb-message">면담 내용이나 준 사람으로 찾아보세요</p></div>
+  </section>
+  <script src="../../widget-frame.js?v=20260930-mobile-layout"></script>
+  <script type="module" src="feedback-search.mjs?v=20261019-feedback"></script>
+</body>
+</html>

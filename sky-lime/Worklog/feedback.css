@@ -1,0 +1,20 @@
+/* 피드백 모음 위젯 3종 공통(핵심 모아보기 · 피드백 검색 · 면담 기록). 수치는 시안 v4 값, 색은 sky-lime 기존 변수.
+   핵심 모아보기 300px · 피드백 검색 216px은 고정(임베드가 더 높으면 카드는 위에 붙고 아래는 투명),
+   면담 기록은 임베드 높이 100%를 채운다. 모바일 배치는 폭 500px 미만. */
+:root {
+  /* 시안의 찾은 줄 강조색(LIME_HL) */
+  --fb-hl: oklch(0.94 0.04 235);
+}
+.fb-root { padding: 22px 24px 20px; }
+.fb-fixed { height: min(100%, var(--fb-h)); }
+/* hidden 속성은 부품의 display 값보다 우선한다. */
+.fb-root [hidden] { display: none !important; }
+.fb-head { flex: none; height: 26px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fb-title { margin: 0; color: var(--sl-ink); font-size: 17px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+.fb-message { flex: none; margin: 0; padding: 16px 2px; color: var(--sl-hint); font-size: 13.5px; line-height: 1.5; }
+@media (max-width: 499.98px) {
+  .fb-root { padding: 18px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-root *, .fb-root *::before, .fb-root *::after { transition: none !important; }
+}
