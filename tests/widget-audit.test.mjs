@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { access, readdir, readFile } from "node:fs/promises";
-import { dirname, extname, resolve } from "node:path";
+import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
@@ -16,6 +16,14 @@ async function filesUnder(folder) {
 }
 
 const htmlFiles = (await filesUnder(root)).filter(file => extname(file).toLowerCase() === ".html");
+
+// .gitignore 의 폴더 항목(예: handover-qa/private/)은 저장소에 없는 로컬 전용 파일이라 참조 검사에서 뺀다.
+const ignoredFolders = (await readFile(resolve(root, ".gitignore"), "utf8"))
+  .split(/\r?\n/)
+  .map(line => line.trim())
+  .filter(line => line && !line.startsWith("#") && line.endsWith("/") && !/[*?[\]!]/.test(line))
+  .map(line => resolve(root, line) + sep);
+const isIgnored = target => ignoredFolders.some(folder => (target + sep).startsWith(folder));
 
 test("every inline widget script parses", async () => {
   const failures = [];
@@ -41,6 +49,7 @@ test("every local HTML asset reference resolves to a file", async () => {
       const clean = reference.split(/[?#]/, 1)[0];
       if (!clean || /\$\{|\{\{/.test(clean)) continue;
       const target = resolve(dirname(file), decodeURIComponent(clean));
+      if (isIgnored(target)) continue;
       try { await access(target); }
       catch { missing.push(`${file}: ${reference}`); }
     }
