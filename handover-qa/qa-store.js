@@ -519,6 +519,21 @@
     return { id: newId(), signature, uploaded: [], created: false, stage: 0, thread: null };
   }
 
+  // 아직 올리지 않은 이미지만 올린다. 이미 저장된 이미지(img:)는 그대로 쓴다.
+  async function uploadAll(images, attempt, report) {
+    report(0, 0);
+    for (let i = 0; i < images.length; i++) {
+      if (attempt.uploaded[i]) continue;
+      const image = images[i];
+      attempt.uploaded[i] = isStoredImage(image)
+        ? image
+        : await withRetry(() => uploadImage(image, p => report(0, (i + p) / images.length)));
+      report(0, (i + 1) / images.length);
+    }
+    report(0, 1);
+    return attempt.uploaded.slice(0, images.length);
+  }
+
   // 순서: 이미지 업로드 → 질문 생성 → 목록 반영 확인
   async function createQuestion(input, { attempt = newAttempt(), onProgress = () => {} } = {}) {
     const title = String(input.title || '').trim().slice(0, 60);
@@ -532,16 +547,7 @@
       if (!body && !images.length) throw new QAError('invalid', 400, 'empty body');
 
       if (!attempt.created) {
-        report(0, 0);
-        for (let i = 0; i < images.length; i++) {
-          if (attempt.uploaded[i]) continue;
-          const image = images[i];
-          attempt.uploaded[i] = isStoredImage(image)
-            ? image
-            : await withRetry(() => uploadImage(image, p => report(0, (i + p) / images.length)));
-          report(0, (i + 1) / images.length);
-        }
-        report(0, 1);
+        await uploadAll(images, attempt, report);
 
         report(1, 0);
         const at = Date.now();
@@ -575,6 +581,47 @@
       });
       report(2, 1);
       emit('changed', { id: attempt.id });
+      return attempt.thread;
+    } catch (error) {
+      const failure = error instanceof QAError ? error : new QAError('invalid', 0, 'client');
+      failure.stage = attempt.stage;
+      throw failure;
+    }
+  }
+
+  // 내가 남긴 질문(첫 메시지)을 고친다. 순서: 새 이미지 업로드 → 질문 수정 → 목록 반영 확인
+  // 서버가 수정 시각·시스템 메시지를 남기고, 같은 내용이면 바꾸지 않는다.
+  async function editQuestion(threadId, input, { attempt = newAttempt(), onProgress = () => {} } = {}) {
+    const title = String(input.title || '').trim().slice(0, 60);
+    const body = String(input.body || '').trim();
+    const author = input.author;
+    const images = Array.isArray(input.images) ? input.images : [];
+    const report = (stage, progress) => { attempt.stage = stage; onProgress({ stage, progress, total: 3 }); };
+    try {
+      const major = String(input.major || '').trim();
+      if (!threadId || !title || !getUser(author) || !major) throw new QAError('invalid', 400, 'missing fields');
+      if (!body && !images.length) throw new QAError('invalid', 400, 'empty body');
+
+      if (!attempt.created) {
+        const uploaded = await uploadAll(images, attempt, report);
+
+        report(1, 0);
+        const result = await withRetry(() => sendJson('/api/qa/op', {
+          method: 'POST',
+          json: { type: 'edit', threadId, who: author, title, cat1: major, text: body, images: uploaded },
+        }));
+        attempt.thread = result.thread;
+        attempt.created = true;
+        report(1, 1);
+      }
+
+      report(2, 0);
+      await withRetry(async () => {
+        const index = await getIndex({ force: true });
+        if (!index.items.some(item => item.id === threadId)) throw new QAError('conflict', 409, 'not listed yet');
+      });
+      report(2, 1);
+      emit('changed', { id: threadId });
       return attempt.thread;
     } catch (error) {
       const failure = error instanceof QAError ? error : new QAError('invalid', 0, 'client');
@@ -648,6 +695,7 @@
     getQuestion,
     newAttempt,
     createQuestion,
+    editQuestion,
     // 목록형
     getState,
     createThread,

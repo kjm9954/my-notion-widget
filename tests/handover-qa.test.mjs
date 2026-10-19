@@ -161,6 +161,84 @@ test("질문 생성·메시지·상태·읽음이 반영되고 리비전 기반 
   assert.equal((await call(env, "GET", "/api/qa/thread?id=nope")).status, 404);
 });
 
+test("질문을 쓴 사람은 답변이 달린 뒤에도 질문을 고칠 수 있고, 수정 표시와 시스템 메시지가 남는다", async () => {
+  const env = await makeEnv();
+  // 생성할 때 보낸 수정 표시는 무시한다
+  const created = await op(env, { type: "create", thread: newThread("t1", "질문자", "원래 제목", { editedAt: 123 }) });
+  assert.equal(created.data.data.thread.editedAt, undefined);
+  await op(env, {
+    type: "message",
+    threadId: "t1",
+    message: { who: "답변자", text: "답변", images: [] },
+    status: "답변됨",
+    read: { 답변자: true, 질문자: false },
+  });
+  await op(env, { type: "read", threadId: "t1", who: "질문자" });
+
+  const image = await call(env, "POST", "/api/qa/image", { json: { type: "image/jpeg", data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString("base64") } });
+  const imageId = image.data.data.id;
+  const edited = await op(env, { type: "edit", threadId: "t1", who: "질문자", title: "고친 제목", cat1: "다른 분류", text: "고친 본문", images: [imageId] });
+  assert.equal(edited.status, 200);
+  const thread = edited.data.data.thread;
+  assert.equal(thread.title, "고친 제목");
+  assert.equal(thread.cat1, "다른 분류");
+  assert.equal(thread.cat2, "", "카테고리를 바꾸면 이전 소분류는 지운다");
+  assert.equal(thread.status, "답변됨", "상태는 그대로 둔다");
+  assert.ok(thread.editedAt > 0);
+  assert.equal(thread.messages[0].text, "고친 본문");
+  assert.deepEqual(thread.messages[0].images, [imageId]);
+  assert.equal(thread.messages[0].editedAt, thread.editedAt);
+  assert.equal(thread.messages[1].text, "답변", "답변은 건드리지 않는다");
+  assert.match(thread.messages.at(-1).text, /^— 질문자님이 질문을 수정 · /);
+  assert.equal(thread.messages.at(-1).system, true);
+  assert.deepEqual(thread.read, { 답변자: false, 질문자: true });
+
+  // 목록 요약과 동기화에도 수정 표시가 실린다
+  const index = await call(env, "GET", "/api/qa/index");
+  assert.equal(index.data.data.items[0].editedAt, thread.editedAt);
+  assert.equal(index.data.data.items[0].title, "고친 제목");
+  const delta = await call(env, "GET", `/api/qa/state?since=${edited.data.data.revision - 1}`);
+  assert.equal(delta.data.data.threads[0].editedAt, thread.editedAt);
+
+  // 같은 내용으로 다시 보내면 바꾸지 않는다
+  const same = await op(env, { type: "edit", threadId: "t1", who: "질문자", title: "고친 제목", cat1: "다른 분류", text: "고친 본문", images: [imageId] });
+  assert.equal(same.data.data.unchanged, true);
+  assert.equal(same.data.data.thread.messages.length, thread.messages.length);
+
+  // 다른 사람은 고칠 수 없고, 제목·카테고리·내용이 비면 받지 않는다
+  const base = { type: "edit", threadId: "t1", who: "질문자", title: "제목", cat1: "분류", text: "본문", images: [] };
+  assert.equal((await op(env, { ...base, who: "답변자" })).status, 400);
+  assert.equal((await op(env, { ...base, title: "  " })).status, 400);
+  assert.equal((await op(env, { ...base, cat1: "" })).status, 400);
+  assert.equal((await op(env, { ...base, text: "", images: [] })).status, 400);
+  assert.equal((await op(env, { ...base, threadId: "nope" })).status, 404);
+
+  // 뒤이은 메시지·상태 변경에도 수정 표시가 유지된다
+  const after = await op(env, { type: "status", threadId: "t1", status: "확인완료", who: "질문자" });
+  assert.equal(after.data.data.thread.editedAt, thread.editedAt);
+  assert.equal(after.data.data.thread.messages[0].editedAt, thread.editedAt);
+});
+
+test("질문형은 내가 남긴 질문을 고치고, 목록형은 (수정됨)을 표시하며, 핑크 사본도 같다", async () => {
+  const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");
+  const configSource = await readFile(new URL("../handover-qa/qa-config.js", import.meta.url), "utf8");
+  assert.match(storeSource, /async function editQuestion\(threadId, input/);
+  assert.match(storeSource, /type: 'edit', threadId, who: author/);
+  assert.match(configSource, /editSubmit: '수정 저장'/);
+  for (const name of ["add", "add-pink"]) {
+    const source = await readFile(new URL(`../handover-qa/${name}.html`, import.meta.url), "utf8");
+    assert.match(source, /S\.editQuestion\(editing\.id, input/, name);
+    assert.match(source, /data-edit="\$\{esc\(item\.id\)\}"/, name);
+    assert.match(source, /first\.who !== ui\.author/, name);
+    assert.match(source, /if \(ui\.editing\) return;\s+\/\/ 고치는 중인 내용은 새 질문 임시 저장에 섞지 않는다/, name);
+  }
+  for (const name of ["index", "index-pink"]) {
+    const source = await readFile(new URL(`../handover-qa/${name}.html`, import.meta.url), "utf8");
+    assert.ok(source.includes("t.editedAt ? `<span class=\"meta-edited\">(수정됨)</span>`"), name);
+    assert.ok(source.includes("${m.editedAt ? ' (수정됨)' : ''}"), name);
+  }
+});
+
 test("거의 동시에 만든 질문이 모두 목록에 남고, 목록은 최근 활동순 요약을 준다", async () => {
   const env = await makeEnv();
   const results = await Promise.all([

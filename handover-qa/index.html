@@ -140,6 +140,7 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px}
 .card-meta{display:flex;align-items:center;gap:8px;margin-top:5px;min-height:22px}
 .card-meta .badge,.meta-replies{margin-left:auto}
 .meta-replies{font-size:11.5px;color:var(--text-3)}
+.meta-edited{font-size:11.5px;color:var(--text-3)}
 .card.done .card-title{font-weight:500;color:var(--text-2)}
 .card.done .card-preview{color:var(--text-3)}
 
@@ -459,8 +460,8 @@ body.dev .harness{display:flex}
   <input type="file" id="cw-file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-asker-view"></script>
-<script src="qa-store.js?v=20260918-asker-view"></script>
+<script src="qa-config.js?v=20261019-edit"></script>
+<script src="qa-store.js?v=20261019-edit"></script>
 <script>
 (function(){
 'use strict';
@@ -757,12 +758,13 @@ function cardHTML(t, pinned){
   const right = answerer
     ? (pinned ? (!t.read[state.me] ? `<span class="badge fill">NEW</span>` : `<span class="badge line">답변 대기</span>`) : replies)
     : (pinned ? `<span class="badge line">답변 대기</span>` : (newReply(t) ? `<span class="badge fill">NEW</span>` : replies));
+  const edited = t.editedAt ? `<span class="meta-edited">(수정됨)</span>` : '';   // 질문형에서 질문을 고친 적이 있음
   return `<div class="card ${pinned?'pinned':''} ${t.status===S.STATUS.DONE?'done':''}" role="button" tabindex="0" data-id="${esc(t.id)}">
     <span class="avatar av40">${esc(spk)}</span>
     <div class="card-body">
       <div class="card-top"><span class="card-title">${esc(t.title)}</span><span class="card-time">${fmtList(lastAt(t))}</span></div>
       <div class="card-preview">${esc(preview)}</div>
-      <div class="card-meta"><span class="chip">${esc(t.cat1 || t.cat2)}</span><span class="status"><i class="dot ${st.color}"></i>${esc(t.status)}</span>${right}</div>
+      <div class="card-meta"><span class="chip">${esc(t.cat1 || t.cat2)}</span><span class="status"><i class="dot ${st.color}"></i>${esc(t.status)}</span>${edited}${right}</div>
     </div></div>`;
 }
 function renderList(){
@@ -992,7 +994,7 @@ function renderThread(){
     const fail = m.failed ? `<div class="fail-row"><span>전송하지 못했습니다</span><button data-act="retry" data-i="${i}">재시도</button><button data-act="del" data-i="${i}">삭제</button></div>` : '';
     html += `<div class="msg ${mine?'me':'them'} ${prevWho===m.who?'tight':''} ${m.pending?'pending':''} ${m.failed?'failed':''}">
       <span class="avatar av32">${esc(m.who)}</span>
-      <div class="msg-body">${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ''}${imgs}${up}${fail}<div class="msg-time">${fmtTime(m.at)}</div></div>
+      <div class="msg-body">${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ''}${imgs}${up}${fail}<div class="msg-time">${fmtTime(m.at)}${m.editedAt ? ' (수정됨)' : ''}</div></div>
     </div>`;
     prevWho = m.who;
   });

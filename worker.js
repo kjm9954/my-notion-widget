@@ -2180,6 +2180,8 @@ function qaNormalizeMessage(raw, now) {
   };
   const clientId = cleanText(raw.clientId, 64);
   if (clientId) message.clientId = clientId;
+  const editedAt = Number(raw.editedAt) || 0;
+  if (editedAt > 0) message.editedAt = Math.min(editedAt, now);
   return message;
 }
 
@@ -2193,7 +2195,7 @@ function qaNormalizeThread(raw, now) {
     .slice(0, QA_LIMITS.messages);
   const id = QA_THREAD_ID_RE.test(String(raw.id || "")) ? String(raw.id) : `t_${now}_${randomUrlSafeId(6)}`;
   const createdAt = Number(raw.createdAt) || now;
-  return {
+  const thread = {
     id,
     cat1: cleanText(raw.cat1, QA_LIMITS.category),
     cat2: cleanText(raw.cat2, QA_LIMITS.category),
@@ -2205,6 +2207,10 @@ function qaNormalizeThread(raw, now) {
     createdAt,
     updatedAt: Number(raw.updatedAt) || createdAt,
   };
+  // 질문을 고친 시각. 목록형이 (수정됨)을 붙이는 기준이다
+  const editedAt = Number(raw.editedAt) || 0;
+  if (editedAt > 0) thread.editedAt = Math.min(editedAt, now);
+  return thread;
 }
 
 function qaSummary(thread) {
@@ -2225,6 +2231,7 @@ function qaSummary(thread) {
     replies: Math.max(0, real.length - 1),
     createdAt: Number(thread.createdAt) || 0,
     updatedAt: Number(thread.updatedAt) || Number(thread.createdAt) || 0,
+    editedAt: Number(thread.editedAt) || 0,
     lastAt: messages.reduce((max, m) => Math.max(max, Number(m?.at) || 0), 0),
   };
 }
@@ -2244,6 +2251,9 @@ async function qaApplyOp(env, room, op) {
     const thread = qaNormalizeThread(op.thread, now);
     if (!thread) return { error: "invalid thread" };
     if (!thread.messages.length || thread.messages[0].system) return { error: "thread needs a first message" };
+    // 수정 표시는 edit 로만 붙는다
+    delete thread.editedAt;
+    thread.messages.forEach(m => { delete m.editedAt; });
     thread.createdAt = now;
     thread.updatedAt = now;
     if (!Object.keys(thread.read).length) thread.read = { [thread.messages[0].who]: true };
@@ -2264,7 +2274,7 @@ async function qaApplyOp(env, room, op) {
 
   const threadId = String(op?.threadId || "");
   if (!QA_THREAD_ID_RE.test(threadId)) return { error: "invalid thread id" };
-  if (!["message", "status", "read"].includes(type)) return { error: "unknown op" };
+  if (!["message", "status", "read", "edit"].includes(type)) return { error: "unknown op" };
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const loaded = await qaLoadThread(env, room, threadId);
@@ -2295,6 +2305,36 @@ async function qaApplyOp(env, room, op) {
       if (thread.status !== status) {
         thread.status = status;
         thread.messages.push({ system: true, at: now, text: `— ${who}님이 ${status}${qaJosaRo(status)} 변경 · ${qaFormatSysDate(now)}` });
+        changed = true;
+      }
+    } else if (type === "edit") {
+      // 질문(첫 메시지)을 쓴 사람만 제목·카테고리·본문·이미지를 고친다. 답변이 달린 뒤에도 고칠 수 있고,
+      // 고치면 수정 시각과 시스템 메시지를 남기고 다른 사람은 안 읽음으로 돌린다. 상태는 그대로 둔다.
+      const who = qaWho(op.who);
+      const index = thread.messages.findIndex(m => !m.system);
+      const first = thread.messages[index];
+      if (!who || !first) return { error: "invalid edit" };
+      if (first.who !== who) return { error: "only the author can edit" };
+      const title = cleanText(op.title, QA_LIMITS.title);
+      const cat1 = cleanText(op.cat1, QA_LIMITS.category);
+      const edited = qaNormalizeMessage({ who, text: op.text, images: op.images, at: first.at }, now);
+      if (!title || !cat1 || !edited) return { error: "invalid edit" };
+      const same = title === thread.title
+        && cat1 === thread.cat1
+        && edited.text === first.text
+        && edited.images.join("\n") === first.images.join("\n");
+      if (!same) {
+        if (thread.messages.length >= QA_LIMITS.messages) return { error: "thread is full", status: 507 };
+        if (cat1 !== thread.cat1) thread.cat2 = "";
+        thread.title = title;
+        thread.cat1 = cat1;
+        thread.messages[index] = { ...first, text: edited.text, images: edited.images, editedAt: now };
+        thread.editedAt = now;
+        thread.messages.push({ system: true, at: now, text: `— ${who}님이 질문을 수정 · ${qaFormatSysDate(now)}` });
+        const read = {};
+        for (const name of Object.keys(thread.read)) read[name] = false;
+        read[who] = true;
+        thread.read = read;
         changed = true;
       }
     } else {

@@ -108,11 +108,15 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 .slot:disabled{font-weight:400}
 
 /* 내가 남긴 질문 */
-.mine{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:6px}
-.mine li{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border-top:1px solid var(--border-soft)}
+.mine{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.mine li{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px 0 12px;border-top:1px solid var(--border-soft)}
 .mine li:first-child{border-top:0}
+.mine li.on{background:var(--accent-bg)}
 .m-title{flex:1;min-width:0;font-size:12.5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m-status{flex:none;font-size:11px;color:var(--text-3)}
+.m-edit{position:relative;flex:none;min-height:28px;padding:0 6px;border-radius:4px;font-size:11.5px;font-weight:600;color:var(--accent)}
+.m-edit::after{content:"";position:absolute;inset:-4px 0}
+.m-edit:disabled{color:var(--text-3);font-weight:400}
 .dot{display:inline-block;flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-strong)}
 .dot.rust{background:var(--rust)}
 .dot.teal{background:var(--teal)}
@@ -268,8 +272,8 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   <input type="file" id="file" accept="image/*" multiple hidden>
 </div>
 
-<script src="qa-config.js?v=20260918-asker-view"></script>
-<script src="qa-store.js?v=20260918-asker-view"></script>
+<script src="qa-config.js?v=20261019-edit"></script>
+<script src="qa-store.js?v=20261019-edit"></script>
 <script>
 (function () {
   'use strict';
@@ -320,12 +324,13 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     similarState: 'idle',  // idle | loading | error
     similarBig: '',
     draftSaved: false,
+    editing: null,         // { id, signature } 내가 남긴 질문을 고치는 중
+    editLoading: '',       // 불러오는 중인 질문 id
+    stash: null,           // 수정하는 동안 보관한 새 질문 작성 내용
   };
 
   /* ───────── 고정 문구 ───────── */
   function applyText() {
-    $('hd-title').textContent = T.title || '';
-    $('hd-desc').textContent = T.desc || '';
     $('l-cat').textContent = T.labelCategory || '';
     $('l-title').textContent = T.labelTitle || '';
     $('l-body').textContent = T.labelBody || '';
@@ -335,15 +340,24 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     $('setup-brand').textContent = (S.getConfig().text || {}).brand || '';
     $('setup-title').textContent = T.setupTitle || '';
     $('setup-desc').textContent = T.setupDesc || '';
-    el.cancel.textContent = T.cancel || '';
-    el.submit.textContent = T.submit || '';
-    $('busy-label').textContent = T.progress || '';
-    $('done-text').textContent = T.done || '';
-    $('again').textContent = T.again || '';
-    $('fail-text').textContent = T.failed || '';
     $('retry').textContent = T.retry || '';
     el.pill.title = T.changeAuthor || '';
+    applyModeText();
   }
+
+  // 새 질문과 수정에서 달라지는 문구
+  function applyModeText() {
+    const editing = !!ui.editing;
+    $('hd-title').textContent = (editing ? T.editTitle : T.title) || '';
+    $('hd-desc').textContent = (editing ? T.editDesc : T.desc) || '';
+    el.cancel.textContent = (editing ? T.editCancel : T.cancel) || '';
+    el.submit.textContent = (editing ? T.editSubmit : T.submit) || '';
+    $('busy-label').textContent = (editing ? T.editProgress : T.progress) || '';
+    $('done-text').textContent = (editing ? T.editDone : T.done) || '';
+    $('again').textContent = (editing ? T.editAgain : T.again) || '';
+    $('fail-text').textContent = (editing ? T.editFailed : T.failed) || '';
+  }
+  const stagesNow = () => (ui.editing && T.editStages) || T.stages || [];
 
   let toastTimer = 0;
   function toast(message) {
@@ -434,7 +448,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     const chip = event.target.closest('.chip');
     if (!chip || chip.disabled || chip.dataset.major === ui.major) return;
     ui.major = chip.dataset.major;
-    S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
+    if (!ui.editing) S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
     onEdit();
   });
 
@@ -464,11 +478,12 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       && !!el.title.value.trim()
       && !!ui.major
       && (!!el.text.value.trim() || ui.images.length > 0)
-      && !ui.images.some(image => image.tooBig);
+      && !ui.images.some(image => image.tooBig)
+      && (!ui.editing || signature() !== ui.editing.signature);   // 수정은 바뀐 것이 있을 때만
   }
 
   function signature() {
-    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(i => i.url)]);
+    return JSON.stringify([el.title.value.trim(), el.text.value.trim(), ui.major, ui.images.map(i => i.ref || i.url)]);
   }
 
   function onEdit() {
@@ -510,16 +525,21 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 
   /* ───────── 임시 저장 ───────── */
   let draftTimer = 0;
+  function writeDraft() {
+    const draft = { title: el.title.value, body: el.text.value, major: ui.major };
+    if (!draft.title.trim() && !draft.body.trim()) {
+      S.local.remove(DRAFT_KEY);
+      ui.draftSaved = false;
+    } else {
+      ui.draftSaved = S.local.set(DRAFT_KEY, draft);
+    }
+  }
+
   function saveDraft() {
     clearTimeout(draftTimer);
+    if (ui.editing) return;   // 고치는 중인 내용은 새 질문 임시 저장에 섞지 않는다
     draftTimer = setTimeout(() => {
-      const draft = { title: el.title.value, body: el.text.value, major: ui.major };
-      if (!draft.title.trim() && !draft.body.trim()) {
-        S.local.remove(DRAFT_KEY);
-        ui.draftSaved = false;
-      } else {
-        ui.draftSaved = S.local.set(DRAFT_KEY, draft);
-      }
+      writeDraft();
       renderFooter();
     }, 300);
   }
@@ -552,21 +572,23 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   /* ───────── 이미지 ───────── */
   function renderThumbs() {
     const locked = ui.phase === 'busy' || ui.phase === 'done';
+    // 수정 중에 불러온 이미지는 이미 저장된 것(ref)이라 헤더를 붙여 받아 온다.
     const items = ui.images.map((image, i) => `
-      <div class="thumb ${image.tooBig ? 'too-big' : ''}" style="background-image:url('${image.url}')">
+      <div class="thumb ${image.tooBig ? 'too-big' : ''}" ${image.ref ? S.imageAttr(image.ref, esc) : `style="background-image:url('${image.url}')"`}>
         <button type="button" class="rm" data-i="${i}" aria-label="${esc(T.removeImage)}" ${locked ? 'disabled' : ''}>✕</button>
       </div>`).join('');
     const slot = ui.images.length < IMG.max
       ? `<button type="button" class="slot" id="slot" aria-label="${esc(T.imageSlotLabel)}" ${locked ? 'disabled' : ''}><span class="plus">+</span><span>${esc(T.imageSlot)}</span></button>`
       : '';
     el.thumbs.innerHTML = items + slot;
+    S.hydrate(el.thumbs);
   }
 
   el.thumbs.addEventListener('click', event => {
     const remove = event.target.closest('.rm');
     if (remove && !remove.disabled) {
       const [image] = ui.images.splice(Number(remove.dataset.i), 1);
-      if (image) URL.revokeObjectURL(image.url);
+      if (image && image.url) URL.revokeObjectURL(image.url);
       renderThumbs();
       onEdit();
       return;
@@ -616,7 +638,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   }
 
   function clearImages() {
-    ui.images.forEach(image => URL.revokeObjectURL(image.url));
+    ui.images.forEach(image => { if (image.url) URL.revokeObjectURL(image.url); });
     ui.images = [];
   }
 
@@ -625,6 +647,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   let similarSeq = 0;
   function scheduleSimilar() {
     clearTimeout(similarTimer);
+    if (ui.editing) return;   // 이미 등록한 질문을 고치는 중에는 비슷한 질문을 찾지 않는다
     similarTimer = setTimeout(refreshSimilar, 300);
   }
 
@@ -760,9 +783,95 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       .filter(item => item.author === ui.author)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 3);
+    const locked = ui.phase !== 'idle';
     el.mine.hidden = !items.length;
-    el.mineList.innerHTML = items.map(item => `
-      <li><i class="dot ${dotClass(item.status)}"></i><span class="m-title">${esc(item.title)}</span><span class="m-status">${esc(item.status)}</span></li>`).join('');
+    el.mineList.innerHTML = items.map(item => {
+      const editing = !!ui.editing && ui.editing.id === item.id;
+      const loading = ui.editLoading === item.id;
+      const label = editing ? T.editing : loading ? T.editLoading : T.edit;
+      return `
+      <li class="${editing ? 'on' : ''}"><i class="dot ${dotClass(item.status)}"></i><span class="m-title">${esc(item.title)}</span><span class="m-status">${esc(item.status)}</span><button type="button" class="m-edit" data-edit="${esc(item.id)}" aria-label="${esc(item.title)} ${esc(T.edit)}" ${editing || loading || locked ? 'disabled' : ''}>${esc(label)}</button></li>`;
+    }).join('');
+  }
+
+  el.mineList.addEventListener('click', event => {
+    const button = event.target.closest('[data-edit]');
+    if (button && !button.disabled) beginEditing(button.dataset.edit);
+  });
+
+  /* ───────── 내 질문 수정 ───────── */
+  // 수정을 시작하면 쓰던 새 질문(제목·내용·카테고리·이미지)을 잠시 보관하고, 수정이 끝나면 되돌린다.
+  let editSeq = 0;
+  async function beginEditing(id) {
+    if (ui.phase !== 'idle' || !ui.author) return;
+    const seq = ++editSeq;
+    ui.editLoading = id;
+    renderMine();
+    let thread;
+    try {
+      thread = await S.getQuestion(id);
+    } catch (error) {
+      if (seq !== editSeq) return;
+      ui.editLoading = '';
+      renderMine();
+      if (!handleAccessError(error)) toast(T.editLoadFailed);
+      return;
+    }
+    if (seq !== editSeq) return;
+    ui.editLoading = '';
+    const first = ((thread && thread.messages) || []).find(m => !m.system);
+    if (ui.phase !== 'idle' || !first || first.who !== ui.author) {
+      renderMine();
+      return;
+    }
+    if (ui.editing) {
+      clearImages();   // 다른 질문으로 옮기면 지금 고치던 내용만 버린다
+    } else {
+      clearTimeout(draftTimer);
+      writeDraft();
+      ui.stash = {
+        title: el.title.value, body: el.text.value, major: ui.major,
+        images: ui.images, attempt: ui.attempt, draftSaved: ui.draftSaved,
+      };
+      ui.images = [];
+    }
+    el.title.value = String(thread.title || '').slice(0, 60);
+    el.text.value = String(first.text || '');
+    ui.major = S.isCategory(thread.cat1) ? thread.cat1 : '';
+    ui.images = (first.images || []).filter(S.isStoredImage).map(ref => ({ ref, url: '', tooBig: false }));
+    ui.attempt = null;
+    ui.draftSaved = false;
+    ui.editing = { id: thread.id, signature: '' };
+    ui.editing.signature = signature();
+    setSimilar(null);
+    applyModeText();
+    setPhase('idle');
+    growText();
+    el.body.scrollTop = 0;
+    el.title.focus({ preventScroll: true });
+  }
+
+  function endEditing() {
+    if (!ui.editing) return;
+    const stash = ui.stash || { title: '', body: '', major: '', images: [], attempt: null, draftSaved: false };
+    ++editSeq;
+    clearTimeout(doneTimer);
+    clearImages();
+    ui.editing = null;
+    ui.stash = null;
+    ui.editLoading = '';
+    el.title.value = stash.title;
+    el.text.value = stash.body;
+    ui.major = stash.major;
+    if (!ui.major) applyLastCategory();
+    ui.images = stash.images;
+    ui.attempt = stash.attempt;
+    ui.draftSaved = stash.draftSaved;
+    applyModeText();
+    setSimilar(null);
+    setPhase('idle');
+    growText();
+    if (el.title.value.trim()) scheduleSimilar();
   }
 
   let indexSeq = 0;
@@ -802,20 +911,21 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     renderThumbs();
     renderPill();
     renderFooter();
+    renderMine();
   }
 
   function renderFooter() {
     const tooBig = ui.images.some(image => image.tooBig);
     el.caption.textContent = tooBig
       ? fill(T.imageTooBig, { mb: megabytes })
-      : fill(T.imageCount, { n: ui.images.length, max: IMG.max }) + (ui.draftSaved ? ` · ${T.draftSaved}` : '');
+      : fill(T.imageCount, { n: ui.images.length, max: IMG.max }) + (ui.draftSaved && !ui.editing ? ` · ${T.draftSaved}` : '');
     el.caption.classList.toggle('warn', tooBig);
     el.submit.disabled = !canSubmit();
-    el.cancel.disabled = ui.phase !== 'idle' || isEmpty();
+    el.cancel.disabled = ui.phase !== 'idle' || (!ui.editing && isEmpty());
   }
 
   function renderProgress({ stage, progress }) {
-    const stages = T.stages || [];
+    const stages = stagesNow();
     document.querySelectorAll('#ft-busy .seg i').forEach((bar, i) => {
       bar.style.width = i < stage ? '100%' : i === stage ? `${Math.round(progress * 100)}%` : '0%';
     });
@@ -823,7 +933,7 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   }
 
   function failureLine(error) {
-    const stages = T.stages || [];
+    const stages = stagesNow();
     const stage = stages[error && error.stage != null ? error.stage : 0] || '';
     let reason;
     if (error && error.exhausted) reason = fill(T.reasonRetries, { n: error.retries || 3 });
@@ -841,17 +951,19 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
     if (ui.attempt && !ui.attempt.created && ui.attempt.signature !== sig) ui.attempt = null;
     if (!ui.attempt) ui.attempt = S.newAttempt(sig);
     const attempt = ui.attempt;
+    const editing = ui.editing;
     setPhase('busy');
     renderProgress({ stage: attempt.created ? 2 : 0, progress: 0 });
     try {
-      await S.createQuestion({
+      const input = {
         title: el.title.value,
         body: el.text.value,
-        images: ui.images.map(image => image.blob),
+        images: ui.images.map(image => image.ref || image.blob),
         major: ui.major,
-        guide: '',
         author: ui.author,
-      }, { attempt, onProgress: renderProgress });
+      };
+      if (editing) await S.editQuestion(editing.id, input, { attempt, onProgress: renderProgress });
+      else await S.createQuestion({ ...input, guide: '' }, { attempt, onProgress: renderProgress });
     } catch (error) {
       setPhase('fail');
       $('fail-code').textContent = failureLine(error);
@@ -860,6 +972,14 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
       return;
     }
     ui.attempt = null;
+    if (editing) {
+      // 수정이 끝나면 잠시 완료를 보여 준 뒤 쓰던 새 질문으로 돌아간다.
+      setPhase('done');
+      loadIndex();
+      clearTimeout(doneTimer);
+      doneTimer = setTimeout(() => { if (ui.phase === 'done') endEditing(); }, DONE_RESET_MS);
+      return;
+    }
     S.local.set(LAST_CATEGORY_KEY, { major: ui.major });
     clearDraft();
     setPhase('done');
@@ -885,9 +1005,14 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
 
   el.submit.addEventListener('click', submit);
   $('retry').addEventListener('click', submit);
-  el.cancel.addEventListener('click', () => { if (!el.cancel.disabled) resetForm(); });
+  el.cancel.addEventListener('click', () => {
+    if (el.cancel.disabled) return;
+    if (ui.editing) endEditing();
+    else resetForm();
+  });
   $('again').addEventListener('click', () => {
-    resetForm();
+    if (ui.editing) endEditing();
+    else resetForm();
     el.title.focus({ preventScroll: true });
   });
 
@@ -904,7 +1029,16 @@ input::placeholder,textarea::placeholder{color:var(--text-3)}
   });
 
   S.on('author', name => {
+    const changed = name !== ui.author;
     ui.author = name;
+    // 질문은 쓴 사람만 고칠 수 있으므로 작성자가 바뀌면 수정을 그만둔다(저장 중이면 저장이 끝난 뒤 돌아간다).
+    if (changed && (ui.editing || ui.editLoading) && ui.phase !== 'busy' && ui.phase !== 'done') {
+      const wasEditing = !!ui.editing;
+      ++editSeq;
+      ui.editLoading = '';
+      endEditing();
+      if (wasEditing) toast(T.editAuthorChanged);
+    }
     if (ui.view === 'access') { renderPill(); return; }
     if (!name) { showSetup(); return; }
     if (ui.view === 'setup') setView('form');

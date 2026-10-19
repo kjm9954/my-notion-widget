@@ -154,6 +154,22 @@ window.QA_CONFIG = {
       deniedTitle: '저장소에 쓸 권한이 없어요',
       deniedDesc: '관리자에게 권한 범위를 확인해 주세요.',
       deniedCode: '403 · 쓰기 권한 필요',
+
+      // 내가 남긴 질문 수정
+      edit: '수정',
+      editing: '수정 중',
+      editLoading: '불러오는 중',
+      editLoadFailed: '질문을 불러오지 못했어요',
+      editTitle: '질문 수정',
+      editDesc: '저장하면 질문함에 (수정됨)으로 표시되고 스레드에 수정 기록이 남습니다.',
+      editCancel: '수정 취소',
+      editSubmit: '수정 저장',
+      editProgress: '수정 중',
+      editStages: ['이미지 업로드', '질문 수정', '목록 갱신'],
+      editDone: '질문을 수정했어요',
+      editAgain: '새 질문 쓰기',
+      editFailed: '수정하지 못했어요 · 내용은 남아 있어요',
+      editAuthorChanged: '작성자가 바뀌어 수정을 취소했어요',
     },
   },
 };
