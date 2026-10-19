@@ -707,8 +707,20 @@ export default {
       }
 
       if (path === "/api/notes/state" && request.method === "POST") {
-        const state = normalizeNotesState(await request.json());
-        await saveSetting(env, "notes", state);
+        const incoming = await request.json();
+        // 완료일을 보내지 않은 완료 항목은 저장된 완료일을 이어 쓴다
+        const state = await changeNotesState(env, current => normalizeNotesState({
+          items: (Array.isArray(incoming?.items) ? incoming.items : []).map(item => {
+            const previous = current.items.find(note => note.id === item?.id);
+            return item?.done && previous?.done && !Object.hasOwn(item, "doneAt") ? { ...item, doneAt: previous.doneAt } : item;
+          }),
+        }));
+        return json({ ok: true, data: state });
+      }
+
+      if (path === "/api/notes/patch" && request.method === "POST") {
+        const patch = await request.json();
+        const state = await changeNotesState(env, current => applyNotesPatch(current, patch));
         return json({ ok: true, data: state });
       }
 
@@ -1502,7 +1514,7 @@ export function normalizeWorklogState(raw) {
     const q = Number(value?.q);
     const progress = Number(value?.progress);
     const estimate = Number(value?.est);
-    const status = ["doing", "done", "wait"].includes(value?.status) ? value.status : "wait";
+    const status = ["doing", "done", "wait", "review"].includes(value?.status) ? value.status : "wait";
     const done = value?.done === true || status === "done";
     return {
       id,
@@ -1518,6 +1530,10 @@ export function normalizeWorklogState(raw) {
       est: value?.est !== null && value?.est !== undefined && value?.est !== "" && Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
       status: done ? "done" : status,
       done,
+      // 완료 전 상태(완료 해제 때 되돌릴 값)
+      ...["doing", "wait", "review"].includes(value?.prevStatus) ? { prevStatus: value.prevStatus } : {},
+      doneAt: done ? validDateKey(value?.doneAt) ? value.doneAt : value.date : null,
+      goalId: cleanText(value?.goalId, 120) || null,
       memo: cleanText(value?.memo, 4000),
       rolledFrom: validDateKey(value?.rolledFrom) ? value.rolledFrom : null,
       progressTouched: value?.progressTouched === true,
@@ -1643,6 +1659,14 @@ async function worklogReadFallback(json, path, method, env, instanceId, error) {
 
 function worklogMeta(raw) {
   const state = normalizeWorklogState(raw);
+  // 수동 정렬은 "work|life:YYYY-MM-DD" 키에 작업 id 목록만 받는다
+  const manualOrder = {};
+  for (const [key, value] of Object.entries(raw?.manualOrder || {}).slice(0, 180)) {
+    const match = /^(work|life):(\d{4}-\d{2}-\d{2})$/.exec(key);
+    if (!match || !validDateKey(match[2]) || !Array.isArray(value)) continue;
+    const ids = [...new Set(value.map(id => cleanText(id, 120)).filter(Boolean))];
+    if (ids.length) manualOrder[key] = ids;
+  }
   return {
     mode: state.mode,
     workView: state.workView,
@@ -1654,7 +1678,7 @@ function worklogMeta(raw) {
     lastRollCount: state.lastRollCount,
     lastUsed: state.lastUsed,
     columnSplit: state.columnSplit,
-    manualOrder: state.manualOrder,
+    manualOrder,
   };
 }
 
@@ -1758,9 +1782,13 @@ async function patchWorklogState(env, rawPatch) {
 
   const statements = [];
   upserts.forEach(task => {
+    const source = patch.upserts.find(value => cleanText(value?.id, 120) === task.id) || {};
     statements.push(env.DB.prepare(
       `DELETE FROM worklog_tombstones WHERE instance_id = ? AND task_id = ?`
     ).bind(instanceId, task.id));
+    // 이미 있는 작업을 덮어쓸 때:
+    // - prevStatus: 막 완료되면 직전 상태(doing/wait/review)를 남기고, 그 밖에는 저장된 값을 유지한다
+    // - goalId·doneAt: 패치에 그 필드가 없으면 저장된 값을 유지한다(doneAt 은 완료 해제 시 비운다)
     statements.push(env.DB.prepare(
       `INSERT INTO worklog_tasks (instance_id, task_id, payload, position, updated_at)
        VALUES (
@@ -1769,9 +1797,34 @@ async function patchWorklogState(env, rawPatch) {
          ?
        )
        ON CONFLICT(instance_id, task_id) DO UPDATE SET
-         payload = excluded.payload,
+         payload = json_set(excluded.payload,
+           '$.prevStatus', CASE
+             WHEN json_extract(excluded.payload, '$.done')
+               AND NOT COALESCE(json_extract(worklog_tasks.payload, '$.done'), 0)
+               AND COALESCE(json_extract(worklog_tasks.payload, '$.status'), '') != 'done'
+             THEN CASE WHEN json_extract(worklog_tasks.payload, '$.status') IN ('doing', 'wait', 'review')
+               THEN json_extract(worklog_tasks.payload, '$.status') ELSE 'wait' END
+             ELSE CASE WHEN json_extract(worklog_tasks.payload, '$.prevStatus') IN ('doing', 'wait', 'review')
+               THEN json_extract(worklog_tasks.payload, '$.prevStatus') ELSE NULL END
+           END,
+           '$.goalId', CASE WHEN ? THEN json_extract(excluded.payload, '$.goalId')
+             ELSE json_extract(worklog_tasks.payload, '$.goalId') END,
+           '$.doneAt', CASE WHEN NOT json_extract(excluded.payload, '$.done') THEN NULL
+             WHEN ? THEN json_extract(excluded.payload, '$.doneAt')
+             WHEN json_extract(worklog_tasks.payload, '$.done') THEN
+               COALESCE(json_extract(worklog_tasks.payload, '$.doneAt'), json_extract(worklog_tasks.payload, '$.date'))
+             ELSE ? END),
          updated_at = excluded.updated_at`
-    ).bind(instanceId, task.id, JSON.stringify(task), instanceId, now));
+    ).bind(
+      instanceId,
+      task.id,
+      JSON.stringify(task),
+      instanceId,
+      now,
+      Number(Object.hasOwn(source, "goalId")),
+      Number(Object.hasOwn(source, "doneAt")),
+      seoulDateKey(now),
+    ));
   });
   deleteIds.forEach(id => {
     statements.push(env.DB.prepare(
@@ -1881,7 +1934,7 @@ async function loadWeeklyGoalsState(env) {
   }));
 }
 
-function normalizeNotesState(raw) {
+export function normalizeNotesState(raw, today = seoulDateKey(Date.now())) {
   const source = raw && typeof raw === "object" ? raw : {};
   const ids = new Set();
   const items = (Array.isArray(source.items) ? source.items : []).map(value => {
@@ -1889,13 +1942,56 @@ function normalizeNotesState(raw) {
     const text = cleanText(value?.text, 1000);
     if (!id || ids.has(id) || !text) return null;
     ids.add(id);
-    return { id, text, done: value?.done === true };
+    const done = value?.done === true;
+    return { id, text, done, doneAt: done ? validDateKey(value?.doneAt) ? value.doneAt : today : null };
   }).filter(Boolean);
   return { items };
 }
 
 async function loadNotesState(env) {
-  return normalizeNotesState(await loadSetting(env, "notes", { items: [] }));
+  return changeNotesState(env, current => current);
+}
+
+// 메모 부분 변경: deleteIds 삭제, updates(create/changes) 반영, cleanupCompleted 면 오늘 이전에 끝낸 항목을 지운다
+export function applyNotesPatch(current, raw, today = seoulDateKey(Date.now())) {
+  const patch = raw && typeof raw === "object" ? raw : {};
+  const deleted = new Set((Array.isArray(patch.deleteIds) ? patch.deleteIds : []).map(id => cleanText(id, 120)));
+  const items = normalizeNotesState(current, today).items.filter(item => !deleted.has(item.id));
+  for (const operation of Array.isArray(patch.updates) ? patch.updates : []) {
+    const id = cleanText(operation?.id, 120);
+    if (!id || deleted.has(id)) continue;
+    const index = items.findIndex(item => item.id === id);
+    if (index < 0 && operation.create !== true || index >= 0 && operation.create === true) continue;
+    const changes = operation.changes && typeof operation.changes === "object" ? operation.changes : {};
+    const item = index < 0 ? { id, text: "", done: false, doneAt: null } : { ...items[index] };
+    if (Object.hasOwn(changes, "text")) item.text = cleanText(changes.text, 1000);
+    if (Object.hasOwn(changes, "done")) {
+      const done = changes.done === true;
+      item.doneAt = done ? item.done ? item.doneAt : today : null;
+      item.done = done;
+    }
+    if (!item.text) continue;
+    if (index < 0) items.push(item);
+    else items[index] = item;
+  }
+  return { items: items.filter(item => !(patch.cleanupCompleted === true && item.done && item.doneAt < today)) };
+}
+
+// 메모 상태를 읽고 change 결과로 바꾼다. 다른 화면이 동시에 고쳤으면 다시 읽어 최대 12번 재시도한다.
+async function changeNotesState(env, change) {
+  const key = settingStorageKey(env, "notes");
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const row = await env.DB.prepare("SELECT value FROM widget_settings WHERE key = ?").bind(key).first();
+    const next = change(normalizeNotesState(safeParse(row?.value, { items: [] })));
+    const value = JSON.stringify(next);
+    if (row?.value === value || !row && !next.items.length) return next;
+    const now = new Date().toISOString();
+    const result = row
+      ? await env.DB.prepare("UPDATE widget_settings SET value = ?, updatedAt = ? WHERE key = ? AND value = ?").bind(value, now, key, row.value).run()
+      : await env.DB.prepare("INSERT OR IGNORE INTO widget_settings (key, value, updatedAt) VALUES (?, ?, ?)").bind(key, value, now).run();
+    if (Number(result.meta?.changes) > 0) return next;
+  }
+  throw new Error("메모가 다른 화면에서 변경 중입니다. 잠시 후 다시 시도해 주세요.");
 }
 
 // ───────── 인수인계 Q&A ─────────

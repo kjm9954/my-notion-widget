@@ -10,7 +10,10 @@ const task = (id, extra = {}) => ({ id:String(id), mode:'work', date:today, titl
 const snapshot = tasks => normalizeSnapshot({ tasks }, { week:'2026-9-28', items:[goal, { ...goal, id:2, text:'연결 업무 없음' }] });
 
 test('공개 Worker의 구형 응답도 읽되 없는 목표 연결과 색을 만들지 않는다', () => {
-  const worklog = normalizeWorklogState({ tasks:[task(1), task(2, { done:true })] });
+  // 지금 Worker는 목표 연결(goalId)을 돌려준다. 구형 응답은 그 필드를 빼서 흉내 낸다.
+  const current = normalizeWorklogState({ tasks:[task(1), task(2, { done:true })] });
+  assert.equal(current.tasks[0].goalId, '1');
+  const worklog = { ...current, tasks: current.tasks.map(({ goalId, ...rest }) => rest) };
   const goals = normalizeWeeklyGoalsState({ week:'2026-9-28', items:[{ ...goal, color:'#6b7b49' }] });
   const state = normalizeSnapshot(worklog, goals);
   assert.equal(state.tasks[0].goalId, undefined);

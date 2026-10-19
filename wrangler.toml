@@ -1,7 +1,8 @@
 name = "notion-widget"
-main = "worker.js"
+main = "layout-entry.mjs"
 compatibility_date = "2026-07-26"
 workers_dev = true
+preview_urls = true
 keep_vars = true
 
 [vars]

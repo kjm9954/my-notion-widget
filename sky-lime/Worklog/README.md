@@ -105,7 +105,7 @@ PLAYWRIGHT_MODULE=<playwright 경로> SKY_LIME_SHOTS=<스크린샷 폴더> node 
 | 다른 위젯 반영 | `Store.watch` (`/api/quarter-goals/`), 2분 공유 캐시로 세 위젯 조회를 한 번으로 합침 | 저장 응답(전체 상태)으로 같은 분기 캐시를 바로 갱신 |
 
 - `store.js`에는 위 두 함수와 조회 합치기·저장 캐시 연결 두 줄만 더했습니다. 기존 함수 동작은 같습니다.
-- 서버: 기존 Worker를 감싸는 별도 모듈(`quarter-goals-api.mjs`)이 새 주소 두 개만 처리합니다. 저장은 기존 `widget_settings` 표의 행 하나(`instance:<키>:quarterGoals:v1:<work|life>:<YYYY-Qn>`)이고 D1 migration·KV는 쓰지 않습니다. 서버 파일은 이 저장소에 넣지 않았고 운영 배포는 별도로 진행합니다. **배포 전에는 세 위젯이 "불러오지 못했어요"로 표시됩니다.**
+- 서버: 기존 Worker를 감싸는 별도 모듈(`quarter-goals-api.mjs`)이 새 주소 두 개만 처리합니다. 저장은 기존 `widget_settings` 표의 행 하나(`instance:<키>:quarterGoals:v1:<work|life>:<YYYY-Qn>`)이고 D1 migration·KV는 쓰지 않습니다. 서버 파일은 저장소 루트의 `quarter-goals-api.mjs`이고, Worker 진입점 `layout-entry.mjs`가 감싸 붙입니다(2026-10-18 운영 배포분과 같음).
 - 목표: `id, order, title, steps[{id,title,done}](최대 6), pct, status(doing/done/hold), lastActivityAt, createdAt, doneAt`. 습관: `id, order, name, months[3](good/half/bad/null)`. 분기당 목표 5개·습관 5개(서버에서도 막음).
 - 습관 이어가기: 그 분기 행이 아직 없으면(한 번도 저장 안 함) 직전 분기(못 찾으면 최대 1년 전까지) 습관 이름만 빈 기호로 보여주고, 처음 저장할 때 함께 저장합니다. 그 뒤 전부 지워도 다시 복사하지 않습니다. 지난 분기에는 복사하지 않습니다.
 - 브라우저 저장소에는 UI 값만 둡니다: 업무/일상(`sky-lime-worklog-mode-v1:<키>`, 업무일지 위젯과 공유)과 고른 분기(`sky-lime-goal-quarter-v1:<키>`, 그 업무일에만 유지).
@@ -169,7 +169,7 @@ PLAYWRIGHT_MODULE=<playwright 경로> GOAL_CHECK_SHOTS=<스크린샷 폴더> nod
 | 다른 위젯 반영 | `Store.watch` (`/api/meeting-notes/`), 2분 공유 캐시로 세 위젯 조회를 한 번으로 합침 | 저장 응답을 공유 캐시에 바로 합침(③에서 ★ → ①에 바로 반영) |
 
 - `store.js`에는 위 세 함수와 조회 합치기·변경 번호 확인·저장 캐시 합치기만 더했습니다. 기존 함수 동작은 같습니다.
-- 서버: 기존 Worker를 감싸는 별도 모듈(`meeting-notes-api.mjs`)이 `/api/meeting-notes/*`만 처리합니다. 면담 1개 = 기존 `widget_settings` 행 1개(`instance:<키>:meetingNotes:v1:note:<id>`) + 변경 번호 행 1개(`…:meetingNotes:v1:rev`). D1 migration·KV는 쓰지 않습니다. 서버 파일은 이 저장소에 넣지 않았고 운영 배포는 별도로 진행합니다. **배포 전에는 세 위젯이 "불러오지 못했어요"로 표시됩니다.**
+- 서버: 기존 Worker를 감싸는 별도 모듈(`meeting-notes-api.mjs`)이 `/api/meeting-notes/*`만 처리합니다. 면담 1개 = 기존 `widget_settings` 행 1개(`instance:<키>:meetingNotes:v1:note:<id>`) + 변경 번호 행 1개(`…:meetingNotes:v1:rev`). D1 migration·KV는 쓰지 않습니다. 서버 파일은 저장소 루트의 `meeting-notes-api.mjs`(테스트 `tests/meeting-notes-api.test.mjs`)이고, Worker 진입점 `layout-entry.mjs`가 감싸 붙입니다(2026-10-19 운영 배포분과 같음).
 - 면담 1개: `id, date(YYYY-MM-DD), title, who, topics[{ id, h(주제명), say(내가 할 말), lines[{ id, t, key(★) }] }], todos[{ id, t, done }]` + 서버가 붙이는 `rev`(버전)·`createdAt`·`updatedAt`. 서버 상한: 면담 2,000개, 글자 수 제목 120 · 준 사람 40 · 주제명 80 · 내가 할 말 300 · 들은 말 500 · 할 일 200.
 - 기록이 많아져도: 핵심·검색은 모든 내용이 필요해서 전체를 한 번 받고, 2분마다 변경 번호(2행)만 확인해 바뀐 때만 다시 받습니다. 면담 300개(약 0.6MB, 압축 전송 약 0.15MB)까지 문제없고, 1,000개를 넘기면 "바뀐 면담만 받기"를 추가할 수 있습니다.
 - 브라우저 저장소(localStorage)에는 아무것도 두지 않습니다.
