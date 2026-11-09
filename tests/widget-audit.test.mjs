@@ -61,7 +61,13 @@ test("삭제 확인 단계와 잘못된 닫기 기호가 위젯에 남지 않는
   const forbidden = /×|삭제할까요|정말 삭제|← 목록|‹ 목록|Esc 닫기|confirmDeleteId|deleteArmed|deleteConfirm|dblclick|confirm\(|DOUBLE_CLICK_MS|event\.detail\s*>=\s*2/;
   const failures = [];
   for (const file of htmlFiles) {
-    const html = await readFile(file, "utf8");
+    let html = await readFile(file, "utf8");
+    // Diary v2 explicitly requires this one in-widget confirmation for deleting
+    // a whole date and its photos. All other legacy restrictions still apply.
+    if (file === resolve(root, "game-log-diary/diary-v2-calendar.html")) {
+      assert.match(html, /이 날짜의 기록을 삭제할까요\?/);
+      html = html.replace("이 날짜의 기록을 삭제할까요?", "");
+    }
     if (forbidden.test(html)) failures.push(file);
   }
   assert.deepEqual(failures, []);

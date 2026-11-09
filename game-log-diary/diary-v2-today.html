@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="referrer" content="no-referrer"><title>하루의 기록</title><link rel="stylesheet" href="diary-v2.css?v=20261109"></head>
+<body><main class="root" id="root" aria-labelledby="title">
+  <header class="head"><h1 class="title" id="title">하루의 기록</h1><nav class="nav" aria-label="기록 날짜"><button class="today-link" id="today" type="button">오늘</button><button class="arrow" id="prev" type="button" aria-label="이전 날짜">‹</button><span class="nav-label" id="date"></span><button class="arrow" id="next" type="button" aria-label="다음 날짜">›</button></nav></header>
+  <form class="form" id="form">
+    <div class="mood-row"><p class="mood-caption" id="caption">오늘의 기분 · 선택</p><div class="moods" id="moods" role="group" aria-labelledby="caption"></div></div>
+    <div class="content no-photos" id="content"><div class="text-cell"><textarea class="writing" id="writing" maxlength="2000" aria-label="일기 내용" placeholder="오늘 있었던 일…"></textarea><button class="preview" id="preview" type="button" hidden><span class="preview-copy" id="preview-copy"></span><span class="preview-action">이어서 쓰기</span></button></div><div class="photos" id="photos" aria-label="첨부 사진" hidden></div></div>
+    <div class="toolbar"><button class="quiet" id="add" type="button">+ 사진 추가</button><button class="quiet" id="long-open" type="button">길게 쓰기</button><button class="save" id="save" type="submit" disabled>저장</button></div>
+    <p class="status reserved" id="status" data-status role="status" aria-live="polite"></p>
+  </form><input id="file" type="file" accept="image/*" multiple hidden>
+  <section class="layer" id="add-layer" role="dialog" aria-modal="true" aria-labelledby="add-title" hidden>
+    <div class="layer-head"><h2 id="add-title">사진 추가</h2><button class="close" data-close type="button" aria-label="닫기">✕</button></div><div class="layer-body"><div class="slots" id="slots"></div></div><p class="status" data-editor-status role="status"></p><div class="layer-foot"><button class="save" data-close type="button">완료</button></div>
+  </section>
+  <section class="layer" id="long-layer" role="dialog" aria-modal="true" aria-labelledby="long-title" hidden>
+    <div class="layer-head"><h2 id="long-title">기록 쓰기</h2><button class="close" data-close type="button" aria-label="닫기">✕</button></div><div class="layer-body"><textarea class="long" id="long" maxlength="2000" aria-label="긴 일기 내용" placeholder="천천히 적어도 괜찮아요."></textarea></div><p class="status" data-editor-status role="status"></p><div class="layer-foot"><span class="char-count" id="char-count">0 / 2000</span><button class="save" id="long-save" type="button">저장</button></div>
+  </section>
+  <section class="layer" id="view-layer" role="dialog" aria-modal="true" aria-labelledby="view-title" hidden>
+    <div class="layer-head"><h2 id="view-title">첨부 사진</h2><button class="close" data-close type="button" aria-label="닫기">✕</button></div><div class="layer-body"><img class="photo-view" id="view-img" alt="첨부한 사진 원본 비율 보기"></div>
+  </section>
+  <section class="layer conflict-layer" id="conflict" role="dialog" aria-modal="true" aria-labelledby="conflict-title" hidden>
+    <div class="layer-head"><h2 id="conflict-title">최신 기록 확인</h2><button class="close" data-close type="button" aria-label="닫기">✕</button></div><div class="layer-body" id="conflict-body"></div><div class="layer-foot"><button class="quiet" id="use-latest" type="button">최신 기록 사용</button><button class="save" id="use-draft" type="button">내 초안으로 다시 작성</button></div>
+  </section>
+</main><script src="diary-v1-client.js?v=20261109"></script><script type="module" src="diary-v2-today.js?v=20261109"></script></body></html>

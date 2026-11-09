@@ -89,13 +89,17 @@ async (page) => {
   await today.locator('[data-shift="-1"]').click();
   await today.waitForFunction(() => {
     const text = document.querySelector('[data-text]');
-    return document.querySelector('.date-label')?.textContent.includes('8월 9일') && text && !text.disabled;
+    return document.querySelector('.date-label')?.textContent.includes('8월 9일') && text && !text.disabled
+      && !document.querySelector('.save-status')?.textContent.includes('불러오는 중');
   });
   check('Previous date loads its own record slot', (await today.locator('.date-label').innerText()).includes('8월 9일') && await today.locator('[data-text]').inputValue() === '');
   await today.locator('[data-shift="1"]').click();
   await today.waitForFunction(() => {
     const text = document.querySelector('[data-text]');
-    return document.querySelector('.date-label')?.textContent.includes('8월 10일') && text && !text.disabled;
+    // v1 paints the date before the read finishes and only disables text while
+    // saving. Wait for the actual read, not just an already-enabled textarea.
+    return document.querySelector('.date-label')?.textContent.includes('8월 10일') && text && !text.disabled
+      && !document.querySelector('.save-status')?.textContent.includes('불러오는 중');
   });
 
   await today.locator('[data-text]').fill('사진과 함께 남기는 실제 기록');
