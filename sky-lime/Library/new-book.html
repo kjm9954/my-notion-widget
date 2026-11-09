@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>새 기록</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../Worklog/sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="library.css?v=20261109-library">
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body data-library-widget="new-book">
+  <form class="sl-root lb-root lb-add" id="app" aria-label="새 기록" autocomplete="off">
+    <label class="lb-title" for="title">새 기록</label>
+    <input class="lb-field" id="title" type="text" maxlength="200" enterkeyhint="done" placeholder="읽기 시작한 책 제목">
+    <a class="lb-field lb-open-book" id="savedLink" target="_blank" rel="noopener noreferrer" hidden>저장됨 · 노션에서 열기</a>
+    <button class="lb-button" id="add" type="submit">추가</button>
+    <span class="lb-add-status" id="notice" role="status" aria-live="polite"></span>
+  </form>
+  <script type="module" src="library-widgets.mjs?v=20261109-library"></script>
+</body>
+</html>

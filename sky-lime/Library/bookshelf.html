@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>책장</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../Worklog/sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="library.css?v=20261109-library">
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body data-library-widget="bookshelf">
+  <main class="sl-root lb-root lb-shelf" id="app" aria-label="책장">
+    <div class="lb-head" id="shelfHead"><h1 class="lb-title">책장</h1></div>
+    <div class="lb-shelf-grid" id="grid"><p class="lb-message">불러오는 중이에요</p></div>
+    <section class="lb-layer" id="layer" role="dialog" aria-modal="true" aria-labelledby="layerTitle" hidden>
+      <div class="lb-layer-head">
+        <h2 class="lb-layer-title" id="layerTitle"></h2>
+        <button class="lb-close" id="close" type="button" aria-label="닫기">✕</button>
+      </div>
+      <div class="lb-stars" id="stars" role="radiogroup" aria-label="별점"></div>
+      <div class="lb-layer-row">
+        <label class="sl-sr" for="one">이 책의 한 줄</label>
+        <textarea class="lb-field" id="one" maxlength="300" placeholder="이 책의 한 줄"></textarea>
+        <button class="lb-button" id="finish" type="button">완독</button>
+      </div>
+      <p class="lb-layer-error" id="saveError" role="status" hidden></p>
+    </section>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script type="module" src="library-widgets.mjs?v=20261109-library"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>책장 검색</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../Worklog/sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="library.css?v=20261109-library">
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body data-library-widget="book-search">
+  <main class="sl-root lb-root sl-search" id="app" aria-label="책장 검색">
+    <div class="sl-search-head"><h1 class="sl-search-title">책장 검색</h1><span class="lb-more" id="more" hidden>더 정확한 단어로 찾아보세요</span></div>
+    <form class="sl-search-field" id="form" role="search" autocomplete="off">
+      <input class="sl-search-input" id="query" type="text" maxlength="100" enterkeyhint="search" spellcheck="false" placeholder="책 제목이나 한 줄 검색" aria-label="책 제목이나 한 줄 검색">
+      <button class="sl-search-clear" id="clear" type="button" aria-label="지우기" hidden>✕</button>
+    </form>
+    <div class="sl-search-list" id="list"><p class="sl-search-message">책 제목이나 한 줄로 찾아보세요</p></div>
+    <div class="sl-sr" id="live" aria-live="polite"></div>
+  </main>
+  <script type="module" src="library-widgets.mjs?v=20261109-library"></script>
+</body>
+</html>

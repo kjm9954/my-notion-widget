@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>읽은 권수</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="../Worklog/sky-lime.css?v=20261015-sky-lime">
+  <link rel="stylesheet" href="library.css?v=20261109-library">
+  <script src="../../store.js?v=20260930-size-sync" data-store-isolated data-store-coalesce></script>
+</head>
+<body data-library-widget="reading-count">
+  <main class="sl-root lb-root lb-count" id="app" aria-label="읽은 권수">
+    <div class="lb-head">
+      <button class="sl-arrow" id="prev" type="button" aria-label="이전 해">‹</button>
+      <span class="lb-year" id="year"></span>
+      <button class="sl-arrow" id="next" type="button" aria-label="다음 해">›</button>
+    </div>
+    <div class="lb-count-body" id="countBody">
+      <p class="lb-num"><strong id="count" aria-live="polite">—</strong><span>권</span></p>
+      <div class="lb-bars" id="bars" aria-label="연도별 읽은 권수"></div>
+    </div>
+    <span class="lb-count-error" id="notice" role="status"></span>
+  </main>
+  <script type="module" src="library-widgets.mjs?v=20261109-library"></script>
+</body>
+</html>
