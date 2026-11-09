@@ -2,6 +2,7 @@
 // the explicitly requested reading source to the new index implementation.
 import meetings, { runMeetingIndex } from './meeting-production.mjs';
 import reading from './worker.js';
+import { runReadingTree, readingReindex } from './reading-tree.mjs';
 
 const readingNamespaces = new WeakMap();
 const readingAccess = env => ({ ...env, ALLOWED_W: env.READING_ALLOWED_W || env.ALLOWED_W });
@@ -20,7 +21,7 @@ export default {
     const url = new URL(request.url);
     if (url.searchParams.get('source') === 'reading') {
       if (url.pathname === '/search') return reading.fetch(request, readingAccess(env), ctx);
-      if (url.pathname === '/reindex') return meetings.fetch(request, readingEnv(env), ctx);
+      if (url.pathname === '/reindex') return readingReindex(request, readingEnv(env));
     }
     return meetings.fetch(request, env, ctx);
   },
@@ -29,11 +30,12 @@ export default {
       const result = await runMeetingIndex(env);
       const budget = Number(env.MAX_NOTION_REQUESTS) > 0 ? Math.floor(Number(env.MAX_NOTION_REQUESTS)) : 45;
       const remaining = Math.max(0, budget - (Number(result.requests) || 0));
-      if (!env.NOTION_READING_DATA_SOURCE_ID || !remaining) return;
+      // Reserve three subrequests for reading checkpoint/index KV operations.
+      if (!env.NOTION_READING_DATA_SOURCE_ID || remaining <= 3) return;
       // Respect Notion's request spacing when switching between the two clients.
       const delay = Math.max(0, Number(env.NOTION_MIN_INTERVAL_MS ?? 350) || 0);
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-      await runMeetingIndex(readingEnv(env, remaining));
+      await runReadingTree(readingEnv(env, remaining - 3));
     })().catch(error => {
       console.error('notion-search cron', error?.status || '', error?.publicMessage || 'server error');
     }));

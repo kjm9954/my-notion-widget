@@ -553,16 +553,16 @@ function seoulDate(value) {
 }
 __name(seoulDate, "seoulDate");
 var isRemoved = /* @__PURE__ */ __name((page) => page?.in_trash === true || page?.archived === true || page?.is_archived === true, "isRemoved");
-function runIndex(env, continuation = null) {
+function runIndex(env, continuation = null, reader = null) {
   const state = runtime(env);
   if (state.running) return state.running;
-  state.running = buildIndex(env, continuation).finally(() => {
+  state.running = buildIndex(env, continuation, reader).finally(() => {
     state.running = null;
   });
   return state.running;
 }
 __name(runIndex, "runIndex");
-async function buildIndex(env, continuation) {
+async function buildIndex(env, continuation, reader) {
   const state = runtime(env);
   const notBefore = Date.parse(env.INDEX_NOT_BEFORE || "");
   if (Number.isFinite(notBefore) && Date.now() < notBefore) {
@@ -577,13 +577,14 @@ async function buildIndex(env, continuation) {
   const previous = await loadIndex(env);
   const before = new Map(previous.pages.map((page) => [page.id, page]));
   let job = continuation ? await openJob(env, continuation) : state.job;
-  if (job && (job.expiresAt <= Date.now() || job.source !== dataSourceId || job.baseUpdatedAt !== (previous.updatedAt || null))) {
+  if (job && (job.expiresAt <= Date.now() || job.source !== dataSourceId || job.baseUpdatedAt !== (previous.updatedAt || null) || (job.readerVersion || null) !== (reader?.version || null))) {
     state.job = null;
     if (continuation) throw indexError("stale continuation; restart indexing", 409, { saved: false, preserved: true });
     job = null;
   }
   job ||= {
     v: 1,
+    ...(reader ? { readerVersion: reader.version } : {}),
     source: dataSourceId,
     baseUpdatedAt: previous.updatedAt || null,
     expiresAt: Date.now() + CONTINUATION_TTL_MS,
@@ -599,6 +600,7 @@ async function buildIndex(env, continuation) {
     await listPages(notion, job);
     job.pages ||= job.listed.map((meta) => {
       const old = before.get(meta.id);
+      if (reader) return reader.prepare(meta, old);
       return { ...meta, summary: old?.summary || "", lead: old?.lead || "", body: old?.body || "", edited: old?.edited ?? null };
     }).sort((a, b) => b.date.localeCompare(a.date) || b.lastEdited.localeCompare(a.lastEdited));
     const denied = /* @__PURE__ */ new Set();
@@ -607,14 +609,15 @@ async function buildIndex(env, continuation) {
       if (!page) break;
       job.work ||= { id: page.id, blocks: [], stack: [blockFrame(page.id)] };
       try {
-        await readBlocks(notion, job.work);
+        if (reader) await reader.read(notion, job.work, page);
+        else await readBlocks(notion, job.work);
       } catch (error) {
         if (error?.status !== 403 && error?.status !== 404) throw error;
         denied.add(page.id);
         job.work = null;
         continue;
       }
-      Object.assign(page, pageText(job.work.blocks), { edited: page.lastEdited });
+      Object.assign(page, reader ? reader.finish(job.work) : pageText(job.work.blocks), { edited: page.lastEdited });
       job.work = null;
       indexed++;
     }
@@ -640,7 +643,7 @@ async function buildIndex(env, continuation) {
   }
   const kept = new Set(pages.map((page) => page.id));
   const removed = previous.pages.filter((page) => !kept.has(page.id)).length;
-  const same = /* @__PURE__ */ __name((page, old) => old && ["url", "title", "date", "summary", "lead", "body", "edited", "lastEdited"].every((key) => page[key] === old[key]) && page.tags.join("\0") === (old.tags || []).join("\0"), "same");
+  const same = /* @__PURE__ */ __name((page, old) => old && ["url", "title", "date", "summary", "lead", "body", "edited", "lastEdited"].every((key) => page[key] === old[key]) && page.tags.join("\0") === (old.tags || []).join("\0") && (!reader || reader.same(page, old)), "same");
   const changed = removed > 0 || pages.length !== previous.pages.length || pages.some((page) => !same(page, before.get(page.id)));
   if (changed) {
     const index = { v: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), complete: true, pages };
@@ -747,4 +750,6 @@ export {
 
 // Export existing index runner for the shared scheduled request budget; implementation unchanged.
 export { runIndex as runMeetingIndex };
+// Reading-only extension hooks. With no reader the deployed meeting path is unchanged.
+export { allowed, corsHeaders, json, requestContinuation };
 

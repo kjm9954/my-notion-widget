@@ -2,8 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import entry from '../entry.mjs';
 import production from '../meeting-production.mjs';
+import { runMeetingIndex } from '../meeting-production.mjs';
 const key = 'w_entry_test_0123456789abcdef';
 const rt = text => [{ plain_text: text }];
+
+test('default meeting index runner preserves the original flat payload and unchanged-page fast path', async t => {
+  const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
+  let calls = 0; const values = new Map();
+  const env = { NOTION_TOKEN: 'test', NOTION_DATA_SOURCE_ID: 'meeting-ds', NOTION_MIN_INTERVAL_MS: 0,
+    SEARCH_INDEX: { async get(k) { return values.get(k) || null; }, async put(k, v) { values.set(k, v); } } };
+  globalThis.fetch = async url => {
+    calls++;
+    if (String(url).includes('/query')) return Response.json({ results: [{ id: 'meeting', object: 'page', last_edited_time: 'v1', created_time: '2026-11-10T00:00:00Z', properties: { 이름: { type: 'title', title: rt('회의') } } }], has_more: false });
+    return Response.json({ results: [{ type: 'paragraph', paragraph: { rich_text: rt('기존 회의 본문') } }], has_more: false });
+  };
+  assert.equal((await runMeetingIndex(env)).saved, true); assert.equal(calls, 2);
+  const result = JSON.parse(values.get('index:v1'));
+  assert.equal(result.v, 1); assert.equal(result.pages[0].body, '기존 회의 본문');
+  assert.equal(Object.hasOwn(result.pages[0], 'readingTree'), false);
+  calls = 0; assert.equal((await runMeetingIndex(env)).saved, false); assert.equal(calls, 1);
+  assert.deepEqual([...values.keys()], ['index:v1']);
+});
 
 test('explicit reading-only access key does not grant meeting access or change the meeting key', async () => {
   const readingKey = 'w_reading_test_0123456789abcdef';
@@ -28,7 +47,7 @@ test('production meeting search, desktop errors, OPTIONS and unknown routes pass
 test('entry cron preserves meeting continuation and shares its remaining request budget with reading', async t => {
   const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
   const data = new Map(), calls = [];
-  const env = { ALLOWED_W: key, NOTION_TOKEN: 'test', NOTION_DATA_SOURCE_ID: 'meeting-ds', NOTION_READING_DATA_SOURCE_ID: 'reading-ds', MAX_NOTION_REQUESTS: 3, NOTION_MIN_INTERVAL_MS: 0,
+  const env = { ALLOWED_W: key, NOTION_TOKEN: 'test', NOTION_DATA_SOURCE_ID: 'meeting-ds', NOTION_READING_DATA_SOURCE_ID: 'reading-ds', MAX_NOTION_REQUESTS: 6, NOTION_MIN_INTERVAL_MS: 0,
     SEARCH_INDEX: { async get(k) { return data.get(k) || null; }, async put(k, v) { data.set(k, v); } } };
   globalThis.fetch = async url => {
     const path = new URL(url).pathname; calls.push(path);
