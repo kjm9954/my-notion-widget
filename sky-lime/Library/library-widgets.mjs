@@ -1,4 +1,5 @@
-import { seoulYear, escapeHtml, isComposing, safeBookUrl, shelfBooks, countBooks, searchBooks, marked, shortDate, fitSearchRows, failureText, createLibraryReader } from './library-common.mjs?v=20261109-library';
+import { seoulYear, escapeHtml, isComposing, safeBookUrl, countBooks, searchBooks, marked, shortDate, fitSearchRows, failureText, createLibraryReader } from './library-common.mjs?v=20261109-search';
+import { dailyShelf, seoulDay } from './library-phrases.mjs?v=20261109';
 
 const Store = window.Store;
 const byId = id => document.getElementById(id);
@@ -39,7 +40,7 @@ function newBook() {
     let tab = null;
     try { tab = window.open('about:blank', '_blank'); if (tab) tab.opener = null; } catch { /* fallback link below */ }
     try {
-      const book = await Store.createReadingBook({ title, status: 'reading', year: seoulYear() });
+      const book = await Store.createReadingBook({ title, status: 'reading' });
       input.value = '';
       const url = safeBookUrl(book?.url);
       let opened = false;
@@ -66,7 +67,8 @@ function newBook() {
 
 function bookshelf() {
   const grid = byId('grid'), layer = byId('layer'), one = byId('one'), stars = byId('stars'), finish = byId('finish'), close = byId('close'), errorLabel = byId('saveError');
-  let state = { books: [], loaded: false, error: null }, target = null, star = 0, saving = false, openerId = '';
+  let state = { books: [], quotes: [], loaded: false, error: null }, target = null, star = 0, saving = false, openerId = '';
+  let day = seoulDay();
   function fitTitles() {
     grid.querySelectorAll('.lb-card-title').forEach(title => {
       const card = title.parentElement, style = getComputedStyle(card), done = card.querySelector('.lb-done');
@@ -76,7 +78,7 @@ function bookshelf() {
     });
   }
   function render() {
-    const list = shelfBooks(state.books, narrow.matches ? 2 : 4);
+    const list = dailyShelf(state.books, state.quotes, narrow.matches ? 2 : 4, day);
     if (!list.length) { message(grid, state.error ? failureText(state.error) : state.loaded ? '기록한 책이 없어요' : '불러오는 중이에요'); return; }
     grid.innerHTML = list.map(book => {
       const reading = book.status === 'reading';
@@ -154,6 +156,17 @@ function bookshelf() {
   finish.addEventListener('click', save);
   narrow.addEventListener('change', render);
   new ResizeObserver(fitTitles).observe(grid);
+  const checkDay = () => { const next = seoulDay(); if (next !== day) { day = next; render(); } };
+  let midnightTimer;
+  function scheduleMidnight() {
+    clearTimeout(midnightTimer);
+    const nextMidnight = Date.parse(`${seoulDay()}T00:00:00+09:00`) + 86400000;
+    midnightTimer = setTimeout(() => { checkDay(); scheduleMidnight(); }, Math.max(1, nextMidnight - Date.now() + 20));
+  }
+  window.addEventListener('focus', () => { checkDay(); scheduleMidnight(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkDay(); scheduleMidnight(); } });
+  window.addEventListener('pagehide', event => { if (!event.persisted) clearTimeout(midnightTimer); });
+  scheduleMidnight();
 }
 
 function readingCount() {
@@ -187,28 +200,48 @@ function readingCount() {
 
 function bookSearch() {
   const input = byId('query'), list = byId('list'), more = byId('more'), clear = byId('clear');
-  let state = { books: [], loaded: false, error: null }, timer = 0;
+  const instanceKey = (new URLSearchParams(location.search).get('w') || '').trim();
+  let state = { books: [], quotes: [], loaded: false, error: null }, timer = 0, sequence = 0, controller = null, bodyHits = [], bodyTotal = 0;
   function render() {
     const query = input.value.trim(); clear.hidden = !input.value;
     more.hidden = true;
     if (state.error && !state.books.length) { message(list, failureText(state.error), 'sl-search-message'); return; }
-    if (!query) { message(list, '책 제목이나 한 줄로 찾아보세요', 'sl-search-message'); return; }
+    if (!query) { message(list, '책 제목이나 내용으로 찾아보세요', 'sl-search-message'); return; }
     if (!state.loaded) { message(list, '불러오는 중이에요', 'sl-search-message'); return; }
-    const hits = searchBooks(state.books, query);
+    const hits = searchBooks(state.books, query, state.quotes, bodyHits);
     if (!hits.length) { message(list, '찾는 내용이 없어요', 'sl-search-message'); return; }
-    const count = fitSearchRows(list.clientHeight); more.hidden = hits.length <= count;
+    const count = fitSearchRows(list.clientHeight); more.hidden = hits.length <= count && bodyTotal <= count;
     list.innerHTML = `<div class="sl-search-rows">${hits.slice(0, count).map(({ book, line }) => {
       const url = safeBookUrl(book.url);
       return `<a class="sl-search-row"${url ? ` href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"` : ' aria-disabled="true"'}><span class="sl-search-line1"><span class="sl-search-date">${shortDate(book)}</span><span class="sl-search-name">${marked(book.title, query)}</span></span><span class="sl-search-line2">${marked(line, query, true)}</span></a>`;
     }).join('')}</div>`;
     byId('live').textContent = `${hits.length}건 찾았어요`;
   }
-  function run() { clearTimeout(timer); render(); }
-  input.addEventListener('input', () => { clear.hidden = !input.value; clearTimeout(timer); if (!input.value.trim()) run(); else timer = setTimeout(run, 300); });
+  async function searchBody(query, id) {
+    const request = new AbortController(); controller = request;
+    try {
+      const url = new URL('https://notion-search.wldnjsdkk.workers.dev/search');
+      url.search = new URLSearchParams({ source: 'reading', q: query, w: instanceKey });
+      const response = await fetch(url, { signal: request.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (id !== sequence || query !== input.value.trim() || !data.ok || !Array.isArray(data.results)) return;
+      bodyHits = data.results; bodyTotal = Number(data.total) || 0; render();
+    } catch { /* Body search is optional; preserve instant Store results. */ }
+    finally { if (controller === request) controller = null; }
+  }
+  function run() {
+    clearTimeout(timer); controller?.abort(); const id = ++sequence;
+    bodyHits = []; bodyTotal = 0; render();
+    const query = input.value.trim();
+    if (query && /^w_[A-Za-z0-9_-]{24,176}$/.test(instanceKey)) timer = setTimeout(() => void searchBody(query, id), 300);
+  }
+  input.addEventListener('input', run);
   input.addEventListener('keydown', event => { if (event.key === 'Escape') { input.value = ''; run(); } if (event.key === 'Enter' && isComposing(event)) event.preventDefault(); });
   byId('form').addEventListener('submit', event => { event.preventDefault(); run(); });
   clear.addEventListener('click', () => { input.value = ''; run(); input.focus(); });
-  watch(next => { state = next; run(); });
+  watch(next => { state = next; render(); });
+  window.addEventListener('pagehide', () => { clearTimeout(timer); ++sequence; controller?.abort(); });
   new ResizeObserver(render).observe(list);
 }
 

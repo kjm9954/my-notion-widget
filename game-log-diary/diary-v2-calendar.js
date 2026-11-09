@@ -1,4 +1,4 @@
-import { $, esc, MOODS, moodButtons, photoSource, connect, watch, installDialogs, EntryEditor, conflictMarkup, monthLabel, shiftMonth, initialMonth, message } from './diary-v2-common.js?v=20261109';
+import { $, esc, MOODS, moodButtons, photoSource, connect, watch, installDialogs, EntryEditor, conflictMarkup, monthLabel, shiftMonth, initialMonth, message, clipboardImages } from './diary-v2-common.js?v=20261109-paste';
 const D = window.DiaryV1;
 if (connect(D, 'diary-v2-calendar.html')) {
   let month = initialMonth(D), entries = new Map(), token = 0, selected = '', detailEntry = null, opening = 0, deleting = false, loading = false;
@@ -9,6 +9,11 @@ if (connect(D, 'diary-v2-calendar.html')) {
     if (rendered !== String(editor.value.mood)) { $('quick-moods').innerHTML = moodButtons(editor.value.mood); $('quick-moods').dataset.value = String(editor.value.mood); }
     $('quick-count').textContent = `${editor.value.text.length} / 2000`;
     $('quick-status').textContent = editor.status;
+    const photos = JSON.stringify(editor.value.photos.map(p => [p.id, photoSource(p)]));
+    if ($('quick-photos').dataset.photos !== photos) {
+      $('quick-photos').dataset.photos = photos;
+      $('quick-photos').innerHTML = editor.value.photos.map((p, i) => `<div class="photo"><img src="${esc(photoSource(p))}" alt="첨부 사진 ${i + 1}"><button class="remove" data-remove="${i}" type="button" aria-label="사진 ${i + 1} 빼기">✕</button></div>`).join('');
+    }
     const locked = editor.busy || editor.loading;
     document.querySelectorAll('#quick button,#quick textarea,#conflict button').forEach(el => { el.disabled = locked; });
     $('quick-save').disabled = !editor.canSave();
@@ -67,6 +72,16 @@ if (connect(D, 'diary-v2-calendar.html')) {
   $('edit').addEventListener('click', () => void quick(selected));
   $('delete').addEventListener('click', () => { $('delete-status').textContent = ''; $('confirm').hidden = false; $('confirm').querySelector('button').focus(); });
   $('quick-text').addEventListener('input', e => editor.edit({ text: e.target.value }));
+  $('quick-photos').addEventListener('click', e => {
+    const button = e.target.closest('[data-remove]');
+    if (!button || editor.busy || editor.loading) return;
+    const photos = [...editor.value.photos]; photos.splice(Number(button.dataset.remove), 1); editor.edit({ photos });
+  });
+  document.addEventListener('paste', e => {
+    if ($('quick').hidden || !$('conflict').hidden || editor.busy || editor.loading) return;
+    const files = clipboardImages(e.clipboardData);
+    if (files.length) { e.preventDefault(); void editor.addFiles(files); }
+  });
   $('quick-moods').addEventListener('click', e => { const b = e.target.closest('[data-mood]'); if (b) editor.edit({ mood: editor.value.mood === b.dataset.mood ? null : b.dataset.mood }); });
   $('quick-save').addEventListener('click', async () => {
     const saved = await editor.save();

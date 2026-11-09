@@ -11,16 +11,14 @@ export function safeBookUrl(value) {
 export function shelfBooks(books, limit = 4) {
   const recent = field => (a, b) => String(field(b) || '').localeCompare(String(field(a) || '')) || String(a.id).localeCompare(String(b.id));
   return [
-    ...books.filter(book => book.status === 'reading').sort(recent(book => book.created)),
+    ...books.filter(book => book.status === 'reading').sort(recent(book => book.startDate || book.created)),
     ...books.filter(book => book.status === 'done').sort(recent(book => book.endDate || book.startDate || book.edited)),
   ].slice(0, limit);
 }
 export function countBooks(books, currentYear = seoulYear()) {
   const counts = new Map();
   for (const book of books) {
-    const year = Number(book.year);
-    // Use the existing API's year field only, never infer a year in the widget.
-    // The existing server may itself derive year from a date when no relation exists.
+    const year = Number(String(book.endDate || book.startDate || '').slice(0, 4));
     if (book.status === 'done' && Number.isInteger(year) && year >= 1000 && year <= currentYear) counts.set(year, (counts.get(year) || 0) + 1);
   }
   const first = counts.size ? Math.min(...counts.keys()) : currentYear;
@@ -64,11 +62,24 @@ export function bookDate(book) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 export const shortDate = book => bookDate(book).slice(2).replaceAll('-', '.');
-export function searchBooks(books, query) {
+export function searchBooks(books, query, quotes = [], bodyHits = []) {
   if (!searchable(query).text) return [];
-  return books.filter(book => ['title', 'author', 'one', 'learned'].some(field => matchRange(book[field], query)))
-    .sort((a, b) => bookDate(b).localeCompare(bookDate(a)) || String(b.edited || '').localeCompare(String(a.edited || '')))
-    .map(book => ({ book, line: ['one', 'learned', 'author'].map(field => book[field]).find(value => matchRange(value, query)) || book.one || book.learned || book.author || '' }));
+  const key = id => String(id || '').replaceAll('-', '').toLowerCase();
+  const quoteMatches = new Map(), bodyMatches = new Map();
+  for (const quote of quotes) {
+    const line = ['text', 'note', 'thought'].map(field => quote[field]).find(value => matchRange(value, query));
+    if (line && !quoteMatches.has(key(quote.bookId))) quoteMatches.set(key(quote.bookId), line);
+  }
+  for (const hit of bodyHits) if (hit.id && matchRange(hit.line, query)) bodyMatches.set(key(hit.id), hit.line);
+  const hits = [];
+  for (const book of books) {
+    const id = key(book.id), quote = quoteMatches.get(id), body = bodyMatches.get(id);
+    if (matchRange(book.title, query)) hits.push({ book, line: book.one || quote || body || '', rank: 0 });
+    else if (matchRange(book.one, query)) hits.push({ book, line: book.one, rank: 1 });
+    else if (quote) hits.push({ book, line: quote, rank: 2 });
+    else if (body) hits.push({ book, line: body, rank: 3 });
+  }
+  return hits.sort((a, b) => a.rank - b.rank || bookDate(b.book).localeCompare(bookDate(a.book)) || String(b.book.edited || '').localeCompare(String(a.book.edited || '')));
 }
 export const fitSearchRows = height => Math.max(0, Math.min(3, Math.floor((height + 6) / 52)));
 export function failureText(error, saving = false) {
@@ -80,12 +91,13 @@ export function failureText(error, saving = false) {
 // Store owns caching, request notifications, the instance key and the shared error indicator.
 // The reader keeps the last valid display during a failed reload and never logs errors/keys.
 export function createLibraryReader(onChange, store = window.Store) {
-  let books = [], loaded = false, error = null, disposed = false, stop = null;
+  let books = [], quotes = [], loaded = false, error = null, disposed = false, stop = null;
   const confirmed = new Map();
-  const emit = () => { if (!disposed) onChange({ books, loaded, error }); };
+  const emit = () => { if (!disposed) onChange({ books, quotes, loaded, error }); };
   function accept(state) {
     if (disposed) return;
     if (!Array.isArray(state?.books)) throw new Error('Invalid reading library response');
+    quotes = Array.isArray(state.quotes) ? state.quotes : [];
     books = state.books.map(book => {
       const patch = confirmed.get(book.id);
       if (!patch) return book;

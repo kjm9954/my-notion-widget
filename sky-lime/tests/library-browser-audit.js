@@ -10,12 +10,13 @@ async (page) => {
     { id: 'read-old', title: '두 번째 읽는 책', status: 'reading', created: '2026-01-01T00:00:00Z', year, url: notionUrl('read-old'), one: '' },
     { id: 'done-new', title: '최근 완독 책', status: 'done', year, endDate: '2026-10-01', one: '작은 습관이 삶을 바꾼다', learned: '내 생각도 찾을 수 있어요', url: notionUrl('done-new') },
     { id: 'done-start', title: '시작일로 정렬하는 책', status: 'done', year: year - 1, startDate: '2026-09-01', one: '앞부분이 아주 길어서 검색 결과에서 생략되어야 하는 문장 작은   습관을 배웠다', url: notionUrl('done-start') },
-    { id: 'done-edit', title: '수정일로 정렬하는 책', status: 'done', year: year - 4, edited: '2026-08-01', created: '2026-03-01T00:00:00Z', learned: '작은 습관을 메모', url: notionUrl('done-edit') },
+    { id: 'done-edit', title: '수정일로 정렬하는 책', status: 'done', year: year - 4, startDate: `${year - 4}-01-01`, edited: '2026-08-01', created: '2026-03-01T00:00:00Z', learned: '작은 습관을 메모', url: notionUrl('done-edit') },
     { id: 'done-no-year', title: '연도 없는 완독 책', status: 'done', year: null, startDate: '2026-07-01', author: '작은 습관', url: notionUrl('done-no-year') },
     { id: 'wishlist', title: '표시하지 않을 구입 전 책', status: 'wishlist', year, url: notionUrl('wishlist') },
     { id: 'dropped', title: '표시하지 않을 중도포기 책', status: 'dropped', year, url: notionUrl('dropped') },
   ];
   const requests = [], errors = [], results = [];
+  const quotes = [{ bookId: 'done-edit', text: '작은 습관을 메모', note: '내 생각', thought: '고유한 필사 생각' }, { bookId: 'done-no-year', text: '작은 습관' }];
   let failSave = false, failCreate = false;
   const check = (name, pass, details) => { results.push({ name, pass: Boolean(pass), details }); };
   const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
@@ -35,20 +36,21 @@ async (page) => {
     requests.push({ method: request.method(), path: url.pathname, instance: url.searchParams.get('w') === key ? 'a' : 'b' });
     const instance = url.searchParams.get('w');
     if (![key, otherKey].includes(instance)) return json({ ok: false, error: 'invalid widget instance' }, 400);
-    if (url.pathname === '/api/reading/library') return json({ ok: true, data: { books: instance === key ? books : [], quotes: [], fetchedAt: new Date().toISOString() } });
+    if (url.pathname === '/api/reading/library') return json({ ok: true, data: { books: instance === key ? books : [], quotes: instance === key ? quotes : [], fetchedAt: new Date().toISOString() } });
     if (url.pathname === '/api/reading/books/create' && request.method() === 'POST') {
       if (failCreate) { failCreate = false; return json({ ok: false, error: 'Notion temporary failure' }, 503); }
       const input = request.postDataJSON();
+      check('Create sends title and reading status only', JSON.stringify(Object.keys(input).sort()) === JSON.stringify(['status', 'title']));
       await new Promise(resolve => setTimeout(resolve, 120));
       const id = `created-${books.length}`;
-      const book = { ...input, id, url: notionUrl(id), created: new Date().toISOString(), one: '', author: '', learned: '' };
+      const book = { ...input, id, url: notionUrl(id), startDate: `${year}-11-09`, created: new Date().toISOString(), one: '', author: '', learned: '' };
       books.push(book); return json({ ok: true, data: book }, 201);
     }
     if (url.pathname === '/api/reading/books/update' && request.method() === 'POST') {
       if (failSave) { failSave = false; return json({ ok: false, error: 'Notion temporary failure' }, 503); }
       const { id, patch } = request.postDataJSON();
       await new Promise(resolve => setTimeout(resolve, 120));
-      Object.assign(books.find(book => book.id === id), patch, { edited: new Date().toISOString() });
+      Object.assign(books.find(book => book.id === id), patch, { endDate: `${year}-11-09`, edited: new Date().toISOString() });
       return json({ ok: true, data: { id } });
     }
     return json({ ok: false, error: 'Unexpected request' }, 404);
@@ -72,14 +74,14 @@ async (page) => {
     }
     const add = tabs['new-book'], shelf = tabs.bookshelf, count = tabs['reading-count'], search = tabs['book-search'];
     check('Mobile add input uses 16px text, 44px controls and the short placeholder', await add.locator('#title').getAttribute('placeholder') === '책 제목' && await add.locator('#title').evaluate(el => getComputedStyle(el).fontSize === '16px' && el.offsetHeight === 44));
-    check('Mobile shelf has two reading cards, with 44px completion hit targets', await shelf.locator('.lb-card').count() === 2 && await shelf.locator('.lb-done-hit').first().evaluate(el => el.offsetWidth === 44 && el.offsetHeight === 44));
+    check('Mobile shelf has one reading card and one phrase, with 44px completion targets', await shelf.locator('.lb-card').count() === 2 && await shelf.locator('.lb-done-hit').count() === 1 && await shelf.locator('.lb-done-hit').first().evaluate(el => el.offsetWidth === 44 && el.offsetHeight === 44));
     await shelf.setViewportSize({ width: 1130, height: 220 });
     await shelf.waitForFunction(() => document.querySelectorAll('[data-book]').length === 4);
     const shelfOrder = await shelf.locator('[data-book]').evaluateAll(els => els.map(el => el.dataset.book));
-    check('PC shelf sorts reading first, then done dates, with exactly four visible cards', JSON.stringify(shelfOrder) === JSON.stringify(['read-new', 'read-old', 'done-new', 'done-start']), shelfOrder);
-    check('Counts include only done books with API year and never count the undated/unlinked example', await count.locator('#count').innerText() === '1' && await count.locator('.lb-bar').count() === 5 && await count.locator('#next').isDisabled());
+    check('PC shelf has one latest reading book then three distinct completed-book phrases', shelfOrder.length === 4 && shelfOrder[0] === 'read-new' && new Set(shelfOrder).size === 4 && shelfOrder.slice(1).every(id => books.find(b => b.id === id).status === 'done'), shelfOrder);
+    check('Counts use dates rather than relation year', await count.locator('#count').innerText() === '3' && await count.locator('.lb-bar').count() === 5 && await count.locator('#next').isDisabled());
     await count.locator('#prev').click();
-    check('Previous year and year bar selection use the correct count', await count.locator('#count').innerText() === '1' && (await count.locator('#year').innerText()).includes(String(year - 1)));
+    check('Previous year and year bar selection use the correct count', await count.locator('#count').innerText() === '0' && (await count.locator('#year').innerText()).includes(String(year - 1)));
     await count.locator(`[data-year="${year}"]`).click();
 
     stage = 'search';
@@ -94,9 +96,9 @@ async (page) => {
     check('Search result opens its own Notion URL in a new tab', popup.url().startsWith('https://www.notion.so/'));
     await popup.close();
     await search.locator('#query').fill('내 생각'); await search.locator('#query').press('Enter');
-    check('Learned field is searchable and is shown as the highlighted result line', (await search.locator('.sl-search-line2').innerText()).includes('내 생각') && await search.locator('.sl-search-line2 b').count() === 1);
+    check('Quote note is searchable and is shown as the highlighted result line', (await search.locator('.sl-search-line2').innerText()).includes('내 생각') && await search.locator('.sl-search-line2 b').count() === 1);
     await search.locator('#query').fill('authorone'); await search.locator('#query').press('Enter');
-    check('Author field is searchable', await search.locator('.sl-search-row').count() === 1);
+    check('Deleted author field is not searchable', await search.locator('.sl-search-row').count() === 0);
     await search.locator('#query').fill('없는단어'); await search.locator('#query').press('Enter');
     check('No-results copy is correct', await search.locator('#list').innerText() === '찾는 내용이 없어요');
 
@@ -114,7 +116,7 @@ async (page) => {
     check('A failed completion leaves the layer, text and stars intact', await shelf.locator('#layer').isVisible() && (await shelf.locator('#one').inputValue()).includes('완독 한 줄') && await shelf.locator('.lb-star.is-on').count() === 4);
     await shelf.locator('#one').press('Enter');
     await shelf.locator('#layer').waitFor({ state: 'hidden' });
-    await count.waitForFunction(() => document.getElementById('count').textContent === '2');
+    await count.waitForFunction(() => document.getElementById('count').textContent === '4');
     check('Completion persists the exact status/star/one patch and updates the open count widget', books.find(book => book.id === 'read-new').status === 'done' && books.find(book => book.id === 'read-new').star === 4 && books.find(book => book.id === 'read-new').one === '완독 한 줄');
     await shelf.reload({ waitUntil: 'networkidle' });
     check('Saved completion survives refresh', await shelf.locator('[data-finish="read-new"]').count() === 0);
@@ -127,7 +129,7 @@ async (page) => {
     await add.evaluate(() => { document.getElementById('app').requestSubmit(); document.getElementById('app').requestSubmit(); });
     await add.waitForFunction(() => document.getElementById('notice').textContent.includes('저장했어요'));
     const created = books.find(book => book.title === '브라우저 검증용 새 책');
-    check('Double submit creates one book, as reading with Seoul current year', requests.filter(req => req.path.endsWith('/create')).length === before + 1 && created.status === 'reading' && created.year === year && await add.locator('#title').inputValue() === '');
+    check('Double submit creates one book as reading, without a year property', requests.filter(req => req.path.endsWith('/create')).length === before + 1 && created.status === 'reading' && !('year' in created) && await add.locator('#title').inputValue() === '');
     await shelf.waitForFunction(() => document.querySelector('.lb-card-title')?.textContent === '브라우저 검증용 새 책');
     check('New record reaches an already-open shelf via Store.watchReadingLibrary', (await shelf.locator('.lb-card-title').first().innerText()) === '브라우저 검증용 새 책');
     for (const extra of context.pages().filter(tab => !Object.values(tabs).includes(tab))) await extra.close();

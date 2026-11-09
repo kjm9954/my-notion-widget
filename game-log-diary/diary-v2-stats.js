@@ -1,4 +1,4 @@
-import { $, MOODS, connect, watch, monthLabel, shiftMonth, initialMonth, monthStats, message } from './diary-v2-common.js?v=20261109';
+import { $, MOODS, connect, watch, monthLabel, shiftMonth, initialMonth, monthStats, message } from './diary-v2-common.js?v=20261109-paste';
 const D = window.DiaryV1, kind = $('root').dataset.kind;
 if (connect(D, `diary-v2-${kind === 'mood' ? 'mood-trend' : 'record-days'}.html`)) {
   let month = initialMonth(D), rows = [], token = 0;

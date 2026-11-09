@@ -1,4 +1,4 @@
-import { $, esc, moodButtons, photoSource, connect, watch, installDialogs, EntryEditor, conflictMarkup } from './diary-v2-common.js?v=20261109';
+import { $, esc, moodButtons, photoSource, connect, watch, installDialogs, EntryEditor, conflictMarkup, clipboardImages } from './diary-v2-common.js?v=20261109-paste';
 const D = window.DiaryV1;
 if (connect(D, 'diary-v2-today.html')) {
   let lastPhotos = '', lastMood, returnFocus;
@@ -81,7 +81,8 @@ if (connect(D, 'diary-v2-today.html')) {
   $('root').addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; $('root').classList.remove('is-dragging'); } });
   $('root').addEventListener('drop', e => { e.preventDefault(); depth = 0; $('root').classList.remove('is-dragging'); void editor.addFiles(e.dataTransfer.files); });
   document.addEventListener('paste', e => {
-    const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+    if (!$('conflict').hidden || editor.busy || editor.loading) return;
+    const files = clipboardImages(e.clipboardData);
     if (files.length) { e.preventDefault(); void editor.addFiles(files); }
   });
   window.addEventListener('beforeunload', e => { if (editor.dirty || editor.busy) { editor.persist(); e.preventDefault(); e.returnValue = ''; } });

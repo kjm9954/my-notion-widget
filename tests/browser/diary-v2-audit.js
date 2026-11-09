@@ -50,6 +50,12 @@ async (page) => {
     await tab.goto(`${base}diary-v2-${kind}.html${instance ? `?w=${instance}${extra}` : ''}`, { waitUntil: 'networkidle' }); return tab;
   };
   const settled = tab => tab.waitForFunction(() => !document.querySelector('#writing')?.disabled);
+  const paste = (tab, n = 1) => tab.evaluate(({ pixel, n }) => {
+    const data = new DataTransfer();
+    for (let i = 0; i < n; i++) data.items.add(new File([Uint8Array.from(atob(pixel), c => c.charCodeAt(0))], `pasted-${i}.png`, { type: 'image/png' }));
+    const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+    document.activeElement.dispatchEvent(event); return event.defaultPrevented;
+  }, { pixel, n });
   const save = async tab => { await tab.locator('#form').evaluate(el => el.requestSubmit()); await tab.waitForFunction(() => document.querySelector('#status').textContent === '저장 완료'); };
   const layout = tab => tab.evaluate(() => {
     const root = document.querySelector('.root'), r = root.getBoundingClientRect();
@@ -63,6 +69,7 @@ async (page) => {
     check('current-month denominator and yesterday streak', await days.locator('#total').innerText() === '/ 9일' && await days.locator('#streak').innerText() === '연속 2일');
     check('future date navigation and empty save disabled', await today.locator('#next').isDisabled() && await today.locator('#save').isDisabled() && await days.locator('#next').isDisabled());
     check('moods immediately below title', await today.locator('.head').evaluate(el => el.nextElementSibling.firstElementChild.classList.contains('mood-row')));
+    check('Writing offers calm, good, tired, sad and angry', JSON.stringify(await today.locator('.mood').evaluateAll(els => els.map(el => el.textContent))) === JSON.stringify(['차분', '좋음', '피곤', '슬픔', '화남']));
     stage = 'responsive layouts';
     for (const width of [1320, 1130, 390]) {
       for (const [tab, kind, height, fraction] of [[today, 'today', 404, 1], [calendar, 'calendar', 760, .65], [mood, 'mood', 236, .35], [days, 'days', 212, .35]]) {
@@ -79,6 +86,12 @@ async (page) => {
     await today.setViewportSize({ width: 390, height: 404 });
     check('mobile input is 16px and mood/nav/save targets are 44px', await today.evaluate(() => getComputedStyle(document.querySelector('#writing')).fontSize === '16px' && [...document.querySelectorAll('.mood,.nav button:not([hidden]),.save')].filter(el => el.getClientRects().length).every(el => el.getBoundingClientRect().height >= 44)));
     stage = 'photos and failed upload';
+    await today.locator('#writing').focus();
+    check('Today intercepts clipboard image paste', await paste(today));
+    await today.waitForFunction(() => document.querySelectorAll('#photos img').length === 1 && !document.querySelector('#save').disabled);
+    check('Pasted photo is previewed without upload before save', !requests.some(r => r.path.endsWith('/save')));
+    await today.locator('#add').click(); await today.locator('[data-remove="0"]').click(); await today.locator('#add-layer .close').click();
+    check('Plain text paste is not prevented', await today.evaluate(() => { const data = new DataTransfer(); data.setData('text/plain', '붙여넣기'); const e = new ClipboardEvent('paste', { clipboardData: data, cancelable: true, bubbles: true }); document.querySelector('#writing').dispatchEvent(e); return !e.defaultPrevented; }));
     await today.locator('#writing').fill('원본 사진과 함께 쓰는 새 기록'); await today.locator('[data-mood="good"]').click();
     await today.locator('#add').click();
     await today.locator('#file').setInputFiles(Array.from({ length: 5 }, (_, i) => ({ name: `photo-${i}.png`, mimeType: 'image/png', buffer: Buffer.from(pixel, 'base64') })));
@@ -114,8 +127,25 @@ async (page) => {
     check('calendar edit keeps all existing photos without uploading', records.get('2026-11-09').photos.length === 4 && requests.filter(r => r.path.endsWith('/save')).at(-1).body.photos.every(p => Object.keys(p).join() === 'id'));
     await today.waitForFunction(() => document.querySelector('#writing').value === '달력에서 수정한 기록');
     check('calendar edit refreshes today widget', true);
-    await calendar.locator('[data-date="2026-11-06"]').click(); await calendar.locator('#quick-text').fill('빠른 쓰기'); await calendar.locator('#quick-save').click();
+    await calendar.locator('[data-date="2026-11-06"]').click(); await calendar.locator('#quick-text').fill('빠른 쓰기');
+    await calendar.locator('[data-mood="sad"]').click();
+    for (const width of [1320, 1130, 960, 390, 344]) {
+      await calendar.setViewportSize({ width, height: 760 });
+      const gap = await calendar.evaluate(() => document.querySelector('#quick-status').getBoundingClientRect().top - document.querySelector('#quick-text').getBoundingClientRect().bottom);
+      check(`Calendar draft status clears focused textarea outline at ${width}px`, gap >= 8, gap);
+    }
+    check('Calendar accepts five clipboard images', await paste(calendar, 5));
+    await calendar.waitForFunction(() => document.querySelectorAll('#quick-photos img').length === 4 && !document.querySelector('#quick-text').disabled);
+    check('Calendar paste enforces four photos and reports the cap', (await calendar.locator('#quick-status').innerText()).includes('최대 4장'));
+    await calendar.locator('#quick-photos [data-remove="1"]').click();
+    check('Pasted preview can be removed before saving', await calendar.locator('#quick-photos img').count() === 3);
+    await calendar.screenshot({ path: 'output/playwright/diary-v2-calendar-paste-344.png' });
+    await calendar.locator('#quick-save').click();
     await calendar.waitForFunction(() => document.querySelector('#quick').hidden); check('empty past date quick write saves its own date', records.get('2026-11-06').text === '빠른 쓰기');
+    check('Calendar clipboard photo previews match saved originals', records.get('2026-11-06').photos.length === 3 && records.get('2026-11-06').photos.every(p => p.dataUrl.endsWith(pixel)));
+    await mood.waitForFunction(() => document.querySelector('[data-count="sad"]').textContent === '1');
+    check('Sad mood saves from calendar and reaches the mood trend', records.get('2026-11-06').mood === 'sad');
+    await calendar.setViewportSize({ width: 960, height: 760 });
     await calendar.locator('[data-date="2026-11-06"]').click(); await calendar.locator('#delete').click();
     await calendar.keyboard.press('Escape'); check('Escape closes only delete confirmation', await calendar.locator('#confirm').isHidden() && await calendar.locator('#detail').isVisible());
     await calendar.locator('#delete').click(); await calendar.locator('#confirm-delete').click();
@@ -166,6 +196,8 @@ async (page) => {
     await photoOnly.locator('#file').setInputFiles({ name: 'only.png', mimeType: 'image/png', buffer: Buffer.from(pixel, 'base64') });
     await photoOnly.waitForFunction(() => !document.querySelector('#save').disabled); await save(photoOnly);
     check('photo-only record saved', records.get('2026-11-05').photos.length === 1 && records.get('2026-11-05').text === '');
+    await photoOnly.locator('[data-mood="angry"]').click(); await save(photoOnly); await photoOnly.reload({ waitUntil: 'networkidle' });
+    check('Angry mood persists after refresh', await photoOnly.locator('[data-mood="angry"]').getAttribute('aria-pressed') === 'true');
     const host = await context.newPage(); await host.setViewportSize({ width: 390, height: 500 });
     await host.goto('http://127.0.0.1:4173/index.html');
     await host.setContent(`<style>body{margin:0}iframe{border:0;width:390px;height:404px}</style><iframe sandbox="allow-scripts allow-same-origin allow-forms" src="${base}diary-v2-today.html?w=${key}&date=2026-11-04"></iframe>`);

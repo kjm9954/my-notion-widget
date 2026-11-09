@@ -1,4 +1,5 @@
-// 노션 회의록 검색 전용 Worker (notion-search).
+// Reading index engine. Production entry.mjs delegates existing meeting APIs
+// to the recovered deployment in meeting-production.mjs without changing them.
 // 기존 notion-widget Worker·D1과 완전히 분리돼 있다. 노션에는 읽기 요청만 보낸다.
 //
 //   GET  /search?q=검색어&w=인스턴스키   색인에서 제목+본문 검색 (최대 20건, 날짜 최신순)
@@ -12,6 +13,7 @@ const NOTION_API = "https://api.notion.com/v1";
 const NOTION_VERSION = "2026-03-11";
 const ALLOWED_ORIGIN = "https://kjm9954.github.io";
 const INDEX_KEY = "index:v1";
+const READING_INDEX_KEY = "index:reading:v1";
 const MAX_RESULTS = 20;
 const MAX_QUERY_LENGTH = 100;
 const MAX_BODY_LENGTH = 20000;
@@ -36,12 +38,13 @@ export default {
     try {
       if (url.pathname === "/search" && request.method === "GET") {
         if (!allowed(url, env)) return json({ ok: false, error: "forbidden" }, 403, cors);
-        const index = await loadIndex(env, 60);
-        return json({ ok: true, ...searchPages(index.pages, url.searchParams.get("q")) }, 200, cors);
+        const reading = url.searchParams.get("source") === "reading";
+        const index = await loadIndex(env, 60, reading ? READING_INDEX_KEY : INDEX_KEY);
+        return json({ ok: true, ...searchPages(index.pages, url.searchParams.get("q"), reading) }, 200, cors);
       }
       if (url.pathname === "/reindex" && request.method === "POST") {
         if (!allowed(url, env)) return json({ ok: false, error: "forbidden" }, 403, cors);
-        return json({ ok: true, ...(await runIndex(env)) }, 200, cors);
+        return json({ ok: true, ...(await runIndex(env, url.searchParams.get("source") === "reading")) }, 200, cors);
       }
       return json({ ok: false, error: "not found" }, 404, cors);
     } catch (error) {
@@ -52,7 +55,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runIndex(env).catch(error => {
+    ctx.waitUntil(runScheduledIndexes(env).catch(error => {
       console.error("notion-search cron", error?.status || "", error?.message || error);
     }));
   },
@@ -90,14 +93,14 @@ function allowed(url, env) {
 // ───────── 색인 저장 ─────────
 // 검색은 KV 가장자리 캐시(cacheTtl)를 써서 빠르게 읽는다. 갱신 후 최대 1분 뒤 검색에 반영된다.
 // 같은 내용이면 이전에 해석한 색인을 다시 쓴다(검색마다 큰 JSON을 다시 해석하지 않게).
-let parsed = { text: null, index: null };
-async function loadIndex(env, cacheTtl = 0) {
-  const text = await env.SEARCH_INDEX.get(INDEX_KEY, cacheTtl ? { type: "text", cacheTtl } : { type: "text" });
-  if (text && text === parsed.text) return parsed.index;
+const parsed = new Map();
+async function loadIndex(env, cacheTtl = 0, key = INDEX_KEY) {
+  const text = await env.SEARCH_INDEX.get(key, cacheTtl ? { type: "text", cacheTtl } : { type: "text" });
+  if (text && text === parsed.get(key)?.text) return parsed.get(key).index;
   let stored = null;
   try { stored = text ? JSON.parse(text) : null; } catch (_) { stored = null; }
   const index = stored && Array.isArray(stored.pages) ? stored : { v: 1, updatedAt: null, pages: [] };
-  parsed = { text, index };
+  parsed.set(key, { text, index });
   return index;
 }
 
@@ -136,7 +139,7 @@ function notionClient(env) {
       throw error;
     }
   }
-  return { request, get used() { return used; } };
+  return { request, get used() { return used; }, get remaining() { return Math.max(0, budget - used); } };
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -233,11 +236,24 @@ const isRemoved = page => page?.in_trash === true || page?.archived === true || 
 // ───────── 색인 갱신 ─────────
 // 1) 회의록 DB 전체 목록(페이지네이션)  2) last_edited_time이 바뀐 페이지만 본문을 다시 읽음(최근 날짜부터)
 // 3) 목록에 없는 페이지(삭제·보관)는 제거. 요청 수 상한에 걸리면 남은 페이지는 다음 실행에서 이어 읽는다.
-async function runIndex(env) {
+async function runScheduledIndexes(env) {
+  // Meeting indexing retains its original priority and full budget. Reading uses only
+  // requests left over from the same client (including retries and page listings).
   const notion = notionClient(env);
-  const dataSourceId = String(env.NOTION_DATA_SOURCE_ID || "").trim();
-  if (!dataSourceId) throw Object.assign(new Error("NOTION_DATA_SOURCE_ID is missing"), { publicMessage: "data source missing" });
-  const previous = await loadIndex(env);
+  await runIndex(env, false, notion);
+  if (env.NOTION_READING_DATA_SOURCE_ID && notion.remaining) {
+    try { await runIndex(env, true, notion); }
+    catch (error) { if (!(error instanceof BudgetError)) throw error; }
+  }
+}
+
+export function runReadingIndex(env) { return runIndex(env, true); }
+
+async function runIndex(env, reading = false, notion = notionClient(env)) {
+  const indexKey = reading ? READING_INDEX_KEY : INDEX_KEY;
+  const dataSourceId = String((reading ? env.NOTION_READING_DATA_SOURCE_ID : env.NOTION_DATA_SOURCE_ID) || "").trim();
+  if (!dataSourceId) throw Object.assign(new Error("data source is missing"), { publicMessage: "data source missing" });
+  const previous = await loadIndex(env, 0, indexKey);
   const before = new Map(previous.pages.map(page => [page.id, page]));
   const listed = (await listPages(notion, dataSourceId)).filter(page => (!page?.object || page.object === "page") && !isRemoved(page));
 
@@ -261,7 +277,7 @@ async function runIndex(env) {
       if (error?.status === 403 || error?.status === 404) continue;
       if (!(error instanceof BudgetError)) throw error;
       // 한 페이지가 상한보다 많은 요청을 쓰면 끝내 못 읽으므로, 이번 실행의 첫 페이지라면 읽은 데까지 저장한다.
-      if (indexed === 0 && blocks.length) Object.assign(page, pageText(blocks), { edited: page.lastEdited });
+      if (indexed === 0 && blocks.length) Object.assign(page, pageText(blocks), reading ? {} : { edited: page.lastEdited });
       break;
     }
     Object.assign(page, pageText(blocks), { edited: page.lastEdited });
@@ -275,7 +291,7 @@ async function runIndex(env) {
   const changed = removed > 0 || pages.length !== previous.pages.length || pages.some(page => !same(page, before.get(page.id)));
   const left = pages.filter(page => page.edited !== page.lastEdited).length;
   if (changed) {
-    await env.SEARCH_INDEX.put(INDEX_KEY, JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), complete: left === 0, pages }));
+    await env.SEARCH_INDEX.put(indexKey, JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), complete: left === 0, pages }));
   }
   return { total: pages.length, indexed, pending: left, removed, requests: notion.used, saved: changed };
 }
@@ -331,7 +347,7 @@ function secondLine(page, query) {
   return { line, matches };
 }
 
-function searchPages(pages, rawQuery) {
+function searchPages(pages, rawQuery, reading = false) {
   const query = normalizeQuery(rawQuery);
   if (!query) return { results: [], total: 0 };
   const hits = [];
@@ -344,8 +360,16 @@ function searchPages(pages, rawQuery) {
   return {
     total: hits.length,
     results: hits.slice(0, MAX_RESULTS).map(({ page, titleMatches }) => {
-      const { line, matches } = secondLine(page, query);
-      return { date: page.date, title: page.title, url: page.url, tags: page.tags, line, titleMatches, lineMatches: matches };
+      const { line, matches } = reading ? readingLine(page, query) : secondLine(page, query);
+      return { ...(reading ? { id: page.id } : {}), date: page.date, title: page.title, url: page.url, tags: page.tags, line, titleMatches, lineMatches: matches };
     }),
   };
+}
+
+function readingLine(page, query) {
+  const body = String(page.body || ''), first = findMatches(body, query)[0];
+  if (!first) return { line: String(page.lead || ''), matches: [] };
+  const start = Math.max(0, first[0] - 12), end = Math.min(body.length, first[1] + 80);
+  const line = (start ? '…' : '') + body.slice(start, end).replace(/\s/g, ' ') + (end < body.length ? '…' : '');
+  return { line, matches: findMatches(line, query) };
 }

@@ -44,6 +44,16 @@ class D1Database {
 }
 
 function env() { return { DB: new D1Database() }; }
+test('sad and angry moods save and reload without changing existing schema or statuses', async () => {
+  const DB = env();
+  for (const [mood, day] of [['sad', '01'], ['angry', '02']]) {
+    const date = `2026-11-${day}`;
+    const result = await save(DB, { date, mood, text: '', photos: [], expectedRevision: null });
+    assert.equal(result.status, 200);
+    const loaded = await json(await handleDiaryV1(new Request(url(`/api/diary-v1/entry?date=${date}`)), DB));
+    assert.equal(loaded.body.data.mood, mood);
+  }
+});
 function url(path, instance = INSTANCE_A) { return `https://worker.example${path}${path.includes('?') ? '&' : '?'}w=${instance}`; }
 async function json(response) { return { status: response.status, body: await response.json() }; }
 async function save(DB, body, instance = INSTANCE_A) {

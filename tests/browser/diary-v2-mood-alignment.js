@@ -24,7 +24,7 @@ async (page) => {
       checks.push({ width, state: 'empty', pass: Math.abs(measured.xOffset) < 1 && Math.abs(measured.yOffset) < 1 && !measured.overflow, ...measured });
       if (width === 390) await tab.screenshot({ path: 'output/playwright/diary-v2-mood-empty-centered.png' });
       empty = false; await tab.reload({ waitUntil: 'networkidle' });
-      checks.push({ width, state: 'populated', pass: await tab.locator('.mood-stat').count() === 3 && await tab.locator('[data-count="good"]').innerText() === '1' && await tab.locator('.empty').count() === 0 });
+      checks.push({ width, state: 'populated', pass: await tab.locator('.mood-stat').count() === 5 && await tab.locator('[data-count="good"]').innerText() === '1' && await tab.locator('.empty').count() === 0 && await tab.locator('#list').evaluate(el => el.scrollHeight <= el.clientHeight) });
     }
     return { checked: checks.length, failures: checks.filter(c => !c.pass), errors, checks };
   } finally { await context.close(); }

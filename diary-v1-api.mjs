@@ -14,7 +14,7 @@ export const DIARY_V1_LIMITS = Object.freeze({
 const INSTANCE_RE = /^w_[A-Za-z0-9_-]{24,176}$/;
 const IMAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const MOODS = new Set(["calm", "good", "tired"]);
+const MOODS = new Set(["calm", "good", "tired", "sad", "angry"]);
 const JSON_HEADERS = Object.freeze({
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",

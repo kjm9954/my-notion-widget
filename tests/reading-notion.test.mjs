@@ -8,11 +8,70 @@ import {
   normalizeBookOneLine,
   normalizeReadingBookPage,
   normalizeNestedQuotePage,
+  createReadingBook,
+  updateReadingBook,
+  notionReadingConfig,
 } from "../reading-notion.js";
 
 function richText(value) {
   return [{ plain_text:value, type:"text", text:{ content:value } }];
 }
+
+const cleanReadingEnv = { NOTION_TOKEN: 'test', NOTION_READING_BOOKS_DATA_SOURCE_ID: 'books', NOTION_READING_QUOTES_DATA_SOURCE_ID: 'quotes' };
+const seoulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+test('cleaned DB creates only title/status/today, ignores all legacy inputs and never queries years', async t => {
+  const calls = [], original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    assert.equal(url, 'https://api.notion.com/v1/pages');
+    const payload = JSON.parse(init.body);
+    assert.deepEqual(Object.keys(payload.properties).sort(), ['날짜', '상태', '제목'].sort());
+    assert.deepEqual(payload.properties['날짜'].date, { start: seoulToday() });
+    assert.equal(payload.properties['상태'].multi_select[0].name, '읽는 중');
+    assert.equal(payload.template.timezone, 'Asia/Seoul');
+    return Response.json({ id: 'new-book', url: 'https://www.notion.so/new-book', properties: payload.properties });
+  };
+  assert.equal(notionReadingConfig(cleanReadingEnv).booksDataSourceId, 'books');
+  const book = await createReadingBook(cleanReadingEnv, { title: '새 책', status: 'reading', author: 'legacy', publisher: 'legacy', cover: 'https://example.com/cover', year: 1990 });
+  assert.equal(book.status, 'reading'); assert.equal(book.startDate, seoulToday());
+  assert.equal(book.year, Number(seoulToday().slice(0, 4))); assert.equal(book.author, '');
+  assert.equal(calls.length, 1);
+});
+test('completion preserves original start and keep tags, sets today end; same-day/undated use a single date', async t => {
+  const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
+  for (const start of ['2020-01-02', seoulToday(), null]) {
+    const calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+      calls.push(init.method || 'GET');
+      if (!init.method) return Response.json({ properties: { '날짜': { date: start ? { start } : null }, '상태': { type: 'multi_select', multi_select: [{ name: '읽는 중' }, { name: '인생책' }] } } });
+      assert.equal(init.method, 'PATCH');
+      const { properties } = JSON.parse(init.body);
+      assert.deepEqual(Object.keys(properties).sort(), ['날짜', '상태', '별점', '이 책의 한 줄'].sort());
+      assert.deepEqual(properties['날짜'].date, { start: start || seoulToday(), end: start && start !== seoulToday() ? seoulToday() : null });
+      assert.deepEqual(properties['상태'].multi_select.map(x => x.name), ['인생책', '완독']);
+      return Response.json({ id: 'book' });
+    };
+    assert.deepEqual(await updateReadingBook(cleanReadingEnv, 'book', { status: 'done', star: 4, one: '한 줄', author: '', publisher: '', learned: '', applying: '', dropReason: '', pageRead: 100 }), { id: 'book' });
+    assert.deepEqual(calls, ['GET', 'PATCH']);
+  }
+});
+test('deleted-only legacy patches are harmless no-ops; date year ignores the removed relation', async t => {
+  const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async () => { throw new Error('No Notion request expected'); };
+  assert.deepEqual(await updateReadingBook(cleanReadingEnv, 'book', { author: 'x', publisher: 'x', learned: 'x', applying: 'x', dropReason: 'x', pageRead: 2 }), { id: 'book' });
+  const props = { '연도': { type: 'relation', relation: [{ id: 'old-year' }] }, '날짜': { date: { start: '2025-12-31', end: '2026-01-01' } } };
+  assert.equal(normalizeReadingBookPage({ properties: props }, new Map([['old-year', '1990']])).year, 2026);
+  assert.equal(normalizeReadingBookPage({ properties: { '연도': props['연도'] } }).year, null);
+});
+test('future start dates cannot be silently destroyed on completion', async t => {
+  const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async (url, init = {}) => {
+    assert.equal(init.method, undefined);
+    return Response.json({ properties: { '날짜': { date: { start: '2999-01-01' } } } });
+  };
+  await assert.rejects(updateReadingBook(cleanReadingEnv, 'book', { status: 'done' }), /시작일/);
+});
 
 test("reading count excludes only dropped books while recent books stay completed-only", async () => {
   const html = await readFile(new URL("../reading-notes/reading-count.html", import.meta.url), "utf8");

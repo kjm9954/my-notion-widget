@@ -1,9 +1,9 @@
 // UI-only helpers. Persistence and instance isolation remain in DiaryV1.
-export const MOODS = { calm: '차분', good: '좋음', tired: '피곤' };
+export const MOODS = { calm: '차분', good: '좋음', tired: '피곤', sad: '슬픔', angry: '화남' };
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const $ = id => document.getElementById(id);
 const face = mouth => `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><circle cx="5.9" cy="6.6" r=".5" fill="currentColor" stroke="none"/><circle cx="10.1" cy="6.6" r=".5" fill="currentColor" stroke="none"/>${mouth}</svg>`;
-const icons = { calm: face('<path d="M5.8 10.2h4.4"/>'), good: face('<path d="M5.5 9.6c.7 1.2 4.3 1.2 5 0"/>'), tired: face('<path d="M5.5 11c.7-1.2 4.3-1.2 5 0"/>') };
+const icons = { calm: face('<path d="M5.8 10.2h4.4"/>'), good: face('<path d="M5.5 9.6c.7 1.2 4.3 1.2 5 0"/>'), tired: face('<path d="M5.5 11c.7-1.2 4.3-1.2 5 0"/>'), sad: face('<path d="M5.5 11c.7-1.2 4.3-1.2 5 0M11 8v1"/>'), angry: face('<path d="m4.8 4.5 2 1m4.4-1-2 1M5.8 10.5h4.4"/>') };
 export function moodButtons(value) {
   return Object.entries(MOODS).map(([key, label]) => `<button class="mood" type="button" data-mood="${key}" aria-pressed="${key === value}">${icons[key]}${label}</button>`).join('');
 }
@@ -23,7 +23,7 @@ export function monthStats(entries, month, today) {
   const until = current ? Number(today.slice(8)) : days;
   const dates = new Set(entries.filter(e => e.date.startsWith(`${month}-`) && e.date <= today).map(e => e.date));
   const has = d => dates.has(`${month}-${String(d).padStart(2, '0')}`);
-  const moods = { calm: 0, good: 0, tired: 0 };
+  const moods = Object.fromEntries(Object.keys(MOODS).map(key => [key, 0]));
   // One record per date, including mood-only and photo-only records.
   for (const e of new Map(entries.map(e => [e.date, e])).values()) {
     if (dates.has(e.date) && Object.hasOwn(moods, e.mood)) moods[e.mood]++;
@@ -194,4 +194,11 @@ export function conflictMarkup(conflict) {
   return `<p class="conflict-copy">다른 기기의 최신 기록입니다. 내 초안은 임시 보관되어 있어요.</p>${entry
     ? `${entry.mood ? `<p class="detail-mood">기분 · ${MOODS[entry.mood] || ''}</p>` : ''}<p class="detail-copy">${esc(entry.text)}</p><div class="conflict-photos">${(entry.photos || []).map(p => `<img src="${esc(photoSource(p))}" alt="최신 기록 사진">`).join('')}</div>`
     : '<p class="detail-copy">다른 기기에서 이 날짜의 기록을 삭제했어요.</p>'}`;
+}
+// Only clipboard image files are handled; ordinary text keeps native paste behavior.
+export function clipboardImages(data) {
+  const files = [...(data?.files || [])].filter(file => file.type.startsWith('image/'));
+  return files.length ? files : [...(data?.items || [])]
+    .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+    .map(item => item.getAsFile()).filter(Boolean);
 }

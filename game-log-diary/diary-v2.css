@@ -70,6 +70,14 @@ img{display:block;max-width:100%}h1,h2,p{margin:0}button svg{pointer-events:none
 .quick-moods{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}.quick-text{display:block;width:100%;height:160px;resize:none;border:1px solid transparent;border-radius:12px;background:var(--surface);padding:12px 14px;font-size:15px;line-height:24px;color:var(--strong)}.quick-text:focus{border-color:var(--accent);background:#fff}
 .mood-list{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:14px;margin-top:12px}.mood-stat{display:grid;grid-template-columns:36px minmax(0,1fr) 28px;align-items:center;gap:12px}.label{font-size:13px;color:var(--secondary)}.track{height:12px;border-radius:6px;background:var(--cell);overflow:hidden}.fill{display:block;height:100%;border-radius:6px;background:var(--accent)}.mood-count{font-size:14px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}.is-zero{color:var(--muted)!important}.empty{color:var(--muted);font-size:13px}
 .mood-list > .empty{text-align:center}
+.moods{flex-wrap:wrap}
+.mood-list{gap:6px}
+@media(max-width:620px){.root .moods{gap:4px}.moods .mood{padding:0 5px;gap:4px}}
+#quick-status{margin-top:8px}
+.quick-photos{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.quick-photos:empty{display:none}
+.quick-photos .photo{width:calc((100% - 24px)/4);height:72px}
+.quick-photos .photo>img{width:100%;height:100%;object-fit:contain}
 .days-body{flex:1;min-height:0;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:8px}.days-count{display:flex;align-items:baseline;gap:6px}.days-count strong{font-size:44px;font-weight:700;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}.days-count span{font-size:15px;color:var(--secondary)}.streak{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--lime-ink);background:var(--lime);border-radius:8px;padding:2px 10px;white-space:nowrap}.strip{flex:none;display:grid;grid-template-columns:repeat(31,minmax(0,1fr));gap:3px;margin-top:14px;height:14px}.strip i{border-radius:3px;background:var(--cell)}.strip i.on{background:var(--accent)}.strip i.off{visibility:hidden}
 @media(max-width:620px){
   .root{padding:18px 14px}.title{font-size:22px}.head{gap:8px}.nav-label{min-width:84px;font-size:12px}.nav button{min-width:44px;height:44px;padding:0 3px}.today-link{display:none}

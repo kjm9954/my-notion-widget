@@ -1,12 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { monthStats, shiftMonth, photoPayload, rebaseDraft, EntryEditor } from '../game-log-diary/diary-v2-common.js';
+import { monthStats, shiftMonth, photoPayload, rebaseDraft, EntryEditor, clipboardImages } from '../game-log-diary/diary-v2-common.js';
+
+test('clipboard image files/items work without duplicates or intercepting plain text', () => {
+  const image = { type: 'image/png' }, file = { type: 'text/plain' };
+  const item = { kind: 'file', type: 'image/png', getAsFile: () => image };
+  assert.deepEqual(clipboardImages({ files: [image, file], items: [item] }), [image]);
+  assert.deepEqual(clipboardImages({ files: [], items: [item] }), [image]);
+  assert.deepEqual(clipboardImages({ files: [file], items: [{ kind: 'string', type: 'text/plain' }] }), []);
+});
 
 const row = (date, mood = null) => ({ date, mood, text: '', photos: [], revision: 1 });
 test('current month excludes future/neighbor dates and includes mood/photo-only days', () => {
   const s = monthStats([row('2026-10-31', 'good'), row('2026-11-07', 'calm'), row('2026-11-08', 'good'), row('2026-11-09'), row('2026-11-10', 'good')], '2026-11', '2026-11-09');
   assert.equal(s.count, 3); assert.equal(s.until, 9); assert.equal(s.streak, 3);
-  assert.deepEqual(s.moods, { calm: 1, good: 1, tired: 0 }); assert.equal(s.marked[9], false);
+  assert.deepEqual(s.moods, { calm: 1, good: 1, tired: 0, sad: 0, angry: 0 }); assert.equal(s.marked[9], false);
 });
 test('current streak starts yesterday when today has no entry, within displayed month', () => {
   assert.equal(monthStats([row('2026-11-07'), row('2026-11-08')], '2026-11', '2026-11-09').streak, 2);

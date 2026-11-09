@@ -1,4 +1,36 @@
-# notion-search · 노션 회의록 검색 Worker
+# notion-search · 회의록 + 독서 본문 검색 Worker
+
+## 2026-11-09 추가: 운영 기능을 보존한 독서 색인
+
+- 배포 진입점은 `entry.mjs`입니다. 운영 버전 `5448ce72-9f78-4124-9dd5-9f4d2f3d97c4`의 번들을 `meeting-production.mjs`로 보존했습니다(기존 index runner export만 추가).
+- 기존 `/search`, `/reindex`, `/resolve`, `/meetings`, 암호화된 색인 continuation, KV 한도 처리와 `INDEX_NOT_BEFORE`는 그대로입니다. 아래 초기 설치 설명의 KV/secret 생성은 **신규 설치에만** 해당하며, 기존 배포에서는 재생성하지 않습니다.
+- `source=reading` 검색만 새 응답(`id`, `url`, 일치 본문 조각 포함)을 사용합니다. 읽기 색인도 운영의 이어받기 엔진을 재사용하되 KV `index:reading:v1`로 격리합니다. 회의록은 `index:v1` 그대로입니다.
+- 추가 vars: `NOTION_READING_DATA_SOURCE_ID = 519b993c-8a61-8222-b574-073c2e3ab536`. 기존 실제 KV ID를 공식 읽기 API로 확인해 설정했고 `keep_vars=true`로 운영 전용 변수를 보존합니다. 기존 secret·KV·cron은 바꾸지 않습니다.
+- 운영 조회에서 Library 키가 기존 검색 인증으로 403이어서, 사용자 승인 후 **독서 검색 전용 secret `READING_ALLOWED_W`**를 추가했습니다. `source=reading`의 `/search`·`/reindex`에만 적용하며 기존 회의록 `ALLOWED_W`는 유지합니다. 별도 secret이 없는 기존 설치는 `ALLOWED_W`로 동작합니다. 키 값은 코드·문서에 남기지 않습니다.
+- 매 cron의 기본 45회 요청은 **회의록 우선, 사용 후 남은 예산만 독서**에 씁니다. 재시도·목록 요청도 포함합니다. 회의록을 늦추지 않지만 대량 변경/최초 색인/오류 때 독서의 반영은 30분을 넘길 수 있습니다. 정상적인 소량 변경은 다음 30분 cron + KV 캐시 최대 1분입니다.
+- `child_database`는 읽지 않습니다. 필사는 Store quotes에서 검색합니다. 책의 `last_edited_time`이 바뀐 경우만 본문을 재조회합니다.
+
+### 기존 환경 배포와 첫 독서 색인
+
+```powershell
+node --test notion-search-worker/test/*.test.mjs
+cd notion-search-worker
+npx wrangler deploy --dry-run
+# 별도 독서 키가 필요한 기존 환경에서만, 승인한 키를 안전한 stdin으로 전달:
+npx wrangler secret put READING_ALLOWED_W
+npx wrangler deploy
+```
+
+키를 파일·터미널 명령 기록에 적지 말고 안전한 세션 메모리에서 URL을 구성해 아래 요청을 보냅니다.
+
+- 첫 `POST /reindex?source=reading&w=<기존 키>`는 본문 없이 보냅니다(`{}` 아님). Notion에는 조회 요청만 하고 KV 색인만 갱신합니다.
+- `pending > 0`이면 응답의 `continuation`을 다음 요청의 JSON `{ "continuation": "..." }`로 넘깁니다. 키와 continuation은 출력/공유하지 않습니다. `pending=0`까지 반복합니다.
+- `GET /search?source=reading&q=<단어>&w=<기존 키>`로 확인합니다. 기존 회의록 검색에는 source를 붙이지 않습니다.
+- `notion connection`(연동 권한 부족)이면 Notion의 lιвrary 페이지/독서 DB → 우상단 `···` → 연결(Connections)에서 **검색 Worker의 NOTION_TOKEN에 해당하는 기존 연동**을 추가하고 첫 색인을 재시도합니다. 새 연동을 무조건 만들지 않습니다.
+
+운영 원본 백업은 git 제외 경로 `output/playwright/notion-search-before.multipart`에 있습니다. 원본에 없는 기능을 덮어 지우지 않도록 복원 모듈을 현재 진입점에서 그대로 위임합니다.
+
+이번 배포 버전: `9f1e2d31-29eb-4cc8-abd2-e09ec7ea72cf`. 독서 검색 인증 200 확인. 첫 독서 색인은 `502 / notion connection`으로 완료되지 않았습니다. 위 안내에 따라 검색용 기존 Notion 연동에 독서 DB 접근 권한을 추가해야 본문 결과가 채워집니다. 운영 본문 검색까지 완료했다고 간주하지 않습니다.
 
 `sky-lime/Worklog/calendar-search.html`(캘린더 검색 위젯)이 부르는 **검색 전용 Cloudflare Worker**입니다.
 

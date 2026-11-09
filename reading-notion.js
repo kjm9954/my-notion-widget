@@ -23,7 +23,6 @@ export function notionReadingConfig(env) {
     token: String(env.NOTION_TOKEN || env.NOTION_CLIENT_SECRET || "").trim(),
     booksDataSourceId: String(env.NOTION_READING_BOOKS_DATA_SOURCE_ID || "").trim(),
     quotesDataSourceId: String(env.NOTION_READING_QUOTES_DATA_SOURCE_ID || "").trim(),
-    yearsDataSourceId: String(env.NOTION_READING_YEARS_DATA_SOURCE_ID || "").trim(),
   };
   const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
   if (missing.length) throw new Error(`독서 노션 연결 설정이 필요합니다: ${missing.join(", ")}`);
@@ -163,12 +162,10 @@ function starNumber(label) {
   return Math.min(5, stars + half);
 }
 
-function pageYear(page, yearsById) {
+function pageYear(page) {
   const properties = page?.properties || {};
-  const relation = relationIds(properties["연도"]);
-  const related = relation.map(id => yearsById.get(id)).find(Boolean);
   const date = properties["날짜"]?.date;
-  return Number(related) || Number(String(date?.end || date?.start || "").slice(0, 4)) || null;
+  return Number(String(date?.end || date?.start || "").slice(0, 4)) || null;
 }
 
 export function normalizeReadingBookPage(page, yearsById = new Map()) {
@@ -201,7 +198,7 @@ export function normalizeReadingBookPage(page, yearsById = new Map()) {
     totalPage: numberValue(properties["total page"]?.number),
     startDate: date?.start || "",
     endDate: date?.end || "",
-    year: pageYear(page, yearsById),
+    year: pageYear(page),
     created: page?.created_time || "",
     edited: page?.last_edited_time || "",
   };
@@ -229,42 +226,6 @@ export function normalizeStructuredQuotePage(page) {
 
 function isMissingDataSource(error) {
   return Number(error?.status) === 404;
-}
-
-async function loadYears(config, bookPages = []) {
-  let pages = [];
-  try {
-    pages = await queryDataSource(config, config.yearsDataSourceId);
-  } catch (error) {
-    if (!isMissingDataSource(error)) throw error;
-  }
-
-  const relatedIds = new Set();
-  bookPages.forEach(page => {
-    relationIds(page?.properties?.["연도"]).forEach(id => relatedIds.add(id));
-  });
-  const knownIds = new Set(pages.map(page => page?.id).filter(Boolean));
-  const relatedPages = await Promise.all([...relatedIds]
-    .filter(id => !knownIds.has(id))
-    .map(async id => {
-      try {
-        return await notionRequest(config, `/pages/${encodeURIComponent(id)}`);
-      } catch (error) {
-        if (isMissingDataSource(error)) return null;
-        throw error;
-      }
-    }));
-  pages.push(...relatedPages.filter(Boolean));
-
-  const byId = new Map();
-  const byYear = new Map();
-  pages.forEach(page => {
-    const label = propertyPlainText(page?.properties?.["이름"]);
-    if (!label) return;
-    byId.set(page.id, label);
-    byYear.set(label, page.id);
-  });
-  return { byId, byYear };
 }
 
 async function listBlockChildren(config, blockId) {
@@ -462,8 +423,7 @@ async function fetchReadingLibrary(env, fresh, options = {}) {
     queryDataSource(config, config.booksDataSourceId),
     queryDataSource(config, config.quotesDataSourceId),
   ]);
-  const { byId: yearsById } = await loadYears(config, bookPages);
-  const books = sortBooks(bookPages.map(page => normalizeReadingBookPage(page, yearsById)).filter(book => book.id));
+  const books = sortBooks(bookPages.map(page => normalizeReadingBookPage(page)).filter(book => book.id));
   const structured = quotePages.map(normalizeStructuredQuotePage).filter(Boolean);
   if (!fresh && typeof options?.waitUntil === "function") {
     const cachedNested = await cachedNestedQuotes(env, books);
@@ -504,31 +464,6 @@ export async function invalidateReadingLibrary(env, options = {}) {
   if (options?.nested === true) await kvDelete(env, NESTED_QUOTES_CACHE_KEY);
 }
 
-async function findOrCreateYear(config, year) {
-  const label = String(Math.floor(Number(year) || 0));
-  if (!/^\d{4}$/.test(label)) return null;
-  try {
-    const found = await queryDataSource(config, config.yearsDataSourceId, {
-      property: "이름",
-      title: { equals: label },
-    });
-    if (found[0]?.id) return found[0].id;
-    const page = await notionRequest(config, "/pages", {
-      method: "POST",
-      body: JSON.stringify({
-        parent: { type: "data_source_id", data_source_id: config.yearsDataSourceId },
-        properties: { "이름": titleProperty(label) },
-      }),
-    });
-    return page?.id || null;
-  } catch (error) {
-    if (!isMissingDataSource(error)) throw error;
-    const bookPages = await queryDataSource(config, config.booksDataSourceId);
-    const years = await loadYears(config, bookPages);
-    return years.byYear.get(label) || null;
-  }
-}
-
 function statusProperty(statuses) {
   return { type: "multi_select", multi_select: statuses.map(name => ({ name })) };
 }
@@ -541,11 +476,6 @@ function selectProperty(name) {
   return { type: "select", select: name ? { name } : null };
 }
 
-function numberProperty(value) {
-  const number = numberValue(value);
-  return { type: "number", number };
-}
-
 function starLabel(value) {
   const number = Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
   return number ? "★".repeat(number) : "";
@@ -556,18 +486,11 @@ export async function createReadingBook(env, input) {
   const title = textValue(input?.title, 200);
   if (!title) throw new Error("책 제목이 필요합니다.");
   const status = STATUS_TO_NOTION[input?.status] || STATUS_TO_NOTION.wishlist;
-  const yearId = await findOrCreateYear(config, input?.year);
   const properties = {
     "제목": titleProperty(title),
-    "저자": richTextProperty(input?.author),
-    "출판사": richTextProperty(input?.publisher),
     "상태": statusProperty([status]),
+    "날짜": { type: "date", date: { start: localDateKey() } },
   };
-  if (yearId) properties["연도"] = relationProperty([yearId]);
-  const cover = textValue(input?.cover, 2000);
-  if (/^https:\/\//i.test(cover)) {
-    properties.cover = { type: "files", files: [{ name: "cover", type: "external", external: { url: cover } }] };
-  }
   const page = await notionRequest(config, "/pages", {
     method: "POST",
     body: JSON.stringify({
@@ -577,8 +500,7 @@ export async function createReadingBook(env, input) {
     }),
   });
   await invalidateReadingLibrary(env);
-  const years = new Map(yearId ? [[yearId, String(input?.year || "")]] : []);
-  return normalizeReadingBookPage(page, years);
+  return normalizeReadingBookPage(page);
 }
 
 function nextStatuses(current, status) {
@@ -597,16 +519,16 @@ export async function updateReadingBook(env, id, patch) {
   if (Object.hasOwn(patch || {}, "status")) {
     const current = await notionRequest(config, `/pages/${encodeURIComponent(pageId)}`);
     properties["상태"] = statusProperty(nextStatuses(propertyNames(current?.properties?.["상태"]), patch.status));
+    if (patch.status === "done") {
+      const today = localDateKey(), start = current?.properties?.["날짜"]?.date?.start || today;
+      // Do not silently erase a future start date or send an invalid end-before-start range.
+      if (start.slice(0, 10) > today) throw new Error("시작일이 오늘보다 뒤에 있어요. 노션에서 시작일을 확인해 주세요.");
+      properties["날짜"] = { type: "date", date: { start, end: start.slice(0, 10) === today ? null : today } };
+    }
   }
   if (Object.hasOwn(patch || {}, "title")) properties["제목"] = titleProperty(textValue(patch.title, 200) || "제목 없음");
-  if (Object.hasOwn(patch || {}, "author")) properties["저자"] = richTextProperty(patch.author);
-  if (Object.hasOwn(patch || {}, "publisher")) properties["출판사"] = richTextProperty(patch.publisher);
   if (Object.hasOwn(patch || {}, "one")) properties["이 책의 한 줄"] = richTextProperty(patch.one);
-  if (Object.hasOwn(patch || {}, "learned")) properties["나의 생각 한줄"] = richTextProperty(patch.learned);
-  if (Object.hasOwn(patch || {}, "applying")) properties["적용할 것"] = richTextProperty(patch.applying);
-  if (Object.hasOwn(patch || {}, "dropReason")) properties["중도포기 이유"] = richTextProperty(patch.dropReason);
   if (Object.hasOwn(patch || {}, "star")) properties["별점"] = selectProperty(starLabel(patch.star));
-  if (Object.hasOwn(patch || {}, "pageRead")) properties["page read"] = numberProperty(patch.pageRead);
   if (!Object.keys(properties).length) return { id: pageId };
   const page = await notionRequest(config, `/pages/${encodeURIComponent(pageId)}`, {
     method: "PATCH",
