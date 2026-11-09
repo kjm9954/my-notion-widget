@@ -434,6 +434,22 @@ test("목록형은 질문한 사람 화면에서 남의 답변 대신 본인 질
   assert.ok(listSource.includes('if (pinned.length) html += `<div class="group-label">이전 대화</div>`;'));
 });
 
+test("목록형은 질문하는 사람이 둘 이상이면 사람별 칸으로 나눠 보고, 검색은 전체에서 찾는다", async () => {
+  for (const name of ["index", "index-pink"]) {
+    const source = await readFile(new URL(`../handover-qa/${name}.html`, import.meta.url), "utf8");
+    assert.match(source, /<div class="qa-chips" id="who-chips" hidden><\/div>/, name);
+    // 질문하는 사람이 한 명이면 나누지 않고, 처음엔 질문하는 사람은 자기 칸·답하는 사람은 전체
+    assert.match(source, /if \(names\.length < 2\) return '전체';/, name);
+    assert.match(source, /return names\.includes\(state\.me\) \? state\.me : '전체';/, name);
+    // 칸 = 그 사람이 남긴 질문 + 답하는 사람이 올린 글
+    assert.match(source, /return by === name \|\| \(!!by && S\.isAnswerer\(by\)\);/, name);
+    // 검색은 칸과 상관없이 전체에서
+    assert.match(source, /const who = q \? '전체' : currentWho\(\);/, name);
+    // 사람을 바꾸면 그 사람의 기본 칸으로
+    assert.match(source, /ui\.who = null;/, name);
+  }
+});
+
 test("미니 질문형은 공용 파일을 쓰고, 고정 주소에서 카테고리를 위젯 안에서 고르게 한다", async () => {
   const miniSource = await readFile(new URL("../handover-qa/compose.html", import.meta.url), "utf8");
   const storeSource = await readFile(new URL("../handover-qa/qa-store.js", import.meta.url), "utf8");

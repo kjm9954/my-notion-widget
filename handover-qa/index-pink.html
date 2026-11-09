@@ -119,6 +119,7 @@ body.dev #stage{width:var(--stage-w,440px);height:1000px;margin:56px auto 24px}
 .search input{width:100%;height:40px;border:0;border-radius:6px;background:var(--sunk);padding:0 38px 0 12px;font-size:13.5px}
 .search-x{position:absolute;right:0;top:0;width:44px;height:40px;font-size:18px;color:var(--text-3);display:inline-flex;align-items:center;justify-content:center}
 .qa-chips{display:flex;gap:6px;padding-bottom:2px}
+.qa-chips + .qa-chips{margin-top:8px}
 .fchip{display:inline-flex;align-items:center;height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:500;white-space:nowrap;flex:none}
 .fchip.on{background:var(--text);border-color:var(--text);color:#fff;font-weight:600}
 .list-body{flex:1;min-height:0;padding:12px 12px 20px}
@@ -349,6 +350,7 @@ body.dev .harness{display:flex}
         <input id="search" type="text" placeholder="제목과 본문에서 검색" autocomplete="off">
         <button class="search-x" id="search-clear" aria-label="검색어 지우기" hidden>✕</button>
       </div>
+      <div class="qa-chips" id="who-chips" hidden></div>
       <div class="qa-chips" id="cat-chips"></div>
     </header>
     <div class="qa-scroll list-body" id="list-body"></div>
@@ -551,7 +553,7 @@ function toast(msg, el){
 
 /* ===== 상태 · 저장 ===== */
 const state = { me: S.getAuthor(), threads: [], drafts: {}, sync: { revision: 0, since: 0 } };
-const ui = { screen: 'setup', query: '', cat: '전체', threadId: null, uploading: false, sheetOpen: false, viewer: null, blocked: false, errorKind: '', cmpCat: null, synced: false, registering: false };
+const ui = { screen: 'setup', query: '', cat: '전체', who: null, threadId: null, uploading: false, sheetOpen: false, viewer: null, blocked: false, errorKind: '', cmpCat: null, synced: false, registering: false };
 const dev = { failSend: false, failStatus: false, failRegister: false };
 let booting = true;                        // 시작 중 작성자 이전(migration)으로 생기는 알림은 무시
 
@@ -674,6 +676,17 @@ const lastAt   = t => t.messages.reduce((mx, m) => (m.failed || m.pending) ? mx 
 const askedBy  = t => (real(t)[0] || {}).who;               // 질문을 남긴 사람
 const waiting  = t => { const l = lastReal(t); return !!l && !S.isAnswerer(l.who); };
 const newReply = t => { const l = lastReal(t); return !!l && S.isAnswerer(l.who) && !(t.read || {})[state.me]; };
+// 질문한 사람별 칸: '전체' 또는 질문하는 사람 이름. 칸 하나 = 답하는 사람과 그 사람 사이의 질문.
+// 답하는 사람이 직접 올린 글은 모든 칸에 보인다.
+const askerNames   = () => S.getUsers().filter(u => u.role !== 'answerer').map(u => u.name);
+const pairLabel    = name => { const a = S.getUsers().filter(u => u.role === 'answerer').map(u => u.name); return a.length ? `${a.join('·')} · ${name}` : name; };
+const inPair       = (t, name) => { const by = askedBy(t); return by === name || (!!by && S.isAnswerer(by)); };
+function currentWho(){
+  const names = askerNames();
+  if (names.length < 2) return '전체';                       // 질문하는 사람이 한 명이면 칸을 나누지 않는다
+  if (ui.who === '전체' || names.includes(ui.who)) return ui.who;
+  return names.includes(state.me) ? state.me : '전체';       // 처음엔 질문하는 사람은 자기 칸, 답하는 사람은 전체
+}
 function isPinned(t){
   if (!lastReal(t)) return false;
   if (S.isAnswerer(state.me)) return waiting(t);
@@ -709,8 +722,9 @@ S.on('author', name => {
   state.me = name;
   if (booting || MODE !== 'main') return;
   if (!name){ show('setup'); return; }
+  ui.who = null;                                   // 사람을 바꾸면 그 사람의 기본 칸으로 돌아간다
   if (ui.screen === 'setup' || !prev){ enterList(); return; }
-  renderHeader();
+  renderHeader(); renderChips();
   if (ui.screen === 'list') renderList();
   if (ui.screen === 'detail'){ setComposerPlaceholder(); renderDetailHead(); renderThread(); }
 });
@@ -723,8 +737,16 @@ function renderHeader(){
   $('#list-count').textContent = `총 ${state.threads.length}개`;
 }
 function renderChips(){
+  const names = askerNames(), who = currentWho();
+  $('#who-chips').hidden = names.length < 2;
+  $('#who-chips').innerHTML = names.length < 2 ? '' : ['전체', ...names].map(n =>
+    `<button class="fchip ${who===n?'on':''}" data-who="${esc(n)}">${esc(n === '전체' ? n : pairLabel(n))}</button>`).join('');
   $('#cat-chips').innerHTML = FILTERS.map(c => `<button class="fchip ${ui.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
 }
+$('#who-chips').addEventListener('click', e => {
+  const b = e.target.closest('.fchip'); if (!b) return;
+  ui.who = b.dataset.who; renderChips(); renderList();
+});
 $('#cat-chips').addEventListener('click', e => {
   const b = e.target.closest('.fchip'); if (!b) return;
   ui.cat = b.dataset.cat; renderChips(); renderList();
@@ -741,8 +763,10 @@ $('#btn-new').addEventListener('click', () => openCompose());
 
 function filtered(){
   const q = ui.query.trim().toLowerCase();
+  const who = q ? '전체' : currentWho();          // 검색은 사람 칸과 상관없이 전체에서 찾는다
   return state.threads.filter(t => {
     if (ui.cat !== '전체' && t.cat1 !== ui.cat && t.cat2 !== ui.cat) return false;
+    if (who !== '전체' && !inPair(t, who)) return false;
     if (q && !(t.title.toLowerCase().includes(q) || real(t).some(m => m.text.toLowerCase().includes(q)))) return false;
     return true;
   }).sort((a, b) => lastAt(b) - lastAt(a));
@@ -779,8 +803,14 @@ function renderList(){
   const items = filtered();
   const q = ui.query.trim();
   if (!items.length){
-    const title = q ? `‘${esc(q)}’${josaGwa(q)} 일치하는 질문이 없습니다` : `‘${esc(ui.cat)}’ 카테고리에 질문이 없습니다`;
-    listBody.innerHTML = `<div class="state"><span class="circ"></span><div class="st-title">${title}</div><div class="st-desc">제목과 본문을 함께 찾습니다. 카테고리 필터가 걸려 있으면 함께 해제해 보세요.</div><button class="btn-primary" id="empty-ask">이 내용으로 질문하기</button></div>`;
+    const who = currentWho();
+    const byWho = !q && who !== '전체';
+    const title = q ? `‘${esc(q)}’${josaGwa(q)} 일치하는 질문이 없습니다`
+      : byWho ? `‘${esc(pairLabel(who) + (ui.cat !== '전체' ? ' · ' + ui.cat : ''))}’ 질문이 아직 없습니다`
+      : `‘${esc(ui.cat)}’ 카테고리에 질문이 없습니다`;
+    const desc = byWho ? '위의 ‘전체’나 다른 사람 칸을 누르면 다른 질문도 볼 수 있습니다.'
+      : '제목과 본문을 함께 찾습니다. 카테고리 필터가 걸려 있으면 함께 해제해 보세요.';
+    listBody.innerHTML = `<div class="state"><span class="circ"></span><div class="st-title">${title}</div><div class="st-desc">${desc}</div><button class="btn-primary" id="empty-ask">이 내용으로 질문하기</button></div>`;
     $('#empty-ask').addEventListener('click', () => openCompose(q));
     return;
   }
