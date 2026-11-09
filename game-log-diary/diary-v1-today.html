@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>오늘의 기록</title>
+  <link rel="stylesheet" href="diary-v1.css">
+</head>
+<body>
+  <main id="app" class="widget-card record-card" aria-live="polite"></main>
+  <script src="diary-v1-client.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const D = window.DiaryV1;
+      const app = document.getElementById('app');
+      const MOOD_ICONS = {
+        calm: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 12.5h6M7.3 8.2h.1M12.6 8.2h.1"></path></svg>',
+        good: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 11.5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8M7.3 8.2h.1M12.6 8.2h.1"></path></svg>',
+        tired: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 8.5h1.5M11.5 8.5H13M8 13c1.3-.8 2.7-.8 4 0"></path></svg>',
+      };
+      const queryDate = new URLSearchParams(location.search).get('date');
+      const state = {
+        date: D.validDateKey(queryDate) ? queryDate : D.seoulDateKey(),
+        text: '', mood: null, photos: [], revision: null,
+        dirty: false, loading: false, saving: false, long: false, photoPanel: false,
+        status: '', statusError: false, conflict: null, backupDraft: null,
+      };
+      let draftTimer = 0;
+      let loadToken = 0;
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        })[character]);
+      }
+
+      function moodButton(name, label) {
+        return `<button class="mood-button${state.mood === name ? ' is-on' : ''}" type="button" data-mood="${name}" aria-pressed="${state.mood === name}">${MOOD_ICONS[name]}<span>${label}</span></button>`;
+      }
+
+      function publicPhoto(photo) {
+        return { id: photo.id, type: photo.type, size: photo.size, url: photo.url, dataUrl: photo.dataUrl, isNew: photo.isNew === true };
+      }
+
+      function currentDraft() {
+        return { text: state.text, mood: state.mood, photos: state.photos.map(publicPhoto), revision: state.revision };
+      }
+
+      function syncTextInput() {
+        const input = app.querySelector('[data-text]');
+        if (input) state.text = input.value;
+      }
+
+      function restore(value, dirty) {
+        state.text = String(value?.text || '');
+        state.mood = ['calm', 'good', 'tired'].includes(value?.mood) ? value.mood : null;
+        state.photos = (Array.isArray(value?.photos) ? value.photos : []).slice(0, D.MAX_PHOTOS).map(publicPhoto);
+        state.revision = value?.revision ?? null;
+        state.long = state.text.length > 280;
+        state.dirty = dirty;
+      }
+
+      function stashDraft(message = false) {
+        if (!state.dirty) return { saved: true, photosSaved: true };
+        const result = D.saveDraft(state.date, currentDraft());
+        if (message) {
+          state.status = result.saved
+            ? (result.photosSaved ? '작성 중인 내용을 임시 보관했어요.' : '글은 임시 보관했지만 새 사진은 다시 선택해야 해요.')
+            : '이 기기에는 임시 보관하지 못했습니다.';
+          state.statusError = !result.saved || !result.photosSaved;
+        }
+        return result;
+      }
+
+      function scheduleDraft() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => stashDraft(false), 250);
+      }
+
+      function markDirty() {
+        state.dirty = true;
+        state.conflict = null;
+        state.status = '작성 중 · 임시 보관됨';
+        state.statusError = false;
+        scheduleDraft();
+      }
+
+      function renderConnection() {
+        app.innerHTML = `<section class="connection-state"><strong>개인 위젯 연결이 필요합니다</strong><p>같은 기록을 PC와 아이패드에서 보려면 개인 연결 주소로 열어 주세요.</p><a class="connection-link" href="${escapeHtml(D.connectionUrl('diary-v1-today.html'))}" target="_top">내 위젯 연결하기</a></section>`;
+      }
+
+      function render() {
+        if (!D.connected) { renderConnection(); return; }
+        const first = state.photos[0];
+        const statusAction = state.conflict
+          ? '<button class="text-button" type="button" data-latest>최신 불러오기</button>'
+          : state.backupDraft
+            ? '<button class="text-button" type="button" data-restore-draft>초안 복원</button>'
+            : '';
+        app.innerHTML = `
+          <header class="record-head">
+            <h1 class="widget-title">오늘의 기록</h1>
+            <nav class="date-nav" aria-label="기록 날짜 이동">
+              <button class="today-button" type="button" data-today>오늘로</button>
+              <button class="nav-button" type="button" data-shift="-1" aria-label="이전 날짜">‹</button>
+              <span class="date-label">${escapeHtml(D.formatDate(state.date))}</span>
+              <button class="nav-button" type="button" data-shift="1" aria-label="다음 날짜">›</button>
+            </nav>
+          </header>
+          <section class="mood-field" aria-labelledby="moodLabel">
+            <span class="field-label" id="moodLabel">오늘의 기분 · 선택</span>
+            <div class="mood-options">
+              ${moodButton('calm', '차분')}${moodButton('good', '좋음')}${moodButton('tired', '피곤')}
+            </div>
+          </section>
+          <form class="record-form" data-form>
+            <div class="compose-grid">
+              <div class="record-text-wrap">
+                <textarea class="record-text${state.long ? ' is-long' : ''}" data-text maxlength="${state.long ? 2000 : 280}" placeholder="오늘 기억하고 싶은 순간을 적어보세요." aria-label="오늘의 기록"${state.saving ? ' disabled' : ''}>${escapeHtml(state.text)}</textarea>
+                <div class="text-tools"><button class="long-button" type="button" data-long>${state.long ? '짧게 보기' : '길게 쓰기'}</button><span class="char-count">${state.text.length}/${state.long ? 2000 : 280}</span></div>
+              </div>
+              <button class="photo-summary${first ? ' has-photo' : ''}" type="button" data-photo-open aria-label="사진 추가 및 변경"${state.saving ? ' disabled' : ''}>
+                ${first ? `<img src="${escapeHtml(first.url || first.dataUrl)}" alt=""><span class="photo-count">${state.photos.length}/4 · 변경</span>` : '<span class="photo-add-copy"><span class="camera-shape" aria-hidden="true"></span><span>사진 추가</span></span>'}
+              </button>
+            </div>
+            <section class="photo-panel${state.photoPanel ? '' : ' is-hidden'}" aria-label="사진 목록">
+              <div class="photo-head"><div><div class="photo-title">사진 추가</div><div class="photo-copy">최대 4장 · 첫 사진이 달력의 대표 사진으로 보여요.</div></div><button class="detail-close" type="button" data-photo-close aria-label="사진 닫기">✕</button></div>
+              <div class="photo-list">
+                ${state.photos.map((photo, index) => `<div class="photo-item"><img src="${escapeHtml(photo.url || photo.dataUrl)}" alt="${index + 1}번째 사진"><button class="photo-remove" type="button" data-remove="${index}" aria-label="${index + 1}번째 사진 삭제">✕</button></div>`).join('')}
+                ${state.photos.length < D.MAX_PHOTOS ? '<label class="photo-add" aria-label="사진 선택">＋<input type="file" accept="image/*" multiple data-files></label>' : ''}
+              </div>
+            </section>
+            <div class="record-actions">
+              <div class="status-row"><span class="save-status${state.statusError ? ' is-error' : ''}" aria-live="polite">${escapeHtml(state.loading ? '불러오는 중…' : state.saving ? '저장 중…' : state.status)}</span>${statusAction}</div>
+              <button class="text-button" type="button" data-export${state.saving ? ' disabled' : ''}>내보내기</button>
+              <button class="save-button" type="submit"${state.saving || state.loading ? ' disabled' : ''}>저장</button>
+            </div>
+          </form>`;
+      }
+
+      async function loadDate(date, options = {}) {
+        if (state.dirty && !options.skipStash) stashDraft(true);
+        const token = ++loadToken;
+        state.date = date;
+        state.loading = true;
+        state.photoPanel = false;
+        state.conflict = null;
+        state.backupDraft = null;
+        state.status = '';
+        render();
+        try {
+          const [entry, draft] = await Promise.all([D.loadEntry(date), Promise.resolve(D.loadDraft(date))]);
+          if (token !== loadToken) return;
+          if (draft) {
+            restore(draft, true);
+            state.status = entry && draft.revision !== entry.revision
+              ? '다른 기기의 최신 기록과 임시 초안이 함께 있습니다.'
+              : '임시 보관한 내용을 불러왔어요.';
+            state.statusError = Boolean(entry && draft.revision !== entry.revision);
+            if (entry && draft.revision !== entry.revision) state.conflict = entry;
+          } else if (entry) {
+            restore(entry, false);
+            state.status = '';
+            state.statusError = false;
+          } else {
+            restore({ text: '', mood: null, photos: [], revision: null }, false);
+            state.status = '';
+            state.statusError = false;
+          }
+        } catch (error) {
+          if (token !== loadToken) return;
+          const draft = D.loadDraft(date);
+          if (draft) restore(draft, true);
+          state.status = error.message;
+          state.statusError = true;
+        } finally {
+          if (token === loadToken) { state.loading = false; render(); }
+        }
+      }
+
+      async function addFiles(files) {
+        const available = D.MAX_PHOTOS - state.photos.length;
+        if (!available) { state.status = '사진은 날짜별로 최대 4장까지 추가할 수 있어요.'; state.statusError = true; render(); return; }
+        const selected = [...files].filter(file => file.type.startsWith('image/'));
+        let notice = '';
+        if (selected.length > available) {
+          notice = `사진은 최대 4장이라 앞의 ${available}장만 추가했어요.`;
+        }
+        for (const file of selected.slice(0, available)) {
+          try { state.photos.push(await D.photoFromFile(file)); }
+          catch (error) { notice = error.message; }
+        }
+        markDirty();
+        if (notice) { state.status = notice; state.statusError = true; }
+        state.photoPanel = true;
+        render();
+      }
+
+      async function save() {
+        if (state.saving) return;
+        syncTextInput();
+        if (!state.text.trim() && !state.mood && !state.photos.length) {
+          state.status = '글, 기분, 사진 중 하나를 남겨 주세요.';
+          state.statusError = true;
+          render();
+          return;
+        }
+        state.saving = true;
+        state.status = '저장 중…';
+        state.statusError = false;
+        stashDraft(false);
+        render();
+        try {
+          const saved = await D.saveEntry({
+            date: state.date, text: state.text, mood: state.mood, expectedRevision: state.revision,
+            photos: state.photos.map(photo => photo.isNew ? { id: photo.id, dataUrl: photo.dataUrl } : { id: photo.id }),
+          });
+          restore(saved, false);
+          D.clearDraft(state.date);
+          D.announce({ type: 'saved', date: state.date, revision: saved.revision });
+          state.status = '저장 완료';
+          state.statusError = false;
+          state.conflict = null;
+          state.backupDraft = null;
+        } catch (error) {
+          state.status = error.message;
+          state.statusError = true;
+          state.conflict = error.status === 409 ? error.data?.current || null : null;
+          state.dirty = true;
+          stashDraft(false);
+        } finally {
+          state.saving = false;
+          render();
+        }
+      }
+
+      async function exportAll() {
+        state.status = '내보내는 중…'; state.statusError = false; render();
+        try {
+          const data = await D.loadExport();
+          const entries = [];
+          for (const entry of data.entries || []) {
+            const photos = [];
+            for (const photo of entry.photos || []) {
+              const response = await fetch(photo.url, { cache: 'no-store' });
+              if (!response.ok) throw new Error('사진을 내보내지 못했습니다. 다시 시도해 주세요.');
+              photos.push({ id: photo.id, type: photo.type, size: photo.size, dataUrl: await D.blobToDataUrl(await response.blob()) });
+            }
+            entries.push({ date: entry.date, text: entry.text, mood: entry.mood, photos, revision: entry.revision, createdAt: entry.createdAt, updatedAt: entry.updatedAt });
+          }
+          const blob = new Blob([JSON.stringify({ version: 1, exportedAt: data.exportedAt, entries }, null, 2)], { type: 'application/json' });
+          const link = document.createElement('a');
+          const objectUrl = URL.createObjectURL(blob);
+          link.href = objectUrl;
+          link.download = `diary-${D.seoulDateKey()}.json`;
+          document.body.append(link); link.click(); link.remove();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          state.status = `${entries.length}개의 기록을 내보냈어요.`;
+        } catch (error) {
+          state.status = error.message; state.statusError = true;
+        }
+        render();
+      }
+
+      app.addEventListener('input', event => {
+        if (!event.target.matches('[data-text]')) return;
+        state.text = event.target.value;
+        markDirty();
+        app.querySelector('.char-count').textContent = `${state.text.length}/${state.long ? 2000 : 280}`;
+        const status = app.querySelector('.save-status');
+        status.textContent = state.status; status.classList.remove('is-error');
+      });
+
+      app.addEventListener('change', async event => {
+        const input = event.target.closest('[data-files]');
+        if (input?.files?.length) await addFiles(input.files);
+      });
+
+      app.addEventListener('submit', event => { event.preventDefault(); void save(); });
+      app.addEventListener('click', event => {
+        const shift = event.target.closest('[data-shift]');
+        if (shift) { void loadDate(D.shiftDate(state.date, Number(shift.dataset.shift))); return; }
+        if (event.target.closest('[data-today]')) { void loadDate(D.seoulDateKey()); return; }
+        const mood = event.target.closest('[data-mood]');
+        if (mood) { syncTextInput(); state.mood = state.mood === mood.dataset.mood ? null : mood.dataset.mood; markDirty(); render(); return; }
+        if (event.target.closest('[data-long]')) { syncTextInput(); state.long = !state.long; render(); app.querySelector('[data-text]')?.focus(); return; }
+        if (event.target.closest('[data-photo-open]')) { syncTextInput(); state.photoPanel = true; render(); return; }
+        if (event.target.closest('[data-photo-close]')) { state.photoPanel = false; render(); return; }
+        const remove = event.target.closest('[data-remove]');
+        if (remove) { state.photos.splice(Number(remove.dataset.remove), 1); markDirty(); render(); return; }
+        if (event.target.closest('[data-export]')) { void exportAll(); return; }
+        if (event.target.closest('[data-latest]') && state.conflict) {
+          state.backupDraft = currentDraft();
+          restore(state.conflict, false);
+          state.conflict = null;
+          state.status = '최신 기록을 표시했습니다. 임시 초안도 보관되어 있어요.';
+          state.statusError = false;
+          render();
+          return;
+        }
+        if (event.target.closest('[data-restore-draft]') && state.backupDraft) {
+          const latestRevision = state.revision;
+          restore({ ...state.backupDraft, revision: latestRevision }, true);
+          state.backupDraft = null;
+          state.status = '임시 초안을 복원했어요. 내용을 확인한 뒤 저장해 주세요.';
+          state.statusError = false;
+          stashDraft(false);
+          render();
+        }
+      });
+
+      app.addEventListener('dragover', event => {
+        if (!event.target.closest('.photo-panel')) return;
+        event.preventDefault();
+      });
+      app.addEventListener('drop', event => {
+        if (!event.target.closest('.photo-panel')) return;
+        event.preventDefault();
+        if (event.dataTransfer?.files?.length) void addFiles(event.dataTransfer.files);
+      });
+      document.addEventListener('paste', event => {
+        if (!state.photoPanel) return;
+        const files = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith('image/'));
+        if (files.length) { event.preventDefault(); void addFiles(files); }
+      });
+
+      D.onChange(detail => {
+        if (detail?.type !== 'saved' || detail.date !== state.date) return;
+        if (state.dirty) {
+          state.status = '다른 화면에서 같은 날짜가 저장됐어요. 현재 초안은 보관했습니다.';
+          state.statusError = true;
+          stashDraft(false);
+          render();
+        } else void loadDate(state.date, { skipStash: true });
+      });
+      window.addEventListener('beforeunload', event => {
+        if (!state.dirty) return;
+        stashDraft(false);
+        event.preventDefault();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stashDraft(false);
+        else if (!state.dirty) void loadDate(state.date, { skipStash: true });
+      });
+
+      render();
+      if (D.connected) void loadDate(state.date, { skipStash: true });
+    })();
+  </script>
+</body>
+</html>

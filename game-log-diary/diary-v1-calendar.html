@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>기록 달력</title>
+  <link rel="stylesheet" href="diary-v1.css">
+</head>
+<body>
+  <main id="app" class="widget-card calendar-card" aria-live="polite"></main>
+  <script src="diary-v1-client.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const D = window.DiaryV1;
+      const app = document.getElementById('app');
+      const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+      const MOOD_LABELS = { calm: '차분', good: '좋음', tired: '피곤' };
+      const MOOD_ICONS = {
+        calm: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 12.5h6M7.3 8.2h.1M12.6 8.2h.1"></path></svg>',
+        good: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 11.5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8M7.3 8.2h.1M12.6 8.2h.1"></path></svg>',
+        tired: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M7 8.5h1.5M11.5 8.5H13M8 13c1.3-.8 2.7-.8 4 0"></path></svg>',
+      };
+      const initial = new URLSearchParams(location.search).get('month');
+      const initialMatch = /^(\d{4})-(\d{2})$/.exec(initial || '');
+      const todayParts = D.seoulDateKey().split('-').map(Number);
+      const state = {
+        year: initialMatch ? Number(initialMatch[1]) : todayParts[0],
+        month: initialMatch ? Number(initialMatch[2]) - 1 : todayParts[1] - 1,
+        entries: new Map(), selected: null, loading: false,
+        status: '', statusError: false, loadToken: 0,
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        })[character]);
+      }
+
+      function dateKey(year, month, day) {
+        const date = new Date(Date.UTC(year, month, day));
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+      }
+
+      function connection() {
+        app.innerHTML = `<section class="connection-state"><strong>개인 위젯 연결이 필요합니다</strong><p>같은 기록을 PC와 아이패드에서 보려면 개인 연결 주소로 열어 주세요.</p><a class="connection-link" href="${escapeHtml(D.connectionUrl('diary-v1-calendar.html'))}" target="_top">내 위젯 연결하기</a></section>`;
+      }
+
+      function editUrl(date) {
+        const url = new URL('diary-v1-today.html', location.href);
+        url.searchParams.set('w', D.instanceId);
+        url.searchParams.set('date', date);
+        return url.toString();
+      }
+
+      function cellHtml(index, bounds) {
+        const dayOffset = index - bounds.lead + 1;
+        const key = dateKey(state.year, state.month, dayOffset);
+        const ownMonth = dayOffset >= 1 && dayOffset <= bounds.lastDay;
+        const entry = state.entries.get(key);
+        const today = D.seoulDateKey();
+        const selected = state.selected === key;
+        const classes = ['day-cell'];
+        if (!ownMonth) classes.push('is-outside');
+        if (key === today) classes.push('is-today');
+        if (selected) classes.push('is-selected');
+        if (entry) classes.push('has-record');
+        const label = entry
+          ? `${D.formatDate(key, { year: true })}, 기록 있음${entry.photoCount ? `, 사진 ${entry.photoCount}장` : ''}`
+          : `${D.formatDate(key, { year: true })}, 기록 없음`;
+        return `<button class="${classes.join(' ')}" type="button" data-date="${key}" aria-label="${escapeHtml(label)}">
+          ${entry?.coverUrl ? `<img class="day-photo" src="${escapeHtml(entry.coverUrl)}" alt="" loading="lazy">` : ''}
+          <span class="day-number">${Number(key.slice(8))}</span>
+          ${entry && !entry.coverUrl ? '<span class="text-mark" aria-hidden="true"></span>' : ''}
+          ${entry?.mood ? `<span class="mood-mark${entry.mood === 'good' ? ' is-good' : ''}" title="${MOOD_LABELS[entry.mood] || ''}">${MOOD_ICONS[entry.mood] || ''}</span>` : ''}
+        </button>`;
+      }
+
+      function detailHtml(entry) {
+        if (!entry || state.selected !== entry.date) return '';
+        return `<div class="calendar-shade" data-close-detail></div>
+          <section class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+            <div class="detail-head"><div class="detail-date" id="detailTitle">${escapeHtml(D.formatDate(entry.date, { year: true }))}</div><button class="detail-close" type="button" data-close-detail aria-label="닫기">✕</button></div>
+            ${entry.coverUrl ? `<img class="detail-photo" src="${escapeHtml(entry.coverUrl)}" alt="${escapeHtml(D.formatDate(entry.date))} 대표 사진">` : ''}
+            ${entry.text ? `<p class="detail-copy">${escapeHtml(entry.text)}</p>` : '<p class="detail-copy">작성한 글은 없어요.</p>'}
+            <div class="detail-meta"><span>${entry.mood ? `기분 · ${MOOD_LABELS[entry.mood]}` : '기분 기록 없음'}${entry.photoCount ? ` · 사진 ${entry.photoCount}장` : ''}</span><a class="edit-link" href="${escapeHtml(editUrl(entry.date))}" target="_self">이 날짜 수정</a></div>
+          </section>`;
+      }
+
+      function render() {
+        if (!D.connected) { connection(); return; }
+        const bounds = D.monthBounds(state.year, state.month);
+        const selected = state.selected ? state.entries.get(state.selected) : null;
+        app.innerHTML = `
+          <header class="calendar-head">
+            <h1 class="widget-title">기록 달력</h1>
+            <nav class="month-nav" aria-label="달 이동">
+              <button class="today-button" type="button" data-this-month>이번 달</button>
+              <button class="nav-button" type="button" data-month="-1" aria-label="이전 달">‹</button>
+              <span class="month-label">${state.year}년 ${state.month + 1}월</span>
+              <button class="nav-button" type="button" data-month="1" aria-label="다음 달">›</button>
+            </nav>
+          </header>
+          <div class="weekday-row" aria-hidden="true">${WEEKDAYS.map(day => `<span class="weekday">${day}</span>`).join('')}</div>
+          <section class="calendar-grid" aria-label="${state.year}년 ${state.month + 1}월 기록">${Array.from({ length: bounds.cells }, (_, index) => cellHtml(index, bounds)).join('')}</section>
+          <div class="calendar-status${state.statusError ? ' is-error' : ''}" aria-live="polite">${escapeHtml(state.loading ? '기록을 불러오는 중…' : state.status)}</div>
+          ${detailHtml(selected)}`;
+      }
+
+      async function loadMonth(options = {}) {
+        const bounds = D.monthBounds(state.year, state.month);
+        const token = ++state.loadToken;
+        state.loading = true;
+        state.status = '';
+        state.statusError = false;
+        if (!options.keepSelection) state.selected = null;
+        render();
+        try {
+          const entries = await D.loadRange(bounds.start, bounds.end);
+          if (token !== state.loadToken) return;
+          state.entries = new Map(entries.map(entry => [entry.date, entry]));
+          if (state.selected && !state.entries.has(state.selected)) state.selected = null;
+          state.status = entries.length ? '' : '이 달에는 아직 기록이 없어요.';
+        } catch (error) {
+          if (token !== state.loadToken) return;
+          state.entries = new Map();
+          state.selected = null;
+          state.status = error.message;
+          state.statusError = true;
+        } finally {
+          if (token === state.loadToken) { state.loading = false; render(); }
+        }
+      }
+
+      function shiftMonth(amount) {
+        const date = new Date(Date.UTC(state.year, state.month + amount, 1));
+        state.year = date.getUTCFullYear();
+        state.month = date.getUTCMonth();
+        void loadMonth();
+      }
+
+      app.addEventListener('click', event => {
+        if (event.target.closest('[data-close-detail]')) { state.selected = null; render(); return; }
+        const month = event.target.closest('[data-month]');
+        if (month) { shiftMonth(Number(month.dataset.month)); return; }
+        if (event.target.closest('[data-this-month]')) {
+          const parts = D.seoulDateKey().split('-').map(Number);
+          state.year = parts[0]; state.month = parts[1] - 1;
+          void loadMonth();
+          return;
+        }
+        const cell = event.target.closest('[data-date]');
+        if (!cell) return;
+        const entry = state.entries.get(cell.dataset.date);
+        if (entry) { state.selected = entry.date; render(); }
+        else location.href = editUrl(cell.dataset.date);
+      });
+
+      D.onChange(detail => {
+        if (detail?.type !== 'saved') return;
+        const prefix = `${state.year}-${String(state.month + 1).padStart(2, '0')}-`;
+        if (String(detail.date || '').startsWith(prefix)) void loadMonth({ keepSelection: true });
+      });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) void loadMonth({ keepSelection: true }); });
+      window.addEventListener('focus', () => void loadMonth({ keepSelection: true }));
+
+      render();
+      if (D.connected) void loadMonth();
+    })();
+  </script>
+</body>
+</html>

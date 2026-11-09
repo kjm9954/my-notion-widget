@@ -5,6 +5,7 @@ import worker from './worker.js';
 import { withWidgetLayouts } from './widget-layout-api.mjs';
 import { withQuarterGoals } from './quarter-goals-api.mjs';
 import { withMeetingNotes } from './meeting-notes-api.mjs';
+import { withDiaryV1 } from './diary-v1-api.mjs';
 
 export * from './worker.js';
-export default withMeetingNotes(withQuarterGoals(withWidgetLayouts(worker)));
+export default withDiaryV1(withMeetingNotes(withQuarterGoals(withWidgetLayouts(worker))));
