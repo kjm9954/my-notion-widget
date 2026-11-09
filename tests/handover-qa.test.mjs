@@ -447,6 +447,9 @@ test("목록형은 질문하는 사람이 둘 이상이면 사람별 칸으로 �
     assert.match(source, /const who = q \? '전체' : currentWho\(\);/, name);
     // 사람을 바꾸면 그 사람의 기본 칸으로
     assert.match(source, /ui\.who = null;/, name);
+    // 전환 버튼은 사람별 칸 이름과 헷갈리지 않게 "지금 누구로 보는지"만 보여 준다
+    assert.ok(source.includes("btn.textContent = `${state.me}${josaRo(state.me)} 보는 중 · 바꾸기`;"), name);
+    assert.doesNotMatch(source, /\$\{state\.me\} · \$\{next\}\$\{josaRo\(next\)\} 전환/, name);
   }
 });
 
