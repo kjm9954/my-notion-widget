@@ -44,8 +44,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   border-radius: 20px;
   background: var(--bg);
 }
-.record-card { max-width: 344px; margin: 0 auto; padding: 18px; }
-.calendar-card { max-width: 960px; margin: 0 auto; padding: 22px 28px 24px; }
+.record-card { max-width: none; margin: 0; padding: 18px; }
+.calendar-card { max-width: none; margin: 0; padding: 22px 28px 24px; }
 .widget-title { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.15; letter-spacing: -.025em; }
 .record-head, .calendar-head, .date-nav, .month-nav, .record-actions, .photo-head, .status-row, .detail-head, .detail-meta {
   display: flex; align-items: center;

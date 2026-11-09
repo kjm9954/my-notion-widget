@@ -163,10 +163,10 @@ async (page) => {
   await calendar.screenshot({ path: 'output/playwright/diary-v1-calendar-390.png', fullPage: true });
   await today.setViewportSize({ width: 1320, height: 900 });
   overflow = await noHorizontalOverflow(today);
-  check('1320px page keeps record widget at 344px', overflow.document && Math.round(overflow.width) === 344, overflow);
+  check('1320px record widget fills its viewport', overflow.document && overflow.card && Math.round(overflow.width) === 1320, overflow);
   await calendar.setViewportSize({ width: 1130, height: 900 });
   overflow = await noHorizontalOverflow(calendar);
-  check('1130px page keeps calendar widget at 960px', overflow.document && Math.round(overflow.width) === 960, overflow);
+  check('1130px calendar fills its viewport', overflow.document && overflow.card && Math.round(overflow.width) === 1130, overflow);
   await today.screenshot({ path: 'output/playwright/diary-v1-today-1320.png', fullPage: true });
   await calendar.screenshot({ path: 'output/playwright/diary-v1-calendar-1130.png', fullPage: true });
 
@@ -206,6 +206,18 @@ async (page) => {
   const frameOverflow = await embedded.locator('html').evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
   check('Core editor works inside a 344px iframe without horizontal scroll', frameOverflow.width === 344 && frameOverflow.scrollWidth <= 344, frameOverflow);
   await iframeHost.screenshot({ path: 'output/playwright/diary-v1-notion-iframe.png', fullPage: true });
+
+  await iframeHost.setViewportSize({ width: 1320, height: 920 });
+  await iframeHost.locator('iframe').evaluate(element => { element.style.width = '700px'; });
+  const enlargedEditor = await embedded.locator('.record-card').evaluate(element => ({ frame: innerWidth, card: element.getBoundingClientRect().width, scroll: document.documentElement.scrollWidth }));
+  check('Editor follows a resized 700px iframe, not the 1320px parent page', enlargedEditor.frame === 700 && enlargedEditor.card === 700 && enlargedEditor.scroll === 700, enlargedEditor);
+  await iframeHost.locator('iframe').evaluate((element, url) => { element.style.width = '1130px'; element.src = url; }, calendarUrl('2026-08'));
+  await embedded.locator('.calendar-grid').waitFor();
+  const enlargedCalendar = await embedded.locator('.calendar-card').evaluate(element => ({ frame: innerWidth, card: element.getBoundingClientRect().width, scroll: document.documentElement.scrollWidth }));
+  check('Calendar fills a 1130px iframe beyond the old 960px cap', enlargedCalendar.frame === 1130 && enlargedCalendar.card === 1130 && enlargedCalendar.scroll === 1130, enlargedCalendar);
+  await iframeHost.locator('iframe').evaluate(element => { element.style.width = '390px'; });
+  const narrowedCalendar = await embedded.locator('.calendar-card').evaluate(element => ({ frame: innerWidth, card: element.getBoundingClientRect().width, scroll: document.documentElement.scrollWidth }));
+  check('Calendar shrinks back to a 390px iframe without horizontal scroll', narrowedCalendar.frame === 390 && narrowedCalendar.card === 390 && narrowedCalendar.scroll === 390, narrowedCalendar);
 
   check('Browser raised no page errors', errors.length === 0, errors);
   await context.close();
